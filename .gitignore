@@ -1,0 +1,12 @@
+/.cache
+/.work
+/_output
+/config/
+/config
+cover.out
+/vendor
+/.vendor-new
+
+# ignore vscode files (debug config etc...)
+/.vscode
+/.idea
