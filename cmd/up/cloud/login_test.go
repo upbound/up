@@ -33,7 +33,7 @@ func TestConstructAuth(t *testing.T) {
 	}{
 		"ErrorNoUserOrToken": {
 			reason: "If neither user or token is provided an error should be returned.",
-			err:    errors.New(errUsernameNoPassword),
+			err:    errors.New(errNoUserOrToken),
 		},
 		"ErrorInvalidToken": {
 			reason: "If token is not a valid JWT an error should be returned.",

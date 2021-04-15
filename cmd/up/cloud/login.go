@@ -22,7 +22,7 @@ const (
 	errLoginFailed        = "unable to login"
 	errParseCookie        = "unable to parse session cookie"
 	errParseCookieFmt     = "unable to parse session cookie: %s"
-	errNoUserOrToken      = "either username or token must be supplied"
+	errNoUserOrToken      = "either username or token must be provided"
 	errUsernameNoPassword = "username provided without password"
 	errNoIDInToken        = "token is missing ID"
 )
@@ -99,7 +99,7 @@ func constructAuth(username string, password string, token string) (*auth, confi
 	var pType config.ProfileType
 	pass := password
 	if username == "" && token == "" {
-		return nil, pType, errors.New(errUsernameNoPassword)
+		return nil, pType, errors.New(errNoUserOrToken)
 	}
 
 	// NOTE(hasheddan): xor tag prevents both username and token being provided,
