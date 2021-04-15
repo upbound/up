@@ -27,14 +27,6 @@ Top-level flags can be passed for any top-level or group-specific command. Some
 commands may choose not to utilize top-level flags when not relevant.
 
 - `-h, --help`: Print help and exit.
-- `-o, --organization = STRING` (Env: `UP_ORG`): Organization with which to
-  perform the specified command.
-- `-u,--username = STRING` (Env: `UP_USER`): User with which to perform the
-  specified command. User must already be present in `config.json` unless the
-  command involves logging in. Email can also be used as username.
-- `-t,--token = STRING` (Env: `UP_TOKEN`): Upbound API token used to perform the
-  specified command. Token must already be present in `config.json` unless the
-  command involves logging in.
 - `-v,--version`: Print current `up` version and exit.
 
 ## Cloud
@@ -55,6 +47,20 @@ Commands in the **Cloud** group are used to interact with Upbound Cloud.
       password are provided, or token is provided. there will be no prompt. The
       acquired session token will be stored in `~/.up/config.json` alongside the
       username or token name.
+
+**Group Flags**
+
+Group flags can be passed for any command in the **Cloud** group. Some commands
+may choose not to utilize the group flags when not relevant.
+
+- `-o, --organization = STRING` (Env: `UP_ORG`): Organization with which to
+  perform the specified command.
+- `-u,--username = STRING` (Env: `UP_USER`): User with which to perform the
+  specified command. User must already be present in `config.json` unless the
+  command involves logging in. Email can also be used as username.
+- `-t,--token = STRING` (Env: `UP_TOKEN`): Upbound API token used to perform the
+  specified command. Token must already be present in `config.json` unless the
+  command involves logging in.
 
 ### Subgroup: Control Plane
 
