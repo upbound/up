@@ -252,6 +252,9 @@ jobs:
         run: make -j2 promote
         env:
           BRANCH_NAME: main
+          # NOTE(hasheddan): publishing to channel main is currently blocked on
+          # https://github.com/upbound/build/issues/147 and will fail until the
+          # issue is resolved.
           CHANNEL: main
           AWS_ACCESS_KEY_ID: ${{ secrets.AWS_USR }}
           AWS_SECRET_ACCESS_KEY: ${{ secrets.AWS_PSW }}
