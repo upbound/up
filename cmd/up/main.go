@@ -14,7 +14,7 @@ type versionFlag bool
 
 // BeforeApply indicates that we want to execute the logic before running any
 // commands.
-func (v versionFlag) BeforeApply(ctx *kong.Context) error {
+func (v versionFlag) BeforeApply(ctx *kong.Context) error { // nolint:unparam
 	fmt.Fprintln(ctx.Stdout, version.GetVersion())
 	ctx.Exit(0)
 	return nil
