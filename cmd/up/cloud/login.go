@@ -2,6 +2,7 @@ package cloud
 
 import (
 	"bytes"
+	"context"
 	"encoding/json"
 	"io"
 	"net/http"
@@ -15,9 +16,9 @@ import (
 )
 
 const (
-	defaultClientTimeout = 30 * time.Second
-	defaultLoginURL      = "https://api.upbound.io/v1/login"
-	cookieName           = "SID"
+	defaultTimeout  = 30 * time.Second
+	defaultLoginURL = "https://api.upbound.io/v1/login"
+	cookieName      = "SID"
 
 	errLoginFailed        = "unable to login"
 	errParseCookie        = "unable to parse session cookie"
@@ -34,9 +35,11 @@ type loginCmd struct {
 }
 
 // Run executes the login command.
-func (c *loginCmd) Run(ctx *kong.Context, username User, token Token) error {
+func (c *loginCmd) Run(kong *kong.Context, username User, token Token) error { // nolint:gocyclo
 	// TODO(hasheddan): prompt for input if only username is supplied or
 	// neither.
+	ctx, cancel := context.WithTimeout(context.Background(), defaultTimeout)
+	defer cancel()
 	auth, pType, err := constructAuth(string(username), c.Password, string(token))
 	if err != nil {
 		return errors.Wrap(err, errLoginFailed)
@@ -53,19 +56,18 @@ func (c *loginCmd) Run(ctx *kong.Context, username User, token Token) error {
 	if err != nil {
 		return errors.Wrap(err, errLoginFailed)
 	}
-	req, err := http.NewRequest(http.MethodPost, defaultLoginURL, bytes.NewReader(jsonStr))
+	req, err := http.NewRequestWithContext(ctx, http.MethodPost, defaultLoginURL, bytes.NewReader(jsonStr))
 	if err != nil {
 		return errors.Wrap(err, errLoginFailed)
 	}
 	req.Header.Set("Content-Type", "application/json")
-	client := &http.Client{
-		Timeout: 10 * time.Second,
-	}
+	// NOTE(hasheddan): client timeout is handled with request context.
+	client := &http.Client{}
 	res, err := client.Do(req)
 	if err != nil {
 		return errors.Wrap(err, errLoginFailed)
 	}
-	defer res.Body.Close()
+	defer res.Body.Close() // nolint:errcheck
 	session, err := extractSession(res, cookieName)
 	if err != nil {
 		return errors.Wrap(err, errLoginFailed)

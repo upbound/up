@@ -15,8 +15,7 @@ const (
 	errNoDefaultSpecified = "no default profile specified"
 	errInvalidProfile     = "profile is not valid"
 
-	errProfileNotFoundFmt      = "profile not found with identifier: %s"
-	errProfileAlreadyExistsFmt = "profile already exists with identifier: %s"
+	errProfileNotFoundFmt = "profile not found with identifier: %s"
 )
 
 // Config is format for the up configuration file.

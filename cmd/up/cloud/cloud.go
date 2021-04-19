@@ -4,10 +4,14 @@ import (
 	"github.com/alecthomas/kong"
 )
 
-// Identifying User and Token as unique types allows them to be bound and
+// User and Token are identified as unique types to allow them to be bound and
 // received by subcommands.
-type User string
-type Token string
+type (
+	// User is an Upbound Cloud username or email.
+	User string
+	// Token is an Upbound Cloud access token.
+	Token string
+)
 
 // AfterApply binds global cloud flags to any subcommands that have Run()
 // methods that receive the specified types.

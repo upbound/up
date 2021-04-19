@@ -42,7 +42,7 @@ func NewFSSource(modifiers ...FSSourceModifier) (*FSSource, error) {
 		if err != nil {
 			return nil, err
 		}
-		defer f.Close()
+		defer f.Close() // nolint:errcheck
 	}
 	return src, nil
 }
@@ -67,7 +67,7 @@ func (src *FSSource) GetConfig() (*Config, error) {
 	if err != nil {
 		return nil, err
 	}
-	defer f.Close()
+	defer f.Close() // nolint:errcheck
 	b, err := io.ReadAll(f)
 	if err != nil {
 		return nil, err
@@ -94,7 +94,7 @@ func (src *FSSource) UpdateConfig(c *Config) error {
 	// close the file (i.e. write buffer is not flushed). In the latter case the
 	// deferred Close() will error (see https://golang.org/pkg/os/#File.Close),
 	// but we do not check it.
-	defer f.Close()
+	defer f.Close() // nolint:errcheck
 	b, err := json.Marshal(c)
 	if err != nil {
 		return err
