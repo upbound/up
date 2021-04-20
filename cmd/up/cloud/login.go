@@ -17,15 +17,16 @@ import (
 
 const (
 	defaultTimeout  = 30 * time.Second
-	defaultLoginURL = "https://api.upbound.io/v1/login"
+	defaultLoginURL = "/v1/login"
 	cookieName      = "SID"
 
 	errLoginFailed        = "unable to login"
-	errParseCookie        = "unable to parse session cookie"
+	errReadBody           = "unable to read response body"
 	errParseCookieFmt     = "unable to parse session cookie: %s"
 	errNoUserOrToken      = "either username or token must be provided"
 	errUsernameNoPassword = "username provided without password"
 	errNoIDInToken        = "token is missing ID"
+	errUpdateConfig       = "unable to update config file"
 )
 
 // loginCmd adds a user or token profile with session token to the up config
@@ -72,10 +73,9 @@ func (c *loginCmd) Run(kong *kong.Context, username User, token Token) error { /
 	if err != nil {
 		return errors.Wrap(err, errLoginFailed)
 	}
-	if err := conf.AddOrUpdateCloudProfile(config.Profile{
-		Type:       pType,
-		Identifier: auth.ID,
-		Session:    session,
+	if err := conf.AddOrUpdateCloudProfile(auth.ID, config.Profile{
+		Type:    pType,
+		Session: session,
 	}); err != nil {
 		return err
 	}
@@ -84,7 +84,7 @@ func (c *loginCmd) Run(kong *kong.Context, username User, token Token) error { /
 			return errors.Wrap(err, errLoginFailed)
 		}
 	}
-	return src.UpdateConfig(conf)
+	return errors.Wrap(src.UpdateConfig(conf), errUpdateConfig)
 }
 
 // auth is the request body sent to authenticate a user or token.
@@ -144,7 +144,7 @@ func extractSession(res *http.Response, cookieName string) (string, error) {
 	}
 	b, err := io.ReadAll(res.Body)
 	if err != nil {
-		return "", errors.Wrap(err, errParseCookie)
+		return "", errors.Wrap(err, errReadBody)
 	}
 	return "", errors.Errorf(errParseCookieFmt, string(b))
 }

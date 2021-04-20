@@ -9,19 +9,19 @@ import (
 )
 
 func TestAddOrUpdateCloudProfile(t *testing.T) {
+	identifier := "cool-user"
 	profOne := Profile{
-		Type:       UserProfileType,
-		Identifier: "cool-user",
-		Org:        "cool-org",
+		Type: UserProfileType,
+		Org:  "cool-org",
 	}
 	profTwo := Profile{
-		Type:       UserProfileType,
-		Identifier: "cool-user",
-		Org:        "other-org",
+		Type: UserProfileType,
+		Org:  "other-org",
 	}
 
 	cases := map[string]struct {
 		reason string
+		id     string
 		cfg    *Config
 		add    Profile
 		want   *Config
@@ -29,30 +29,33 @@ func TestAddOrUpdateCloudProfile(t *testing.T) {
 	}{
 		"AddNewProfile": {
 			reason: "Adding a new profile to an empty Config should not cause an error.",
+			id:     identifier,
 			cfg:    &Config{},
 			add:    profOne,
 			want: &Config{
 				Cloud: Cloud{
-					Profiles: []Profile{profOne},
+					Profiles: map[string]Profile{identifier: profOne},
 				},
 			},
 		},
 		"UpdateExistingProfile": {
 			reason: "Updating an existing profile in the Config should not cause an error.",
+			id:     identifier,
 			cfg: &Config{
 				Cloud: Cloud{
-					Profiles: []Profile{profOne},
+					Profiles: map[string]Profile{identifier: profOne},
 				},
 			},
 			add: profTwo,
 			want: &Config{
 				Cloud: Cloud{
-					Profiles: []Profile{profTwo},
+					Profiles: map[string]Profile{identifier: profTwo},
 				},
 			},
 		},
 		"Invalid": {
 			reason: "Adding an invalid profile should cause an error.",
+			id:     identifier,
 			cfg:    &Config{},
 			add:    Profile{},
 			want:   &Config{},
@@ -61,7 +64,7 @@ func TestAddOrUpdateCloudProfile(t *testing.T) {
 	}
 	for name, tc := range cases {
 		t.Run(name, func(t *testing.T) {
-			err := tc.cfg.AddOrUpdateCloudProfile(tc.add)
+			err := tc.cfg.AddOrUpdateCloudProfile(tc.id, tc.add)
 			if diff := cmp.Diff(tc.err, err, test.EquateErrors()); diff != "" {
 				t.Errorf("\n%s\nAddOrUpdateCloudProfile(...): -want error, +got error:\n%s", tc.reason, diff)
 			}
@@ -73,14 +76,15 @@ func TestAddOrUpdateCloudProfile(t *testing.T) {
 }
 
 func TestGetDefaultCloudProfile(t *testing.T) {
+	identifier := "cool-user"
 	profOne := Profile{
-		Type:       UserProfileType,
-		Identifier: "cool-user",
-		Org:        "cool-org",
+		Type: UserProfileType,
+		Org:  "cool-org",
 	}
 
 	cases := map[string]struct {
 		reason string
+		id     string
 		cfg    *Config
 		want   Profile
 		err    error
@@ -103,10 +107,11 @@ func TestGetDefaultCloudProfile(t *testing.T) {
 		},
 		"Successful": {
 			reason: "If defined default exists it should be returned.",
+			id:     identifier,
 			cfg: &Config{
 				Cloud: Cloud{
 					Default:  "cool-user",
-					Profiles: []Profile{profOne},
+					Profiles: map[string]Profile{identifier: profOne},
 				},
 			},
 			want: profOne,
@@ -126,10 +131,10 @@ func TestGetDefaultCloudProfile(t *testing.T) {
 }
 
 func TestGetCloudProfile(t *testing.T) {
+	identifier := "cool-user"
 	profOne := Profile{
-		Type:       UserProfileType,
-		Identifier: "cool-user",
-		Org:        "cool-org",
+		Type: UserProfileType,
+		Org:  "cool-org",
 	}
 
 	cases := map[string]struct {
@@ -141,7 +146,7 @@ func TestGetCloudProfile(t *testing.T) {
 	}{
 		"ErrorProfileNotExist": {
 			reason: "If profile does not exist an error should be returned.",
-			id:     "cool-user",
+			id:     identifier,
 			cfg:    &Config{},
 			want:   Profile{},
 			err:    errors.Errorf(errProfileNotFoundFmt, "cool-user"),
@@ -151,7 +156,7 @@ func TestGetCloudProfile(t *testing.T) {
 			id:     "cool-user",
 			cfg: &Config{
 				Cloud: Cloud{
-					Profiles: []Profile{profOne},
+					Profiles: map[string]Profile{identifier: profOne},
 				},
 			},
 			want: profOne,
@@ -171,10 +176,10 @@ func TestGetCloudProfile(t *testing.T) {
 }
 
 func TestSetDefaultCloudProfile(t *testing.T) {
+	identifier := "cool-user"
 	profOne := Profile{
-		Type:       UserProfileType,
-		Identifier: "cool-user",
-		Org:        "cool-org",
+		Type: UserProfileType,
+		Org:  "cool-org",
 	}
 
 	cases := map[string]struct {
@@ -185,7 +190,7 @@ func TestSetDefaultCloudProfile(t *testing.T) {
 	}{
 		"ErrorProfileNotExist": {
 			reason: "If profile does not exist an error should be returned.",
-			id:     "cool-user",
+			id:     identifier,
 			cfg:    &Config{},
 			err:    errors.Errorf(errProfileNotFoundFmt, "cool-user"),
 		},
@@ -194,7 +199,7 @@ func TestSetDefaultCloudProfile(t *testing.T) {
 			id:     "cool-user",
 			cfg: &Config{
 				Cloud: Cloud{
-					Profiles: []Profile{profOne},
+					Profiles: map[string]Profile{identifier: profOne},
 				},
 			},
 		},

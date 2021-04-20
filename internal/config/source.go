@@ -28,8 +28,8 @@ func NewFSSource(modifiers ...FSSourceModifier) (*FSSource, error) {
 	if err != nil {
 		return nil, err
 	}
-	src.path = filepath.Join(h, ConfigDir, ConfigFile)
 	src.dirPath = filepath.Join(h, ConfigDir)
+	src.path = filepath.Join(src.dirPath, ConfigFile)
 	_, err = src.fs.Stat(src.path)
 	if err != nil {
 		if !os.IsNotExist(err) {

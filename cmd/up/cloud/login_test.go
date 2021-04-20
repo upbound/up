@@ -125,7 +125,7 @@ func TestExtractSession(t *testing.T) {
 					Body: io.NopCloser(iotest.ErrReader(errBoom)),
 				},
 			},
-			err: errors.Wrap(errBoom, errParseCookie),
+			err: errors.Wrap(errBoom, errReadBody),
 		},
 		"ErrorNoCookie": {
 			reason: "Should return an error if cookie does not exist.",
