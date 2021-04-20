@@ -5,6 +5,7 @@ import (
 
 	"github.com/alecthomas/kong"
 
+	"github.com/upbound/up/cmd/up/cloud"
 	"github.com/upbound/up/internal/version"
 )
 
@@ -22,6 +23,8 @@ func (v versionFlag) BeforeApply(ctx *kong.Context) error { // nolint:unparam
 
 var cli struct {
 	Version versionFlag `short:"v" name:"version" help:"Print version and exit."`
+
+	Cloud cloud.Cmd `cmd:"" help:"Interact with Upbound Cloud."`
 }
 
 func main() {
