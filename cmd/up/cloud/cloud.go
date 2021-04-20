@@ -1,6 +1,8 @@
 package cloud
 
 import (
+	"net/url"
+
 	"github.com/alecthomas/kong"
 )
 
@@ -16,6 +18,7 @@ type (
 // AfterApply binds global cloud flags to any subcommands that have Run()
 // methods that receive the specified types.
 func (c Cmd) AfterApply(ctx *kong.Context) error {
+	ctx.Bind(c.Endpoint)
 	ctx.Bind(c.Username)
 	ctx.Bind(c.Token)
 	return nil
@@ -25,6 +28,7 @@ func (c Cmd) AfterApply(ctx *kong.Context) error {
 type Cmd struct {
 	Login loginCmd `cmd:"" help:"Login to Upbound Cloud."`
 
-	Username User  `short:"u" env:"UP_USER" xor:"identifier" help:"Username used to execute command."`
-	Token    Token `short:"t" env:"UP_TOKEN" xor:"identifier" help:"Token used to execute command."`
+	Endpoint *url.URL `env:"UP_ENDPOINT" default:"https://api.upbound.io" help:"Endpoint used for Upbound API."`
+	Username User     `short:"u" env:"UP_USER" xor:"identifier" help:"Username used to execute command."`
+	Token    Token    `short:"t" env:"UP_TOKEN" xor:"identifier" help:"Token used to execute command."`
 }

@@ -6,6 +6,7 @@ import (
 	"encoding/json"
 	"io"
 	"net/http"
+	"net/url"
 	"time"
 
 	"github.com/alecthomas/kong"
@@ -16,9 +17,9 @@ import (
 )
 
 const (
-	defaultTimeout  = 30 * time.Second
-	defaultLoginURL = "/v1/login"
-	cookieName      = "SID"
+	defaultTimeout = 30 * time.Second
+	loginPath      = "/v1/login"
+	cookieName     = "SID"
 
 	errLoginFailed        = "unable to login"
 	errReadBody           = "unable to read response body"
@@ -36,7 +37,7 @@ type loginCmd struct {
 }
 
 // Run executes the login command.
-func (c *loginCmd) Run(kong *kong.Context, username User, token Token) error { // nolint:gocyclo
+func (c *loginCmd) Run(kong *kong.Context, endpoint *url.URL, username User, token Token) error { // nolint:gocyclo
 	// TODO(hasheddan): prompt for input if only username is supplied or
 	// neither.
 	ctx, cancel := context.WithTimeout(context.Background(), defaultTimeout)
@@ -57,7 +58,8 @@ func (c *loginCmd) Run(kong *kong.Context, username User, token Token) error { /
 	if err != nil {
 		return errors.Wrap(err, errLoginFailed)
 	}
-	req, err := http.NewRequestWithContext(ctx, http.MethodPost, defaultLoginURL, bytes.NewReader(jsonStr))
+	endpoint.Path = loginPath
+	req, err := http.NewRequestWithContext(ctx, http.MethodPost, endpoint.String(), bytes.NewReader(jsonStr))
 	if err != nil {
 		return errors.Wrap(err, errLoginFailed)
 	}
