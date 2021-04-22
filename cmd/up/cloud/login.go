@@ -6,20 +6,18 @@ import (
 	"encoding/json"
 	"io"
 	"net/http"
-	"net/url"
 	"time"
 
 	"github.com/alecthomas/kong"
-	"github.com/dgrijalva/jwt-go"
 	"github.com/pkg/errors"
 
+	"github.com/upbound/up/internal/cloud"
 	"github.com/upbound/up/internal/config"
 )
 
 const (
 	defaultTimeout = 30 * time.Second
 	loginPath      = "/v1/login"
-	cookieName     = "SID"
 
 	errLoginFailed        = "unable to login"
 	errReadBody           = "unable to read response body"
@@ -37,20 +35,12 @@ type loginCmd struct {
 }
 
 // Run executes the login command.
-func (c *loginCmd) Run(kong *kong.Context, endpoint *url.URL, username User, token Token) error { // nolint:gocyclo
+func (c *loginCmd) Run(kong *kong.Context, cloudCtx *cloud.Context) error { // nolint:gocyclo
 	// TODO(hasheddan): prompt for input if only username is supplied or
 	// neither.
 	ctx, cancel := context.WithTimeout(context.Background(), defaultTimeout)
 	defer cancel()
-	auth, pType, err := constructAuth(string(username), c.Password, string(token))
-	if err != nil {
-		return errors.Wrap(err, errLoginFailed)
-	}
-	src, err := config.NewFSSource()
-	if err != nil {
-		return errors.Wrap(err, errLoginFailed)
-	}
-	conf, err := src.GetConfig()
+	auth, err := constructAuth(cloudCtx.ID, c.Password)
 	if err != nil {
 		return errors.Wrap(err, errLoginFailed)
 	}
@@ -58,8 +48,8 @@ func (c *loginCmd) Run(kong *kong.Context, endpoint *url.URL, username User, tok
 	if err != nil {
 		return errors.Wrap(err, errLoginFailed)
 	}
-	endpoint.Path = loginPath
-	req, err := http.NewRequestWithContext(ctx, http.MethodPost, endpoint.String(), bytes.NewReader(jsonStr))
+	cloudCtx.Endpoint.Path = loginPath
+	req, err := http.NewRequestWithContext(ctx, http.MethodPost, cloudCtx.Endpoint.String(), bytes.NewReader(jsonStr))
 	if err != nil {
 		return errors.Wrap(err, errLoginFailed)
 	}
@@ -71,22 +61,22 @@ func (c *loginCmd) Run(kong *kong.Context, endpoint *url.URL, username User, tok
 		return errors.Wrap(err, errLoginFailed)
 	}
 	defer res.Body.Close() // nolint:errcheck
-	session, err := extractSession(res, cookieName)
+	session, err := extractSession(res, cloud.CookieName)
 	if err != nil {
 		return errors.Wrap(err, errLoginFailed)
 	}
-	if err := conf.AddOrUpdateCloudProfile(auth.ID, config.Profile{
-		Type:    pType,
+	if err := cloudCtx.Cfg.AddOrUpdateCloudProfile(auth.ID, config.Profile{
+		Type:    cloudCtx.Type,
 		Session: session,
 	}); err != nil {
 		return err
 	}
-	if len(conf.Cloud.Profiles) == 1 {
-		if err := conf.SetDefaultCloudProfile(auth.ID); err != nil {
+	if len(cloudCtx.Cfg.Cloud.Profiles) == 1 {
+		if err := cloudCtx.Cfg.SetDefaultCloudProfile(auth.ID); err != nil {
 			return errors.Wrap(err, errLoginFailed)
 		}
 	}
-	return errors.Wrap(src.UpdateConfig(conf), errUpdateConfig)
+	return errors.Wrap(cloudCtx.CfgSrc.UpdateConfig(cloudCtx.Cfg), errUpdateConfig)
 }
 
 // auth is the request body sent to authenticate a user or token.
@@ -98,42 +88,16 @@ type auth struct {
 
 // constructAuth constructs the body of an Upbound Cloud authentication request
 // given the provided credentials.
-func constructAuth(username string, password string, token string) (*auth, config.ProfileType, error) {
-	var id string
-	var pType config.ProfileType
+func constructAuth(id string, password string) (*auth, error) {
 	pass := password
-	if username == "" && token == "" {
-		return nil, pType, errors.New(errNoUserOrToken)
-	}
-
-	// NOTE(hasheddan): xor tag prevents both username and token being provided,
-	// but we default to username flow if provided.
-	if token != "" {
-		p := jwt.Parser{}
-		claims := &jwt.StandardClaims{}
-		_, _, err := p.ParseUnverified(token, claims)
-		if err != nil {
-			return nil, pType, err
-		}
-		if claims.Id == "" {
-			return nil, pType, errors.New(errNoIDInToken)
-		}
-		id = claims.Id
-		pass = token
-		pType = config.TokenProfileType
-	}
-	if username != "" {
-		id = username
-		if password == "" {
-			return nil, pType, errors.New(errUsernameNoPassword)
-		}
-		pType = config.UserProfileType
+	if id == "" {
+		return nil, errors.New(errNoUserOrToken)
 	}
 	return &auth{
 		ID:       id,
 		Password: pass,
 		Remember: true,
-	}, pType, nil
+	}, nil
 }
 
 // extractSession extracts the specified cookie from an HTTP response. The
