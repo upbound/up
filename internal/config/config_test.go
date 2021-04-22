@@ -119,9 +119,12 @@ func TestGetDefaultCloudProfile(t *testing.T) {
 	}
 	for name, tc := range cases {
 		t.Run(name, func(t *testing.T) {
-			prof, err := tc.cfg.GetDefaultCloudProfile()
+			id, prof, err := tc.cfg.GetDefaultCloudProfile()
 			if diff := cmp.Diff(tc.err, err, test.EquateErrors()); diff != "" {
 				t.Errorf("\n%s\nGetDefaultCloudProfile(...): -want error, +got error:\n%s", tc.reason, diff)
+			}
+			if diff := cmp.Diff(tc.id, id); diff != "" {
+				t.Errorf("\n%s\nGetDefaultCloudProfile(...): -want, +got:\n%s", tc.reason, diff)
 			}
 			if diff := cmp.Diff(tc.want, prof); diff != "" {
 				t.Errorf("\n%s\nGetDefaultCloudProfile(...): -want, +got:\n%s", tc.reason, diff)
