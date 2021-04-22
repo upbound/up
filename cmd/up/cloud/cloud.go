@@ -17,7 +17,7 @@ func (c Cmd) AfterApply(ctx *kong.Context) error {
 	if c.Token != "" {
 		p := jwt.Parser{}
 		claims := &jwt.StandardClaims{}
-		_, _, err := p.ParseUnverified(string(c.Token), claims)
+		_, _, err := p.ParseUnverified(c.Token, claims)
 		if err != nil {
 			return err
 		}
@@ -27,7 +27,7 @@ func (c Cmd) AfterApply(ctx *kong.Context) error {
 		id = claims.Id
 	}
 	if c.Username != "" {
-		id = string(c.Username)
+		id = c.Username
 	}
 	id, prof, conf, src, err := cloud.ExtractConfig(id)
 	if err != nil {

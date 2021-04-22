@@ -10,10 +10,14 @@ import (
 )
 
 const (
-	UserAgent  = "up-cli"
+	// UserAgent is the default user agent to use to make requests to the
+	// Upbound Cloud API.
+	UserAgent = "up-cli"
+	// CookieName is the default cookie name used to identify a session token.
 	CookieName = "SID"
 )
 
+// Context includes common data that Upbound Cloud consumers may utilize.
 type Context struct {
 	ID       string
 	Type     config.ProfileType
@@ -24,6 +28,8 @@ type Context struct {
 	CfgSrc   config.Source
 }
 
+// ExtractConfig performs extraction of configuration from the default source,
+// which is the ~/.up/config.json file on the local filesystem.
 func ExtractConfig(user string) (string, config.Profile, *config.Config, config.Source, error) {
 	var profile config.Profile
 	var id string
@@ -44,6 +50,8 @@ func ExtractConfig(user string) (string, config.Profile, *config.Config, config.
 	return id, profile, conf, src, nil
 }
 
+// BuildSDKConfig builds an Upbound SDK config suitable for usage with any
+// service client.
 func BuildSDKConfig(session string, endpoint *url.URL) (*up.Config, error) {
 	cj, err := cookiejar.New(nil)
 	if err != nil {

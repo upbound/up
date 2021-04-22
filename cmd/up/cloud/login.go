@@ -19,13 +19,12 @@ const (
 	defaultTimeout = 30 * time.Second
 	loginPath      = "/v1/login"
 
-	errLoginFailed        = "unable to login"
-	errReadBody           = "unable to read response body"
-	errParseCookieFmt     = "unable to parse session cookie: %s"
-	errNoUserOrToken      = "either username or token must be provided"
-	errUsernameNoPassword = "username provided without password"
-	errNoIDInToken        = "token is missing ID"
-	errUpdateConfig       = "unable to update config file"
+	errLoginFailed    = "unable to login"
+	errReadBody       = "unable to read response body"
+	errParseCookieFmt = "unable to parse session cookie: %s"
+	errNoUserOrToken  = "either username or token must be provided"
+	errNoIDInToken    = "token is missing ID"
+	errUpdateConfig   = "unable to update config file"
 )
 
 // loginCmd adds a user or token profile with session token to the up config
