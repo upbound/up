@@ -64,7 +64,7 @@ may choose not to utilize the group flags when not relevant.
 
 ### Subgroup: Control Plane
 
-Format: `up cloud controlplane <cmd> ...` Alias: `up cloud cp <cmd> ...`
+Format: `up cloud controlplane <cmd> ...` Alias: `up cloud xp <cmd> ...`
 
 - `attach <name>`
     - Status: `Unimplemented`
