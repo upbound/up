@@ -56,6 +56,8 @@ func (c Cmd) AfterApply(ctx *kong.Context) error {
 type Cmd struct {
 	Login loginCmd `cmd:"" group:"cloud" help:"Login to Upbound Cloud."`
 
+	ControlPlane controlPlaneCmd `cmd:"" group:"cloud" help:"Interact with control planes."`
+
 	Endpoint     *url.URL `env:"UP_ENDPOINT" default:"https://api.upbound.io" help:"Endpoint used for Upbound API."`
 	Username     string   `short:"u" env:"UP_USER" xor:"identifier" help:"Username used to execute command."`
 	Token        string   `short:"t" env:"UP_TOKEN" xor:"identifier" help:"Token used to execute command."`
