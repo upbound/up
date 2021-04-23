@@ -39,7 +39,7 @@ func (c *loginCmd) Run(kong *kong.Context, cloudCtx *cloud.Context) error { // n
 	// neither.
 	ctx, cancel := context.WithTimeout(context.Background(), defaultTimeout)
 	defer cancel()
-	auth, err := constructAuth(cloudCtx.ID, c.Password)
+	auth, err := constructAuth(cloudCtx.ID, cloudCtx.Token, c.Password)
 	if err != nil {
 		return errors.Wrap(err, errLoginFailed)
 	}
@@ -87,14 +87,16 @@ type auth struct {
 
 // constructAuth constructs the body of an Upbound Cloud authentication request
 // given the provided credentials.
-func constructAuth(id string, password string) (*auth, error) {
-	pass := password
+func constructAuth(id, token, password string) (*auth, error) {
 	if id == "" {
 		return nil, errors.New(errNoUserOrToken)
 	}
+	if password == "" {
+		password = token
+	}
 	return &auth{
 		ID:       id,
-		Password: pass,
+		Password: password,
 		Remember: true,
 	}, nil
 }

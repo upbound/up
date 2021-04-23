@@ -8,43 +8,32 @@ import (
 	"github.com/pkg/errors"
 
 	"github.com/upbound/up/internal/cloud"
+	"github.com/upbound/up/internal/config"
 )
 
 // AfterApply constructs and binds Upbound-specific context to any subcommands
 // that have Run() methods that receive it.
 func (c Cmd) AfterApply(ctx *kong.Context) error {
-	var id string
-	if c.Token != "" {
-		p := jwt.Parser{}
-		claims := &jwt.StandardClaims{}
-		_, _, err := p.ParseUnverified(c.Token, claims)
-		if err != nil {
-			return err
-		}
-		if claims.Id == "" {
-			return errors.New(errNoIDInToken)
-		}
-		id = claims.Id
-	}
-	if c.Username != "" {
-		id = c.Username
-	}
-	id, prof, conf, src, err := cloud.ExtractConfig(id)
+	id, profType, err := parseID(c.Username, c.Token)
 	if err != nil {
 		return err
 	}
-	org := id
-	if prof.Org != "" {
-		org = prof.Org
+	conf, src, err := cloud.ExtractConfig()
+	if err != nil {
+		return err
 	}
+	var org string
 	if c.Organization != "" {
 		org = c.Organization
 	}
+	if org == "" {
+		org = id
+	}
 	ctx.Bind(&cloud.Context{
 		ID:       id,
-		Type:     prof.Type,
+		Token:    c.Token,
+		Type:     profType,
 		Org:      org,
-		Session:  prof.Session,
 		Endpoint: c.Endpoint,
 		Cfg:      conf,
 		CfgSrc:   src,
@@ -62,4 +51,21 @@ type Cmd struct {
 	Username     string   `short:"u" env:"UP_USER" xor:"identifier" help:"Username used to execute command."`
 	Token        string   `short:"t" env:"UP_TOKEN" xor:"identifier" help:"Token used to execute command."`
 	Organization string   `short:"o" env:"UP_ORG" help:"Organization used to execute command."`
+}
+
+// parseID gets a user ID by either parsing a token or returning the username.
+func parseID(user, token string) (string, config.ProfileType, error) {
+	if token != "" {
+		p := jwt.Parser{}
+		claims := &jwt.StandardClaims{}
+		_, _, err := p.ParseUnverified(token, claims)
+		if err != nil {
+			return "", "", err
+		}
+		if claims.Id == "" {
+			return "", "", errors.New(errNoIDInToken)
+		}
+		return claims.Id, config.TokenProfileType, nil
+	}
+	return user, config.UserProfileType, nil
 }

@@ -17,6 +17,7 @@ import (
 func TestConstructAuth(t *testing.T) {
 	type args struct {
 		id       string
+		token    string
 		password string
 	}
 	type want struct {
@@ -33,7 +34,7 @@ func TestConstructAuth(t *testing.T) {
 			reason: "If neither user or token is provided an error should be returned.",
 			err:    errors.New(errNoUserOrToken),
 		},
-		"Successful": {
+		"SuccessfulUser": {
 			reason: "Providing a valid id and password should return a valid auth request.",
 			args: args{
 				id:       "cool-user",
@@ -48,10 +49,25 @@ func TestConstructAuth(t *testing.T) {
 				},
 			},
 		},
+		"SuccessfulToken": {
+			reason: "Providing a valid id and token should return a valid auth request.",
+			args: args{
+				id:    "cool-user",
+				token: "eyJ0eXAiOiJKV1QiLCJhbGciOiJIUzI1NiJ9.eyJpc3MiOiJPbmxpbmUgSldUIEJ1aWxkZXIiLCJpYXQiOjE2MTg1MTc1NDQsImV4cCI6MTY1MDA1MzU0NCwiYXVkIjoiaHR0cHM6Ly9kYW5pZWxtYW5ndW0uY29tIiwic3ViIjoiZ2VvcmdlZGFuaWVsbWFuZ3VtQGdtYWlsLmNvbSIsIkZpcnN0IjoiRGFuIiwiU3VybmFtZSI6Ik1hbmd1bSJ9.8F4mgY5-lpt2KmGx7Z8yeSorfs-WRgdJmCq8mCcrxZQ",
+			},
+			want: want{
+				pType: config.UserProfileType,
+				auth: &auth{
+					ID:       "cool-user",
+					Password: "eyJ0eXAiOiJKV1QiLCJhbGciOiJIUzI1NiJ9.eyJpc3MiOiJPbmxpbmUgSldUIEJ1aWxkZXIiLCJpYXQiOjE2MTg1MTc1NDQsImV4cCI6MTY1MDA1MzU0NCwiYXVkIjoiaHR0cHM6Ly9kYW5pZWxtYW5ndW0uY29tIiwic3ViIjoiZ2VvcmdlZGFuaWVsbWFuZ3VtQGdtYWlsLmNvbSIsIkZpcnN0IjoiRGFuIiwiU3VybmFtZSI6Ik1hbmd1bSJ9.8F4mgY5-lpt2KmGx7Z8yeSorfs-WRgdJmCq8mCcrxZQ",
+					Remember: true,
+				},
+			},
+		},
 	}
 	for name, tc := range cases {
 		t.Run(name, func(t *testing.T) {
-			auth, err := constructAuth(tc.args.id, tc.args.password)
+			auth, err := constructAuth(tc.args.id, tc.args.token, tc.args.password)
 			if diff := cmp.Diff(tc.err, err, test.EquateErrors()); diff != "" {
 				t.Errorf("\n%s\nconstructAuth(...): -want error, +got error:\n%s", tc.reason, diff)
 			}

@@ -7,12 +7,28 @@ import (
 
 	"github.com/upbound/up/cmd/up/cloud/controlplane"
 	"github.com/upbound/up/internal/cloud"
+	"github.com/upbound/up/internal/config"
 )
 
 // AfterApply constructs and binds a control plane client to any subcommands
 // that have Run() methods that receive it.
 func (c controlPlaneCmd) AfterApply(ctx *kong.Context, cloudCtx *cloud.Context) error {
-	cfg, err := cloud.BuildSDKConfig(cloudCtx.Session, cloudCtx.Endpoint)
+	var profile config.Profile
+	var err error
+	if cloudCtx.ID == "" {
+		var id string
+		id, profile, err = cloudCtx.Cfg.GetDefaultCloudProfile()
+		if err != nil {
+			return err
+		}
+		cloudCtx.ID = id
+	} else {
+		profile, err = cloudCtx.Cfg.GetCloudProfile(cloudCtx.ID)
+		if err != nil {
+			return err
+		}
+	}
+	cfg, err := cloud.BuildSDKConfig(profile.Session, cloudCtx.Endpoint)
 	if err != nil {
 		return err
 	}
