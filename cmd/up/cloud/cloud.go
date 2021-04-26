@@ -22,18 +22,11 @@ func (c Cmd) AfterApply(ctx *kong.Context) error {
 	if err != nil {
 		return err
 	}
-	var org string
-	if c.Organization != "" {
-		org = c.Organization
-	}
-	if org == "" {
-		org = id
-	}
 	ctx.Bind(&cloud.Context{
 		ID:       id,
 		Token:    c.Token,
 		Type:     profType,
-		Org:      org,
+		Org:      c.Organization,
 		Endpoint: c.Endpoint,
 		Cfg:      conf,
 		CfgSrc:   src,

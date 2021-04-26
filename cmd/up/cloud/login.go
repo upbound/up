@@ -67,6 +67,7 @@ func (c *loginCmd) Run(kong *kong.Context, cloudCtx *cloud.Context) error { // n
 	if err := cloudCtx.Cfg.AddOrUpdateCloudProfile(auth.ID, config.Profile{
 		Type:    cloudCtx.Type,
 		Session: session,
+		Org:     cloudCtx.Org,
 	}); err != nil {
 		return err
 	}

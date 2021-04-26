@@ -28,6 +28,14 @@ func (c controlPlaneCmd) AfterApply(ctx *kong.Context, cloudCtx *cloud.Context) 
 			return err
 		}
 	}
+	// If org has not already been set, use the profile default.
+	if cloudCtx.Org == "" {
+		cloudCtx.Org = profile.Org
+	}
+	// If no org is set in profile, use the ID.
+	if cloudCtx.Org == "" {
+		cloudCtx.Org = cloudCtx.ID
+	}
 	cfg, err := cloud.BuildSDKConfig(profile.Session, cloudCtx.Endpoint)
 	if err != nil {
 		return err
