@@ -76,15 +76,15 @@ func (c *Config) AddOrUpdateCloudProfile(id string, new Profile) error {
 
 // GetDefaultCloudProfile gets the default cloud profile or returns an error if
 // default is not set or default profile does not exist.
-func (c *Config) GetDefaultCloudProfile() (Profile, error) {
+func (c *Config) GetDefaultCloudProfile() (string, Profile, error) {
 	if c.Cloud.Default == "" {
-		return Profile{}, errors.New(errNoDefaultSpecified)
+		return "", Profile{}, errors.New(errNoDefaultSpecified)
 	}
 	p, ok := c.Cloud.Profiles[c.Cloud.Default]
 	if !ok {
-		return Profile{}, errors.New(errDefaultNotExist)
+		return "", Profile{}, errors.New(errDefaultNotExist)
 	}
-	return p, nil
+	return c.Cloud.Default, p, nil
 }
 
 // GetCloudProfile gets a profile with a given identifier. If a profile does not
