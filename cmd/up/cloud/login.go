@@ -9,6 +9,7 @@ import (
 	"time"
 
 	"github.com/alecthomas/kong"
+	"github.com/dgrijalva/jwt-go"
 	"github.com/pkg/errors"
 
 	"github.com/upbound/up/internal/cloud"
@@ -16,8 +17,9 @@ import (
 )
 
 const (
-	defaultTimeout = 30 * time.Second
-	loginPath      = "/v1/login"
+	defaultTimeout     = 30 * time.Second
+	defaultProfileName = "default"
+	loginPath          = "/v1/login"
 
 	errLoginFailed    = "unable to login"
 	errReadBody       = "unable to read response body"
@@ -31,6 +33,8 @@ const (
 // file.
 type loginCmd struct {
 	Password string `short:"p" env:"UP_PASSWORD" help:"Password for specified user."`
+	Username string `short:"u" env:"UP_USER" xor:"identifier" help:"Username used to execute command."`
+	Token    string `short:"t" env:"UP_TOKEN" xor:"identifier" help:"Token used to execute command."`
 }
 
 // Run executes the login command.
@@ -39,7 +43,7 @@ func (c *loginCmd) Run(kong *kong.Context, cloudCtx *cloud.Context) error { // n
 	// neither.
 	ctx, cancel := context.WithTimeout(context.Background(), defaultTimeout)
 	defer cancel()
-	auth, err := constructAuth(cloudCtx.ID, cloudCtx.Token, c.Password)
+	auth, profType, err := constructAuth(c.Username, c.Token, c.Password)
 	if err != nil {
 		return errors.Wrap(err, errLoginFailed)
 	}
@@ -64,15 +68,19 @@ func (c *loginCmd) Run(kong *kong.Context, cloudCtx *cloud.Context) error { // n
 	if err != nil {
 		return errors.Wrap(err, errLoginFailed)
 	}
-	if err := cloudCtx.Cfg.AddOrUpdateCloudProfile(auth.ID, config.Profile{
-		Type:    cloudCtx.Type,
+	if cloudCtx.Profile == "" {
+		cloudCtx.Profile = defaultProfileName
+	}
+	if err := cloudCtx.Cfg.AddOrUpdateCloudProfile(cloudCtx.Profile, config.Profile{
+		ID:      auth.ID,
+		Type:    profType,
 		Session: session,
 		Org:     cloudCtx.Org,
 	}); err != nil {
-		return err
+		return errors.Wrap(err, errLoginFailed)
 	}
 	if len(cloudCtx.Cfg.Cloud.Profiles) == 1 {
-		if err := cloudCtx.Cfg.SetDefaultCloudProfile(auth.ID); err != nil {
+		if err := cloudCtx.Cfg.SetDefaultCloudProfile(cloudCtx.Profile); err != nil {
 			return errors.Wrap(err, errLoginFailed)
 		}
 	}
@@ -88,9 +96,13 @@ type auth struct {
 
 // constructAuth constructs the body of an Upbound Cloud authentication request
 // given the provided credentials.
-func constructAuth(id, token, password string) (*auth, error) {
-	if id == "" {
-		return nil, errors.New(errNoUserOrToken)
+func constructAuth(username, token, password string) (*auth, config.ProfileType, error) {
+	if username == "" && token == "" {
+		return nil, "", errors.New(errNoUserOrToken)
+	}
+	id, profType, err := parseID(username, token)
+	if err != nil {
+		return nil, "", err
 	}
 	if password == "" {
 		password = token
@@ -99,7 +111,24 @@ func constructAuth(id, token, password string) (*auth, error) {
 		ID:       id,
 		Password: password,
 		Remember: true,
-	}, nil
+	}, profType, nil
+}
+
+// parseID gets a user ID by either parsing a token or returning the username.
+func parseID(user, token string) (string, config.ProfileType, error) {
+	if token != "" {
+		p := jwt.Parser{}
+		claims := &jwt.StandardClaims{}
+		_, _, err := p.ParseUnverified(token, claims)
+		if err != nil {
+			return "", "", err
+		}
+		if claims.Id == "" {
+			return "", "", errors.New(errNoIDInToken)
+		}
+		return claims.Id, config.TokenProfileType, nil
+	}
+	return user, config.UserProfileType, nil
 }
 
 // extractSession extracts the specified cookie from an HTTP response. The
