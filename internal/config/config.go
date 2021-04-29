@@ -29,7 +29,7 @@ type Cloud struct {
 	Default string `json:"default"`
 
 	// Profiles contain sets of credentials for communicating with Upbound
-	// Cloud. Key is one of username, email, or token ID.
+	// Cloud. Key is name of the profile.
 	Profiles map[string]Profile `json:"profiles,omitempty"`
 }
 
@@ -44,6 +44,9 @@ const (
 
 // A Profile is a set of credentials
 type Profile struct {
+	// ID is either a username, email, or token.
+	ID string `json:"id"`
+
 	// Type is the type of the profile.
 	Type ProfileType `json:"type"`
 
@@ -56,21 +59,21 @@ type Profile struct {
 
 // checkProfile ensures a profile does not violate constraints.
 func checkProfile(p Profile) error {
-	if p.Type == "" {
+	if p.ID == "" || p.Type == "" {
 		return errors.New(errInvalidProfile)
 	}
 	return nil
 }
 
 // AddOrUpdateCloudProfile adds or updates a cloud profile to the Config.
-func (c *Config) AddOrUpdateCloudProfile(id string, new Profile) error {
+func (c *Config) AddOrUpdateCloudProfile(name string, new Profile) error {
 	if err := checkProfile(new); err != nil {
 		return err
 	}
 	if c.Cloud.Profiles == nil {
 		c.Cloud.Profiles = map[string]Profile{}
 	}
-	c.Cloud.Profiles[id] = new
+	c.Cloud.Profiles[name] = new
 	return nil
 }
 
@@ -91,10 +94,10 @@ func (c *Config) GetDefaultCloudProfile() (string, Profile, error) {
 // exist for the given identifier an error will be returned. Multiple profiles
 // should never exist for the same identifier, but in the case that they do, the
 // first will be returned.
-func (c *Config) GetCloudProfile(id string) (Profile, error) {
-	p, ok := c.Cloud.Profiles[id]
+func (c *Config) GetCloudProfile(name string) (Profile, error) {
+	p, ok := c.Cloud.Profiles[name]
 	if !ok {
-		return Profile{}, errors.Errorf(errProfileNotFoundFmt, id)
+		return Profile{}, errors.Errorf(errProfileNotFoundFmt, name)
 	}
 	return p, nil
 }
@@ -102,10 +105,10 @@ func (c *Config) GetCloudProfile(id string) (Profile, error) {
 // SetDefaultCloudProfile sets the default profile for communicating with
 // Upbound Cloud. Setting a default profile that does not exist will return an
 // error.
-func (c *Config) SetDefaultCloudProfile(id string) error {
-	if _, ok := c.Cloud.Profiles[id]; !ok {
-		return errors.Errorf(errProfileNotFoundFmt, id)
+func (c *Config) SetDefaultCloudProfile(name string) error {
+	if _, ok := c.Cloud.Profiles[name]; !ok {
+		return errors.Errorf(errProfileNotFoundFmt, name)
 	}
-	c.Cloud.Default = id
+	c.Cloud.Default = name
 	return nil
 }
