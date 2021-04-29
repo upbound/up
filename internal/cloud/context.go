@@ -19,6 +19,7 @@ const (
 
 // Context includes common data that Upbound Cloud consumers may utilize.
 type Context struct {
+	Profile  string
 	ID       string
 	Token    string
 	Type     config.ProfileType
