@@ -68,6 +68,12 @@ func (c *loginCmd) Run(kong *kong.Context, cloudCtx *cloud.Context) error { // n
 	if err != nil {
 		return errors.Wrap(err, errLoginFailed)
 	}
+	// If profile is not set, we assume operation on profile designated as
+	// default in config.
+	if cloudCtx.Profile == "" {
+		cloudCtx.Profile = cloudCtx.Cfg.Cloud.Default
+	}
+	// If no default profile is specified, the profile is named `default`.
 	if cloudCtx.Profile == "" {
 		cloudCtx.Profile = defaultProfileName
 	}

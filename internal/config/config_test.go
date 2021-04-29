@@ -9,12 +9,14 @@ import (
 )
 
 func TestAddOrUpdateCloudProfile(t *testing.T) {
-	name := "cool-user"
+	name := "cool-profile"
 	profOne := Profile{
+		ID:   "cool-user",
 		Type: UserProfileType,
 		Org:  "cool-org",
 	}
 	profTwo := Profile{
+		ID:   "cool-user",
 		Type: UserProfileType,
 		Org:  "other-org",
 	}
