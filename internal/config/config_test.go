@@ -9,19 +9,21 @@ import (
 )
 
 func TestAddOrUpdateCloudProfile(t *testing.T) {
-	identifier := "cool-user"
+	name := "cool-profile"
 	profOne := Profile{
+		ID:   "cool-user",
 		Type: UserProfileType,
 		Org:  "cool-org",
 	}
 	profTwo := Profile{
+		ID:   "cool-user",
 		Type: UserProfileType,
 		Org:  "other-org",
 	}
 
 	cases := map[string]struct {
 		reason string
-		id     string
+		name   string
 		cfg    *Config
 		add    Profile
 		want   *Config
@@ -29,33 +31,33 @@ func TestAddOrUpdateCloudProfile(t *testing.T) {
 	}{
 		"AddNewProfile": {
 			reason: "Adding a new profile to an empty Config should not cause an error.",
-			id:     identifier,
+			name:   name,
 			cfg:    &Config{},
 			add:    profOne,
 			want: &Config{
 				Cloud: Cloud{
-					Profiles: map[string]Profile{identifier: profOne},
+					Profiles: map[string]Profile{name: profOne},
 				},
 			},
 		},
 		"UpdateExistingProfile": {
 			reason: "Updating an existing profile in the Config should not cause an error.",
-			id:     identifier,
+			name:   name,
 			cfg: &Config{
 				Cloud: Cloud{
-					Profiles: map[string]Profile{identifier: profOne},
+					Profiles: map[string]Profile{name: profOne},
 				},
 			},
 			add: profTwo,
 			want: &Config{
 				Cloud: Cloud{
-					Profiles: map[string]Profile{identifier: profTwo},
+					Profiles: map[string]Profile{name: profTwo},
 				},
 			},
 		},
 		"Invalid": {
 			reason: "Adding an invalid profile should cause an error.",
-			id:     identifier,
+			name:   name,
 			cfg:    &Config{},
 			add:    Profile{},
 			want:   &Config{},
@@ -64,7 +66,7 @@ func TestAddOrUpdateCloudProfile(t *testing.T) {
 	}
 	for name, tc := range cases {
 		t.Run(name, func(t *testing.T) {
-			err := tc.cfg.AddOrUpdateCloudProfile(tc.id, tc.add)
+			err := tc.cfg.AddOrUpdateCloudProfile(tc.name, tc.add)
 			if diff := cmp.Diff(tc.err, err, test.EquateErrors()); diff != "" {
 				t.Errorf("\n%s\nAddOrUpdateCloudProfile(...): -want error, +got error:\n%s", tc.reason, diff)
 			}
@@ -76,15 +78,16 @@ func TestAddOrUpdateCloudProfile(t *testing.T) {
 }
 
 func TestGetDefaultCloudProfile(t *testing.T) {
-	identifier := "cool-user"
+	name := "cool-profile"
 	profOne := Profile{
+		ID:   "cool-user",
 		Type: UserProfileType,
 		Org:  "cool-org",
 	}
 
 	cases := map[string]struct {
 		reason string
-		id     string
+		name   string
 		cfg    *Config
 		want   Profile
 		err    error
@@ -107,11 +110,11 @@ func TestGetDefaultCloudProfile(t *testing.T) {
 		},
 		"Successful": {
 			reason: "If defined default exists it should be returned.",
-			id:     identifier,
+			name:   name,
 			cfg: &Config{
 				Cloud: Cloud{
-					Default:  "cool-user",
-					Profiles: map[string]Profile{identifier: profOne},
+					Default:  "cool-profile",
+					Profiles: map[string]Profile{name: profOne},
 				},
 			},
 			want: profOne,
@@ -119,11 +122,11 @@ func TestGetDefaultCloudProfile(t *testing.T) {
 	}
 	for name, tc := range cases {
 		t.Run(name, func(t *testing.T) {
-			id, prof, err := tc.cfg.GetDefaultCloudProfile()
+			name, prof, err := tc.cfg.GetDefaultCloudProfile()
 			if diff := cmp.Diff(tc.err, err, test.EquateErrors()); diff != "" {
 				t.Errorf("\n%s\nGetDefaultCloudProfile(...): -want error, +got error:\n%s", tc.reason, diff)
 			}
-			if diff := cmp.Diff(tc.id, id); diff != "" {
+			if diff := cmp.Diff(tc.name, name); diff != "" {
 				t.Errorf("\n%s\nGetDefaultCloudProfile(...): -want, +got:\n%s", tc.reason, diff)
 			}
 			if diff := cmp.Diff(tc.want, prof); diff != "" {
@@ -134,32 +137,33 @@ func TestGetDefaultCloudProfile(t *testing.T) {
 }
 
 func TestGetCloudProfile(t *testing.T) {
-	identifier := "cool-user"
+	name := "cool-profile"
 	profOne := Profile{
+		ID:   "cool-user",
 		Type: UserProfileType,
 		Org:  "cool-org",
 	}
 
 	cases := map[string]struct {
 		reason string
-		id     string
+		name   string
 		cfg    *Config
 		want   Profile
 		err    error
 	}{
 		"ErrorProfileNotExist": {
 			reason: "If profile does not exist an error should be returned.",
-			id:     identifier,
+			name:   name,
 			cfg:    &Config{},
 			want:   Profile{},
-			err:    errors.Errorf(errProfileNotFoundFmt, "cool-user"),
+			err:    errors.Errorf(errProfileNotFoundFmt, "cool-profile"),
 		},
 		"Successful": {
 			reason: "If profile exists it should be returned.",
-			id:     "cool-user",
+			name:   "cool-profile",
 			cfg: &Config{
 				Cloud: Cloud{
-					Profiles: map[string]Profile{identifier: profOne},
+					Profiles: map[string]Profile{name: profOne},
 				},
 			},
 			want: profOne,
@@ -167,7 +171,7 @@ func TestGetCloudProfile(t *testing.T) {
 	}
 	for name, tc := range cases {
 		t.Run(name, func(t *testing.T) {
-			prof, err := tc.cfg.GetCloudProfile(tc.id)
+			prof, err := tc.cfg.GetCloudProfile(tc.name)
 			if diff := cmp.Diff(tc.err, err, test.EquateErrors()); diff != "" {
 				t.Errorf("\n%s\nGetCloudProfile(...): -want error, +got error:\n%s", tc.reason, diff)
 			}
@@ -179,7 +183,7 @@ func TestGetCloudProfile(t *testing.T) {
 }
 
 func TestSetDefaultCloudProfile(t *testing.T) {
-	identifier := "cool-user"
+	name := "cool-user"
 	profOne := Profile{
 		Type: UserProfileType,
 		Org:  "cool-org",
@@ -187,29 +191,29 @@ func TestSetDefaultCloudProfile(t *testing.T) {
 
 	cases := map[string]struct {
 		reason string
-		id     string
+		name   string
 		cfg    *Config
 		err    error
 	}{
 		"ErrorProfileNotExist": {
 			reason: "If profile does not exist an error should be returned.",
-			id:     identifier,
+			name:   name,
 			cfg:    &Config{},
 			err:    errors.Errorf(errProfileNotFoundFmt, "cool-user"),
 		},
 		"Successful": {
 			reason: "If profile exists it should be set as default.",
-			id:     "cool-user",
+			name:   "cool-user",
 			cfg: &Config{
 				Cloud: Cloud{
-					Profiles: map[string]Profile{identifier: profOne},
+					Profiles: map[string]Profile{name: profOne},
 				},
 			},
 		},
 	}
 	for name, tc := range cases {
 		t.Run(name, func(t *testing.T) {
-			err := tc.cfg.SetDefaultCloudProfile(tc.id)
+			err := tc.cfg.SetDefaultCloudProfile(tc.name)
 			if diff := cmp.Diff(tc.err, err, test.EquateErrors()); diff != "" {
 				t.Errorf("\n%s\nGetCloudProfile(...): -want error, +got error:\n%s", tc.reason, diff)
 			}

@@ -13,17 +13,20 @@ import (
 // AfterApply constructs and binds a control plane client to any subcommands
 // that have Run() methods that receive it.
 func (c controlPlaneCmd) AfterApply(ctx *kong.Context, cloudCtx *cloud.Context) error {
+	// TODO(hasheddan): the majority of this logic can be used generically
+	// across cloud commands when others are implemented.
 	var profile config.Profile
+	var name string
 	var err error
-	if cloudCtx.ID == "" {
-		var id string
-		id, profile, err = cloudCtx.Cfg.GetDefaultCloudProfile()
+	if cloudCtx.Profile == "" {
+		name, profile, err = cloudCtx.Cfg.GetDefaultCloudProfile()
 		if err != nil {
 			return err
 		}
-		cloudCtx.ID = id
+		cloudCtx.Profile = name
+		cloudCtx.ID = profile.ID
 	} else {
-		profile, err = cloudCtx.Cfg.GetCloudProfile(cloudCtx.ID)
+		profile, err = cloudCtx.Cfg.GetCloudProfile(cloudCtx.Profile)
 		if err != nil {
 			return err
 		}
@@ -34,7 +37,7 @@ func (c controlPlaneCmd) AfterApply(ctx *kong.Context, cloudCtx *cloud.Context) 
 	}
 	// If no org is set in profile, use the ID.
 	if cloudCtx.Org == "" {
-		cloudCtx.Org = cloudCtx.ID
+		cloudCtx.Org = profile.ID
 	}
 	cfg, err := cloud.BuildSDKConfig(profile.Session, cloudCtx.Endpoint)
 	if err != nil {
