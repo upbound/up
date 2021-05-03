@@ -43,7 +43,7 @@ func (c controlPlaneCmd) AfterApply(ctx *kong.Context, cloudCtx *cloud.Context) 
 	if err != nil {
 		return err
 	}
-	ctx.Bind(cp.NewControlPlanesClient(cfg))
+	ctx.Bind(cp.NewClient(cfg))
 	return nil
 }
 
