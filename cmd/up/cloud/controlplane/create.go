@@ -19,7 +19,7 @@ type CreateCmd struct {
 // Run executes the create command.
 func (c *CreateCmd) Run(kong *kong.Context, client *cp.Client, cloudCtx *cloud.Context) error {
 	_, err := client.Create(context.Background(), &cp.ControlPlaneCreateParameters{
-		Namespace:   cloudCtx.Org,
+		Account:     cloudCtx.Org,
 		Name:        c.Name,
 		Description: c.Description,
 	})
