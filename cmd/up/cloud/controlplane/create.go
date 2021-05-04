@@ -3,8 +3,6 @@ package controlplane
 import (
 	"context"
 
-	"github.com/alecthomas/kong"
-
 	cp "github.com/upbound/up-sdk-go/service/controlplanes"
 	"github.com/upbound/up/internal/cloud"
 )
@@ -17,7 +15,7 @@ type CreateCmd struct {
 }
 
 // Run executes the create command.
-func (c *CreateCmd) Run(kong *kong.Context, client *cp.Client, cloudCtx *cloud.Context) error {
+func (c *CreateCmd) Run(client *cp.Client, cloudCtx *cloud.Context) error {
 	_, err := client.Create(context.Background(), &cp.ControlPlaneCreateParameters{
 		Account:     cloudCtx.Account,
 		Name:        c.Name,
