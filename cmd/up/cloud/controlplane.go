@@ -5,6 +5,7 @@ import (
 	"github.com/pkg/errors"
 
 	cp "github.com/upbound/up-sdk-go/service/controlplanes"
+	"github.com/upbound/up-sdk-go/service/tokens"
 
 	"github.com/upbound/up/cmd/up/cloud/controlplane"
 	"github.com/upbound/up/internal/cloud"
@@ -49,11 +50,13 @@ func (c controlPlaneCmd) AfterApply(ctx *kong.Context, cloudCtx *cloud.Context) 
 		return err
 	}
 	ctx.Bind(cp.NewClient(cfg))
+	ctx.Bind(tokens.NewClient(cfg))
 	return nil
 }
 
 // controlPlaneCmd contains commands for interacting with control planes.
 type controlPlaneCmd struct {
+	Attach controlplane.AttachCmd `cmd:"" help:"Attach a self-hosted control plane."`
 	Create controlplane.CreateCmd `cmd:"" help:"Create a hosted control plane."`
 	Delete controlplane.DeleteCmd `cmd:"" help:"Delete a control plane."`
 }
