@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"io"
 	"net/http"
+	"net/url"
 	"testing"
 	"testing/iotest"
 
@@ -12,8 +13,51 @@ import (
 	"github.com/google/go-cmp/cmp"
 	"github.com/pkg/errors"
 
+	"github.com/upbound/up/internal/cloud"
 	"github.com/upbound/up/internal/config"
+	"github.com/upbound/up/internal/http/mocks"
 )
+
+func TestRun(t *testing.T) {
+	errBoom := errors.New("boom")
+	defaultURL, _ := url.Parse("https://test.com")
+
+	cases := map[string]struct {
+		reason string
+		cmd    *loginCmd
+		ctx    *cloud.Context
+		err    error
+	}{
+		"ErrorNoUserOrToken": {
+			reason: "If neither user or token is provided an error should be returned.",
+			cmd:    &loginCmd{},
+			err:    errors.Wrap(errors.New(errNoUserOrToken), errLoginFailed),
+		},
+		"ErrLoginFailed": {
+			reason: "If Upbound Cloud endpoint is ",
+			cmd: &loginCmd{
+				client: &mocks.MockClient{
+					DoFn: func(req *http.Request) (*http.Response, error) {
+						return nil, errBoom
+					},
+				},
+				Username: "cool-user",
+				Password: "cool-pass",
+			},
+			ctx: &cloud.Context{
+				Endpoint: defaultURL,
+			},
+			err: errors.Wrap(errBoom, errLoginFailed),
+		},
+	}
+	for name, tc := range cases {
+		t.Run(name, func(t *testing.T) {
+			if diff := cmp.Diff(tc.err, tc.cmd.Run(tc.ctx), test.EquateErrors()); diff != "" {
+				t.Errorf("\n%s\nRun(...): -want error, +got error:\n%s", tc.reason, diff)
+			}
+		})
+	}
+}
 
 func TestConstructAuth(t *testing.T) {
 	type args struct {

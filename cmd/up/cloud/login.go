@@ -9,12 +9,12 @@ import (
 	"strings"
 	"time"
 
-	"github.com/alecthomas/kong"
 	"github.com/dgrijalva/jwt-go"
 	"github.com/pkg/errors"
 
 	"github.com/upbound/up/internal/cloud"
 	"github.com/upbound/up/internal/config"
+	uphttp "github.com/upbound/up/internal/http"
 )
 
 const (
@@ -30,16 +30,25 @@ const (
 	errUpdateConfig   = "unable to update config file"
 )
 
+// BeforeApply sets default values in login before assignment and validation.
+func (c *loginCmd) BeforeApply() error {
+	// NOTE(hasheddan): client timeout is handled with request context.
+	c.client = &http.Client{}
+	return nil
+}
+
 // loginCmd adds a user or token profile with session token to the up config
 // file.
 type loginCmd struct {
+	client uphttp.Client
+
 	Password string `short:"p" env:"UP_PASSWORD" help:"Password for specified user."`
 	Username string `short:"u" env:"UP_USER" xor:"identifier" help:"Username used to execute command."`
 	Token    string `short:"t" env:"UP_TOKEN" xor:"identifier" help:"Token used to execute command."`
 }
 
 // Run executes the login command.
-func (c *loginCmd) Run(kong *kong.Context, cloudCtx *cloud.Context) error { // nolint:gocyclo
+func (c *loginCmd) Run(cloudCtx *cloud.Context) error { // nolint:gocyclo
 	// TODO(hasheddan): prompt for input if only username is supplied or
 	// neither.
 	ctx, cancel := context.WithTimeout(context.Background(), defaultTimeout)
@@ -58,9 +67,7 @@ func (c *loginCmd) Run(kong *kong.Context, cloudCtx *cloud.Context) error { // n
 		return errors.Wrap(err, errLoginFailed)
 	}
 	req.Header.Set("Content-Type", "application/json")
-	// NOTE(hasheddan): client timeout is handled with request context.
-	client := &http.Client{}
-	res, err := client.Do(req)
+	res, err := c.client.Do(req)
 	if err != nil {
 		return errors.Wrap(err, errLoginFailed)
 	}

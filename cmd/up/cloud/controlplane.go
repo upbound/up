@@ -18,7 +18,7 @@ const (
 
 // AfterApply constructs and binds a control plane client to any subcommands
 // that have Run() methods that receive it.
-func (c controlPlaneCmd) AfterApply(ctx *kong.Context, cloudCtx *cloud.Context) error {
+func (c *controlPlaneCmd) AfterApply(ctx *kong.Context, cloudCtx *cloud.Context) error {
 	// TODO(hasheddan): the majority of this logic can be used generically
 	// across cloud commands when others are implemented.
 	var profile config.Profile

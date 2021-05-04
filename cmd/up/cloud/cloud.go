@@ -10,7 +10,7 @@ import (
 
 // AfterApply constructs and binds Upbound-specific context to any subcommands
 // that have Run() methods that receive it.
-func (c Cmd) AfterApply(ctx *kong.Context) error {
+func (c *Cmd) AfterApply(ctx *kong.Context) error {
 	conf, src, err := cloud.ExtractConfig()
 	if err != nil {
 		return err
