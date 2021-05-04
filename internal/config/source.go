@@ -84,7 +84,7 @@ func (src *FSSource) GetConfig() (*Config, error) {
 
 // UpdateConfig updates the Config in the filesystem.
 func (src *FSSource) UpdateConfig(c *Config) error {
-	f, err := src.fs.OpenFile(src.path, os.O_RDWR, 0600)
+	f, err := src.fs.OpenFile(src.path, os.O_RDWR|os.O_TRUNC, 0600)
 	if err != nil {
 		return err
 	}
