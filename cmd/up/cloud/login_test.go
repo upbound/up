@@ -204,3 +204,30 @@ func TestExtractSession(t *testing.T) {
 		})
 	}
 }
+
+func TestIsEmail(t *testing.T) {
+	cases := map[string]struct {
+		reason string
+		user   string
+		want   bool
+	}{
+		"UserIsEmail": {
+			reason: "Should return true if username is an email address.",
+			user:   "dan@upbound.io",
+			want:   true,
+		},
+		"NotEmail": {
+			reason: "Should return false if username is not an email address.",
+			user:   "hasheddan",
+			want:   false,
+		},
+	}
+	for name, tc := range cases {
+		t.Run(name, func(t *testing.T) {
+			got := isEmail(tc.user)
+			if diff := cmp.Diff(tc.want, got); diff != "" {
+				t.Errorf("\n%s\nisEmail(...): -want, +got:\n%s", tc.reason, diff)
+			}
+		})
+	}
+}

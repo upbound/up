@@ -6,6 +6,7 @@ import (
 	"encoding/json"
 	"io"
 	"net/http"
+	"strings"
 	"time"
 
 	"github.com/alecthomas/kong"
@@ -76,6 +77,12 @@ func (c *loginCmd) Run(kong *kong.Context, cloudCtx *cloud.Context) error { // n
 	// If no default profile is specified, the profile is named `default`.
 	if cloudCtx.Profile == "" {
 		cloudCtx.Profile = defaultProfileName
+	}
+	// If no account is specified and profile type is user, set profile account
+	// to user ID if not an email address. This is for convenience if a user is
+	// using a personal account.
+	if cloudCtx.Account == "" && profType == config.UserProfileType && !isEmail(auth.ID) {
+		cloudCtx.Account = auth.ID
 	}
 	if err := cloudCtx.Cfg.AddOrUpdateCloudProfile(cloudCtx.Profile, config.Profile{
 		ID:      auth.ID,
@@ -150,4 +157,9 @@ func extractSession(res *http.Response, cookieName string) (string, error) {
 		return "", errors.Wrap(err, errReadBody)
 	}
 	return "", errors.Errorf(errParseCookieFmt, string(b))
+}
+
+// isEmail determines if the specified username is an email address.
+func isEmail(user string) bool {
+	return strings.Contains(user, "@")
 }
