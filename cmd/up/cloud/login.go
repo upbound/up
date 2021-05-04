@@ -81,7 +81,7 @@ func (c *loginCmd) Run(kong *kong.Context, cloudCtx *cloud.Context) error { // n
 		ID:      auth.ID,
 		Type:    profType,
 		Session: session,
-		Org:     cloudCtx.Org,
+		Account: cloudCtx.Account,
 	}); err != nil {
 		return errors.Wrap(err, errLoginFailed)
 	}

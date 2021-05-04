@@ -53,7 +53,7 @@ func (c *AttachCmd) Run(kong *kong.Context, client *cp.Client, token *tokens.Cli
 		}
 	}
 	cpRes, err := client.Create(context.Background(), &cp.ControlPlaneCreateParameters{
-		Account:       cloudCtx.Org,
+		Account:       cloudCtx.Account,
 		Name:          c.Name,
 		Description:   c.Description,
 		SelfHosted:    true,
