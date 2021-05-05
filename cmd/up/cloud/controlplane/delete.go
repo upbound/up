@@ -3,7 +3,6 @@ package controlplane
 import (
 	"context"
 
-	"github.com/alecthomas/kong"
 	"github.com/google/uuid"
 
 	cp "github.com/upbound/up-sdk-go/service/controlplanes"
@@ -16,6 +15,6 @@ type DeleteCmd struct {
 }
 
 // Run executes the delete command.
-func (c *DeleteCmd) Run(kong *kong.Context, client *cp.Client) error {
+func (c *DeleteCmd) Run(client *cp.Client) error {
 	return client.Delete(context.Background(), c.ID)
 }

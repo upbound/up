@@ -10,14 +10,14 @@ import (
 
 // AfterApply constructs and binds Upbound-specific context to any subcommands
 // that have Run() methods that receive it.
-func (c Cmd) AfterApply(ctx *kong.Context) error {
+func (c *Cmd) AfterApply(ctx *kong.Context) error {
 	conf, src, err := cloud.ExtractConfig()
 	if err != nil {
 		return err
 	}
 	ctx.Bind(&cloud.Context{
 		Profile:  c.Profile,
-		Org:      c.Organization,
+		Account:  c.Account,
 		Endpoint: c.Endpoint,
 		Cfg:      conf,
 		CfgSrc:   src,
@@ -31,7 +31,7 @@ type Cmd struct {
 
 	ControlPlane controlPlaneCmd `cmd:"" name:"controlplane" aliases:"xp" group:"cloud" help:"Interact with control planes."`
 
-	Endpoint     *url.URL `env:"UP_ENDPOINT" default:"https://api.upbound.io" help:"Endpoint used for Upbound API."`
-	Profile      string   `env:"UP_PROFILE" help:"Profile used to execute command."`
-	Organization string   `short:"o" env:"UP_ORG" help:"Organization used to execute command."`
+	Endpoint *url.URL `env:"UP_ENDPOINT" default:"https://api.upbound.io" help:"Endpoint used for Upbound API."`
+	Profile  string   `env:"UP_PROFILE" help:"Profile used to execute command."`
+	Account  string   `short:"a" env:"UP_ACCOUNT" help:"Account used to execute command."`
 }

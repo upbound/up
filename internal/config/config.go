@@ -53,8 +53,8 @@ type Profile struct {
 	// Session is a session token used to authenticate to Upbound Cloud.
 	Session string `json:"session,omitempty"`
 
-	// Org is the default organization to use when this profile is selected.
-	Org string `json:"org,omitempty"`
+	// Account is the default account to use when this profile is selected.
+	Account string `json:"account,omitempty"`
 }
 
 // checkProfile ensures a profile does not violate constraints.

@@ -11,14 +11,14 @@ import (
 func TestAddOrUpdateCloudProfile(t *testing.T) {
 	name := "cool-profile"
 	profOne := Profile{
-		ID:   "cool-user",
-		Type: UserProfileType,
-		Org:  "cool-org",
+		ID:      "cool-user",
+		Type:    UserProfileType,
+		Account: "cool-org",
 	}
 	profTwo := Profile{
-		ID:   "cool-user",
-		Type: UserProfileType,
-		Org:  "other-org",
+		ID:      "cool-user",
+		Type:    UserProfileType,
+		Account: "other-org",
 	}
 
 	cases := map[string]struct {
@@ -80,9 +80,9 @@ func TestAddOrUpdateCloudProfile(t *testing.T) {
 func TestGetDefaultCloudProfile(t *testing.T) {
 	name := "cool-profile"
 	profOne := Profile{
-		ID:   "cool-user",
-		Type: UserProfileType,
-		Org:  "cool-org",
+		ID:      "cool-user",
+		Type:    UserProfileType,
+		Account: "cool-org",
 	}
 
 	cases := map[string]struct {
@@ -139,9 +139,9 @@ func TestGetDefaultCloudProfile(t *testing.T) {
 func TestGetCloudProfile(t *testing.T) {
 	name := "cool-profile"
 	profOne := Profile{
-		ID:   "cool-user",
-		Type: UserProfileType,
-		Org:  "cool-org",
+		ID:      "cool-user",
+		Type:    UserProfileType,
+		Account: "cool-org",
 	}
 
 	cases := map[string]struct {
@@ -185,8 +185,8 @@ func TestGetCloudProfile(t *testing.T) {
 func TestSetDefaultCloudProfile(t *testing.T) {
 	name := "cool-user"
 	profOne := Profile{
-		Type: UserProfileType,
-		Org:  "cool-org",
+		Type:    UserProfileType,
+		Account: "cool-org",
 	}
 
 	cases := map[string]struct {

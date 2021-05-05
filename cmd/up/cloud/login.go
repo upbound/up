@@ -6,14 +6,15 @@ import (
 	"encoding/json"
 	"io"
 	"net/http"
+	"strings"
 	"time"
 
-	"github.com/alecthomas/kong"
 	"github.com/dgrijalva/jwt-go"
 	"github.com/pkg/errors"
 
 	"github.com/upbound/up/internal/cloud"
 	"github.com/upbound/up/internal/config"
+	uphttp "github.com/upbound/up/internal/http"
 )
 
 const (
@@ -29,16 +30,25 @@ const (
 	errUpdateConfig   = "unable to update config file"
 )
 
+// BeforeApply sets default values in login before assignment and validation.
+func (c *loginCmd) BeforeApply() error {
+	// NOTE(hasheddan): client timeout is handled with request context.
+	c.client = &http.Client{}
+	return nil
+}
+
 // loginCmd adds a user or token profile with session token to the up config
 // file.
 type loginCmd struct {
+	client uphttp.Client
+
 	Password string `short:"p" env:"UP_PASSWORD" help:"Password for specified user."`
 	Username string `short:"u" env:"UP_USER" xor:"identifier" help:"Username used to execute command."`
 	Token    string `short:"t" env:"UP_TOKEN" xor:"identifier" help:"Token used to execute command."`
 }
 
 // Run executes the login command.
-func (c *loginCmd) Run(kong *kong.Context, cloudCtx *cloud.Context) error { // nolint:gocyclo
+func (c *loginCmd) Run(cloudCtx *cloud.Context) error { // nolint:gocyclo
 	// TODO(hasheddan): prompt for input if only username is supplied or
 	// neither.
 	ctx, cancel := context.WithTimeout(context.Background(), defaultTimeout)
@@ -57,9 +67,7 @@ func (c *loginCmd) Run(kong *kong.Context, cloudCtx *cloud.Context) error { // n
 		return errors.Wrap(err, errLoginFailed)
 	}
 	req.Header.Set("Content-Type", "application/json")
-	// NOTE(hasheddan): client timeout is handled with request context.
-	client := &http.Client{}
-	res, err := client.Do(req)
+	res, err := c.client.Do(req)
 	if err != nil {
 		return errors.Wrap(err, errLoginFailed)
 	}
@@ -77,11 +85,17 @@ func (c *loginCmd) Run(kong *kong.Context, cloudCtx *cloud.Context) error { // n
 	if cloudCtx.Profile == "" {
 		cloudCtx.Profile = defaultProfileName
 	}
+	// If no account is specified and profile type is user, set profile account
+	// to user ID if not an email address. This is for convenience if a user is
+	// using a personal account.
+	if cloudCtx.Account == "" && profType == config.UserProfileType && !isEmail(auth.ID) {
+		cloudCtx.Account = auth.ID
+	}
 	if err := cloudCtx.Cfg.AddOrUpdateCloudProfile(cloudCtx.Profile, config.Profile{
 		ID:      auth.ID,
 		Type:    profType,
 		Session: session,
-		Org:     cloudCtx.Org,
+		Account: cloudCtx.Account,
 	}); err != nil {
 		return errors.Wrap(err, errLoginFailed)
 	}
@@ -150,4 +164,9 @@ func extractSession(res *http.Response, cookieName string) (string, error) {
 		return "", errors.Wrap(err, errReadBody)
 	}
 	return "", errors.Errorf(errParseCookieFmt, string(b))
+}
+
+// isEmail determines if the specified username is an email address.
+func isEmail(user string) bool {
+	return strings.Contains(user, "@")
 }

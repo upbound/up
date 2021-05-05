@@ -13,12 +13,12 @@ import (
 )
 
 const (
-	errNoOrg = "no organization was specified and a default could not be found"
+	errNoAccount = "no account was specified and a default could not be found"
 )
 
 // AfterApply constructs and binds a control plane client to any subcommands
 // that have Run() methods that receive it.
-func (c controlPlaneCmd) AfterApply(ctx *kong.Context, cloudCtx *cloud.Context) error {
+func (c *controlPlaneCmd) AfterApply(ctx *kong.Context, cloudCtx *cloud.Context) error {
 	// TODO(hasheddan): the majority of this logic can be used generically
 	// across cloud commands when others are implemented.
 	var profile config.Profile
@@ -37,13 +37,13 @@ func (c controlPlaneCmd) AfterApply(ctx *kong.Context, cloudCtx *cloud.Context) 
 			return err
 		}
 	}
-	// If org has not already been set, use the profile default.
-	if cloudCtx.Org == "" {
-		cloudCtx.Org = profile.Org
+	// If account has not already been set, use the profile default.
+	if cloudCtx.Account == "" {
+		cloudCtx.Account = profile.Account
 	}
-	// If no org is set in profile, return an error.
-	if cloudCtx.Org == "" {
-		return errors.New(errNoOrg)
+	// If no account is set in profile, return an error.
+	if cloudCtx.Account == "" {
+		return errors.New(errNoAccount)
 	}
 	cfg, err := cloud.BuildSDKConfig(profile.Session, cloudCtx.Endpoint)
 	if err != nil {

@@ -23,7 +23,7 @@ type Context struct {
 	ID       string
 	Token    string
 	Type     config.ProfileType
-	Org      string
+	Account  string
 	Endpoint *url.URL
 	Cfg      *config.Config
 	CfgSrc   config.Source
