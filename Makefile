@@ -14,9 +14,8 @@ PLATFORMS ?= linux_amd64 linux_arm64 linux_arm darwin_amd64 windows_amd64
 # ====================================================================================
 # Setup Output
 
-# TODO(hasheddan): enable when we start building releases.
-# S3_BUCKET ?= upbound.releases
-# -include build/makelib/output.mk
+S3_BUCKET ?= public-cli.releases
+-include build/makelib/output.mk
 
 # ====================================================================================
 # Setup Go
