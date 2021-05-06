@@ -6,6 +6,7 @@ import (
 	"github.com/alecthomas/kong"
 
 	"github.com/upbound/up/cmd/up/cloud"
+	"github.com/upbound/up/cmd/up/uxp"
 	"github.com/upbound/up/internal/version"
 )
 
@@ -25,6 +26,7 @@ var cli struct {
 	Version versionFlag `short:"v" name:"version" help:"Print version and exit."`
 
 	Cloud cloud.Cmd `cmd:"" help:"Interact with Upbound Cloud."`
+	UXP   uxp.Cmd   `cmd:"" help:"Interact with UXP."`
 }
 
 func main() {
