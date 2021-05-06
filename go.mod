@@ -11,6 +11,14 @@ require (
 	github.com/pkg/errors v0.9.1
 	github.com/spf13/afero v1.6.0
 	github.com/upbound/up-sdk-go v0.0.0-20210504142142-5d0a553f9895
-	k8s.io/apimachinery v0.20.1
-	k8s.io/client-go v0.20.1
+	helm.sh/helm/v3 v3.5.4
+	k8s.io/api v0.20.4
+	k8s.io/apimachinery v0.20.4
+	k8s.io/cli-runtime v0.20.4
+	k8s.io/client-go v0.20.4
+)
+
+replace (
+	github.com/docker/distribution => github.com/docker/distribution v0.0.0-20191216044856-a8371794149d
+	github.com/docker/docker => github.com/moby/moby v17.12.0-ce-rc1.0.20200618181300-9dc6525e6118+incompatible
 )
