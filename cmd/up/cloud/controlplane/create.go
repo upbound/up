@@ -9,7 +9,7 @@ import (
 
 // CreateCmd creates a hosted control plane on Upbound Cloud.
 type CreateCmd struct {
-	Name string ` arg:"" required:"" help:"Name of control plane."`
+	Name string `arg:"" required:"" help:"Name of control plane."`
 
 	Description string `short:"d" help:"Description for control plane."`
 }
