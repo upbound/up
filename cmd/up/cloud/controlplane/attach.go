@@ -8,6 +8,7 @@ import (
 	"github.com/alecthomas/kong"
 	"github.com/google/uuid"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/client-go/kubernetes"
 
 	// Allow auth to all
 	_ "k8s.io/client-go/plugin/pkg/client/auth"
@@ -26,24 +27,38 @@ const (
 	errNoToken = "could not identify token in response"
 )
 
+// AfterApply sets default values in command after assignment and validation.
+func (c *AttachCmd) AfterApply() error {
+	if c.KubeClusterID == uuid.Nil {
+		config, err := kube.GetKubeConfig(c.Kubeconfig)
+		if err != nil {
+			return err
+		}
+		client, err := kubernetes.NewForConfig(config)
+		if err != nil {
+			return err
+		}
+		c.kClient = client
+	}
+	return nil
+}
+
 // AttachCmd adds a user or token profile with session token to the up config
 // file.
 type AttachCmd struct {
-	Name string ` arg:"" required:"" help:"Name of control plane."`
+	kClient kubernetes.Interface
+
+	Name string `arg:"" required:"" help:"Name of control plane."`
 
 	Description   string    `short:"d" help:"Description for control plane."`
 	KubeClusterID uuid.UUID `help:"ID for self-hosted Kubernetes cluster."`
 	Kubeconfig    string    `type:"existingfile" help:"Override default kubeconfig path."`
 }
 
-// Run executes the login command.
+// Run executes the attach command.
 func (c *AttachCmd) Run(kong *kong.Context, client *cp.Client, token *tokens.Client, cloudCtx *cloud.Context) error {
 	if c.KubeClusterID == uuid.Nil {
-		client, err := kube.GetKubeClient(c.Kubeconfig)
-		if err != nil {
-			return err
-		}
-		ns, err := client.CoreV1().Namespaces().Get(context.Background(), kubeIDNamespace, metav1.GetOptions{})
+		ns, err := c.kClient.CoreV1().Namespaces().Get(context.Background(), kubeIDNamespace, metav1.GetOptions{})
 		if err != nil {
 			return err
 		}
