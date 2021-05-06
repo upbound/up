@@ -22,11 +22,12 @@ import (
 )
 
 const (
-	helmDriverSecret = "secret"
-	defaultCacheDir  = ".cache/up/charts"
-	defaultNamespace = "upbound-system"
-	defaultRepoURL   = "https://charts.upbound.io/stable"
-	defaultChartName = "universal-crossplane"
+	helmDriverSecret       = "secret"
+	defaultCacheDir        = ".cache/up/charts"
+	defaultNamespace       = "upbound-system"
+	defaultRepoURL         = "https://charts.upbound.io/stable"
+	defaultUnstableRepoURL = "https://charts.upbound.io/main"
+	defaultChartName       = "universal-crossplane"
 )
 
 const (
@@ -158,7 +159,7 @@ func AllowUnstableVersions(d bool) InstallerModifierFn {
 }
 
 // NewInstaller builds a helm installer for UXP.
-func NewInstaller(config *rest.Config, modifiers ...InstallerModifierFn) (uxp.Installer, error) {
+func NewInstaller(config *rest.Config, modifiers ...InstallerModifierFn) (uxp.Installer, error) { // nolint:gocyclo
 	u, err := url.Parse(defaultRepoURL)
 	if err != nil {
 		return nil, err
@@ -177,6 +178,16 @@ func NewInstaller(config *rest.Config, modifiers ...InstallerModifierFn) (uxp.In
 	for _, m := range modifiers {
 		m(h)
 	}
+
+	// Use default unstable URL if URL is default and unstable is specified.
+	if h.unstable && h.repoURL == u {
+		unstableURL, err := url.Parse(defaultUnstableRepoURL)
+		if err != nil {
+			return nil, err
+		}
+		h.repoURL = unstableURL
+	}
+
 	if h.cacheDir == "" {
 		home, err := h.home()
 		if err != nil {
