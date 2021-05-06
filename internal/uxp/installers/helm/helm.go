@@ -15,7 +15,6 @@ import (
 	"helm.sh/helm/v3/pkg/cli"
 	"helm.sh/helm/v3/pkg/release"
 	"helm.sh/helm/v3/pkg/storage/driver"
-	"k8s.io/cli-runtime/pkg/genericclioptions"
 	"k8s.io/client-go/rest"
 
 	"github.com/upbound/up/internal/uxp"
@@ -31,12 +30,13 @@ const (
 )
 
 const (
-	errVerifyInstalledVersion  = "could not identify current version"
-	errVerifyChartNotInstalled = "could not verify that chart is not already installed"
-	errPullChart               = "could not pull chart"
-	errGetLatestPulled         = "could not identify chart pulled as latest"
-	errCorruptTempDirFmt       = "corrupt chart tmp directory, consider removing cache (%s)"
-	errMoveLatest              = "could not move latest pulled chart to cache"
+	errVerifyInstalledVersion   = "could not identify current version"
+	errVerifyChartNotInstalled  = "could not verify that chart is not already installed"
+	errChartAlreadyInstalledFmt = "chart already installed with version %s"
+	errPullChart                = "could not pull chart"
+	errGetLatestPulled          = "could not identify chart pulled as latest"
+	errCorruptTempDirFmt        = "corrupt chart tmp directory, consider removing cache (%s)"
+	errMoveLatest               = "could not move latest pulled chart to cache"
 
 	errUpgradeVersionsSame   = "upgrade version is same as existing"
 	errFailedUpgradeRollback = "failed upgrade resulted in a failed rollback"
@@ -196,7 +196,7 @@ func NewInstaller(config *rest.Config, modifiers ...InstallerModifierFn) (uxp.In
 		h.cacheDir = filepath.Join(home, defaultCacheDir)
 	}
 	actionConfig := new(action.Configuration)
-	if err := actionConfig.Init(genericclioptions.NewConfigFlags(false), h.namespace, helmDriverSecret, func(format string, v ...interface{}) {
+	if err := actionConfig.Init(newRESTClientGetter(config, h.namespace), h.namespace, helmDriverSecret, func(format string, v ...interface{}) {
 		h.log.Debug(fmt.Sprintf(format, v))
 	}); err != nil {
 		return nil, err
@@ -231,6 +231,7 @@ func NewInstaller(config *rest.Config, modifiers ...InstallerModifierFn) (uxp.In
 
 	// Upgrade Client
 	uc := action.NewUpgrade(actionConfig)
+	uc.Namespace = h.namespace
 	h.upgradeClient = uc
 
 	// Uninstall Client
@@ -258,7 +259,11 @@ func (h *installer) GetCurrentVersion() (string, error) {
 // Install installs UXP in the cluster.
 func (h *installer) Install(version string) error {
 	// make sure no version is already installed
-	if _, err := h.GetCurrentVersion(); !errors.Is(err, driver.ErrReleaseNotFound) {
+	current, err := h.GetCurrentVersion()
+	if err == nil {
+		return errors.Errorf(errChartAlreadyInstalledFmt, current)
+	}
+	if !errors.Is(err, driver.ErrReleaseNotFound) {
 		return errors.Wrap(err, errVerifyChartNotInstalled)
 	}
 	// install desired version
