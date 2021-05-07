@@ -62,16 +62,17 @@ func (c *connectCmd) Run(kong *kong.Context, uxpCtx *uxp.Context) error {
 	if err != nil && !kerrors.IsAlreadyExists(err) {
 		return err
 	}
-	_, err = c.kClient.CoreV1().Secrets(uxpCtx.Namespace).Create(context.Background(), &corev1.Secret{
+	secret := &corev1.Secret{
 		ObjectMeta: metav1.ObjectMeta{
 			Name: defaultSecretName,
 		},
 		StringData: map[string]string{
 			defaultSecretKey: c.CPToken,
 		},
-	}, metav1.CreateOptions{})
-	if err != nil {
-		return err
 	}
-	return nil
+	_, err = c.kClient.CoreV1().Secrets(uxpCtx.Namespace).Create(context.Background(), secret, metav1.CreateOptions{})
+	if err != nil && kerrors.IsAlreadyExists(err) {
+		_, err = c.kClient.CoreV1().Secrets(uxpCtx.Namespace).Update(context.Background(), secret, metav1.UpdateOptions{})
+	}
+	return err
 }
