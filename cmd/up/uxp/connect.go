@@ -4,6 +4,7 @@ import (
 	"context"
 	"io"
 	"os"
+	"strings"
 
 	"github.com/alecthomas/kong"
 	corev1 "k8s.io/api/core/v1"
@@ -48,6 +49,10 @@ func (c *connectCmd) Run(kong *kong.Context, uxpCtx *uxp.Context) error {
 		}
 		c.CPToken = string(b)
 	}
+	// Remove any trailing newlines from token, which can make piping output
+	// from other commands more convenient.
+	c.CPToken = strings.TrimRight(c.CPToken, "\r\n")
+
 	// Create namespace if it does not exist.
 	_, err := c.kClient.CoreV1().Namespaces().Create(context.Background(), &corev1.Namespace{
 		ObjectMeta: metav1.ObjectMeta{
