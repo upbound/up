@@ -16,8 +16,7 @@ import (
 )
 
 const (
-	defaultSecretName = "upbound-control-plane-token"
-	defaultSecretKey  = "token"
+	defaultSecretKey = "token"
 )
 
 // AfterApply sets default values in command before assignment and validation.
@@ -37,6 +36,8 @@ type connectCmd struct {
 	stdin   io.Reader
 
 	CPToken string `arg:"" required:"" help:"Token used to connect self-hosted control plane."`
+
+	TokenSecretName string `default:"upbound-control-plane-token" help:"Name of secret that will be populated with token data."`
 }
 
 // Run executes the connect command.
@@ -64,7 +65,7 @@ func (c *connectCmd) Run(kong *kong.Context, uxpCtx *uxp.Context) error {
 	}
 	secret := &corev1.Secret{
 		ObjectMeta: metav1.ObjectMeta{
-			Name: defaultSecretName,
+			Name: c.TokenSecretName,
 		},
 		StringData: map[string]string{
 			defaultSecretKey: c.CPToken,
