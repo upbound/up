@@ -51,7 +51,7 @@ func (c *connectCmd) Run(kong *kong.Context, uxpCtx *uxp.Context) error {
 	}
 	// Remove any trailing newlines from token, which can make piping output
 	// from other commands more convenient.
-	c.CPToken = strings.TrimRight(c.CPToken, "\r\n")
+	c.CPToken = strings.TrimSpace(c.CPToken)
 
 	// Create namespace if it does not exist.
 	_, err := c.kClient.CoreV1().Namespaces().Create(context.Background(), &corev1.Namespace{
