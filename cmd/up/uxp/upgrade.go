@@ -9,7 +9,8 @@ import (
 func (c *upgradeCmd) AfterApply(uxpCtx *uxp.Context) error {
 	installer, err := helm.NewInstaller(uxpCtx.Kubeconfig,
 		helm.WithNamespace(uxpCtx.Namespace),
-		helm.AllowUnstableVersions(c.Unstable))
+		helm.AllowUnstableVersions(c.Unstable),
+		helm.RollbackOnError(c.Rollback))
 	if err != nil {
 		return err
 	}
@@ -23,7 +24,8 @@ type upgradeCmd struct {
 
 	Version string `arg:"" optional:"" help:"UXP version to upgrade to."`
 
-	Unstable bool `help:"Allow installing unstable UXP versions."`
+	Rollback bool `help:"Rollback to previously installed version on failed upgrade."`
+	Unstable bool `help:"Allow upgrading to unstable UXP versions."`
 }
 
 // Run executes the upgrade command.
