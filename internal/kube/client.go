@@ -3,7 +3,7 @@ package kube
 import (
 	"path/filepath"
 
-	"k8s.io/client-go/kubernetes"
+	"k8s.io/client-go/rest"
 	"k8s.io/client-go/tools/clientcmd"
 	"k8s.io/client-go/util/homedir"
 )
@@ -15,14 +15,10 @@ const (
 	KubeconfigFile = "config"
 )
 
-// GetKubeClient constructs a Kubernetes client from the specified kubeconfig.
-func GetKubeClient(path string) (*kubernetes.Clientset, error) {
+// GetKubeConfig constructs a Kubernetes REST config from the specified kubeconfig.
+func GetKubeConfig(path string) (*rest.Config, error) {
 	if path == "" {
 		path = filepath.Join(homedir.HomeDir(), KubeconfigDir, KubeconfigFile)
 	}
-	config, err := clientcmd.BuildConfigFromFlags("", path)
-	if err != nil {
-		return nil, err
-	}
-	return kubernetes.NewForConfig(config)
+	return clientcmd.BuildConfigFromFlags("", path)
 }
