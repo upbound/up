@@ -2,11 +2,11 @@ package controlplane
 
 import (
 	"context"
-	"errors"
 	"fmt"
 
 	"github.com/alecthomas/kong"
 	"github.com/google/uuid"
+	"github.com/pkg/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/client-go/kubernetes"
 
@@ -24,7 +24,8 @@ const (
 	kubeIDNamespace = "kube-system"
 	jwtKey          = "jwt"
 
-	errNoToken = "could not identify token in response"
+	errKubeSystemUID = "unable to extract kube-system namespace uid for usage as cluster identifier"
+	errNoToken       = "could not identify token in response"
 )
 
 // AfterApply sets default values in command after assignment and validation.
@@ -60,11 +61,11 @@ func (c *AttachCmd) Run(kong *kong.Context, client *cp.Client, token *tokens.Cli
 	if c.KubeClusterID == uuid.Nil {
 		ns, err := c.kClient.CoreV1().Namespaces().Get(context.Background(), kubeIDNamespace, metav1.GetOptions{})
 		if err != nil {
-			return err
+			return errors.Wrap(err, errKubeSystemUID)
 		}
 		c.KubeClusterID, err = uuid.Parse(string(ns.GetObjectMeta().GetUID()))
 		if err != nil {
-			return err
+			return errors.Wrap(err, errKubeSystemUID)
 		}
 	}
 	cpRes, err := client.Create(context.Background(), &cp.ControlPlaneCreateParameters{
