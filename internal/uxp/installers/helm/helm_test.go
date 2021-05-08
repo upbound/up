@@ -387,6 +387,91 @@ func TestUpgrade(t *testing.T) {
 						return errBoom
 					},
 				},
+				cacheDir:        "/",
+				chartName:       "test",
+				rollbackOnError: true,
+				load: func(string) (*chart.Chart, error) {
+					return nil, nil
+				},
+			},
+			fsSetup: func() afero.Fs {
+				fs := afero.NewMemMapFs()
+				f, _ := fs.Create("test-real-version.tgz")
+				_ = f.Close()
+				return fs
+			},
+			version: "real-version",
+			err:     errors.Wrap(errBoom, errFailedUpgradeFailedRollback),
+		},
+		"ErrorUpgradeSuccessfulRollback": {
+			reason: "If upgrade fails but rollback is successful a wrapped error should be returned.",
+			installer: &installer{
+				getClient: &mockGetClient{
+					runFn: func(string) (*release.Release, error) {
+						return &release.Release{
+							Chart: &chart.Chart{
+								Metadata: &chart.Metadata{
+									Version: "a-version",
+								},
+							},
+						}, nil
+					},
+				},
+				pullClient: &mockPullClient{
+					runFn: func(string) (string, error) {
+						return "", nil
+					},
+				},
+				upgradeClient: &mockUpgradeClient{
+					runFn: func(string, *chart.Chart, map[string]interface{}) (*release.Release, error) {
+						return nil, errBoom
+					},
+				},
+				rollbackClient: &mockRollbackClient{
+					runFn: func(string) error {
+						return nil
+					},
+				},
+				cacheDir:        "/",
+				chartName:       "test",
+				rollbackOnError: true,
+				load: func(string) (*chart.Chart, error) {
+					return nil, nil
+				},
+			},
+			fsSetup: func() afero.Fs {
+				fs := afero.NewMemMapFs()
+				f, _ := fs.Create("test-real-version.tgz")
+				_ = f.Close()
+				return fs
+			},
+			version: "real-version",
+			err:     errors.Wrap(errBoom, errFailedUpgradeRollback),
+		},
+		"ErrorUpgradeNolRollback": {
+			reason: "If upgrade fails an error should be returned.",
+			installer: &installer{
+				getClient: &mockGetClient{
+					runFn: func(string) (*release.Release, error) {
+						return &release.Release{
+							Chart: &chart.Chart{
+								Metadata: &chart.Metadata{
+									Version: "a-version",
+								},
+							},
+						}, nil
+					},
+				},
+				pullClient: &mockPullClient{
+					runFn: func(string) (string, error) {
+						return "", nil
+					},
+				},
+				upgradeClient: &mockUpgradeClient{
+					runFn: func(string, *chart.Chart, map[string]interface{}) (*release.Release, error) {
+						return nil, errBoom
+					},
+				},
 				cacheDir:  "/",
 				chartName: "test",
 				load: func(string) (*chart.Chart, error) {
@@ -400,7 +485,7 @@ func TestUpgrade(t *testing.T) {
 				return fs
 			},
 			version: "real-version",
-			err:     errors.Wrap(errBoom, errFailedUpgradeRollback),
+			err:     errBoom,
 		},
 		"Successful": {
 			reason: "If upgrade is successful no error should be returned.",

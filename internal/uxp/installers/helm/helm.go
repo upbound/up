@@ -38,8 +38,9 @@ const (
 	errCorruptTempDirFmt        = "corrupt chart tmp directory, consider removing cache (%s)"
 	errMoveLatest               = "could not move latest pulled chart to cache"
 
-	errUpgradeVersionsSame   = "upgrade version is same as existing"
-	errFailedUpgradeRollback = "failed upgrade resulted in a failed rollback"
+	errUpgradeVersionsSame         = "upgrade version is same as existing"
+	errFailedUpgradeFailedRollback = "failed upgrade resulted in a failed rollback"
+	errFailedUpgradeRollback       = "failed upgrade was rolled back"
 )
 
 type helmPuller interface {
@@ -90,15 +91,16 @@ type LoaderFn func(name string) (*chart.Chart, error)
 type HomeDirFn func() (string, error)
 
 type installer struct {
-	repoURL   *url.URL
-	chartName string
-	namespace string
-	cacheDir  string
-	unstable  bool
-	home      HomeDirFn
-	fs        afero.Fs
-	tempDir   TempDirFn
-	log       logging.Logger
+	repoURL         *url.URL
+	chartName       string
+	namespace       string
+	cacheDir        string
+	unstable        bool
+	rollbackOnError bool
+	home            HomeDirFn
+	fs              afero.Fs
+	tempDir         TempDirFn
+	log             logging.Logger
 
 	// Clients
 	pullClient      helmPuller
@@ -155,6 +157,13 @@ func WithCacheDir(c string) InstallerModifierFn {
 func AllowUnstableVersions(d bool) InstallerModifierFn {
 	return func(h *installer) {
 		h.unstable = d
+	}
+}
+
+// RollbackOnError will cause installer to rollback on failed upgrade.
+func RollbackOnError(r bool) InstallerModifierFn {
+	return func(h *installer) {
+		h.rollbackOnError = r
 	}
 }
 
@@ -289,12 +298,14 @@ func (h *installer) Upgrade(version string) error {
 	if err != nil {
 		return err
 	}
-	if _, err = h.upgradeClient.Run(h.chartName, chart, map[string]interface{}{}); err != nil {
-		if err := h.rollbackClient.Run(h.chartName); err != nil {
-			return errors.Wrap(err, errFailedUpgradeRollback)
+	_, upErr := h.upgradeClient.Run(h.chartName, chart, map[string]interface{}{})
+	if upErr != nil && h.rollbackOnError {
+		if rErr := h.rollbackClient.Run(h.chartName); rErr != nil {
+			return errors.Wrap(rErr, errFailedUpgradeFailedRollback)
 		}
+		return errors.Wrap(upErr, errFailedUpgradeRollback)
 	}
-	return err
+	return upErr
 }
 
 // Uninstall uninstalls a UXP installation.
