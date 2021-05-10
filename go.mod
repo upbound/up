@@ -10,7 +10,7 @@ require (
 	github.com/google/uuid v1.1.2
 	github.com/pkg/errors v0.9.1
 	github.com/spf13/afero v1.6.0
-	github.com/upbound/up-sdk-go v0.0.0-20210504142142-5d0a553f9895
+	github.com/upbound/up-sdk-go v0.0.0-20210510154259-67152a64ee01
 	helm.sh/helm/v3 v3.5.4
 	k8s.io/api v0.20.4
 	k8s.io/apimachinery v0.20.4
