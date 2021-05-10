@@ -41,8 +41,9 @@ func (v versionFlag) BeforeApply(ctx *kong.Context) error { // nolint:unparam
 var cli struct {
 	Version versionFlag `short:"v" name:"version" help:"Print version and exit."`
 
-	Cloud cloud.Cmd `cmd:"" help:"Interact with Upbound Cloud."`
-	UXP   uxp.Cmd   `cmd:"" help:"Interact with UXP."`
+	License licenseCmd `cmd:"" help:"Print Up license information."`
+	Cloud   cloud.Cmd  `cmd:"" help:"Interact with Upbound Cloud."`
+	UXP     uxp.Cmd    `cmd:"" help:"Interact with UXP."`
 }
 
 func main() {
