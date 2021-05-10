@@ -12,13 +12,16 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-package uxp
+// +build generate
 
-// Installer can install and manage UXP in a Kubernetes cluster.
-// TODO(hasheddan): support custom error types, such as AlreadyExists.
-type Installer interface {
-	GetCurrentVersion() (string, error)
-	Install(version string) error
-	Upgrade(version string) error
-	Uninstall() error
-}
+// NOTE(negz): See the below link for details on what is happening here.
+// https://github.com/golang/go/wiki/Modules#how-can-i-track-tool-dependencies-for-a-module
+
+// Add license headers to all files.
+//go:generate go run -tags generate github.com/google/addlicense -v -c "Upbound Inc" . ../cmd
+
+package internal
+
+import (
+	_ "github.com/google/addlicense" //nolint:typecheck
+)
