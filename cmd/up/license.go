@@ -14,22 +14,19 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-package mocks
+package main
 
 import (
-	"net/http"
+	"fmt"
 
-	uphttp "github.com/upbound/up/internal/http"
+	"github.com/alecthomas/kong"
 )
 
-var _ uphttp.Client = &MockClient{}
+// licenseCmd prints license information for using Up.
+type licenseCmd struct{}
 
-// MockClient is a mock HTTP client.
-type MockClient struct {
-	DoFn func(req *http.Request) (*http.Response, error)
-}
-
-// Do calls the underlying DoFn.
-func (m *MockClient) Do(req *http.Request) (*http.Response, error) {
-	return m.DoFn(req)
+// Run executes the license command.
+func (c *licenseCmd) Run(kong *kong.Context) error {
+	_, err := fmt.Fprintln(kong.Stdout, "By using Up, you are accepting to comply with terms and conditions in https://licenses.upbound.io/upbound-software-license.html")
+	return err
 }
