@@ -41,6 +41,7 @@ const (
 	defaultRepoURL         = "https://charts.upbound.io/stable"
 	defaultUnstableRepoURL = "https://charts.upbound.io/main"
 	defaultChartName       = "universal-crossplane"
+	allVersions            = ">0.0.0-0"
 )
 
 const (
@@ -364,6 +365,12 @@ func (h *installer) pullAndLoad(version string) (*chart.Chart, error) {
 }
 
 func (h *installer) pullChart(version string) error {
+	// NOTE(hasheddan): Because UXP uses different Helm repos for stable and
+	// development versions, we are safe to set version to latest in repo
+	// regardless of whether stable or unstable is specified.
+	if version == "" {
+		version = allVersions
+	}
 	h.pullClient.SetVersion(version)
 	_, err := h.pullClient.Run(h.chartName)
 	return err
