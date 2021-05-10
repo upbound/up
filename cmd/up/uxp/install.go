@@ -16,14 +16,23 @@ package uxp
 
 import (
 	"context"
+	"io"
+	"os"
 
+	"github.com/pkg/errors"
 	corev1 "k8s.io/api/core/v1"
 	kerrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/client-go/kubernetes"
+	"sigs.k8s.io/yaml"
 
 	"github.com/upbound/up/internal/uxp"
 	"github.com/upbound/up/internal/uxp/installers/helm"
+)
+
+const (
+	errReadParametersFile     = "unable to read parameters file"
+	errParseInstallParameters = "unable to parse install parameters"
 )
 
 // AfterApply sets default values in command after assignment and validation.
@@ -40,17 +49,34 @@ func (c *installCmd) AfterApply(uxpCtx *uxp.Context) error {
 		return err
 	}
 	c.kClient = client
+	base := map[string]interface{}{}
+	if c.File != nil {
+		b, err := io.ReadAll(c.File)
+		if err != nil {
+			return errors.Wrap(err, errReadParametersFile)
+		}
+		if err := yaml.Unmarshal(b, &base); err != nil {
+			return errors.Wrap(err, errReadParametersFile)
+		}
+		if err := c.File.Close(); err != nil {
+			return errors.Wrap(err, errReadParametersFile)
+		}
+	}
+	c.parser = helm.NewParser(base, c.Set)
 	return nil
 }
 
 // installCmd installs UXP.
 type installCmd struct {
 	installer uxp.Installer
+	parser    uxp.ParameterParser
 	kClient   kubernetes.Interface
 
 	Version string `arg:"" optional:"" help:"UXP version to install."`
 
-	Unstable bool `help:"Allow installing unstable UXP versions."`
+	Unstable bool              `help:"Allow installing unstable UXP versions."`
+	Set      map[string]string `help:"Set install parameters."`
+	File     *os.File          `short:"f" help:"Parameters file for install."`
 }
 
 // Run executes the install command.
@@ -64,7 +90,11 @@ func (c *installCmd) Run(uxpCtx *uxp.Context) error {
 	if err != nil && !kerrors.IsAlreadyExists(err) {
 		return err
 	}
-	err = c.installer.Install(c.Version)
+	params, err := c.parser.Parse()
+	if err != nil {
+		return errors.Wrap(err, errParseInstallParameters)
+	}
+	err = c.installer.Install(c.Version, params)
 	if err != nil {
 		return err
 	}

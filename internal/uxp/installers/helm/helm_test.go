@@ -256,7 +256,7 @@ func TestInstall(t *testing.T) {
 	for name, tc := range cases {
 		t.Run(name, func(t *testing.T) {
 			tc.installer.fs = tc.fsSetup()
-			err := tc.installer.Install(tc.version)
+			err := tc.installer.Install(tc.version, nil)
 			if diff := cmp.Diff(tc.err, err, test.EquateErrors()); diff != "" {
 				t.Errorf("\n%s\nInstall(...): -want error, +got error:\n%s", tc.reason, diff)
 			}
@@ -284,25 +284,6 @@ func TestUpgrade(t *testing.T) {
 			},
 			fsSetup: afero.NewMemMapFs,
 			err:     errBoom,
-		},
-		"ErrorInstalledSameVersion": {
-			reason: "If installed version matches upgrade version an error should be returned.",
-			installer: &installer{
-				getClient: &mockGetClient{
-					runFn: func(string) (*release.Release, error) {
-						return &release.Release{
-							Chart: &chart.Chart{
-								Metadata: &chart.Metadata{
-									Version: "a-version",
-								},
-							},
-						}, nil
-					},
-				},
-			},
-			version: "a-version",
-			fsSetup: afero.NewMemMapFs,
-			err:     errors.New(errUpgradeVersionsSame),
 		},
 		"ErrorPullNewVersion": {
 			reason: "If unable to pull specified version an error should be returned.",
@@ -548,7 +529,7 @@ func TestUpgrade(t *testing.T) {
 	for name, tc := range cases {
 		t.Run(name, func(t *testing.T) {
 			tc.installer.fs = tc.fsSetup()
-			err := tc.installer.Upgrade(tc.version)
+			err := tc.installer.Upgrade(tc.version, nil)
 			if diff := cmp.Diff(tc.err, err, test.EquateErrors()); diff != "" {
 				t.Errorf("\n%s\nUpgrade(...): -want error, +got error:\n%s", tc.reason, diff)
 			}

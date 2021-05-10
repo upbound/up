@@ -18,7 +18,12 @@ package uxp
 // TODO(hasheddan): support custom error types, such as AlreadyExists.
 type Installer interface {
 	GetCurrentVersion() (string, error)
-	Install(version string) error
-	Upgrade(version string) error
+	Install(version string, parameters map[string]interface{}) error
+	Upgrade(version string, parameters map[string]interface{}) error
 	Uninstall() error
+}
+
+// ParameterParser parses install and upgrade parameters.
+type ParameterParser interface {
+	Parse() (map[string]interface{}, error)
 }

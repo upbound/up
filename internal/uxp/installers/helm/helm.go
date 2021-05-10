@@ -41,6 +41,7 @@ const (
 	defaultRepoURL         = "https://charts.upbound.io/stable"
 	defaultUnstableRepoURL = "https://charts.upbound.io/main"
 	defaultChartName       = "universal-crossplane"
+	allVersions            = ">0.0.0-0"
 )
 
 const (
@@ -52,7 +53,6 @@ const (
 	errCorruptTempDirFmt        = "corrupt chart tmp directory, consider removing cache (%s)"
 	errMoveLatest               = "could not move latest pulled chart to cache"
 
-	errUpgradeVersionsSame         = "upgrade version is same as existing"
 	errFailedUpgradeFailedRollback = "failed upgrade resulted in a failed rollback"
 	errFailedUpgradeRollback       = "failed upgrade was rolled back"
 )
@@ -280,7 +280,7 @@ func (h *installer) GetCurrentVersion() (string, error) {
 }
 
 // Install installs UXP in the cluster.
-func (h *installer) Install(version string) error {
+func (h *installer) Install(version string, parameters map[string]interface{}) error {
 	// make sure no version is already installed
 	current, err := h.GetCurrentVersion()
 	if err == nil {
@@ -294,25 +294,21 @@ func (h *installer) Install(version string) error {
 	if err != nil {
 		return err
 	}
-	_, err = h.installClient.Run(chart, map[string]interface{}{})
+	_, err = h.installClient.Run(chart, parameters)
 	return err
 }
 
 // Upgrade upgrades an existing UXP installation to a new version.
-func (h *installer) Upgrade(version string) error {
-	// check if version exists and is not the same as desired
-	current, err := h.GetCurrentVersion()
-	if err != nil {
+func (h *installer) Upgrade(version string, parameters map[string]interface{}) error {
+	// check if version exists
+	if _, err := h.GetCurrentVersion(); err != nil {
 		return err
-	}
-	if version != "" && version == current {
-		return errors.New(errUpgradeVersionsSame)
 	}
 	chart, err := h.pullAndLoad(version)
 	if err != nil {
 		return err
 	}
-	_, upErr := h.upgradeClient.Run(h.chartName, chart, map[string]interface{}{})
+	_, upErr := h.upgradeClient.Run(h.chartName, chart, parameters)
 	if upErr != nil && h.rollbackOnError {
 		if rErr := h.rollbackClient.Run(h.chartName); rErr != nil {
 			return errors.Wrap(rErr, errFailedUpgradeFailedRollback)
@@ -369,6 +365,12 @@ func (h *installer) pullAndLoad(version string) (*chart.Chart, error) {
 }
 
 func (h *installer) pullChart(version string) error {
+	// NOTE(hasheddan): Because UXP uses different Helm repos for stable and
+	// development versions, we are safe to set version to latest in repo
+	// regardless of whether stable or unstable is specified.
+	if version == "" {
+		version = allVersions
+	}
 	h.pullClient.SetVersion(version)
 	_, err := h.pullClient.Run(h.chartName)
 	return err
