@@ -18,6 +18,7 @@ import (
 	"github.com/alecthomas/kong"
 	"github.com/pkg/errors"
 
+	"github.com/upbound/up-sdk-go/service/accounts"
 	cp "github.com/upbound/up-sdk-go/service/controlplanes"
 	"github.com/upbound/up-sdk-go/service/tokens"
 
@@ -65,6 +66,7 @@ func (c *controlPlaneCmd) AfterApply(ctx *kong.Context, cloudCtx *cloud.Context)
 	}
 	ctx.Bind(cp.NewClient(cfg))
 	ctx.Bind(tokens.NewClient(cfg))
+	ctx.Bind(accounts.NewClient(cfg))
 	return nil
 }
 
@@ -73,4 +75,5 @@ type controlPlaneCmd struct {
 	Attach controlplane.AttachCmd `cmd:"" help:"Attach a self-hosted control plane."`
 	Create controlplane.CreateCmd `cmd:"" help:"Create a hosted control plane."`
 	Delete controlplane.DeleteCmd `cmd:"" help:"Delete a control plane."`
+	List   controlplane.ListCmd   `cmd:"" help:"List control planes for the account."`
 }
