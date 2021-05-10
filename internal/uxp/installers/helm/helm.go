@@ -52,7 +52,6 @@ const (
 	errCorruptTempDirFmt        = "corrupt chart tmp directory, consider removing cache (%s)"
 	errMoveLatest               = "could not move latest pulled chart to cache"
 
-	errUpgradeVersionsSame         = "upgrade version is same as existing"
 	errFailedUpgradeFailedRollback = "failed upgrade resulted in a failed rollback"
 	errFailedUpgradeRollback       = "failed upgrade was rolled back"
 )
@@ -300,13 +299,9 @@ func (h *installer) Install(version string, parameters map[string]interface{}) e
 
 // Upgrade upgrades an existing UXP installation to a new version.
 func (h *installer) Upgrade(version string, parameters map[string]interface{}) error {
-	// check if version exists and is not the same as desired
-	current, err := h.GetCurrentVersion()
-	if err != nil {
+	// check if version exists
+	if _, err := h.GetCurrentVersion(); err != nil {
 		return err
-	}
-	if version != "" && version == current {
-		return errors.New(errUpgradeVersionsSame)
 	}
 	chart, err := h.pullAndLoad(version)
 	if err != nil {

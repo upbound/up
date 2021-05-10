@@ -285,25 +285,6 @@ func TestUpgrade(t *testing.T) {
 			fsSetup: afero.NewMemMapFs,
 			err:     errBoom,
 		},
-		"ErrorInstalledSameVersion": {
-			reason: "If installed version matches upgrade version an error should be returned.",
-			installer: &installer{
-				getClient: &mockGetClient{
-					runFn: func(string) (*release.Release, error) {
-						return &release.Release{
-							Chart: &chart.Chart{
-								Metadata: &chart.Metadata{
-									Version: "a-version",
-								},
-							},
-						}, nil
-					},
-				},
-			},
-			version: "a-version",
-			fsSetup: afero.NewMemMapFs,
-			err:     errors.New(errUpgradeVersionsSame),
-		},
 		"ErrorPullNewVersion": {
 			reason: "If unable to pull specified version an error should be returned.",
 			installer: &installer{
