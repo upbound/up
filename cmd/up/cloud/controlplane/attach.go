@@ -70,6 +70,7 @@ type AttachCmd struct {
 	Description   string    `short:"d" help:"Description for control plane."`
 	KubeClusterID uuid.UUID `help:"ID for self-hosted Kubernetes cluster."`
 	Kubeconfig    string    `type:"existingfile" help:"Override default kubeconfig path."`
+	ViewOnly      bool      `help:"Create control plane with view only permissions."`
 }
 
 // Run executes the attach command.
@@ -93,6 +94,11 @@ func (c *AttachCmd) Run(kong *kong.Context, client *cp.Client, token *tokens.Cli
 	})
 	if err != nil {
 		return err
+	}
+	if c.ViewOnly {
+		if err := client.SetViewOnly(context.Background(), cpRes.ControlPlane.ID, c.ViewOnly); err != nil {
+			return err
+		}
 	}
 	tRes, err := token.Create(context.Background(), &tokens.TokenCreateParameters{
 		Attributes: tokens.TokenAttributes{
