@@ -280,7 +280,7 @@ func (h *installer) GetCurrentVersion() (string, error) {
 }
 
 // Install installs UXP in the cluster.
-func (h *installer) Install(version string) error {
+func (h *installer) Install(version string, parameters map[string]interface{}) error {
 	// make sure no version is already installed
 	current, err := h.GetCurrentVersion()
 	if err == nil {
@@ -294,12 +294,12 @@ func (h *installer) Install(version string) error {
 	if err != nil {
 		return err
 	}
-	_, err = h.installClient.Run(chart, map[string]interface{}{})
+	_, err = h.installClient.Run(chart, parameters)
 	return err
 }
 
 // Upgrade upgrades an existing UXP installation to a new version.
-func (h *installer) Upgrade(version string) error {
+func (h *installer) Upgrade(version string, parameters map[string]interface{}) error {
 	// check if version exists and is not the same as desired
 	current, err := h.GetCurrentVersion()
 	if err != nil {
@@ -312,7 +312,7 @@ func (h *installer) Upgrade(version string) error {
 	if err != nil {
 		return err
 	}
-	_, upErr := h.upgradeClient.Run(h.chartName, chart, map[string]interface{}{})
+	_, upErr := h.upgradeClient.Run(h.chartName, chart, parameters)
 	if upErr != nil && h.rollbackOnError {
 		if rErr := h.rollbackClient.Run(h.chartName); rErr != nil {
 			return errors.Wrap(rErr, errFailedUpgradeFailedRollback)

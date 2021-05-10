@@ -256,7 +256,7 @@ func TestInstall(t *testing.T) {
 	for name, tc := range cases {
 		t.Run(name, func(t *testing.T) {
 			tc.installer.fs = tc.fsSetup()
-			err := tc.installer.Install(tc.version)
+			err := tc.installer.Install(tc.version, nil)
 			if diff := cmp.Diff(tc.err, err, test.EquateErrors()); diff != "" {
 				t.Errorf("\n%s\nInstall(...): -want error, +got error:\n%s", tc.reason, diff)
 			}
@@ -548,7 +548,7 @@ func TestUpgrade(t *testing.T) {
 	for name, tc := range cases {
 		t.Run(name, func(t *testing.T) {
 			tc.installer.fs = tc.fsSetup()
-			err := tc.installer.Upgrade(tc.version)
+			err := tc.installer.Upgrade(tc.version, nil)
 			if diff := cmp.Diff(tc.err, err, test.EquateErrors()); diff != "" {
 				t.Errorf("\n%s\nUpgrade(...): -want error, +got error:\n%s", tc.reason, diff)
 			}
