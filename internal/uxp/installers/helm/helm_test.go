@@ -353,6 +353,54 @@ func TestUpgrade(t *testing.T) {
 			fsSetup: afero.NewMemMapFs,
 			err:     errors.New(errUpgradeCrossplaneVersion),
 		},
+		"CrossplaneVersionNotMatchForce": {
+			reason: "If force is specified, upgrade should be attempted regardless of version mismatch.",
+			installer: &installer{
+				namespace: "test",
+				force:     true,
+				getClient: &mockGetClient{
+					runFn: func(n string) (*release.Release, error) {
+						if n == crossplaneChartName {
+							return &release.Release{
+								Chart: &chart.Chart{
+									Metadata: &chart.Metadata{
+										Version: "1.2.1",
+									},
+								},
+							}, nil
+						}
+						return nil, driver.ErrReleaseNotFound
+					},
+				},
+				pullClient: &mockPullClient{
+					runFn: func(string) (string, error) {
+						return "", nil
+					},
+				},
+				upgradeClient: &mockUpgradeClient{
+					runFn: func(string, *chart.Chart, map[string]interface{}) (*release.Release, error) {
+						return nil, nil
+					},
+				},
+				rollbackClient: &mockRollbackClient{
+					runFn: func(string) error {
+						return nil
+					},
+				},
+				cacheDir:  "/",
+				chartName: "test",
+				load: func(string) (*chart.Chart, error) {
+					return nil, nil
+				},
+			},
+			fsSetup: func() afero.Fs {
+				fs := afero.NewMemMapFs()
+				f, _ := fs.Create("test-real-version.tgz")
+				_ = f.Close()
+				return fs
+			},
+			version: "real-version",
+		},
 		"ErrorPullNewVersion": {
 			reason: "If unable to pull specified version an error should be returned.",
 			installer: &installer{
