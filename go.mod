@@ -3,6 +3,7 @@ module github.com/upbound/up
 go 1.16
 
 require (
+	github.com/Masterminds/semver/v3 v3.1.1
 	github.com/alecthomas/kong v0.2.16
 	github.com/crossplane/crossplane-runtime v0.13.0
 	github.com/dgrijalva/jwt-go v3.2.0+incompatible

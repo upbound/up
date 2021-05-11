@@ -105,7 +105,43 @@ func TestGetCurrentVersion(t *testing.T) {
 					},
 				},
 			},
+			err: errBoom,
+		},
+		"ErrorGetReleaseFallbackCrossplaneError": {
+			reason: "If uxp release not found and crossplane fallback fails an error should be returned.",
+			installer: &installer{
+				namespace: "test",
+				getClient: &mockGetClient{
+					runFn: func(n string) (*release.Release, error) {
+						if n == crossplaneChartName {
+							return nil, errBoom
+						}
+						return nil, driver.ErrReleaseNotFound
+					},
+				},
+			},
 			err: errors.Wrapf(errBoom, errGetInstalledReleaseFmt, "test"),
+		},
+		"ErrorGetReleaseFallbackCrossplaneSuccess": {
+			reason: "If unable to get uxp release but crossplane is found an error should not be returned.",
+			installer: &installer{
+				namespace: "test",
+				getClient: &mockGetClient{
+					runFn: func(n string) (*release.Release, error) {
+						if n == crossplaneChartName {
+							return &release.Release{
+								Chart: &chart.Chart{
+									Metadata: &chart.Metadata{
+										Version: "a-version",
+									},
+								},
+							}, nil
+						}
+						return nil, driver.ErrReleaseNotFound
+					},
+				},
+			},
+			version: "a-version",
 		},
 		"ErrorExtractVersion": {
 			reason: "If unable to extract version from current release and error should be returned.",
@@ -163,8 +199,11 @@ func TestInstall(t *testing.T) {
 			installer: &installer{
 				namespace: "test",
 				getClient: &mockGetClient{
-					runFn: func(string) (*release.Release, error) {
-						return nil, errBoom
+					runFn: func(n string) (*release.Release, error) {
+						if n == crossplaneChartName {
+							return nil, errBoom
+						}
+						return nil, driver.ErrReleaseNotFound
 					},
 				},
 			},
@@ -280,13 +319,39 @@ func TestUpgrade(t *testing.T) {
 			installer: &installer{
 				namespace: "test",
 				getClient: &mockGetClient{
-					runFn: func(string) (*release.Release, error) {
+					runFn: func(n string) (*release.Release, error) {
+						if n == defaultChartName {
+							return nil, driver.ErrReleaseNotFound
+						}
 						return nil, errBoom
 					},
 				},
 			},
 			fsSetup: afero.NewMemMapFs,
 			err:     errors.Wrapf(errBoom, errGetInstalledReleaseFmt, "test"),
+		},
+		"ErrorCrossplaneVersionNotMatch": {
+			reason: "If force is not specified, error should be returned when upgrading Crossplane and versions do not match.",
+			installer: &installer{
+				namespace: "test",
+				getClient: &mockGetClient{
+					runFn: func(n string) (*release.Release, error) {
+						if n == crossplaneChartName {
+							return &release.Release{
+								Chart: &chart.Chart{
+									Metadata: &chart.Metadata{
+										Version: "1.2.1",
+									},
+								},
+							}, nil
+						}
+						return nil, driver.ErrReleaseNotFound
+					},
+				},
+			},
+			version: "1.2.2-up.3",
+			fsSetup: afero.NewMemMapFs,
+			err:     errors.New(errUpgradeCrossplaneVersion),
 		},
 		"ErrorPullNewVersion": {
 			reason: "If unable to pull specified version an error should be returned.",
@@ -738,6 +803,41 @@ func TestUninstall(t *testing.T) {
 		t.Run(name, func(t *testing.T) {
 			if diff := cmp.Diff(tc.err, tc.installer.Uninstall(), test.EquateErrors()); diff != "" {
 				t.Errorf("\n%s\nUninstall(...): -want error, +got error:\n%s", tc.reason, diff)
+			}
+		})
+	}
+}
+
+func TestEquivalentVersions(t *testing.T) {
+	cases := map[string]struct {
+		reason  string
+		current string
+		target  string
+		want    bool
+	}{
+		"Mismatch": {
+			reason:  "Should be false if versions do not match.",
+			current: "1.2.1",
+			target:  "1.2.2-up.1",
+			want:    false,
+		},
+		"Match": {
+			reason:  "Should be true if versions do match except for pre-release data.",
+			current: "1.2.2",
+			target:  "1.2.2-up.1",
+			want:    true,
+		},
+		"MatchWithV": {
+			reason:  "Should be true if versions do match except for pre-release data, regardless of leading v.",
+			current: "1.2.2",
+			target:  "v1.2.2-up.1",
+			want:    true,
+		},
+	}
+	for name, tc := range cases {
+		t.Run(name, func(t *testing.T) {
+			if diff := cmp.Diff(tc.want, equivalentVersions(tc.current, tc.target)); diff != "" {
+				t.Errorf("\n%s\nequivalentVersions(...): -want, +got:\n%s", tc.reason, diff)
 			}
 		})
 	}

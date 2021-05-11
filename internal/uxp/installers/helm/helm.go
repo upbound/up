@@ -20,6 +20,7 @@ import (
 	"os"
 	"path/filepath"
 
+	"github.com/Masterminds/semver/v3"
 	"github.com/crossplane/crossplane-runtime/pkg/logging"
 	"github.com/pkg/errors"
 	"github.com/spf13/afero"
@@ -55,6 +56,7 @@ const (
 	errCorruptTempDirFmt        = "corrupt chart tmp directory, consider removing cache (%s)"
 	errMoveLatest               = "could not move latest pulled chart to cache"
 
+	errUpgradeCrossplaneVersion    = "cannot upgrade crossplane to universal-crossplane with version mismatch"
 	errFailedUpgradeFailedRollback = "failed upgrade resulted in a failed rollback"
 	errFailedUpgradeRollback       = "failed upgrade was rolled back"
 )
@@ -114,6 +116,7 @@ type installer struct {
 	cacheDir        string
 	unstable        bool
 	rollbackOnError bool
+	force           bool
 	home            HomeDirFn
 	fs              afero.Fs
 	tempDir         TempDirFn
@@ -184,6 +187,13 @@ func RollbackOnError(r bool) InstallerModifierFn {
 	}
 }
 
+// Force will force operations when possible.
+func Force(f bool) InstallerModifierFn {
+	return func(h *installer) {
+		h.force = f
+	}
+}
+
 // NewInstaller builds a helm installer for UXP.
 func NewInstaller(config *rest.Config, modifiers ...InstallerModifierFn) (uxp.Installer, error) { // nolint:gocyclo
 	u, err := url.Parse(defaultRepoURL)
@@ -196,7 +206,6 @@ func NewInstaller(config *rest.Config, modifiers ...InstallerModifierFn) (uxp.In
 		releaseName: defaultChartName,
 		namespace:   defaultNamespace,
 		home:        os.UserHomeDir,
-		unstable:    false,
 		fs:          afero.NewOsFs(),
 		tempDir:     afero.TempDir,
 		log:         logging.NewNopLogger(),
@@ -276,7 +285,10 @@ func (h *installer) GetCurrentVersion() (string, error) {
 	var release *release.Release
 	var err error
 	release, err = h.getClient.Run(defaultChartName)
-	if err != nil {
+	if err != nil && !errors.Is(err, driver.ErrReleaseNotFound) {
+		return "", err
+	}
+	if errors.Is(err, driver.ErrReleaseNotFound) {
 		// TODO(hasheddan): add logging indicating fallback to crossplane.
 		if release, err = h.getClient.Run(crossplaneChartName); err != nil {
 			return "", errors.Wrapf(err, errGetInstalledReleaseFmt, h.namespace)
@@ -311,8 +323,12 @@ func (h *installer) Install(version string, parameters map[string]interface{}) e
 // Upgrade upgrades an existing UXP installation to a new version.
 func (h *installer) Upgrade(version string, parameters map[string]interface{}) error {
 	// check if version exists
-	if _, err := h.GetCurrentVersion(); err != nil {
+	current, err := h.GetCurrentVersion()
+	if err != nil {
 		return err
+	}
+	if h.releaseName == crossplaneChartName && !equivalentVersions(current, version) && !h.force {
+		return errors.New(errUpgradeCrossplaneVersion)
 	}
 	chart, err := h.pullAndLoad(version)
 	if err != nil {
@@ -384,4 +400,24 @@ func (h *installer) pullChart(version string) error {
 	h.pullClient.SetVersion(version)
 	_, err := h.pullClient.Run(h.chartName)
 	return err
+}
+
+// equivalentVersions determines if two versions are equivalent by comparing
+// their major, minor, and patch versions. This is used to determine if a
+// crossplane version can be upgraded to the specified universal-crossplane
+// version, which should only have what this semver package considers as
+// different prerelease data.
+func equivalentVersions(current, target string) bool {
+	curV, err := semver.NewVersion(current)
+	if err != nil {
+		return false
+	}
+	tarV, err := semver.NewVersion(target)
+	if err != nil {
+		return false
+	}
+	if curV.Major() == tarV.Major() && curV.Minor() == tarV.Minor() && curV.Patch() == tarV.Patch() {
+		return true
+	}
+	return false
 }
