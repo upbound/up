@@ -98,13 +98,14 @@ func TestGetCurrentVersion(t *testing.T) {
 		"ErrorGetRelease": {
 			reason: "If unable to get release an error should be returned.",
 			installer: &installer{
+				namespace: "test",
 				getClient: &mockGetClient{
 					runFn: func(string) (*release.Release, error) {
 						return nil, errBoom
 					},
 				},
 			},
-			err: errBoom,
+			err: errors.Wrapf(errBoom, errGetInstalledReleaseFmt, "test"),
 		},
 		"ErrorExtractVersion": {
 			reason: "If unable to extract version from current release and error should be returned.",
@@ -160,6 +161,7 @@ func TestInstall(t *testing.T) {
 		"ErrorCouldNotVerifyNotInstalled": {
 			reason: "If unable to verify that the chart is not already installed an error should be returned.",
 			installer: &installer{
+				namespace: "test",
 				getClient: &mockGetClient{
 					runFn: func(string) (*release.Release, error) {
 						return nil, errBoom
@@ -167,7 +169,7 @@ func TestInstall(t *testing.T) {
 				},
 			},
 			fsSetup: afero.NewMemMapFs,
-			err:     errors.Wrap(errBoom, errVerifyChartNotInstalled),
+			err:     errors.Wrap(errors.Wrapf(errBoom, errGetInstalledReleaseFmt, "test"), errVerifyChartNotInstalled),
 		},
 		"ErrorPullNewVersion": {
 			reason: "If unable to pull specified version an error should be returned.",
@@ -276,6 +278,7 @@ func TestUpgrade(t *testing.T) {
 		"ErrorNotInstalled": {
 			reason: "If unable to verify that the chart is installed an error should be returned.",
 			installer: &installer{
+				namespace: "test",
 				getClient: &mockGetClient{
 					runFn: func(string) (*release.Release, error) {
 						return nil, errBoom
@@ -283,7 +286,7 @@ func TestUpgrade(t *testing.T) {
 				},
 			},
 			fsSetup: afero.NewMemMapFs,
-			err:     errBoom,
+			err:     errors.Wrapf(errBoom, errGetInstalledReleaseFmt, "test"),
 		},
 		"ErrorPullNewVersion": {
 			reason: "If unable to pull specified version an error should be returned.",
