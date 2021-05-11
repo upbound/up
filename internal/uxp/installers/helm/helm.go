@@ -41,10 +41,12 @@ const (
 	defaultRepoURL         = "https://charts.upbound.io/stable"
 	defaultUnstableRepoURL = "https://charts.upbound.io/main"
 	defaultChartName       = "universal-crossplane"
+	crossplaneChartName    = "crossplane"
 	allVersions            = ">0.0.0-0"
 )
 
 const (
+	errGetInstalledReleaseFmt   = "could not identify installed release for crossplane or universal-crossplane in namespace %s"
 	errVerifyInstalledVersion   = "could not identify current version"
 	errVerifyChartNotInstalled  = "could not verify that chart is not already installed"
 	errChartAlreadyInstalledFmt = "chart already installed with version %s"
@@ -107,6 +109,7 @@ type HomeDirFn func() (string, error)
 type installer struct {
 	repoURL         *url.URL
 	chartName       string
+	releaseName     string
 	namespace       string
 	cacheDir        string
 	unstable        bool
@@ -188,15 +191,16 @@ func NewInstaller(config *rest.Config, modifiers ...InstallerModifierFn) (uxp.In
 		return nil, err
 	}
 	h := &installer{
-		repoURL:   u,
-		chartName: defaultChartName,
-		namespace: defaultNamespace,
-		home:      os.UserHomeDir,
-		unstable:  false,
-		fs:        afero.NewOsFs(),
-		tempDir:   afero.TempDir,
-		log:       logging.NewNopLogger(),
-		load:      loader.Load,
+		repoURL:     u,
+		chartName:   defaultChartName,
+		releaseName: defaultChartName,
+		namespace:   defaultNamespace,
+		home:        os.UserHomeDir,
+		unstable:    false,
+		fs:          afero.NewOsFs(),
+		tempDir:     afero.TempDir,
+		log:         logging.NewNopLogger(),
+		load:        loader.Load,
 	}
 	for _, m := range modifiers {
 		m(h)
@@ -269,9 +273,15 @@ func NewInstaller(config *rest.Config, modifiers ...InstallerModifierFn) (uxp.In
 
 // GetCurrentVersion gets the current UXP version in the cluster.
 func (h *installer) GetCurrentVersion() (string, error) {
-	release, err := h.getClient.Run(defaultChartName)
+	var release *release.Release
+	var err error
+	release, err = h.getClient.Run(defaultChartName)
 	if err != nil {
-		return "", err
+		// TODO(hasheddan): add logging indicating fallback to crossplane.
+		if release, err = h.getClient.Run(crossplaneChartName); err != nil {
+			return "", errors.Wrapf(err, errGetInstalledReleaseFmt, h.namespace)
+		}
+		h.releaseName = crossplaneChartName
 	}
 	if release == nil || release.Chart == nil || release.Chart.Metadata == nil {
 		return "", errors.New(errVerifyInstalledVersion)
@@ -308,9 +318,9 @@ func (h *installer) Upgrade(version string, parameters map[string]interface{}) e
 	if err != nil {
 		return err
 	}
-	_, upErr := h.upgradeClient.Run(h.chartName, chart, parameters)
+	_, upErr := h.upgradeClient.Run(h.releaseName, chart, parameters)
 	if upErr != nil && h.rollbackOnError {
-		if rErr := h.rollbackClient.Run(h.chartName); rErr != nil {
+		if rErr := h.rollbackClient.Run(h.releaseName); rErr != nil {
 			return errors.Wrap(rErr, errFailedUpgradeFailedRollback)
 		}
 		return errors.Wrap(upErr, errFailedUpgradeRollback)
