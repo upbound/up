@@ -41,6 +41,7 @@ func (c *upgradeCmd) AfterApply(uxpCtx *uxp.Context) error {
 	c.installer = installer
 	base := map[string]interface{}{}
 	if c.File != nil {
+		defer c.File.Close() //nolint:errcheck,gosec
 		b, err := io.ReadAll(c.File)
 		if err != nil {
 			return errors.Wrap(err, errReadParametersFile)
