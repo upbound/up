@@ -138,7 +138,7 @@ func constructAuth(username, token, password string) (*auth, config.ProfileType,
 	if err != nil {
 		return nil, "", err
 	}
-	if password == "" {
+	if profType == config.TokenProfileType {
 		password = token
 	}
 	return &auth{
