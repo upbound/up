@@ -50,10 +50,16 @@ fallthrough: submodules
 	@echo Initial setup complete. Running make again . . .
 	@make
 
+build.init: build.bundle.init
+
+build.bundle.init:
+	@mkdir -p $(abspath $(OUTPUT_DIR)/bundle)
+
 build.artifacts.platform: build.artifacts.bundle.platform
 
 build.artifacts.bundle.platform:
 	@sha256sum $(GO_OUT_DIR)/up$(GO_OUT_EXT) | head -c 64 >  $(GO_OUT_DIR)/up.sha256
+	@tar -czvf $(abspath $(OUTPUT_DIR)/bundle/$(PLATFORM)).tar.gz -C $(GO_BIN_DIR) $(PLATFORM)
 
 # Ensure a PR is ready for review.
 reviewable: generate lint
