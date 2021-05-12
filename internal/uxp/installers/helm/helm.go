@@ -20,6 +20,7 @@ import (
 	"os"
 	"path/filepath"
 
+	"github.com/Masterminds/semver/v3"
 	"github.com/crossplane/crossplane-runtime/pkg/logging"
 	"github.com/pkg/errors"
 	"github.com/spf13/afero"
@@ -41,10 +42,12 @@ const (
 	defaultRepoURL         = "https://charts.upbound.io/stable"
 	defaultUnstableRepoURL = "https://charts.upbound.io/main"
 	defaultChartName       = "universal-crossplane"
+	crossplaneChartName    = "crossplane"
 	allVersions            = ">0.0.0-0"
 )
 
 const (
+	errGetInstalledReleaseFmt   = "could not identify installed release for crossplane or universal-crossplane in namespace %s"
 	errVerifyInstalledVersion   = "could not identify current version"
 	errVerifyChartNotInstalled  = "could not verify that chart is not already installed"
 	errChartAlreadyInstalledFmt = "chart already installed with version %s"
@@ -53,6 +56,7 @@ const (
 	errCorruptTempDirFmt        = "corrupt chart tmp directory, consider removing cache (%s)"
 	errMoveLatest               = "could not move latest pulled chart to cache"
 
+	errUpgradeCrossplaneVersion    = "cannot upgrade crossplane to universal-crossplane with version mismatch"
 	errFailedUpgradeFailedRollback = "failed upgrade resulted in a failed rollback"
 	errFailedUpgradeRollback       = "failed upgrade was rolled back"
 )
@@ -107,10 +111,12 @@ type HomeDirFn func() (string, error)
 type installer struct {
 	repoURL         *url.URL
 	chartName       string
+	releaseName     string
 	namespace       string
 	cacheDir        string
 	unstable        bool
 	rollbackOnError bool
+	force           bool
 	home            HomeDirFn
 	fs              afero.Fs
 	tempDir         TempDirFn
@@ -181,6 +187,13 @@ func RollbackOnError(r bool) InstallerModifierFn {
 	}
 }
 
+// Force will force operations when possible.
+func Force(f bool) InstallerModifierFn {
+	return func(h *installer) {
+		h.force = f
+	}
+}
+
 // NewInstaller builds a helm installer for UXP.
 func NewInstaller(config *rest.Config, modifiers ...InstallerModifierFn) (uxp.Installer, error) { // nolint:gocyclo
 	u, err := url.Parse(defaultRepoURL)
@@ -188,15 +201,15 @@ func NewInstaller(config *rest.Config, modifiers ...InstallerModifierFn) (uxp.In
 		return nil, err
 	}
 	h := &installer{
-		repoURL:   u,
-		chartName: defaultChartName,
-		namespace: defaultNamespace,
-		home:      os.UserHomeDir,
-		unstable:  false,
-		fs:        afero.NewOsFs(),
-		tempDir:   afero.TempDir,
-		log:       logging.NewNopLogger(),
-		load:      loader.Load,
+		repoURL:     u,
+		chartName:   defaultChartName,
+		releaseName: defaultChartName,
+		namespace:   defaultNamespace,
+		home:        os.UserHomeDir,
+		fs:          afero.NewOsFs(),
+		tempDir:     afero.TempDir,
+		log:         logging.NewNopLogger(),
+		load:        loader.Load,
 	}
 	for _, m := range modifiers {
 		m(h)
@@ -269,9 +282,18 @@ func NewInstaller(config *rest.Config, modifiers ...InstallerModifierFn) (uxp.In
 
 // GetCurrentVersion gets the current UXP version in the cluster.
 func (h *installer) GetCurrentVersion() (string, error) {
-	release, err := h.getClient.Run(defaultChartName)
-	if err != nil {
+	var release *release.Release
+	var err error
+	release, err = h.getClient.Run(defaultChartName)
+	if err != nil && !errors.Is(err, driver.ErrReleaseNotFound) {
 		return "", err
+	}
+	if errors.Is(err, driver.ErrReleaseNotFound) {
+		// TODO(hasheddan): add logging indicating fallback to crossplane.
+		if release, err = h.getClient.Run(crossplaneChartName); err != nil {
+			return "", errors.Wrapf(err, errGetInstalledReleaseFmt, h.namespace)
+		}
+		h.releaseName = crossplaneChartName
 	}
 	if release == nil || release.Chart == nil || release.Chart.Metadata == nil {
 		return "", errors.New(errVerifyInstalledVersion)
@@ -301,16 +323,20 @@ func (h *installer) Install(version string, parameters map[string]interface{}) e
 // Upgrade upgrades an existing UXP installation to a new version.
 func (h *installer) Upgrade(version string, parameters map[string]interface{}) error {
 	// check if version exists
-	if _, err := h.GetCurrentVersion(); err != nil {
+	current, err := h.GetCurrentVersion()
+	if err != nil {
 		return err
+	}
+	if h.releaseName == crossplaneChartName && !equivalentVersions(current, version) && !h.force {
+		return errors.New(errUpgradeCrossplaneVersion)
 	}
 	chart, err := h.pullAndLoad(version)
 	if err != nil {
 		return err
 	}
-	_, upErr := h.upgradeClient.Run(h.chartName, chart, parameters)
+	_, upErr := h.upgradeClient.Run(h.releaseName, chart, parameters)
 	if upErr != nil && h.rollbackOnError {
-		if rErr := h.rollbackClient.Run(h.chartName); rErr != nil {
+		if rErr := h.rollbackClient.Run(h.releaseName); rErr != nil {
 			return errors.Wrap(rErr, errFailedUpgradeFailedRollback)
 		}
 		return errors.Wrap(upErr, errFailedUpgradeRollback)
@@ -374,4 +400,24 @@ func (h *installer) pullChart(version string) error {
 	h.pullClient.SetVersion(version)
 	_, err := h.pullClient.Run(h.chartName)
 	return err
+}
+
+// equivalentVersions determines if two versions are equivalent by comparing
+// their major, minor, and patch versions. This is used to determine if a
+// crossplane version can be upgraded to the specified universal-crossplane
+// version, which should only have what this semver package considers as
+// different prerelease data.
+func equivalentVersions(current, target string) bool {
+	curV, err := semver.NewVersion(current)
+	if err != nil {
+		return false
+	}
+	tarV, err := semver.NewVersion(target)
+	if err != nil {
+		return false
+	}
+	if curV.Major() == tarV.Major() && curV.Minor() == tarV.Minor() && curV.Patch() == tarV.Patch() {
+		return true
+	}
+	return false
 }
