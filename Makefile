@@ -50,6 +50,8 @@ fallthrough: submodules
 	@echo Initial setup complete. Running make again . . .
 	@make
 
+# TODO(hasheddan): consider adding the following build targets as native
+# functionality in the build submodule.
 build.init: build.bundle.init
 
 build.bundle.init:
