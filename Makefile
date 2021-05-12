@@ -50,6 +50,11 @@ fallthrough: submodules
 	@echo Initial setup complete. Running make again . . .
 	@make
 
+build.artifacts.platform: build.artifacts.bundle.platform
+
+build.artifacts.bundle.platform:
+	@sha256sum $(GO_OUT_DIR)/up$(GO_OUT_EXT) | head -c 64 >  $(GO_OUT_DIR)/up.sha256
+
 # Ensure a PR is ready for review.
 reviewable: generate lint
 	@go mod tidy
