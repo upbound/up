@@ -21,14 +21,12 @@ configure `up` itself.
 Format: `up <cmd> ...`
 
 - `license`
-    - Status: `Implemented`
     - Behavior: Prints license information for the `up` binary, which is under
       the [Upbound Software License].
 
 **Flags:**
 
-Top-level flags can be passed for any top-level or group-specific command. Some
-commands may choose not to utilize top-level flags when not relevant.
+Top-level flags can be passed for any top-level or group-specific command.
 
 - `-h,--help`: Print help and exit.
 - `-v,--version`: Print current `up` version and exit.
@@ -40,7 +38,6 @@ Format: `up cloud <cmd> ...`
 Commands in the **Cloud** group are used to interact with Upbound Cloud.
 
 - `login`
-    - Status: `Implemented`
     - Flags:
         - `-p,--password = STRING` (Env: `UP_PASS`): Password for specified
           user.
@@ -69,7 +66,6 @@ may choose not to utilize the group flags when not relevant.
 Format: `up cloud controlplane <cmd> ...` Alias: `up cloud xp <cmd> ...`
 
 - `attach <name>`
-    - Status: `Implemented`
     - Flags:
       - `-d,--description = STRING`: Control plane description.
       - `--kube-cluster-id = UUID`: UUID for self-hosted control plane.
@@ -81,18 +77,16 @@ Format: `up cloud controlplane <cmd> ...` Alias: `up cloud xp <cmd> ...`
     - Behavior: Creates a self-hosted control plane on Upbound Cloud and returns
       token to connect a UXP instance to it.
 - `create <name>`
-    - Status: `Implemented`
     - Flags:
         - `--description = STRING`: Control plane description.
     - Behavior: Creates a hosted control plane on Upbound Cloud.
 - `delete <id>`
-    - Status: `Implemented`
     - Behavior: Deletes a control plane on Upbound Cloud. If control plane is
       hosted, the UXP cluster will be deleted. If the control plane is
       self-hosted, the UXP cluster will begin failing to connect to Upbound
       Cloud.
 - `list`
-    - Status: `Implemented` Behavior: Lists all control planes for the
+    - Behavior: Lists all control planes for the
       configured account.
 
 ## UXP
@@ -103,7 +97,6 @@ Commands in the **UXP** group are used to install and manage Upbound Universal
 Crossplane, as well as connect it to Upbound Cloud.
 
 - `install [version]`
-    - Status: `Implemented`
     - Flags:
         - `--unstable = BOOL`: Allows installing unstable UXP versions. If using
           Helm as install engine, setting to `true` will use
@@ -120,7 +113,6 @@ Crossplane, as well as connect it to Upbound Cloud.
       chart version will be used from the either the stable or unstable
       repository.
 - `connect <control-plane-token>`
-    - Status: `Implemented`
     - Flags:
       - `--token-secret-name` (Default: `upbound-control-plane-token`): Sets the
         name of the secret that will be used to store the control plane token in
@@ -130,7 +122,6 @@ Crossplane, as well as connect it to Upbound Cloud.
       specified by `<control-plane-token>`. If `-` is given for
       `<control-plane-token>` the value will be read from stdin.
 - `upgrade [version]` 
-    - Status: `Implemented`
     - Flags:
         - `--rollback = BOOL`: Indicates that the upgrade should be rolled back
           in case of failure.
@@ -169,7 +160,6 @@ Crossplane, as well as connect it to Upbound Cloud.
           Crossplane to an incompatible latest unstable version of UXP in the
           same namespace.
 - `uninstall` 
-    - Status: `Implemented`
     - Behavior: Uninstalls UXP from the cluster specified by currently
       configured `kubeconfig`.
 
