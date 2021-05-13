@@ -41,7 +41,8 @@ func (c *Cmd) AfterApply(ctx *kong.Context) error {
 
 // Cmd contains commands for interacting with Upbound Cloud.
 type Cmd struct {
-	Login loginCmd `cmd:"" group:"cloud" help:"Login to Upbound Cloud."`
+	Login  loginCmd  `cmd:"" group:"cloud" help:"Login to Upbound Cloud."`
+	Logout logoutCmd `cmd:"" group:"cloud" help:"Logout from Upbound Cloud."`
 
 	ControlPlane controlPlaneCmd `cmd:"" name:"controlplane" aliases:"xp" group:"cloud" help:"Interact with control planes."`
 

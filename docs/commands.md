@@ -48,6 +48,9 @@ Commands in the **Cloud** group are used to interact with Upbound Cloud.
     - Behavior: Acquires a session token based on the provided information.
       Either username and password can be provided or just a token. The acquired
       session token will be stored in `~/.up/config.json`.
+- `logout`
+    - Behavior: Invalidates the session token for the default profile or one
+      specified with `--profile`.
 
 **Group Flags**
 
