@@ -85,5 +85,20 @@ necessarily the one that will be specified as `default:`.
 In the future, dedicated commands will be introduced to manage profiles and
 other configuration data.
 
+### Invalidating Session Tokens
+
+`up` uses session tokens for authentication after login. Tokens are valid for 30
+days by default, meaning that a user must login at least once in any 30 day
+period. Tokens are sensitive and should not be exposed in any setting. However,
+if a token is exposed, assuming it is still present for the given profile in the
+configuration file, it can be revoked by running `up cloud logout --profile
+<profile-name>`. If a token is exposed and it is no longer present in the
+profile and cannot be retrieved for any reason, the user account should reset
+its password on [Upbound Cloud] immediately. This can be accomplished today by
+clicking "Forgot Password?" on the [Upbound Cloud login page], following the
+link in the email you receive, and making sure to check "Delete all active
+sessions".
+
 <!-- Named Links -->
 [Upbound Cloud]: https://www.upbound.io/
+[Upbound Cloud login page]: https://cloud.upbound.io/login
