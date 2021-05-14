@@ -18,6 +18,16 @@ Login with API token:
 $ up cloud login --token=supersecrettoken
 ```
 
+Login with specified profile name:
+
+```
+$ up cloud login --username=hasheddan --password=supersecret --profile=dev
+```
+
+```
+$ up cloud login --token=supersecrettoken --profile=dev
+```
+
 ## Hosted Control Plane
 
 Create hosted control plane on Upbound Cloud:
@@ -26,41 +36,111 @@ Create hosted control plane on Upbound Cloud:
 $ up cloud controlplane create my-hosted-cp
 ```
 
-Fetch `kubeconfig` for hosted control plane:
-
 ```
-$ up cloud controlplane kubeconfig my-hosted-cp > kube.yaml
-```
-
-Interact with hosted control plane:
-
-```
-$ kubectl --kubeconfig=kube.yaml get providers
+$ up cloud xp create my-hosted-cp
 ```
 
 ## Self-Hosted Control Plane
 
-Install UXP into any Kubernetes cluster:
+Creating a self-hosted control plane on Upbound Cloud consists of three primary
+steps: installing UXP, creating a self-hosted control plane on Upbound Cloud
+(i.e. "attaching"), and connecting UXP to that control plane.
+
+### Installing UXP
+
+Install latest stable version:
 
 ```
 $ up uxp install
 ```
 
-Create self-hosted control plane on Upbound Cloud:
+Install latest unstable version (i.e. development build):
+
+```
+$ up uxp install --unstable
+```
+
+Install specific stable version:
+
+```
+$ up uxp install v1.2.1-up.2
+```
+
+Install specific unstable version:
+
+```
+$ up uxp install v1.2.1-up.2.rc.0.7-g46c7750 --unstable
+```
+
+Install with inline parameters:
+
+```
+$ up uxp install --set key1=value1 --set key2=value2
+```
+
+Install with parameters file:
+
+```
+$ up uxp install -f uxp-params.yaml
+```
+
+### Upgrading Crossplane to UXP
+
+`up` also supports upgrading a Crossplane installation to a compatible UXP
+version. Compatibility is defined as having matching major, minor, and patch
+versions (in accordance with [semantic versioning]). In addition, UXP must be
+installed in the same namespace where Crossplane is currently installed.
+Crossplane is typically installed in the `crossplane-system` namespace.
+
+Upgrade Crossplane vX.Y.Z to UXP:
+
+```
+$ up uxp upgrade vX.Y.Z-up.N -n crossplane-system
+```
+
+> Because installations cannot be moved from one namespace to another, users
+> operating outside of the default `upbound-system` namespace will frequently
+> set `UXP_NAMESPACE=<namespace>` to avoid having to supply it for every UXP
+> command.
+
+### Attaching a Self-Hosted Control PLane
+
+Attach a self-hosted control plane on Upbound Cloud:
 
 ```
 $ up cloud controlplane attach my-self-hosted-cp
 <control-plane-token>
 ```
 
+```
+$ up cloud xp attach my-self-hosted-cp
+<control-plane-token>
+```
+
+Self-hosted control planes can be created with "view only" permissions:
+
+```
+$ up cloud xp attach my-self-hosted-cp --view-only
+<control-plane-token>
+```
+
+### Connecting UXP to a Self-Hosted Control Plane
+
 Connect UXP to self-hosted control plane:
 
 ```
-$ up uxp connect my-self-hosted-cp --cp-token=<control-plane-token>
+$ up uxp connect <control-plane-token>
 ```
 
-Most users will likely pipe the attach command into the connect one:
+Most users pipe the attach command into the connect one:
 
 ```
-$ up cloud controlplane attach my-self-hosted-cp | up uxp connect my-self-hosted-cp --cp-token=-
+$ up cloud controlplane attach my-self-hosted-cp | up uxp connect -
 ```
+
+```
+$ up cloud xp attach my-self-hosted-cp | up uxp connect -
+```
+
+<!-- Named Links -->
+[semantic versioning]: https://semver.org/
