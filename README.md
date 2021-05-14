@@ -26,11 +26,11 @@ Deb and RPM packages are available for Linux platforms, but currently require
 manual download and install.
 
 ```
-curl -sL https://cli.upbound.io/stable/${VERSION}/deb/linux_${ARCH}/up.deb
+curl -sLo up.deb https://cli.upbound.io/stable/${VERSION}/deb/linux_${ARCH}/up.deb
 ```
 
 ```
-curl -sL https://cli.upbound.io/stable/${VERSION}/rpm/linux_${ARCH}/up.rpm
+curl -sLo up.rpm https://cli.upbound.io/stable/${VERSION}/rpm/linux_${ARCH}/up.rpm
 ```
 
 ## Setup
