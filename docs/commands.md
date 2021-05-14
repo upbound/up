@@ -40,9 +40,9 @@ Commands in the **Cloud** group are used to interact with Upbound Cloud.
 - `login`
     - Flags:
         - `-p,--password = STRING` (Env: `UP_PASS`): Password for specified
-          user.
+          user. If `-` is given the value will be read from stdin.
         - `-t,--token = STRING` (Env: `UP_TOKEN`): Upbound API token used to
-          perform the login.
+          perform the login. If `-` is given the value will be read from stdin.
         - `-u,--username = STRING` (Env: `UP_USER`): User with which to perform
           the login. Email can also be used as username.
     - Behavior: Acquires a session token based on the provided information.
