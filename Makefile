@@ -35,6 +35,17 @@ GO_SUBDIRS += cmd internal
 GO111MODULE = on
 -include build/makelib/golang.mk
 
+# ====================================================================================
+# Setup Tools
+
+# nfpm download
+# TODO(hasheddan): set specific version instead of just using latest
+export NFPM := $(TOOLS_HOST_DIR)/nfpm
+$(NFPM):
+	@$(INFO) installing nfpm $(NFPM_VERSION)
+	@mkdir -p $(TOOLS_HOST_DIR)
+	@curl -sfL https://install.goreleaser.com/github.com/goreleaser/nfpm.sh | BINDIR=$(TOOLS_HOST_DIR) sh
+	@$(OK) installing nfpm $(NFPM)
 
 # ====================================================================================
 # Targets
@@ -57,11 +68,22 @@ build.init: build.bundle.init
 build.bundle.init:
 	@mkdir -p $(abspath $(OUTPUT_DIR)/bundle)
 
+ifeq ($(OS),linux)
+build.artifacts.platform: build.artifacts.bundle.platform build.artifacts.pkg.platform
+else
 build.artifacts.platform: build.artifacts.bundle.platform
+endif
 
 build.artifacts.bundle.platform:
 	@sha256sum $(GO_OUT_DIR)/up$(GO_OUT_EXT) | head -c 64 >  $(GO_OUT_DIR)/up.sha256
 	@tar -czvf $(abspath $(OUTPUT_DIR)/bundle/$(PLATFORM)).tar.gz -C $(GO_BIN_DIR) $(PLATFORM)
+
+build.artifacts.pkg.platform: $(NFPM)
+	@cat nfpm.yaml | GO_BIN_DIR=$(GO_BIN_DIR) envsubst > $(CACHE_DIR)/nfpm.yaml
+	@mkdir -p $(OUTPUT_DIR)/deb/$(PLATFORM)
+	@$(NFPM) pkg --config $(CACHE_DIR)/nfpm.yaml --packager deb --target $(OUTPUT_DIR)/deb/$(PLATFORM)/up.deb
+	@mkdir -p $(OUTPUT_DIR)/rpm/$(PLATFORM)
+	@$(NFPM) pkg --config $(CACHE_DIR)/nfpm.yaml --packager rpm --target $(OUTPUT_DIR)/rpm/$(PLATFORM)/up.rpm
 
 # Ensure a PR is ready for review.
 reviewable: generate lint

@@ -20,6 +20,19 @@ curl -sL https://cli.upbound.io | sh
 brew install upbound/tap/up
 ```
 
+### Deb/RPM Packages
+
+Deb and RPM packages are available for Linux platforms, but currently require
+manual download and install.
+
+```
+curl -sLo up.deb https://cli.upbound.io/stable/${VERSION}/deb/linux_${ARCH}/up.deb
+```
+
+```
+curl -sLo up.rpm https://cli.upbound.io/stable/${VERSION}/rpm/linux_${ARCH}/up.rpm
+```
+
 ## Setup
 
 Users typically begin by either logging in to [Upbound Cloud] or installing
