@@ -20,6 +20,7 @@ import (
 	"encoding/json"
 	"io"
 	"net/http"
+	"os"
 	"strings"
 	"time"
 
@@ -48,6 +49,7 @@ const (
 func (c *loginCmd) BeforeApply() error {
 	// NOTE(hasheddan): client timeout is handled with request context.
 	c.client = &http.Client{}
+	c.stdin = os.Stdin
 	return nil
 }
 
@@ -55,14 +57,31 @@ func (c *loginCmd) BeforeApply() error {
 // file.
 type loginCmd struct {
 	client uphttp.Client
+	stdin  io.Reader
 
-	Password string `short:"p" env:"UP_PASSWORD" help:"Password for specified user."`
 	Username string `short:"u" env:"UP_USER" xor:"identifier" help:"Username used to execute command."`
-	Token    string `short:"t" env:"UP_TOKEN" xor:"identifier" help:"Token used to execute command."`
+	Password string `short:"p" env:"UP_PASSWORD" help:"Password for specified user. '-' to read from stdin."`
+	Token    string `short:"t" env:"UP_TOKEN" xor:"identifier" help:"Token used to execute command. '-' to read from stdin."`
 }
 
 // Run executes the login command.
 func (c *loginCmd) Run(cloudCtx *cloud.Context) error { // nolint:gocyclo
+	if c.Token == "-" {
+		b, err := io.ReadAll(c.stdin)
+		if err != nil {
+			return err
+		}
+		c.Token = strings.TrimSpace(string(b))
+	}
+
+	if c.Password == "-" {
+		b, err := io.ReadAll(c.stdin)
+		if err != nil {
+			return err
+		}
+		c.Password = strings.TrimSpace(string(b))
+	}
+
 	// TODO(hasheddan): prompt for input if only username is supplied or
 	// neither.
 	ctx, cancel := context.WithTimeout(context.Background(), defaultTimeout)

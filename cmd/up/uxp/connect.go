@@ -49,7 +49,7 @@ type connectCmd struct {
 	kClient kubernetes.Interface
 	stdin   io.Reader
 
-	CPToken string `arg:"" required:"" help:"Token used to connect self-hosted control plane."`
+	CPToken string `arg:"" required:"" help:"Token used to connect self-hosted control plane. '-' to read from stdin."`
 
 	TokenSecretName string `default:"upbound-control-plane-token" help:"Name of secret that will be populated with token data."`
 }
