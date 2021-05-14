@@ -62,7 +62,7 @@ information.
 
 
 <!-- Named Links -->
-[Upbound Cloud]: https://www.upbound.io/
+[Upbound Cloud]: https://cloud.upbound.io/
 [Universal Crossplane (UXP)]: https://github.com/upbound/universal-crossplane
 [UXP]: https://github.com/upbound/universal-crossplane
 [configuration documentation]: docs/configuration.md
