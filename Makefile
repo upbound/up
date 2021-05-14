@@ -68,7 +68,11 @@ build.init: build.bundle.init
 build.bundle.init:
 	@mkdir -p $(abspath $(OUTPUT_DIR)/bundle)
 
+ifeq ($(OS),linux)
+build.artifacts.platform: build.artifacts.bundle.platform build.artifacts.pkg.platform
+else
 build.artifacts.platform: build.artifacts.bundle.platform
+endif
 
 build.artifacts.bundle.platform:
 	@sha256sum $(GO_OUT_DIR)/up$(GO_OUT_EXT) | head -c 64 >  $(GO_OUT_DIR)/up.sha256
