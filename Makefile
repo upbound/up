@@ -74,6 +74,13 @@ build.artifacts.bundle.platform:
 	@sha256sum $(GO_OUT_DIR)/up$(GO_OUT_EXT) | head -c 64 >  $(GO_OUT_DIR)/up.sha256
 	@tar -czvf $(abspath $(OUTPUT_DIR)/bundle/$(PLATFORM)).tar.gz -C $(GO_BIN_DIR) $(PLATFORM)
 
+build.artifacts.pkg.platform: $(NFPM)
+	@cat nfpm.yaml | GO_BIN_DIR=$(GO_BIN_DIR) envsubst > $(CACHE_DIR)/nfpm.yaml
+	@mkdir -p $(OUTPUT_DIR)/deb/$(PLATFORM)
+	@$(NFPM) pkg --config $(CACHE_DIR)/nfpm.yaml --packager deb --target $(OUTPUT_DIR)/deb/$(PLATFORM)/up.deb
+	@mkdir -p $(OUTPUT_DIR)/rpm/$(PLATFORM)
+	@$(NFPM) pkg --config $(CACHE_DIR)/nfpm.yaml --packager rpm --target $(OUTPUT_DIR)/rpm/$(PLATFORM)/up.rpm
+
 # Ensure a PR is ready for review.
 reviewable: generate lint
 	@go mod tidy
