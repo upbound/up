@@ -57,7 +57,7 @@ profile specified as `default`, which in this case is actually named `default`.
 }
 ```
 
-### Adding or Update Profile
+### Adding or Updating Profile
 
 To add or update a profile, users can execute `up cloud login` with the
 appropriate credentials and a profile name specified. For instance, the

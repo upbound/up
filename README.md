@@ -53,7 +53,7 @@ up cloud login -u <username> -p <password>
 
 `up` can install [UXP] into any Kubernetes cluster, or upgrade an existing
 [Crossplane] installation to UXP of compatible version. UXP versions with the
-same major, minor, and patch number are considered compatible (e.g.` v1.2.1` of
+same major, minor, and patch number are considered compatible (e.g. `v1.2.1` of
 Crossplane is compatible with UXP `v1.2.1-up.N`)
 
 To install the latest stable UXP release:
