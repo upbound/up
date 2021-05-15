@@ -42,11 +42,13 @@ Users typically begin by either logging in to [Upbound Cloud] or installing
 
 `up` uses profiles to manage sets of credentials for interacting with [Upbound
 Cloud]. You can read more about how to manage multiple profiles in the
-[configuration documentation]. To log in for the first time, use your Upbound
-username and password.
+[configuration documentation]. If no `--profile` flag is provided when logging
+in the profile designated as default will be updated, and if no profiles exist a
+new one will be created with name `default` and it will be designated as the
+default profile.
 
 ```
-up cloud login -u <username> -p <password>
+up cloud login
 ```
 
 ### Install Universal Crossplane
