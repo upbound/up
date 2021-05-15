@@ -45,9 +45,12 @@ Commands in the **Cloud** group are used to interact with Upbound Cloud.
           perform the login. If `-` is given the value will be read from stdin.
         - `-u,--username = STRING` (Env: `UP_USER`): User with which to perform
           the login. Email can also be used as username.
-    - Behavior: Acquires a session token based on the provided information.
-      Either username and password can be provided or just a token. The acquired
-      session token will be stored in `~/.up/config.json`.
+    - Behavior: Acquires a session token based on the provided information. If
+      only username is provided, the user will be prompted for a password. If
+      neither username or password is provided, the user will be prompted for
+      both. If token is provided, the user will not be prompted for input. The
+      acquired session token will be stored in `~/.up/config.json`. Interactive
+      input is disabled if stdin is not an interactive terminal.
 - `logout`
     - Behavior: Invalidates the session token for the default profile or one
       specified with `--profile`.
