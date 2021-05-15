@@ -97,7 +97,6 @@ func (c *loginCmd) Run(cloudCtx *cloud.Context) error { // nolint:gocyclo
 		}
 		c.Token = strings.TrimSpace(string(b))
 	}
-
 	if c.Password == "-" {
 		b, err := io.ReadAll(c.stdin)
 		if err != nil {
@@ -105,8 +104,6 @@ func (c *loginCmd) Run(cloudCtx *cloud.Context) error { // nolint:gocyclo
 		}
 		c.Password = strings.TrimSpace(string(b))
 	}
-	// TODO(hasheddan): prompt for input if only username is supplied or
-	// neither.
 	ctx, cancel := context.WithTimeout(context.Background(), defaultTimeout)
 	defer cancel()
 	auth, profType, err := constructAuth(c.Username, c.Token, c.Password)
