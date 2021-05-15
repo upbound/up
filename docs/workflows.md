@@ -6,6 +6,18 @@ design decisions and feature implementations based on common user experience.
 
 ## Upbound Cloud Login
 
+Interactively be prompted for username and password:
+
+```
+$ up cloud login
+```
+
+Interactively be prompted for password:
+
+```
+$ up cloud login -u hasheddan
+```
+
 Login with username and password:
 
 ```
@@ -19,6 +31,10 @@ $ up cloud login --token=supersecrettoken
 ```
 
 Login with specified profile name:
+
+```
+$ up cloud login --profile=dev
+```
 
 ```
 $ up cloud login --username=hasheddan --password=supersecret --profile=dev
