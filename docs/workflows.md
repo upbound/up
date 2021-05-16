@@ -6,6 +6,47 @@ design decisions and feature implementations based on common user experience.
 
 ## Upbound Cloud Login
 
+> Though a variety of login methods are demonstrated below, users are highly
+> encouraged to provide sensitive data either interactively or by reading from
+> stdin.
+
+Interactively be prompted for username and password:
+
+```
+$ up cloud login
+```
+
+Interactively be prompted for password:
+
+```
+$ up cloud login -u hasheddan
+```
+
+Login with sensitive data from file:
+
+```
+cat password.txt | up cloud login -u hasheddan -p -
+```
+
+```
+cat token.txt | up cloud login -t -
+```
+
+Login with data from environment variables:
+
+```
+export UP_USER=hasheddan
+export UP_PASSWORD=supersecret
+
+up cloud login -u hasheddan
+```
+
+```
+export UP_TOKEN=supersecrettoken
+
+up cloud login
+```
+
 Login with username and password:
 
 ```
@@ -19,6 +60,10 @@ $ up cloud login --token=supersecrettoken
 ```
 
 Login with specified profile name:
+
+```
+$ up cloud login --profile=dev
+```
 
 ```
 $ up cloud login --username=hasheddan --password=supersecret --profile=dev

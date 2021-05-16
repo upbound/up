@@ -30,6 +30,7 @@ import (
 	"github.com/upbound/up/internal/cloud"
 	"github.com/upbound/up/internal/config"
 	uphttp "github.com/upbound/up/internal/http"
+	"github.com/upbound/up/internal/input"
 )
 
 const (
@@ -50,14 +51,37 @@ func (c *loginCmd) BeforeApply() error {
 	// NOTE(hasheddan): client timeout is handled with request context.
 	c.client = &http.Client{}
 	c.stdin = os.Stdin
+	c.prompter = input.NewPrompter()
+	return nil
+}
+
+func (c *loginCmd) AfterApply() error {
+	if c.Token != "" {
+		return nil
+	}
+	if c.Username == "" {
+		username, err := c.prompter.Prompt("Username", false)
+		if err != nil {
+			return err
+		}
+		c.Username = username
+	}
+	if c.Password == "" {
+		password, err := c.prompter.Prompt("Password", true)
+		if err != nil {
+			return err
+		}
+		c.Password = password
+	}
 	return nil
 }
 
 // loginCmd adds a user or token profile with session token to the up config
 // file.
 type loginCmd struct {
-	client uphttp.Client
-	stdin  io.Reader
+	client   uphttp.Client
+	stdin    io.Reader
+	prompter input.Prompter
 
 	Username string `short:"u" env:"UP_USER" xor:"identifier" help:"Username used to execute command."`
 	Password string `short:"p" env:"UP_PASSWORD" help:"Password for specified user. '-' to read from stdin."`
@@ -73,7 +97,6 @@ func (c *loginCmd) Run(cloudCtx *cloud.Context) error { // nolint:gocyclo
 		}
 		c.Token = strings.TrimSpace(string(b))
 	}
-
 	if c.Password == "-" {
 		b, err := io.ReadAll(c.stdin)
 		if err != nil {
@@ -81,9 +104,6 @@ func (c *loginCmd) Run(cloudCtx *cloud.Context) error { // nolint:gocyclo
 		}
 		c.Password = strings.TrimSpace(string(b))
 	}
-
-	// TODO(hasheddan): prompt for input if only username is supplied or
-	// neither.
 	ctx, cancel := context.WithTimeout(context.Background(), defaultTimeout)
 	defer cancel()
 	auth, profType, err := constructAuth(c.Username, c.Token, c.Password)
