@@ -1,5 +1,9 @@
 # up - The Upbound CLI
 
+<a href="https://upbound.io">
+    <img align="right" style="margin-left: 20px" src="docs/media/logo.png" width=200 />
+</a>
+
 `up` is the official CLI for interacting with [Upbound Cloud] and [Universal
 Crossplane (UXP)].
 
