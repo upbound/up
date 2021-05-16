@@ -12,7 +12,7 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-package prompt
+package input
 
 import (
 	"bufio"
@@ -57,7 +57,6 @@ func (defaultTTY) ReadPassword(fd int) ([]byte, error) {
 // Prompter prompts a user for input.
 type Prompter interface {
 	Prompt(label string, sensitive bool) (string, error)
-	End() error
 }
 
 // NewPrompter constructs a new prompter that uses stdin for input and stdout
@@ -84,8 +83,10 @@ func (d *defaultPrompter) Prompt(label string, sensitive bool) (string, error) {
 	if !d.tty.IsTerminal(int(d.in.Fd())) {
 		return "", errors.New(errNotTTY)
 	}
+	if _, err := fmt.Fprintf(d.out, "%s: ", label); err != nil {
+		return "", err
+	}
 	reader := bufio.NewReader(d.in)
-	fmt.Fprintf(d.out, "%s: ", label)
 	if !sensitive {
 		s, err := reader.ReadString('\n')
 		if err != nil {
@@ -97,11 +98,10 @@ func (d *defaultPrompter) Prompt(label string, sensitive bool) (string, error) {
 	if err != nil {
 		return "", err
 	}
+	// manually write newline since tty.ReadPassword silences echo, including
+	// the user-entered newline
+	if _, err := d.out.Write([]byte{newLine}); err != nil {
+		return "", err
+	}
 	return string(b), nil
-}
-
-// End performs any clean up necessary for ending the prompter session.
-func (d *defaultPrompter) End() error {
-	_, err := d.out.Write([]byte{newLine})
-	return err
 }

@@ -12,7 +12,7 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-package prompt
+package input
 
 import (
 	"testing"
@@ -57,7 +57,6 @@ func TestPrompt(t *testing.T) {
 	errBoom := errors.New("boom")
 	input := "hello\n"
 	label := "Input"
-	writeLable := "Input: "
 	type args struct {
 		label     string
 		sensitive bool
@@ -80,6 +79,23 @@ func TestPrompt(t *testing.T) {
 				},
 			},
 			err: errors.New(errNotTTY),
+		},
+		"ErrWrite": {
+			reason: "Error should be returned if we fail to write output.",
+			prompter: &defaultPrompter{
+				in: &mockFile{
+					mockFd: func() uintptr { return 1 },
+				},
+				out: &mockFile{
+					mockWriteFn: func([]byte) (int, error) {
+						return 0, errBoom
+					},
+				},
+				tty: &mockTTY{
+					mockIsTerminal: func(int) bool { return true },
+				},
+			},
+			err: errBoom,
 		},
 		"ErrNotSensitive": {
 			reason: "Error should be returned if we fail to read non-sensitive input.",
@@ -156,9 +172,6 @@ func TestPrompt(t *testing.T) {
 				},
 				out: &mockFile{
 					mockWriteFn: func(b []byte) (int, error) {
-						if diff := cmp.Diff(b, []byte(writeLable)); diff != "" {
-							t.Errorf("\nPrompt.Write(...): -want, +got:\n%s", diff)
-						}
 						return len(b), nil
 					},
 				},
@@ -180,51 +193,6 @@ func TestPrompt(t *testing.T) {
 			}
 			if diff := cmp.Diff(tc.want, p); diff != "" {
 				t.Errorf("\n%s\nPrompt(...): -want, +got:\n%s", tc.reason, diff)
-			}
-		})
-	}
-}
-
-func TestEnd(t *testing.T) {
-	errBoom := errors.New("boom")
-	cases := map[string]struct {
-		reason   string
-		prompter Prompter
-		err      error
-	}{
-		"ErrorWrite": {
-			reason: "Error should be returned if we fail to clean up.",
-			prompter: &defaultPrompter{
-				out: &mockFile{
-					mockWriteFn: func(b []byte) (int, error) {
-						if diff := cmp.Diff(b, []byte{newLine}); diff != "" {
-							t.Errorf("\nEnd.Write(...): -want, +got:\n%s", diff)
-						}
-						return 0, errBoom
-					},
-				},
-			},
-			err: errBoom,
-		},
-		"Successful": {
-			reason: "Should return result if successfully clean up.",
-			prompter: &defaultPrompter{
-				out: &mockFile{
-					mockWriteFn: func(b []byte) (int, error) {
-						if diff := cmp.Diff(b, []byte{newLine}); diff != "" {
-							t.Errorf("\nEnd.Write(...): -want, +got:\n%s", diff)
-						}
-						return len(b), nil
-					},
-				},
-			},
-		},
-	}
-	for name, tc := range cases {
-		t.Run(name, func(t *testing.T) {
-			err := tc.prompter.End()
-			if diff := cmp.Diff(tc.err, err, test.EquateErrors()); diff != "" {
-				t.Errorf("\n%s\nEnd(...): -want error, +got error:\n%s", tc.reason, diff)
 			}
 		})
 	}

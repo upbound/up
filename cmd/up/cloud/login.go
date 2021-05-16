@@ -30,7 +30,7 @@ import (
 	"github.com/upbound/up/internal/cloud"
 	"github.com/upbound/up/internal/config"
 	uphttp "github.com/upbound/up/internal/http"
-	"github.com/upbound/up/internal/prompt"
+	"github.com/upbound/up/internal/input"
 )
 
 const (
@@ -51,7 +51,7 @@ func (c *loginCmd) BeforeApply() error {
 	// NOTE(hasheddan): client timeout is handled with request context.
 	c.client = &http.Client{}
 	c.stdin = os.Stdin
-	c.prompter = prompt.NewPrompter()
+	c.prompter = input.NewPrompter()
 	return nil
 }
 
@@ -73,7 +73,7 @@ func (c *loginCmd) AfterApply() error {
 		}
 		c.Password = password
 	}
-	return c.prompter.End()
+	return nil
 }
 
 // loginCmd adds a user or token profile with session token to the up config
@@ -81,7 +81,7 @@ func (c *loginCmd) AfterApply() error {
 type loginCmd struct {
 	client   uphttp.Client
 	stdin    io.Reader
-	prompter prompt.Prompter
+	prompter input.Prompter
 
 	Username string `short:"u" env:"UP_USER" xor:"identifier" help:"Username used to execute command."`
 	Password string `short:"p" env:"UP_PASSWORD" help:"Password for specified user. '-' to read from stdin."`
