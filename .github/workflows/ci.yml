@@ -208,11 +208,6 @@ jobs:
         with:
           submodules: true
 
-      # TODO(hasheddan): temporary to allow access to up-sdk-go
-      - name: Granting private modules access
-        run: |
-          git config --global url."https://${{ secrets.UPBOUND_BOT_GITHUB_TOKEN }}:x-oauth-basic@github.com/upbound".insteadOf "https://github.com/upbound"
-
       - name: Fetch History
         run: git fetch --prune --unshallow
 
