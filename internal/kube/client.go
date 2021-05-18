@@ -15,11 +15,8 @@
 package kube
 
 import (
-	"path/filepath"
-
 	"k8s.io/client-go/rest"
 	"k8s.io/client-go/tools/clientcmd"
-	"k8s.io/client-go/util/homedir"
 )
 
 const (
@@ -31,8 +28,7 @@ const (
 
 // GetKubeConfig constructs a Kubernetes REST config from the specified kubeconfig.
 func GetKubeConfig(path string) (*rest.Config, error) {
-	if path == "" {
-		path = filepath.Join(homedir.HomeDir(), KubeconfigDir, KubeconfigFile)
-	}
-	return clientcmd.BuildConfigFromFlags("", path)
+	rules := clientcmd.NewDefaultClientConfigLoadingRules()
+	rules.ExplicitPath = path
+	return clientcmd.NewNonInteractiveDeferredLoadingClientConfig(rules, &clientcmd.ConfigOverrides{}).ClientConfig()
 }
