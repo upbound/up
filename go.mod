@@ -9,11 +9,13 @@ require (
 	github.com/dgrijalva/jwt-go v3.2.0+incompatible
 	github.com/google/addlicense v0.0.0-20210428195630-6d92264d7170
 	github.com/google/go-cmp v0.5.5
-	github.com/google/uuid v1.1.2
+	github.com/google/uuid v1.2.0
+	github.com/goreleaser/nfpm/v2 v2.5.1
 	github.com/pkg/errors v0.9.1
 	github.com/spf13/afero v1.6.0
+	github.com/spf13/cobra v1.1.3
 	github.com/upbound/up-sdk-go v0.1.0
-	golang.org/x/term v0.0.0-20201117132131-f5c789dd3221
+	golang.org/x/term v0.0.0-20201126162022-7de9c90e9dd1
 	helm.sh/helm/v3 v3.5.4
 	k8s.io/api v0.20.4
 	k8s.io/apimachinery v0.20.4
