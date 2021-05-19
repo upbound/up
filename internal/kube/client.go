@@ -26,7 +26,8 @@ const (
 	KubeconfigFile = "config"
 )
 
-// GetKubeConfig constructs a Kubernetes REST config from the specified kubeconfig.
+// GetKubeConfig constructs a Kubernetes REST config from the specified
+// kubeconfig, or falls back to same defaults as kubectl.
 func GetKubeConfig(path string) (*rest.Config, error) {
 	rules := clientcmd.NewDefaultClientConfigLoadingRules()
 	rules.ExplicitPath = path
