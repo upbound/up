@@ -67,7 +67,7 @@ type AttachCmd struct {
 
 	Description   string    `short:"d" help:"Description for control plane."`
 	KubeClusterID uuid.UUID `help:"ID for self-hosted Kubernetes cluster."`
-	Kubeconfig    string    `env:"KUBECONFIG" type:"existingfile" help:"Override default kubeconfig path."`
+	Kubeconfig    string    `type:"existingfile" help:"Override default kubeconfig path."`
 	ViewOnly      bool      `help:"Create control plane with view only permissions."`
 }
 
