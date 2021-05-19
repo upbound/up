@@ -22,6 +22,6 @@ package build
 //go:generate go run github.com/goreleaser/nfpm/v2/cmd/nfpm pkg --config $CACHE_DIR/nfpm.yaml --packager $PACKAGER --target $OUTPUT_DIR/$PACKAGER/$PLATFORM/up.$PACKAGER
 
 import (
-	_ "github.com/goreleaser/nfpm/v2" //nolint:typecheck
-	_ "github.com/spf13/cobra/doc"    //nolint:typecheck
+	_ "github.com/goreleaser/nfpm/v2/cmd/nfpm" //nolint:typecheck
+	_ "github.com/spf13/cobra/doc"             //nolint:typecheck
 )
