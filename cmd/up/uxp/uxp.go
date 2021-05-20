@@ -42,6 +42,6 @@ type Cmd struct {
 	Upgrade   upgradeCmd   `cmd:"" group:"uxp" help:"Upgrade UXP."`
 	Connect   connectCmd   `cmd:"" group:"uxp" help:"Connect UXP to Upbound Cloud."`
 
-	Kubeconfig string `env:"KUBECONFIG" type:"existingfile" help:"Override default kubeconfig path."`
+	Kubeconfig string `type:"existingfile" help:"Override default kubeconfig path."`
 	Namespace  string `short:"n" env:"UXP_NAMESPACE" default:"upbound-system" help:"Kubernetes namespace for UXP."`
 }

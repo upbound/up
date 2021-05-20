@@ -77,8 +77,8 @@ Format: `up cloud controlplane <cmd> ...` Alias: `up cloud xp <cmd> ...`
       - `--kube-cluster-id = UUID`: UUID for self-hosted control plane.
         Auto-populated as `metadata.uid` of `kube-system` `Namespace` of
         currently configured `kubeconfig` if not manually provided.
-      - `--kubeconfig` (Env: `KUBECONFIG`): overrides default kubeconfig path
-        (`~/.kube/config`).
+      - `--kubeconfig = STRING`: sets `kubeconfig` path. Same defaults as
+        `kubectl` are used if not provided.
       - `--view-only`: creates the self-hosted control plane as view only.
     - Behavior: Creates a self-hosted control plane on Upbound Cloud and returns
       token to connect a UXP instance to it.
@@ -174,8 +174,8 @@ Crossplane, as well as connect it to Upbound Cloud.
 Group flags can be passed for any command in the **UXP** group. Some commands
 may choose not to utilize the group flags when not relevant.
 
-- `--kubeconfig` (Env: `KUBECONFIG`): overrides default kubeconfig path
-  (`~/.kube/config`).
+- `--kubeconfig = STRING`: sets `kubeconfig` path. Same defaults as `kubectl`
+  are used if not provided.
 - `-n,--namespace = STRING` (Env: `UXP_NAMESPACE`) (Default: `upbound-system`):
   Kubernetes namespace used for installing and managing UXP.
 
