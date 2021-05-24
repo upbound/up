@@ -19,6 +19,7 @@ import (
 	"net/url"
 	"os"
 	"path/filepath"
+	"strings"
 
 	"github.com/Masterminds/semver/v3"
 	"github.com/crossplane/crossplane-runtime/pkg/logging"
@@ -352,6 +353,9 @@ func (h *installer) Uninstall() error {
 
 // pullAndLoad pulls and loads a chart or fetches it from the catch.
 func (h *installer) pullAndLoad(version string) (*chart.Chart, error) {
+	// helm strips versions with leading v, which can cause issues when fetching
+	// the chart from the cache.
+	version = strings.TrimPrefix(version, "v")
 	// check to see if version is cached
 	fileName := filepath.Join(h.cacheDir, fmt.Sprintf("%s-%s.tgz", h.chartName, version))
 	if version != "" {
