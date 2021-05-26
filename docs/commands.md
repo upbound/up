@@ -74,11 +74,6 @@ Format: `up cloud controlplane <cmd> ...` Alias: `up cloud xp <cmd> ...`
 - `attach <name>`
     - Flags:
       - `-d,--description = STRING`: Control plane description.
-      - `--kube-cluster-id = UUID`: UUID for self-hosted control plane.
-        Auto-populated as `metadata.uid` of `kube-system` `Namespace` of
-        currently configured `kubeconfig` if not manually provided.
-      - `--kubeconfig = STRING`: sets `kubeconfig` path. Same defaults as
-        `kubectl` are used if not provided.
       - `--view-only`: creates the self-hosted control plane as view only.
     - Behavior: Creates a self-hosted control plane on Upbound Cloud and returns
       token to connect a UXP instance to it.
