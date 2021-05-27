@@ -44,7 +44,7 @@ type Cmd struct {
 	Login  loginCmd  `cmd:"" group:"cloud" help:"Login to Upbound Cloud."`
 	Logout logoutCmd `cmd:"" group:"cloud" help:"Logout from Upbound Cloud."`
 
-	ControlPlane controlPlaneCmd `cmd:"" name:"controlplane" aliases:"xp" group:"cloud" help:"Interact with control planes."`
+	ControlPlane controlPlaneCmd `cmd:"" name:"controlplane" aliases:"ctp" group:"cloud" help:"Interact with control planes."`
 
 	Endpoint *url.URL `env:"UP_ENDPOINT" default:"https://api.upbound.io" help:"Endpoint used for Upbound API."`
 	Profile  string   `env:"UP_PROFILE" help:"Profile used to execute command."`
