@@ -82,7 +82,7 @@ $ up cloud controlplane create my-hosted-cp
 ```
 
 ```
-$ up cloud xp create my-hosted-cp
+$ up cloud ctp create my-hosted-cp
 ```
 
 ## Self-Hosted Control Plane
@@ -158,14 +158,14 @@ $ up cloud controlplane attach my-self-hosted-cp
 ```
 
 ```
-$ up cloud xp attach my-self-hosted-cp
+$ up cloud ctp attach my-self-hosted-cp
 <control-plane-token>
 ```
 
 Self-hosted control planes can be created with "view only" permissions:
 
 ```
-$ up cloud xp attach my-self-hosted-cp --view-only
+$ up cloud ctp attach my-self-hosted-cp --view-only
 <control-plane-token>
 ```
 
@@ -184,7 +184,7 @@ $ up cloud controlplane attach my-self-hosted-cp | up uxp connect -
 ```
 
 ```
-$ up cloud xp attach my-self-hosted-cp | up uxp connect -
+$ up cloud ctp attach my-self-hosted-cp | up uxp connect -
 ```
 
 <!-- Named Links -->
