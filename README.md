@@ -71,7 +71,7 @@ up uxp install
 To upgrade a Crossplane installation to a compatible UXP version:
 
 ```
-up uxp install vX.Y.Z-up.N -n <crossplane-namespace>
+up uxp upgrade vX.Y.Z-up.N -n <crossplane-namespace>
 ```
 
 ## Usage
