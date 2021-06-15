@@ -98,6 +98,8 @@ func Build(ctx context.Context, b parser.Backend, p parser.Parser) (v1.Image, ru
 	if len(metas) != 1 {
 		return nil, nil, errors.New(errNotExactlyOneMeta)
 	}
+
+	// TODO(hasheddan): make linter selection logic configurable.
 	meta := metas[0]
 	var linter parser.Linter
 	if meta.GetObjectKind().GroupVersionKind().Kind == pkgmetav1.ConfigurationKind {
