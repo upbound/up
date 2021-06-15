@@ -10,6 +10,7 @@ Groups:
 - [Cloud](#cloud)
   - [Control Plane](#subgroup-control-plane)
 - [UXP](#uxp)
+- [XPKG](#xpkg)
 
 ## Top-Level
 
@@ -174,6 +175,32 @@ may choose not to utilize the group flags when not relevant.
 - `-n,--namespace = STRING` (Env: `UXP_NAMESPACE`) (Default: `upbound-system`):
   Kubernetes namespace used for installing and managing UXP.
 
+## XPKG
+
+Format: `up xpkg <cmd> ...`
+
+Commands in the **XPKG** group are used to build, push, and interact with
+on-disk UXP packages.
+
+- `build`
+    - Flags:
+        - `--name = STRING`: Name of the package to be built. Uses name in
+          crossplane.yaml if not specified. Does not correspond to package tag.
+        - `-f, --package-root = STRING`: Path to package directory.
+        - `--ignore = STRING,...`: Paths, specified relative to --package-root,
+          to exclude from the package.
+    - Behavior: Builds a UXP package (`.xpkg`) that is compatible with upstream
+      Crossplane packages and is a valid OCI image. Build will fail if package
+      is malformed or contains resources that are not compatible with its type
+      (e.g. a `Provider` package containing a `Composition`).
+- `push <tag>`
+    - Flags:.
+        - `-f, --package = STRING`: Path to package. If not specified and only
+          one package exists in current directory it will be used.
+    - Behavior: Pushes a UXP package (`.xpkg`) to an OCI compliant registry. The
+      [Upbound Registry] (`registry.upbound.io`) will be used by default if tag
+      does not specify.
+
 <!-- Named Links -->
-[Upbound Software License]:
-https://licenses.upbound.io/upbound-software-license.html
+[Upbound Software License]: https://licenses.upbound.io/upbound-software-license.html
+[Upbound Registry]: https://www.upbound.io/registry
