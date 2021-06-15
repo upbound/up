@@ -32,6 +32,8 @@ const (
 	errFindPackageinWd = "failed to find a package in current working directory"
 )
 
+const upboundRegistry = "registry.upbound.io"
+
 // AfterApply constructs and binds Upbound-specific context to any subcommands
 // that have Run() methods that receive it.
 func (c *pushCmd) AfterApply() error {
@@ -49,7 +51,7 @@ type pushCmd struct {
 
 // Run runs the push cmd.
 func (c *pushCmd) Run() error {
-	tag, err := name.NewTag(c.Tag)
+	tag, err := name.NewTag(c.Tag, name.WithDefaultRegistry(upboundRegistry))
 	if err != nil {
 		return err
 	}
