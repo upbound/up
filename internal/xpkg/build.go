@@ -1,0 +1,143 @@
+// Copyright 2021 Upbound Inc
+//
+// Licensed under the Apache License, Version 2.0 (the "License");
+// you may not use this file except in compliance with the License.
+// You may obtain a copy of the License at
+//
+//      http://www.apache.org/licenses/LICENSE-2.0
+//
+// Unless required by applicable law or agreed to in writing, software
+// distributed under the License is distributed on an "AS IS" BASIS,
+// WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+// See the License for the specific language governing permissions and
+// limitations under the License.
+
+package xpkg
+
+import (
+	"archive/tar"
+	"bytes"
+	"context"
+	"io"
+
+	"github.com/crossplane/crossplane-runtime/pkg/parser"
+	pkgmetav1 "github.com/crossplane/crossplane/apis/pkg/meta/v1"
+	v1 "github.com/google/go-containerregistry/pkg/v1"
+	"github.com/google/go-containerregistry/pkg/v1/empty"
+	"github.com/google/go-containerregistry/pkg/v1/mutate"
+	"github.com/google/go-containerregistry/pkg/v1/tarball"
+	"github.com/pkg/errors"
+	"k8s.io/apimachinery/pkg/runtime"
+)
+
+const (
+	errParserPackage = "failed to parse package"
+	errLintPackage   = "failed to lint package"
+	errInitBackend   = "failed to initialize package parsing backend"
+	errTarFromStream = "failed to build tarball from package stream"
+	errLayerFromTar  = "failed to convert tarball to image layer"
+	errBuildImage    = "failed to build image from layers"
+)
+
+// annotatedTeeReadCloser is a copy of io.TeeReader that implements
+// parser.AnnotatedReadCloser. It returns a Reader that writes to w what it
+// reads from r. All reads from r performed through it are matched with
+// corresponding writes to w. There is no internal buffering - the write must
+// complete before the read completes. Any error encountered while writing is
+// reported as a read error. If the underling reader is a
+// parser.AnnotatedReadCloser the tee reader will invoke its Annotate function.
+// Otherwise it will return nil. Closing is always a no-op.
+func annotatedTeeReadCloser(r io.Reader, w io.Writer) *teeReader {
+	return &teeReader{r, w}
+}
+
+type teeReader struct {
+	r io.Reader
+	w io.Writer
+}
+
+func (t *teeReader) Read(p []byte) (n int, err error) {
+	n, err = t.r.Read(p)
+	if n > 0 {
+		if n, err := t.w.Write(p[:n]); err != nil {
+			return n, err
+		}
+	}
+	return
+}
+
+func (t *teeReader) Close() error {
+	return nil
+}
+
+func (t *teeReader) Annotate() interface{} {
+	anno, ok := t.r.(parser.AnnotatedReadCloser)
+	if !ok {
+		return nil
+	}
+	return anno.Annotate()
+}
+
+// Build compiles a Crossplane package from an on-disk package.
+func Build(ctx context.Context, b parser.Backend, p parser.Parser) (v1.Image, runtime.Object, error) { // nolint:gocyclo
+	// Get YAML stream.
+	r, err := b.Init(ctx)
+	if err != nil {
+		return nil, nil, errors.Wrap(err, errInitBackend)
+	}
+	defer func() { _ = r.Close() }()
+
+	// Copy stream once to parse and once write to tarball.
+	buf := new(bytes.Buffer)
+	pkg, err := p.Parse(ctx, annotatedTeeReadCloser(r, buf))
+	if err != nil {
+		return nil, nil, errors.Wrap(err, errParserPackage)
+	}
+
+	metas := pkg.GetMeta()
+	if len(metas) != 1 {
+		return nil, nil, errors.New(errNotExactlyOneMeta)
+	}
+	meta := metas[0]
+	var linter parser.Linter
+	if meta.GetObjectKind().GroupVersionKind().Kind == pkgmetav1.ConfigurationKind {
+		linter = NewConfigurationLinter()
+	} else {
+		linter = NewProviderLinter()
+	}
+	if err := linter.Lint(pkg); err != nil {
+		return nil, nil, errors.Wrap(err, errLintPackage)
+	}
+
+	// Write on-disk package contents to tarball.
+	tarBuf := new(bytes.Buffer)
+	tw := tar.NewWriter(tarBuf)
+
+	hdr := &tar.Header{
+		Name: StreamFile,
+		Mode: int64(StreamFileMode),
+		Size: int64(buf.Len()),
+	}
+	if err := tw.WriteHeader(hdr); err != nil {
+		return nil, nil, errors.Wrap(err, errTarFromStream)
+	}
+	if _, err = io.Copy(tw, buf); err != nil {
+		return nil, nil, errors.Wrap(err, errTarFromStream)
+	}
+	if err := tw.Close(); err != nil {
+		return nil, nil, errors.Wrap(err, errTarFromStream)
+	}
+
+	// Build image layer from tarball.
+	layer, err := tarball.LayerFromReader(tarBuf)
+	if err != nil {
+		return nil, nil, errors.Wrap(err, errLayerFromTar)
+	}
+
+	// Append layer to to scratch image.
+	img, err := mutate.AppendLayers(empty.Image, layer)
+	if err != nil {
+		return nil, nil, errors.Wrap(err, errBuildImage)
+	}
+	return img, meta, nil
+}
