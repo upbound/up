@@ -21,6 +21,7 @@ import (
 
 	"github.com/upbound/up/cmd/up/cloud"
 	"github.com/upbound/up/cmd/up/uxp"
+	"github.com/upbound/up/cmd/up/xpkg"
 	"github.com/upbound/up/internal/version"
 )
 
@@ -42,6 +43,7 @@ var cli struct {
 	License licenseCmd `cmd:"" help:"Print Up license information."`
 	Cloud   cloud.Cmd  `cmd:"" help:"Interact with Upbound Cloud."`
 	UXP     uxp.Cmd    `cmd:"" help:"Interact with UXP."`
+	XPKG    xpkg.Cmd   `cmd:"" help:"Interact with UXP packages."`
 }
 
 func main() {
