@@ -44,7 +44,7 @@ const (
 // reads from r. All reads from r performed through it are matched with
 // corresponding writes to w. There is no internal buffering - the write must
 // complete before the read completes. Any error encountered while writing is
-// reported as a read error. If the underling reader is a
+// reported as a read error. If the underlying reader is a
 // parser.AnnotatedReadCloser the tee reader will invoke its Annotate function.
 // Otherwise it will return nil. Closing is always a no-op.
 func annotatedTeeReadCloser(r io.Reader, w io.Writer) *teeReader {
