@@ -236,8 +236,9 @@ github.com/creack/pty v1.1.7/go.mod h1:lj5s0c3V2DBrqTV7llrYr5NG6My20zk30Fl46Y7Do
 github.com/creack/pty v1.1.9/go.mod h1:oKZEueFk5CKHvIhNR5MUki03XCEU+Q6VDXinZuGJ33E=
 github.com/crossplane/crossplane v1.2.2 h1:bT9Piu4fT5tdkgKHi9t5mUMJfrbhZvFR5EXfX67bs38=
 github.com/crossplane/crossplane v1.2.2/go.mod h1:RsojcoV2wRhR/6tpNzfglQOJQi3r77FXQLua212kWrg=
-github.com/crossplane/crossplane-runtime v0.13.0 h1:TFeItxtW32/fETB9be0AsEha/ur0bbrtQRocC+Jd6RI=
 github.com/crossplane/crossplane-runtime v0.13.0/go.mod h1:Bc54/KBvV9ld/tvervcnhcSzk13FYguTqmYt72Mybps=
+github.com/crossplane/crossplane-runtime v0.14.0 h1:alBvQAwg9wJ88wEBnzyzmlN0N/v1W3Jx4OvBX3Fmrkg=
+github.com/crossplane/crossplane-runtime v0.14.0/go.mod h1:Bc54/KBvV9ld/tvervcnhcSzk13FYguTqmYt72Mybps=
 github.com/cyphar/filepath-securejoin v0.2.2 h1:jCwT2GTP+PY5nBz3c/YL5PAIbusElVrPujOBSCj8xRg=
 github.com/cyphar/filepath-securejoin v0.2.2/go.mod h1:FpkQEhXnPnOthhzymB7CGsFk2G9VLXONKD9G7QGMM+4=
 github.com/davecgh/go-spew v0.0.0-20151105211317-5215b55f46b2/go.mod h1:J7Y8YcW2NihsgmVo/mv3lAwl/skON4iLHjSsI+c5H38=
