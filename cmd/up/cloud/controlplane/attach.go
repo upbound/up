@@ -19,6 +19,7 @@ import (
 	"fmt"
 
 	"github.com/alecthomas/kong"
+	"github.com/docker/docker/pkg/namesgenerator"
 	"github.com/pkg/errors"
 
 	// Allow auth to all
@@ -63,7 +64,7 @@ func (c *AttachCmd) Run(kong *kong.Context, client *cp.Client, token *tokens.Cli
 	}
 	tRes, err := token.Create(context.Background(), &tokens.TokenCreateParameters{
 		Attributes: tokens.TokenAttributes{
-			Name: c.Name,
+			Name: namesgenerator.GetRandomName(0),
 		},
 		Relationships: tokens.TokenRelationships{
 			Owner: tokens.TokenOwner{
@@ -82,5 +83,5 @@ func (c *AttachCmd) Run(kong *kong.Context, client *cp.Client, token *tokens.Cli
 		return errors.New(errNoToken)
 	}
 	fmt.Fprintf(kong.Stdout, "%s\n", jwt)
-	return err
+	return nil
 }

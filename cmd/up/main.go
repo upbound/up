@@ -16,6 +16,8 @@ package main
 
 import (
 	"fmt"
+	"math/rand"
+	"time"
 
 	"github.com/alecthomas/kong"
 
@@ -47,6 +49,7 @@ var cli struct {
 }
 
 func main() {
+	rand.Seed(time.Now().UTC().UnixNano())
 	ctx := kong.Parse(&cli,
 		kong.Name("up"),
 		kong.Description("The Upbound CLI"),
