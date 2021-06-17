@@ -31,7 +31,7 @@ const (
 
 // deleteCmd deletes a control plane token on Upbound Cloud.
 type deleteCmd struct {
-	ID uuid.UUID `arg:"" required:"" help:"ID of token."`
+	ID uuid.UUID `arg:"" name:"token-ID" required:"" help:"ID of token."`
 }
 
 // Run executes the delete command.

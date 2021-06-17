@@ -44,7 +44,7 @@ func (c *createCmd) AfterApply(ctx *kong.Context) error {
 
 // createCmd creates a control plane token on Upbound Cloud.
 type createCmd struct {
-	ID uuid.UUID `arg:"" required:"" help:"ID of control plane."`
+	ID uuid.UUID `arg:"" name:"control-plane-ID" required:"" help:"ID of control plane."`
 
 	Name string `help:"Name of control plane token."`
 }

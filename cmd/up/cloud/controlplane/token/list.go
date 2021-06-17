@@ -35,7 +35,7 @@ const (
 
 // listCmd lists tokens for a control plane on Upbound Cloud.
 type listCmd struct {
-	ID uuid.UUID `arg:"" required:"" help:"ID of control plane."`
+	ID uuid.UUID `arg:"" name:"control-plane-ID" required:"" help:"ID of control plane."`
 }
 
 // Run executes the list command.
