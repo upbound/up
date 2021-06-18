@@ -12,7 +12,7 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-package controlplane
+package token
 
 import (
 	"context"
@@ -20,14 +20,10 @@ import (
 
 	"github.com/alecthomas/kong"
 	"github.com/docker/docker/pkg/namesgenerator"
+	"github.com/google/uuid"
 	"github.com/pkg/errors"
 
-	// Allow auth to all
-	_ "k8s.io/client-go/plugin/pkg/client/auth"
-
-	cp "github.com/upbound/up-sdk-go/service/controlplanes"
 	"github.com/upbound/up-sdk-go/service/tokens"
-
 	"github.com/upbound/up/internal/cloud"
 )
 
@@ -37,40 +33,33 @@ const (
 	errNoToken = "could not identify token in response"
 )
 
-// AttachCmd adds a user or token profile with session token to the up config
-// file.
-type AttachCmd struct {
-	Name string `arg:"" required:"" help:"Name of control plane."`
-
-	Description string `short:"d" help:"Description for control plane."`
-	ViewOnly    bool   `help:"Create control plane with view only permissions."`
+// AfterApply constructs and binds Upbound-specific context to any subcommands
+// that have Run() methods that receive it.
+func (c *createCmd) AfterApply(ctx *kong.Context) error {
+	if c.Name == "" {
+		c.Name = namesgenerator.GetRandomName(0)
+	}
+	return nil
 }
 
-// Run executes the attach command.
-func (c *AttachCmd) Run(kong *kong.Context, client *cp.Client, token *tokens.Client, cloudCtx *cloud.Context) error {
-	cpRes, err := client.Create(context.Background(), &cp.ControlPlaneCreateParameters{
-		Account:     cloudCtx.Account,
-		Name:        c.Name,
-		Description: c.Description,
-		SelfHosted:  true,
-	})
-	if err != nil {
-		return err
-	}
-	if c.ViewOnly {
-		if err := client.SetViewOnly(context.Background(), cpRes.ControlPlane.ID, c.ViewOnly); err != nil {
-			return err
-		}
-	}
-	tRes, err := token.Create(context.Background(), &tokens.TokenCreateParameters{
+// createCmd creates a control plane token on Upbound Cloud.
+type createCmd struct {
+	ID uuid.UUID `arg:"" name:"control-plane-ID" required:"" help:"ID of control plane."`
+
+	Name string `help:"Name of control plane token."`
+}
+
+// Run executes the create command.
+func (c *createCmd) Run(kong *kong.Context, client *tokens.Client, cloudCtx *cloud.Context) error {
+	tRes, err := client.Create(context.Background(), &tokens.TokenCreateParameters{
 		Attributes: tokens.TokenAttributes{
-			Name: namesgenerator.GetRandomName(0),
+			Name: c.Name,
 		},
 		Relationships: tokens.TokenRelationships{
 			Owner: tokens.TokenOwner{
 				Data: tokens.TokenOwnerData{
 					Type: tokens.TokenOwnerControlPlane,
-					ID:   cpRes.ControlPlane.ID,
+					ID:   c.ID,
 				},
 			},
 		},

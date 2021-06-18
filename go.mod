@@ -9,6 +9,7 @@ require (
 	github.com/crossplane/crossplane v1.2.2
 	github.com/crossplane/crossplane-runtime v0.14.0
 	github.com/dgrijalva/jwt-go v3.2.0+incompatible
+	github.com/docker/docker v17.12.0-ce-rc1.0.20200926000217-2617742802f6+incompatible
 	github.com/google/addlicense v0.0.0-20210428195630-6d92264d7170
 	github.com/google/go-cmp v0.5.5
 	github.com/google/go-containerregistry v0.5.1

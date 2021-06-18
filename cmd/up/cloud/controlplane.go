@@ -23,6 +23,7 @@ import (
 	"github.com/upbound/up-sdk-go/service/tokens"
 
 	"github.com/upbound/up/cmd/up/cloud/controlplane"
+	"github.com/upbound/up/cmd/up/cloud/controlplane/token"
 	"github.com/upbound/up/internal/cloud"
 	"github.com/upbound/up/internal/config"
 )
@@ -76,4 +77,6 @@ type controlPlaneCmd struct {
 	Create controlplane.CreateCmd `cmd:"" help:"Create a hosted control plane."`
 	Delete controlplane.DeleteCmd `cmd:"" help:"Delete a control plane."`
 	List   controlplane.ListCmd   `cmd:"" help:"List control planes for the account."`
+
+	Token token.Cmd `cmd:"" name:"token" help:"Interact with control plane tokens."`
 }

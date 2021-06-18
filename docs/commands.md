@@ -77,7 +77,8 @@ Format: `up cloud controlplane <cmd> ...` Alias: `up cloud ctp <cmd> ...`
       - `-d,--description = STRING`: Control plane description.
       - `--view-only`: creates the self-hosted control plane as view only.
     - Behavior: Creates a self-hosted control plane on Upbound Cloud and returns
-      token to connect a UXP instance to it.
+      token to connect a UXP instance to it. The name of the token is randomly
+      generated.
 - `create <name>`
     - Flags:
         - `--description = STRING`: Control plane description.
@@ -90,6 +91,21 @@ Format: `up cloud controlplane <cmd> ...` Alias: `up cloud ctp <cmd> ...`
 - `list`
     - Behavior: Lists all control planes for the
       configured account.
+
+**Subgroup: Token**
+
+Format: `up cloud controlplane token <cmd> ...` Alias: `up cloud ctp token <cmd>...`
+
+- `create <control-plane-ID>`
+    - Flags:
+        - `--name = STRING`: Name of control plane token. Name is randomly
+          generated if not specified.
+    - Behavior: Creates a token for the specified self-hosted control plane ID
+      and prints it to stdout.
+- `delete <token-ID>`
+    - Behavior: Deletes the control plane token with the specified ID.
+- `list <control-plane-ID>`
+    - Behavior: Lists all tokens for the specified control plane.
 
 ## UXP
 
