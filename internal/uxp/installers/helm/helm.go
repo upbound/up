@@ -351,7 +351,7 @@ func (h *installer) Uninstall() error {
 	return err
 }
 
-// pullAndLoad pulls and loads a chart or fetches it from the catch.
+// pullAndLoad pulls and loads a chart or fetches it from the cache.
 func (h *installer) pullAndLoad(version string) (*chart.Chart, error) { //nolint:gocyclo
 	// check to see if version is cached
 	if version != "" {
