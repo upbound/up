@@ -352,46 +352,54 @@ func (h *installer) Uninstall() error {
 }
 
 // pullAndLoad pulls and loads a chart or fetches it from the catch.
-func (h *installer) pullAndLoad(version string) (*chart.Chart, error) {
-	// helm strips versions with leading v, which can cause issues when fetching
-	// the chart from the cache.
-	version = strings.TrimPrefix(version, "v")
+func (h *installer) pullAndLoad(version string) (*chart.Chart, error) { //nolint:gocyclo
 	// check to see if version is cached
-	fileName := filepath.Join(h.cacheDir, fmt.Sprintf("%s-%s.tgz", h.chartName, version))
 	if version != "" {
+		// helm strips versions with leading v, which can cause issues when fetching
+		// the chart from the cache.
+		version = strings.TrimPrefix(version, "v")
+		fileName := filepath.Join(h.cacheDir, fmt.Sprintf("%s-%s.tgz", h.chartName, version))
 		if _, err := h.fs.Stat(filepath.Join(h.cacheDir, fileName)); err != nil {
 			h.pullClient.SetDestDir(h.cacheDir)
 			if err := h.pullChart(version); err != nil {
 				return nil, errors.Wrap(err, errPullChart)
 			}
 		}
-	} else {
-		tmp, err := h.tempDir(h.fs, h.cacheDir, "")
-		if err != nil {
-			return nil, err
-		}
-		defer func() {
-			if err := h.fs.RemoveAll(tmp); err != nil {
-				h.log.Debug("failed to clean up temporary directory", "error", err)
-			}
-		}()
-		h.pullClient.SetDestDir(tmp)
-		if err := h.pullChart(version); err != nil {
-			return nil, errors.Wrap(err, errPullChart)
-		}
-		files, err := afero.ReadDir(h.fs, tmp)
-		if err != nil {
-			return nil, errors.Wrap(err, errGetLatestPulled)
-		}
-		if len(files) != 1 {
-			return nil, errors.Errorf(errCorruptTempDirFmt, h.cacheDir)
-		}
-		tmpFileName := filepath.Join(tmp, files[0].Name())
-		if err := h.fs.Rename(tmpFileName, fileName); err != nil {
-			return nil, errors.Wrap(err, errMoveLatest)
-		}
+		return h.load(fileName)
 	}
-	return h.load(fileName)
+	tmp, err := h.tempDir(h.fs, h.cacheDir, "")
+	if err != nil {
+		return nil, err
+	}
+	defer func() {
+		if err := h.fs.RemoveAll(tmp); err != nil {
+			h.log.Debug("failed to clean up temporary directory", "error", err)
+		}
+	}()
+	h.pullClient.SetDestDir(tmp)
+	if err := h.pullChart(version); err != nil {
+		return nil, errors.Wrap(err, errPullChart)
+	}
+	files, err := afero.ReadDir(h.fs, tmp)
+	if err != nil {
+		return nil, errors.Wrap(err, errGetLatestPulled)
+	}
+	if len(files) != 1 {
+		return nil, errors.Errorf(errCorruptTempDirFmt, h.cacheDir)
+	}
+	// load the chart before copying to cache so that we are able to identify
+	// this version in the cache if it is explicitly specified in a future
+	// install or upgrade.
+	tmpFileName := filepath.Join(tmp, files[0].Name())
+	c, err := h.load(tmpFileName)
+	if err != nil {
+		return nil, err
+	}
+	fileName := filepath.Join(h.cacheDir, fmt.Sprintf("%s-%s.tgz", h.chartName, c.Metadata.Version))
+	if err := h.fs.Rename(tmpFileName, fileName); err != nil {
+		return nil, errors.Wrap(err, errMoveLatest)
+	}
+	return c, nil
 }
 
 func (h *installer) pullChart(version string) error {
