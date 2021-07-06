@@ -15,8 +15,14 @@
 package kube
 
 import (
+	"fmt"
+	"net/url"
+	"path"
+
+	"github.com/google/uuid"
 	"k8s.io/client-go/rest"
 	"k8s.io/client-go/tools/clientcmd"
+	"k8s.io/client-go/tools/clientcmd/api"
 )
 
 const (
@@ -24,6 +30,9 @@ const (
 	KubeconfigDir = ".kube"
 	// KubeconfigFile is the default kubeconfig file.
 	KubeconfigFile = "config"
+	// UpboundKubeconfigKeyFmt is the format for Upbound control plane entries
+	// in a kubeconfig file.
+	UpboundKubeconfigKeyFmt = "upbound-%s"
 )
 
 // GetKubeConfig constructs a Kubernetes REST config from the specified
@@ -32,4 +41,28 @@ func GetKubeConfig(path string) (*rest.Config, error) {
 	rules := clientcmd.NewDefaultClientConfigLoadingRules()
 	rules.ExplicitPath = path
 	return clientcmd.NewNonInteractiveDeferredLoadingClientConfig(rules, &clientcmd.ConfigOverrides{}).ClientConfig()
+}
+
+// BuildControlPlaneKubeconfig builds a kubeconfig entry for a control plane.
+func BuildControlPlaneKubeconfig(proxy *url.URL, id uuid.UUID, token, kube string) error { //nolint:interfacer
+	po := clientcmd.NewDefaultPathOptions()
+	po.LoadingRules.ExplicitPath = kube
+	conf, err := po.GetStartingConfig()
+	if err != nil {
+		return err
+	}
+	key := fmt.Sprintf(UpboundKubeconfigKeyFmt, id.String())
+	proxy.Path = path.Join(proxy.Path, id.String())
+	conf.Clusters[key] = &api.Cluster{
+		Server: proxy.String(),
+	}
+	conf.AuthInfos[key] = &api.AuthInfo{
+		Token: token,
+	}
+	conf.Contexts[key] = &api.Context{
+		Cluster:  key,
+		AuthInfo: key,
+	}
+	conf.CurrentContext = key
+	return clientcmd.ModifyConfig(po, *conf, true)
 }
