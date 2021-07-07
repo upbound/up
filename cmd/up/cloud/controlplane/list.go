@@ -27,7 +27,7 @@ import (
 )
 
 const (
-	listRowFormat = "%v\t%v\t%v\n"
+	listRowFormat = "%v\t%v\t%v\t%v\n"
 )
 
 // ListCmd list control planes in an account on Upbound Cloud.
@@ -43,9 +43,9 @@ func (c *ListCmd) Run(kong *kong.Context, client *accounts.Client, cloudCtx *clo
 		return nil
 	}
 	w := printers.GetNewTabWriter(kong.Stdout)
-	fmt.Fprintf(w, listRowFormat, "NAME", "ID", "SELF-HOSTED")
+	fmt.Fprintf(w, listRowFormat, "NAME", "ID", "SELF-HOSTED", "STATUS")
 	for _, cp := range cps {
-		fmt.Fprintf(w, listRowFormat, cp.ControlPlane.Name, cp.ControlPlane.ID, cp.ControlPlane.SelfHosted)
+		fmt.Fprintf(w, listRowFormat, cp.ControlPlane.Name, cp.ControlPlane.ID, cp.ControlPlane.SelfHosted, cp.Status)
 	}
 	return w.Flush()
 }
