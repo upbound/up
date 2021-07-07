@@ -62,7 +62,7 @@ func (c *connectCmd) Run(kong *kong.Context, uxpCtx *uxp.Context) error {
 		if err != nil {
 			return err
 		}
-		c.CPToken = string(b)
+		c.CPToken = strings.TrimSpace(string(b))
 	}
 	// Remove any trailing newlines from token, which can make piping output
 	// from other commands more convenient.

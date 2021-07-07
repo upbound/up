@@ -18,6 +18,7 @@ import (
 	"io"
 	"net/url"
 	"os"
+	"strings"
 
 	"github.com/alecthomas/kong"
 	"github.com/google/uuid"
@@ -51,7 +52,7 @@ func (c *getCmd) Run(kong *kong.Context, cloudCtx *cloud.Context) error {
 		if err != nil {
 			return err
 		}
-		c.Token = string(b)
+		c.Token = strings.TrimSpace(string(b))
 	}
 	return kube.BuildControlPlaneKubeconfig(c.Proxy, c.ID, c.Token, c.File)
 }
