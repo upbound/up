@@ -92,6 +92,24 @@ Format: `up cloud controlplane <cmd> ...` Alias: `up cloud ctp <cmd> ...`
     - Behavior: Lists all control planes for the
       configured account.
 
+**Subgroup: Kubeconfig**
+
+Format: `up cloud controlplane kubeconfig <cmd> ...` Alias: `up cloud ctp kubeconfig <cmd>...`
+
+- `get <control-plane-ID>`
+    - Flags:
+        - `--token = STRING` (*Required*): API token for authenticating to
+          control plane. If `-` is given the value will be read from stdin.
+        - `-f,--file = FILE`: File to merge `kubeconfig`.
+        - `--proxy = URL` (Env: `UP_PROXY`) (Default:
+          `https://proxy.upbound.io/env`): Endpoint for Upbound control plane
+          proxy.
+    - Behavior: Merges control plane cluster and authentication data into
+      currently configured `kubeconfig`, or one specified by `--file`. The
+      `--token` flag must be provided and must be a valid Upbound API token. A
+      new context will be created for the cluster and authentication data and it
+      will be set as current.
+
 **Subgroup: Token**
 
 Format: `up cloud controlplane token <cmd> ...` Alias: `up cloud ctp token <cmd>...`
