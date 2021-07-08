@@ -38,7 +38,7 @@ type getCmd struct {
 	stdin io.Reader
 
 	File  string   `type:"path" short:"f" help:"File to merge kubeconfig."`
-	Proxy *url.URL `env:"UP_PROXY" default:"https://proxy.upbound.io/env" help:"Endpoint used for Upbound Proxy."`
+	Proxy *url.URL `env:"UP_PROXY" default:"https://proxy.upbound.io/controlPlanes" help:"Endpoint used for Upbound Proxy."`
 	Token string   `required:"" help:"API token used to authenticate."`
 
 	ID uuid.UUID `arg:"" name:"control-plane-ID" required:"" help:"ID of control plane."`
