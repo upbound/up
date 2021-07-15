@@ -16,7 +16,6 @@ package uxp
 
 import (
 	"io"
-	"os"
 
 	"github.com/pkg/errors"
 	"sigs.k8s.io/yaml"
@@ -34,6 +33,7 @@ func (c *upgradeCmd) AfterApply(uxpCtx *uxp.Context) error {
 	installer, err := helm.NewInstaller(uxpCtx.Kubeconfig,
 		helm.WithNamespace(uxpCtx.Namespace),
 		helm.AllowUnstableVersions(c.Unstable),
+		helm.WithChart(c.Chart),
 		helm.RollbackOnError(c.Rollback),
 		helm.Force(c.Force))
 	if err != nil {
@@ -65,11 +65,10 @@ type upgradeCmd struct {
 
 	Version string `arg:"" optional:"" help:"UXP version to upgrade to."`
 
-	Rollback bool              `help:"Rollback to previously installed version on failed upgrade."`
-	Unstable bool              `help:"Allow upgrading to unstable UXP versions."`
-	Set      map[string]string `help:"Set upgrade parameters."`
-	File     *os.File          `short:"f" help:"Parameters file for upgrade."`
-	Force    bool              `help:"Force upgrade even if versions are incompatible."`
+	Rollback bool `help:"Rollback to previously installed version on failed upgrade."`
+	Force    bool `help:"Force upgrade even if versions are incompatible."`
+
+	ChartParams
 }
 
 // Run executes the upgrade command.

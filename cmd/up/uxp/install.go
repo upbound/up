@@ -17,7 +17,6 @@ package uxp
 import (
 	"context"
 	"io"
-	"os"
 
 	"github.com/pkg/errors"
 	corev1 "k8s.io/api/core/v1"
@@ -39,7 +38,8 @@ const (
 func (c *installCmd) AfterApply(uxpCtx *uxp.Context) error {
 	installer, err := helm.NewInstaller(uxpCtx.Kubeconfig,
 		helm.WithNamespace(uxpCtx.Namespace),
-		helm.AllowUnstableVersions(c.Unstable))
+		helm.AllowUnstableVersions(c.Unstable),
+		helm.WithChart(c.Chart))
 	if err != nil {
 		return err
 	}
@@ -75,9 +75,7 @@ type installCmd struct {
 
 	Version string `arg:"" optional:"" help:"UXP version to install."`
 
-	Unstable bool              `help:"Allow installing unstable UXP versions."`
-	Set      map[string]string `help:"Set install parameters."`
-	File     *os.File          `short:"f" help:"Parameters file for install."`
+	ChartParams
 }
 
 // Run executes the install command.

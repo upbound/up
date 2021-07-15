@@ -111,6 +111,7 @@ type HomeDirFn func() (string, error)
 
 type installer struct {
 	repoURL         *url.URL
+	chartFile       *os.File
 	chartName       string
 	releaseName     string
 	namespace       string
@@ -170,6 +171,13 @@ func WithLogger(l logging.Logger) InstallerModifierFn {
 func WithCacheDir(c string) InstallerModifierFn {
 	return func(h *installer) {
 		h.cacheDir = c
+	}
+}
+
+// WithChart sets the chart to be installed/upgraded
+func WithChart(chartFile *os.File) InstallerModifierFn {
+	return func(h *installer) {
+		h.chartFile = chartFile
 	}
 }
 
@@ -312,12 +320,23 @@ func (h *installer) Install(version string, parameters map[string]interface{}) e
 	if !errors.Is(err, driver.ErrReleaseNotFound) {
 		return errors.Wrap(err, errVerifyChartNotInstalled)
 	}
-	// install desired version
-	chart, err := h.pullAndLoad(version)
+
+	var helmChart *chart.Chart
+	if h.chartFile == nil {
+		// install desired version from repo
+		helmChart, err = h.pullAndLoad(version)
+	} else {
+		// install specified chart from file or folder
+		// We assume a uxp or a crossplane chart is referred.
+		// For dev purposes, no need to assert this.
+		// (see above release check)
+		helmChart, err = h.load(h.chartFile.Name())
+	}
 	if err != nil {
 		return err
 	}
-	_, err = h.installClient.Run(chart, parameters)
+
+	_, err = h.installClient.Run(helmChart, parameters)
 	return err
 }
 
@@ -331,11 +350,22 @@ func (h *installer) Upgrade(version string, parameters map[string]interface{}) e
 	if h.releaseName == crossplaneChartName && !equivalentVersions(current, version) && !h.force {
 		return errors.New(errUpgradeCrossplaneVersion)
 	}
-	chart, err := h.pullAndLoad(version)
+
+	var helmChart *chart.Chart
+	if h.chartFile == nil {
+		helmChart, err = h.pullAndLoad(version)
+	} else {
+		// upgrade specified chart from file or folder
+		// We assume a uxp or a crossplane chart is referred.
+		// For dev purposes, no need to assert this.
+		// (see above release check)
+		helmChart, err = h.load(h.chartFile.Name())
+	}
 	if err != nil {
 		return err
 	}
-	_, upErr := h.upgradeClient.Run(h.releaseName, chart, parameters)
+
+	_, upErr := h.upgradeClient.Run(h.releaseName, helmChart, parameters)
 	if upErr != nil && h.rollbackOnError {
 		if rErr := h.rollbackClient.Run(h.releaseName); rErr != nil {
 			return errors.Wrap(rErr, errFailedUpgradeFailedRollback)
