@@ -19,7 +19,7 @@ import "os"
 // ChartParams common parameters for installing/upgrading charts
 type ChartParams struct {
 	Unstable bool              `help:"Allow installing unstable UXP versions."`
-	Set      map[string]string `help:"Set Helm parameters."`
-	File     *os.File          `short:"f" help:"Helm parameters file."`
-	Chart    *os.File          `help:"Chart archive file."`
+	Set      map[string]string `help:"Set parameters."`
+	File     *os.File          `short:"f" help:"Parameters file."`
+	Bundle   *os.File          `help:"Local bundle path."`
 }

@@ -33,7 +33,7 @@ func (c *upgradeCmd) AfterApply(uxpCtx *uxp.Context) error {
 	installer, err := helm.NewInstaller(uxpCtx.Kubeconfig,
 		helm.WithNamespace(uxpCtx.Namespace),
 		helm.AllowUnstableVersions(c.Unstable),
-		helm.WithChart(c.Chart),
+		helm.WithChart(c.Bundle),
 		helm.RollbackOnError(c.Rollback),
 		helm.Force(c.Force))
 	if err != nil {
