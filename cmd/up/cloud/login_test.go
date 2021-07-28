@@ -23,7 +23,7 @@ import (
 	"testing/iotest"
 
 	"github.com/crossplane/crossplane-runtime/pkg/test"
-	"github.com/dgrijalva/jwt-go"
+	"github.com/golang-jwt/jwt"
 	"github.com/google/go-cmp/cmp"
 	"github.com/pkg/errors"
 
