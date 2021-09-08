@@ -17,8 +17,8 @@ package uxp
 import (
 	"github.com/alecthomas/kong"
 
+	"github.com/upbound/up/internal/install"
 	"github.com/upbound/up/internal/kube"
-	"github.com/upbound/up/internal/uxp"
 )
 
 // AfterApply constructs and binds Upbound-specific context to any subcommands
@@ -28,7 +28,7 @@ func (c *Cmd) AfterApply(ctx *kong.Context) error {
 	if err != nil {
 		return err
 	}
-	ctx.Bind(&uxp.Context{
+	ctx.Bind(&install.Context{
 		Kubeconfig: kubeconfig,
 		Namespace:  c.Namespace,
 	})

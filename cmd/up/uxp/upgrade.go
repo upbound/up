@@ -20,8 +20,8 @@ import (
 	"github.com/pkg/errors"
 	"sigs.k8s.io/yaml"
 
-	"github.com/upbound/up/internal/uxp"
-	"github.com/upbound/up/internal/uxp/installers/helm"
+	"github.com/upbound/up/internal/install"
+	"github.com/upbound/up/internal/install/helm"
 )
 
 const (
@@ -29,9 +29,9 @@ const (
 )
 
 // AfterApply sets default values in command after assignment and validation.
-func (c *upgradeCmd) AfterApply(uxpCtx *uxp.Context) error {
-	installer, err := helm.NewInstaller(uxpCtx.Kubeconfig,
-		helm.WithNamespace(uxpCtx.Namespace),
+func (c *upgradeCmd) AfterApply(insCtx *install.Context) error {
+	ins, err := helm.NewManager(insCtx.Kubeconfig,
+		helm.WithNamespace(insCtx.Namespace),
 		helm.AllowUnstableVersions(c.Unstable),
 		helm.WithChart(c.Bundle),
 		helm.RollbackOnError(c.Rollback),
@@ -39,7 +39,7 @@ func (c *upgradeCmd) AfterApply(uxpCtx *uxp.Context) error {
 	if err != nil {
 		return err
 	}
-	c.installer = installer
+	c.mgr = ins
 	base := map[string]interface{}{}
 	if c.File != nil {
 		defer c.File.Close() //nolint:errcheck,gosec
@@ -60,8 +60,8 @@ func (c *upgradeCmd) AfterApply(uxpCtx *uxp.Context) error {
 
 // upgradeCmd upgrades UXP.
 type upgradeCmd struct {
-	installer uxp.Installer
-	parser    uxp.ParameterParser
+	mgr    install.Manager
+	parser install.ParameterParser
 
 	Version string `arg:"" optional:"" help:"UXP version to upgrade to."`
 
@@ -72,10 +72,10 @@ type upgradeCmd struct {
 }
 
 // Run executes the upgrade command.
-func (c *upgradeCmd) Run(uxpCtx *uxp.Context) error {
+func (c *upgradeCmd) Run(insCtx *install.Context) error {
 	params, err := c.parser.Parse()
 	if err != nil {
 		return errors.Wrap(err, errParseUpgradeParameters)
 	}
-	return c.installer.Upgrade(c.Version, params)
+	return c.mgr.Upgrade(c.Version, params)
 }

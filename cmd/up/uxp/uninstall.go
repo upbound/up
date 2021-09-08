@@ -15,27 +15,27 @@
 package uxp
 
 import (
-	"github.com/upbound/up/internal/uxp"
-	"github.com/upbound/up/internal/uxp/installers/helm"
+	"github.com/upbound/up/internal/install"
+	"github.com/upbound/up/internal/install/helm"
 )
 
 // AfterApply sets default values in command after assignment and validation.
-func (c *uninstallCmd) AfterApply(uxpCtx *uxp.Context) error {
-	installer, err := helm.NewInstaller(uxpCtx.Kubeconfig,
-		helm.WithNamespace(uxpCtx.Namespace))
+func (c *uninstallCmd) AfterApply(insCtx *install.Context) error {
+	mgr, err := helm.NewManager(insCtx.Kubeconfig,
+		helm.WithNamespace(insCtx.Namespace))
 	if err != nil {
 		return err
 	}
-	c.installer = installer
+	c.mgr = mgr
 	return nil
 }
 
 // uninstallCmd uninstalls UXP.
 type uninstallCmd struct {
-	installer uxp.Installer
+	mgr install.Manager
 }
 
 // Run executes the uninstall command.
-func (c *uninstallCmd) Run(uxpCtx *uxp.Context) error {
-	return c.installer.Uninstall()
+func (c *uninstallCmd) Run(insCtx *install.Context) error {
+	return c.mgr.Uninstall()
 }

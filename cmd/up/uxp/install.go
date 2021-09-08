@@ -25,8 +25,8 @@ import (
 	"k8s.io/client-go/kubernetes"
 	"sigs.k8s.io/yaml"
 
-	"github.com/upbound/up/internal/uxp"
-	"github.com/upbound/up/internal/uxp/installers/helm"
+	"github.com/upbound/up/internal/install"
+	"github.com/upbound/up/internal/install/helm"
 )
 
 const (
@@ -35,16 +35,16 @@ const (
 )
 
 // AfterApply sets default values in command after assignment and validation.
-func (c *installCmd) AfterApply(uxpCtx *uxp.Context) error {
-	installer, err := helm.NewInstaller(uxpCtx.Kubeconfig,
-		helm.WithNamespace(uxpCtx.Namespace),
+func (c *installCmd) AfterApply(insCtx *install.Context) error {
+	mgr, err := helm.NewManager(insCtx.Kubeconfig,
+		helm.WithNamespace(insCtx.Namespace),
 		helm.AllowUnstableVersions(c.Unstable),
 		helm.WithChart(c.Bundle))
 	if err != nil {
 		return err
 	}
-	c.installer = installer
-	client, err := kubernetes.NewForConfig(uxpCtx.Kubeconfig)
+	c.mgr = mgr
+	client, err := kubernetes.NewForConfig(insCtx.Kubeconfig)
 	if err != nil {
 		return err
 	}
@@ -69,9 +69,9 @@ func (c *installCmd) AfterApply(uxpCtx *uxp.Context) error {
 
 // installCmd installs UXP.
 type installCmd struct {
-	installer uxp.Installer
-	parser    uxp.ParameterParser
-	kClient   kubernetes.Interface
+	mgr     install.Manager
+	parser  install.ParameterParser
+	kClient kubernetes.Interface
 
 	Version string `arg:"" optional:"" help:"UXP version to install."`
 
@@ -79,11 +79,11 @@ type installCmd struct {
 }
 
 // Run executes the install command.
-func (c *installCmd) Run(uxpCtx *uxp.Context) error {
+func (c *installCmd) Run(insCtx *install.Context) error {
 	// Create namespace if it does not exist.
 	_, err := c.kClient.CoreV1().Namespaces().Create(context.Background(), &corev1.Namespace{
 		ObjectMeta: metav1.ObjectMeta{
-			Name: uxpCtx.Namespace,
+			Name: insCtx.Namespace,
 		},
 	}, metav1.CreateOptions{})
 	if err != nil && !kerrors.IsAlreadyExists(err) {
@@ -93,7 +93,7 @@ func (c *installCmd) Run(uxpCtx *uxp.Context) error {
 	if err != nil {
 		return errors.Wrap(err, errParseInstallParameters)
 	}
-	err = c.installer.Install(c.Version, params)
+	err = c.mgr.Install(c.Version, params)
 	if err != nil {
 		return err
 	}
