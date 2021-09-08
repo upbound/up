@@ -12,14 +12,18 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-package uxp
+package install
 
-import (
-	"k8s.io/client-go/rest"
-)
+// Manager can install and manage Upbound software in a Kubernetes cluster.
+// TODO(hasheddan): support custom error types, such as AlreadyExists.
+type Manager interface {
+	GetCurrentVersion() (string, error)
+	Install(version string, parameters map[string]interface{}) error
+	Upgrade(version string, parameters map[string]interface{}) error
+	Uninstall() error
+}
 
-// Context includes common data that UXP consumers may utilize.
-type Context struct {
-	Kubeconfig *rest.Config
-	Namespace  string
+// ParameterParser parses install and upgrade parameters.
+type ParameterParser interface {
+	Parse() (map[string]interface{}, error)
 }

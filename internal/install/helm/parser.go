@@ -19,7 +19,7 @@ import (
 
 	"helm.sh/helm/v3/pkg/strvals"
 
-	"github.com/upbound/up/internal/uxp"
+	"github.com/upbound/up/internal/install"
 )
 
 // Parser is a helm-style parameter parser.
@@ -29,7 +29,7 @@ type Parser struct {
 }
 
 // NewParser returns a parameter parser backed by helm.
-func NewParser(base map[string]interface{}, overrides map[string]string) uxp.ParameterParser {
+func NewParser(base map[string]interface{}, overrides map[string]string) install.ParameterParser {
 	return &Parser{
 		values:    base,
 		overrides: overrides,

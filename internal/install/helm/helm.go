@@ -33,7 +33,7 @@ import (
 	"helm.sh/helm/v3/pkg/storage/driver"
 	"k8s.io/client-go/rest"
 
-	"github.com/upbound/up/internal/uxp"
+	"github.com/upbound/up/internal/install"
 )
 
 const (
@@ -203,8 +203,8 @@ func Force(f bool) InstallerModifierFn {
 	}
 }
 
-// NewInstaller builds a helm installer for UXP.
-func NewInstaller(config *rest.Config, modifiers ...InstallerModifierFn) (uxp.Installer, error) { // nolint:gocyclo
+// NewManager builds a helm install manager for UXP.
+func NewManager(config *rest.Config, modifiers ...InstallerModifierFn) (install.Manager, error) { // nolint:gocyclo
 	u, err := url.Parse(defaultRepoURL)
 	if err != nil {
 		return nil, err

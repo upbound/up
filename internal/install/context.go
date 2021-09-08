@@ -12,18 +12,14 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-package uxp
+package install
 
-// Installer can install and manage UXP in a Kubernetes cluster.
-// TODO(hasheddan): support custom error types, such as AlreadyExists.
-type Installer interface {
-	GetCurrentVersion() (string, error)
-	Install(version string, parameters map[string]interface{}) error
-	Upgrade(version string, parameters map[string]interface{}) error
-	Uninstall() error
-}
+import (
+	"k8s.io/client-go/rest"
+)
 
-// ParameterParser parses install and upgrade parameters.
-type ParameterParser interface {
-	Parse() (map[string]interface{}, error)
+// Context includes common data that installer consumers may utilize.
+type Context struct {
+	Kubeconfig *rest.Config
+	Namespace  string
 }
