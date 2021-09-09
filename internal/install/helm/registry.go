@@ -40,7 +40,7 @@ const (
 	errImageReference    = "failed to parse helm chart repository and name into a valid OCI image reference"
 	errGetImage          = "failed to get OCI image"
 	errGetImageLayers    = "failed to get OCI image layers"
-	errNotSingleLayer    = "OCI image has more than one layer"
+	errNotSingleLayer    = "OCI image does not have a single layer"
 	errLayerMediaTypeFmt = "OCI image layer has media type %s and %s is required"
 	errReadCompressed    = "failed to read compressed chart contents"
 )
@@ -50,8 +50,9 @@ type fetchFn func(ref name.Reference, options ...remote.Option) (v1.Image, error
 var _ helmPuller = &registryPuller{}
 
 type registryPuller struct {
-	fs    afero.Fs
-	fetch fetchFn
+	fs                afero.Fs
+	fetch             fetchFn
+	acceptedMediaType string
 
 	cacheDir   string
 	version    string
@@ -75,8 +76,9 @@ func withRepoURL(u *url.URL) registryPullerOpt {
 
 func newRegistryPuller(opts ...registryPullerOpt) *registryPuller {
 	r := &registryPuller{
-		fs:    afero.NewOsFs(),
-		fetch: remote.Image,
+		fs:                afero.NewOsFs(),
+		fetch:             remote.Image,
+		acceptedMediaType: HelmChartContentLayerMediaType,
 	}
 	for _, o := range opts {
 		o(r)
@@ -107,8 +109,8 @@ func (p *registryPuller) Run(chartName string) (string, error) {
 	if err != nil {
 		return "", err
 	}
-	if string(mt) != HelmChartContentLayerMediaType {
-		return "", errors.Errorf(errLayerMediaTypeFmt, string(mt), HelmChartContentLayerMediaType)
+	if string(mt) != p.acceptedMediaType {
+		return "", errors.Errorf(errLayerMediaTypeFmt, string(mt), p.acceptedMediaType)
 	}
 	read, err := chart.Compressed()
 	if err != nil {
