@@ -22,6 +22,7 @@ import (
 	"github.com/alecthomas/kong"
 
 	"github.com/upbound/up/cmd/up/cloud"
+	"github.com/upbound/up/cmd/up/enterprise"
 	"github.com/upbound/up/cmd/up/uxp"
 	"github.com/upbound/up/cmd/up/xpkg"
 	"github.com/upbound/up/internal/version"
@@ -42,10 +43,11 @@ func (v versionFlag) BeforeApply(ctx *kong.Context) error { // nolint:unparam
 var cli struct {
 	Version versionFlag `short:"v" name:"version" help:"Print version and exit."`
 
-	License licenseCmd `cmd:"" help:"Print Up license information."`
-	Cloud   cloud.Cmd  `cmd:"" help:"Interact with Upbound Cloud."`
-	UXP     uxp.Cmd    `cmd:"" help:"Interact with UXP."`
-	XPKG    xpkg.Cmd   `cmd:"" help:"Interact with UXP packages."`
+	License    licenseCmd     `cmd:"" help:"Print Up license information."`
+	Cloud      cloud.Cmd      `cmd:"" help:"Interact with Upbound Cloud."`
+	Enterprise enterprise.Cmd `cmd:"" help:"Interact with Enterprise."`
+	UXP        uxp.Cmd        `cmd:"" help:"Interact with UXP."`
+	XPKG       xpkg.Cmd       `cmd:"" help:"Interact with UXP packages."`
 }
 
 func main() {
