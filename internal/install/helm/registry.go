@@ -125,7 +125,7 @@ func (p *registryPuller) Run(chartName string) (string, error) {
 	// so we return an empty string in all cases in the registry puller. We
 	// should evaluate in the future if exposing this information is relevant to
 	// users.
-	return "", afero.WriteReader(afero.NewOsFs(), fileName, read)
+	return "", afero.WriteReader(p.fs, fileName, read)
 }
 
 func (p *registryPuller) SetDestDir(dir string) {
