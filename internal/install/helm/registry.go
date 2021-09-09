@@ -114,7 +114,7 @@ func (p *registryPuller) Run(chartName string) (string, error) {
 	if err != nil {
 		return "", errors.Wrap(err, errReadCompressed)
 	}
-	defer func() { _ = read.Close() }()
+	defer read.Close() //nolint:errcheck
 	fileName := filepath.Join(p.cacheDir, fmt.Sprintf("%s-%s.tgz", chartName, p.version))
 
 	// TODO(hasheddan): the native helm pull client will build up a string
