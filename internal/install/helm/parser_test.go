@@ -22,7 +22,6 @@ import (
 )
 
 func TestParse(t *testing.T) {
-	// errBoom := errors.New("boom")
 	cases := map[string]struct {
 		reason string
 		parser *Parser

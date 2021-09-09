@@ -89,6 +89,8 @@ func (m *mockUninstallClient) Run(r string) (*release.UninstallReleaseResponse, 
 
 func TestGetCurrentVersion(t *testing.T) {
 	errBoom := errors.New("boom")
+	chartName := "primary-chart"
+	alternate := "some-chart"
 	cases := map[string]struct {
 		reason    string
 		installer *installer
@@ -107,28 +109,31 @@ func TestGetCurrentVersion(t *testing.T) {
 			},
 			err: errBoom,
 		},
-		"ErrorGetReleaseFallbackCrossplaneError": {
-			reason: "If uxp release not found and crossplane fallback fails an error should be returned.",
+		"ErrorGetReleaseFallbackAlternateError": {
+			reason: "If primary release not found and alternate fallback fails an error should be returned.",
 			installer: &installer{
-				namespace: "test",
+				namespace:      "test",
+				chartName:      chartName,
+				alternateChart: alternate,
 				getClient: &mockGetClient{
 					runFn: func(n string) (*release.Release, error) {
-						if n == crossplaneChartName {
+						if n == alternate {
 							return nil, errBoom
 						}
 						return nil, driver.ErrReleaseNotFound
 					},
 				},
 			},
-			err: errors.Wrapf(errBoom, errGetInstalledReleaseFmt, "test"),
+			err: errors.Wrapf(errBoom, errGetInstalledReleaseOrAlternateFmt, chartName, alternate, "test"),
 		},
-		"ErrorGetReleaseFallbackCrossplaneSuccess": {
-			reason: "If unable to get uxp release but crossplane is found an error should not be returned.",
+		"ErrorGetReleaseFallbackAlternateSuccess": {
+			reason: "If unable to get primary release but alternate is found an error should not be returned.",
 			installer: &installer{
-				namespace: "test",
+				namespace:      "test",
+				alternateChart: alternate,
 				getClient: &mockGetClient{
 					runFn: func(n string) (*release.Release, error) {
-						if n == crossplaneChartName {
+						if n == alternate {
 							return &release.Release{
 								Chart: &chart.Chart{
 									Metadata: &chart.Metadata{
@@ -187,6 +192,8 @@ func TestGetCurrentVersion(t *testing.T) {
 
 func TestInstall(t *testing.T) {
 	errBoom := errors.New("boom")
+	chartName := "primary-chart"
+	alternate := "some-chart"
 	cases := map[string]struct {
 		reason    string
 		installer *installer
@@ -197,10 +204,12 @@ func TestInstall(t *testing.T) {
 		"ErrorCouldNotVerifyNotInstalled": {
 			reason: "If unable to verify that the chart is not already installed an error should be returned.",
 			installer: &installer{
-				namespace: "test",
+				namespace:      "test",
+				chartName:      chartName,
+				alternateChart: alternate,
 				getClient: &mockGetClient{
 					runFn: func(n string) (*release.Release, error) {
-						if n == crossplaneChartName {
+						if n == alternate {
 							return nil, errBoom
 						}
 						return nil, driver.ErrReleaseNotFound
@@ -208,7 +217,7 @@ func TestInstall(t *testing.T) {
 				},
 			},
 			fsSetup: afero.NewMemMapFs,
-			err:     errors.Wrap(errors.Wrapf(errBoom, errGetInstalledReleaseFmt, "test"), errVerifyChartNotInstalled),
+			err:     errors.Wrap(errors.Wrapf(errBoom, errGetInstalledReleaseOrAlternateFmt, chartName, alternate, "test"), errVerifyChartNotInstalled),
 		},
 		"ErrorPullNewVersion": {
 			reason: "If unable to pull specified version an error should be returned.",
@@ -307,6 +316,8 @@ func TestInstall(t *testing.T) {
 
 func TestUpgrade(t *testing.T) {
 	errBoom := errors.New("boom")
+	chartName := "primary-chart"
+	alternate := "some-chart"
 	cases := map[string]struct {
 		reason    string
 		installer *installer
@@ -317,10 +328,12 @@ func TestUpgrade(t *testing.T) {
 		"ErrorNotInstalled": {
 			reason: "If unable to verify that the chart is installed an error should be returned.",
 			installer: &installer{
-				namespace: "test",
+				namespace:      "test",
+				chartName:      chartName,
+				alternateChart: alternate,
 				getClient: &mockGetClient{
 					runFn: func(n string) (*release.Release, error) {
-						if n == defaultChartName {
+						if n == chartName {
 							return nil, driver.ErrReleaseNotFound
 						}
 						return nil, errBoom
@@ -328,15 +341,17 @@ func TestUpgrade(t *testing.T) {
 				},
 			},
 			fsSetup: afero.NewMemMapFs,
-			err:     errors.Wrapf(errBoom, errGetInstalledReleaseFmt, "test"),
+			err:     errors.Wrapf(errBoom, errGetInstalledReleaseOrAlternateFmt, chartName, alternate, "test"),
 		},
-		"ErrorCrossplaneVersionNotMatch": {
-			reason: "If force is not specified, error should be returned when upgrading Crossplane and versions do not match.",
+		"ErrorAlternateVersionNotMatch": {
+			reason: "If force is not specified, error should be returned when upgrading alternate and versions do not match.",
 			installer: &installer{
-				namespace: "test",
+				namespace:      "test",
+				chartName:      chartName,
+				alternateChart: alternate,
 				getClient: &mockGetClient{
 					runFn: func(n string) (*release.Release, error) {
-						if n == crossplaneChartName {
+						if n == alternate {
 							return &release.Release{
 								Chart: &chart.Chart{
 									Metadata: &chart.Metadata{
@@ -351,16 +366,17 @@ func TestUpgrade(t *testing.T) {
 			},
 			version: "1.2.2-up.3",
 			fsSetup: afero.NewMemMapFs,
-			err:     errors.New(errUpgradeCrossplaneVersion),
+			err:     errors.Errorf(errUpgradeFromAlternateVersionFmt, alternate, chartName),
 		},
-		"CrossplaneVersionNotMatchForce": {
+		"AlternateVersionNotMatchForce": {
 			reason: "If force is specified, upgrade should be attempted regardless of version mismatch.",
 			installer: &installer{
-				namespace: "test",
-				force:     true,
+				namespace:      "test",
+				force:          true,
+				alternateChart: alternate,
 				getClient: &mockGetClient{
 					runFn: func(n string) (*release.Release, error) {
-						if n == crossplaneChartName {
+						if n == alternate {
 							return &release.Release{
 								Chart: &chart.Chart{
 									Metadata: &chart.Metadata{
@@ -404,6 +420,7 @@ func TestUpgrade(t *testing.T) {
 		"ErrorPullNewVersion": {
 			reason: "If unable to pull specified version an error should be returned.",
 			installer: &installer{
+				releaseName: chartName,
 				getClient: &mockGetClient{
 					runFn: func(string) (*release.Release, error) {
 						return &release.Release{
@@ -428,6 +445,8 @@ func TestUpgrade(t *testing.T) {
 		"ErrorUpgradeRollbackSuccessful": {
 			reason: "If upgrade fails but rollback is successful, only upgrade error should be returned.",
 			installer: &installer{
+				chartName:      chartName,
+				alternateChart: alternate,
 				getClient: &mockGetClient{
 					runFn: func(string) (*release.Release, error) {
 						return &release.Release{
@@ -454,8 +473,7 @@ func TestUpgrade(t *testing.T) {
 						return nil
 					},
 				},
-				cacheDir:  "/",
-				chartName: "test",
+				cacheDir: "/",
 				load: func(string) (*chart.Chart, error) {
 					return nil, nil
 				},
@@ -472,6 +490,8 @@ func TestUpgrade(t *testing.T) {
 		"ErrorUpgradeErrorRollback": {
 			reason: "If upgrade and rollback fails a wrapped error should be returned.",
 			installer: &installer{
+				chartName:      chartName,
+				alternateChart: alternate,
 				getClient: &mockGetClient{
 					runFn: func(string) (*release.Release, error) {
 						return &release.Release{
@@ -499,7 +519,6 @@ func TestUpgrade(t *testing.T) {
 					},
 				},
 				cacheDir:        "/",
-				chartName:       "test",
 				rollbackOnError: true,
 				load: func(string) (*chart.Chart, error) {
 					return nil, nil
@@ -517,6 +536,8 @@ func TestUpgrade(t *testing.T) {
 		"ErrorUpgradeSuccessfulRollback": {
 			reason: "If upgrade fails but rollback is successful a wrapped error should be returned.",
 			installer: &installer{
+				chartName:      chartName,
+				alternateChart: alternate,
 				getClient: &mockGetClient{
 					runFn: func(string) (*release.Release, error) {
 						return &release.Release{
@@ -544,7 +565,6 @@ func TestUpgrade(t *testing.T) {
 					},
 				},
 				cacheDir:        "/",
-				chartName:       "test",
 				rollbackOnError: true,
 				load: func(string) (*chart.Chart, error) {
 					return nil, nil
@@ -562,6 +582,8 @@ func TestUpgrade(t *testing.T) {
 		"ErrorUpgradeNolRollback": {
 			reason: "If upgrade fails an error should be returned.",
 			installer: &installer{
+				chartName:      chartName,
+				alternateChart: alternate,
 				getClient: &mockGetClient{
 					runFn: func(string) (*release.Release, error) {
 						return &release.Release{
@@ -583,8 +605,7 @@ func TestUpgrade(t *testing.T) {
 						return nil, errBoom
 					},
 				},
-				cacheDir:  "/",
-				chartName: "test",
+				cacheDir: "/",
 				load: func(string) (*chart.Chart, error) {
 					return nil, nil
 				},
@@ -601,6 +622,7 @@ func TestUpgrade(t *testing.T) {
 		"Successful": {
 			reason: "If upgrade is successful no error should be returned.",
 			installer: &installer{
+				releaseName: chartName,
 				getClient: &mockGetClient{
 					runFn: func(string) (*release.Release, error) {
 						return &release.Release{

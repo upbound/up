@@ -12,11 +12,12 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-package uxp
+package enterprise
 
 import (
 	"context"
 	"io"
+	"net/url"
 
 	"github.com/pkg/errors"
 	corev1 "k8s.io/api/core/v1"
@@ -25,6 +26,7 @@ import (
 	"k8s.io/client-go/kubernetes"
 	"sigs.k8s.io/yaml"
 
+	"github.com/upbound/up/internal/input"
 	"github.com/upbound/up/internal/install"
 	"github.com/upbound/up/internal/install/helm"
 )
@@ -34,18 +36,29 @@ const (
 	errParseInstallParameters = "unable to parse install parameters"
 )
 
+// BeforeApply sets default values in login before assignment and validation.
+func (c *installCmd) BeforeApply() error {
+	c.prompter = input.NewPrompter()
+	return nil
+}
+
 // AfterApply sets default values in command after assignment and validation.
 func (c *installCmd) AfterApply(insCtx *install.Context) error {
-	repo := uxpRepoURL
-	if c.Unstable {
-		repo = uxpUnstableRepoURL
+	id, err := c.prompter.Prompt("License ID", false)
+	if err != nil {
+		return err
+	}
+	token, err := c.prompter.Prompt("Token", true)
+	if err != nil {
+		return err
 	}
 	mgr, err := helm.NewManager(insCtx.Kubeconfig,
-		chartName,
-		repo,
+		enterpriseChart,
+		c.Repo,
 		helm.WithNamespace(insCtx.Namespace),
-		helm.WithChart(c.Bundle),
-		helm.WithAlternateChart(alternateChartName))
+		helm.WithBasicAuth(id, token),
+		helm.IsOCI(),
+		helm.WithChart(c.Bundle))
 	if err != nil {
 		return err
 	}
@@ -73,14 +86,16 @@ func (c *installCmd) AfterApply(insCtx *install.Context) error {
 	return nil
 }
 
-// installCmd installs UXP.
+// installCmd installs enterprise.
 type installCmd struct {
-	mgr     install.Manager
-	parser  install.ParameterParser
-	kClient kubernetes.Interface
+	mgr      install.Manager
+	parser   install.ParameterParser
+	kClient  kubernetes.Interface
+	prompter input.Prompter
 
-	Version  string `arg:"" optional:"" help:"UXP version to install."`
-	Unstable bool   `help:"Allow installing unstable versions."`
+	Version string `arg:"" help:"Enterprise version to install."`
+
+	Repo *url.URL `hidden:"" env:"ENTERPRISE_REPO" default:"registry.upbound.io/enterprise" help:"Set repo for enterprise."`
 
 	install.CommonParams
 }

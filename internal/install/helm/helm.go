@@ -23,6 +23,8 @@ import (
 
 	"github.com/Masterminds/semver/v3"
 	"github.com/crossplane/crossplane-runtime/pkg/logging"
+	"github.com/google/go-containerregistry/pkg/authn"
+	"github.com/google/go-containerregistry/pkg/v1/remote"
 	"github.com/pkg/errors"
 	"github.com/spf13/afero"
 	"helm.sh/helm/v3/pkg/action"
@@ -33,33 +35,30 @@ import (
 	"helm.sh/helm/v3/pkg/storage/driver"
 	"k8s.io/client-go/rest"
 
-	"github.com/upbound/up/internal/uxp"
+	"github.com/upbound/up/internal/install"
 )
 
 const (
-	helmDriverSecret       = "secret"
-	defaultCacheDir        = ".cache/up/charts"
-	defaultNamespace       = "upbound-system"
-	defaultRepoURL         = "https://charts.upbound.io/stable"
-	defaultUnstableRepoURL = "https://charts.upbound.io/main"
-	defaultChartName       = "universal-crossplane"
-	crossplaneChartName    = "crossplane"
-	allVersions            = ">0.0.0-0"
+	helmDriverSecret = "secret"
+	defaultCacheDir  = ".cache/up/charts"
+	defaultNamespace = "upbound-system"
+	allVersions      = ">0.0.0-0"
 )
 
 const (
-	errGetInstalledReleaseFmt   = "could not identify installed release for crossplane or universal-crossplane in namespace %s"
-	errVerifyInstalledVersion   = "could not identify current version"
-	errVerifyChartNotInstalled  = "could not verify that chart is not already installed"
-	errChartAlreadyInstalledFmt = "chart already installed with version %s"
-	errPullChart                = "could not pull chart"
-	errGetLatestPulled          = "could not identify chart pulled as latest"
-	errCorruptTempDirFmt        = "corrupt chart tmp directory, consider removing cache (%s)"
-	errMoveLatest               = "could not move latest pulled chart to cache"
+	errGetInstalledReleaseFmt            = "could not identify installed release for %s in namespace %s"
+	errGetInstalledReleaseOrAlternateFmt = "could not identify installed release for %s or %s in namespace %s"
+	errVerifyInstalledVersion            = "could not identify current version"
+	errVerifyChartNotInstalled           = "could not verify that chart is not already installed"
+	errChartAlreadyInstalledFmt          = "chart already installed with version %s"
+	errPullChart                         = "could not pull chart"
+	errGetLatestPulled                   = "could not identify chart pulled as latest"
+	errCorruptTempDirFmt                 = "corrupt chart tmp directory, consider removing cache (%s)"
+	errMoveLatest                        = "could not move latest pulled chart to cache"
 
-	errUpgradeCrossplaneVersion    = "cannot upgrade crossplane to universal-crossplane with version mismatch"
-	errFailedUpgradeFailedRollback = "failed upgrade resulted in a failed rollback"
-	errFailedUpgradeRollback       = "failed upgrade was rolled back"
+	errUpgradeFromAlternateVersionFmt = "cannot upgrade %s to %s with version mismatch"
+	errFailedUpgradeFailedRollback    = "failed upgrade resulted in a failed rollback"
+	errFailedUpgradeRollback          = "failed upgrade was rolled back"
 )
 
 type helmPuller interface {
@@ -68,7 +67,7 @@ type helmPuller interface {
 	SetVersion(string)
 }
 
-type puller struct {
+type puller struct { //nolint:unused
 	*action.Pull
 }
 
@@ -114,15 +113,20 @@ type installer struct {
 	chartFile       *os.File
 	chartName       string
 	releaseName     string
+	alternateChart  string
 	namespace       string
 	cacheDir        string
-	unstable        bool
 	rollbackOnError bool
 	force           bool
 	home            HomeDirFn
 	fs              afero.Fs
 	tempDir         TempDirFn
 	log             logging.Logger
+	oci             bool
+
+	// Auth
+	username string
+	password string
 
 	// Clients
 	pullClient      helmPuller
@@ -139,24 +143,32 @@ type installer struct {
 // InstallerModifierFn modifies the installer.
 type InstallerModifierFn func(*installer)
 
-// WithRepoURL sets the repo URL for the helm installer.
-func WithRepoURL(u *url.URL) InstallerModifierFn {
-	return func(h *installer) {
-		h.repoURL = u
-	}
-}
-
-// WithChartName sets the chart name for the helm installer.
-func WithChartName(name string) InstallerModifierFn {
-	return func(h *installer) {
-		h.chartName = name
-	}
-}
-
 // WithNamespace sets the namespace for the helm installer.
 func WithNamespace(ns string) InstallerModifierFn {
 	return func(h *installer) {
 		h.namespace = ns
+	}
+}
+
+// WithAlternateChart sets an alternate chart that is compatible to upgrade from if installed.
+func WithAlternateChart(chartName string) InstallerModifierFn {
+	return func(h *installer) {
+		h.alternateChart = chartName
+	}
+}
+
+// WithBasicAuth sets the username and password for the helm installer.
+func WithBasicAuth(username, password string) InstallerModifierFn {
+	return func(h *installer) {
+		h.username = username
+		h.password = password
+	}
+}
+
+// IsOCI indicates that the chart is an OCI image.
+func IsOCI() InstallerModifierFn {
+	return func(h *installer) {
+		h.oci = true
 	}
 }
 
@@ -181,14 +193,6 @@ func WithChart(chartFile *os.File) InstallerModifierFn {
 	}
 }
 
-// AllowUnstableVersions allows installing development versions using the helm
-// installer.
-func AllowUnstableVersions(d bool) InstallerModifierFn {
-	return func(h *installer) {
-		h.unstable = d
-	}
-}
-
 // RollbackOnError will cause installer to rollback on failed upgrade.
 func RollbackOnError(r bool) InstallerModifierFn {
 	return func(h *installer) {
@@ -203,16 +207,12 @@ func Force(f bool) InstallerModifierFn {
 	}
 }
 
-// NewInstaller builds a helm installer for UXP.
-func NewInstaller(config *rest.Config, modifiers ...InstallerModifierFn) (uxp.Installer, error) { // nolint:gocyclo
-	u, err := url.Parse(defaultRepoURL)
-	if err != nil {
-		return nil, err
-	}
+// NewManager builds a helm install manager for UXP.
+func NewManager(config *rest.Config, chartName string, repoURL *url.URL, modifiers ...InstallerModifierFn) (install.Manager, error) { // nolint:gocyclo
 	h := &installer{
-		repoURL:     u,
-		chartName:   defaultChartName,
-		releaseName: defaultChartName,
+		repoURL:     repoURL,
+		chartName:   chartName,
+		releaseName: chartName,
 		namespace:   defaultNamespace,
 		home:        os.UserHomeDir,
 		fs:          afero.NewOsFs(),
@@ -222,15 +222,6 @@ func NewInstaller(config *rest.Config, modifiers ...InstallerModifierFn) (uxp.In
 	}
 	for _, m := range modifiers {
 		m(h)
-	}
-
-	// Use default unstable URL if URL is default and unstable is specified.
-	if h.unstable && h.repoURL == u {
-		unstableURL, err := url.Parse(defaultUnstableRepoURL)
-		if err != nil {
-			return nil, err
-		}
-		h.repoURL = unstableURL
 	}
 
 	if h.cacheDir == "" {
@@ -247,7 +238,7 @@ func NewInstaller(config *rest.Config, modifiers ...InstallerModifierFn) (uxp.In
 		return nil, err
 	}
 
-	_, err = h.fs.Stat(h.cacheDir)
+	_, err := h.fs.Stat(h.cacheDir)
 	if err != nil {
 		if !os.IsNotExist(err) {
 			return nil, err
@@ -258,12 +249,23 @@ func NewInstaller(config *rest.Config, modifiers ...InstallerModifierFn) (uxp.In
 	}
 
 	// Pull Client
-	p := action.NewPull()
-	p.DestDir = h.cacheDir
-	p.Devel = h.unstable
-	p.Settings = &cli.EnvSettings{}
-	p.RepoURL = h.repoURL.String()
-	h.pullClient = &puller{p}
+	if h.oci {
+		h.pullClient = newRegistryPuller(withRemoteOpts(remote.WithAuth(&authn.Basic{
+			Username: h.username,
+			Password: h.password,
+		})), withRepoURL(h.repoURL))
+	} else {
+		p := action.NewPull()
+		p.DestDir = h.cacheDir
+		p.Username = h.username
+		p.Password = h.password
+		p.Devel = true
+		p.Username = h.username
+		p.Password = h.password
+		p.Settings = &cli.EnvSettings{}
+		p.RepoURL = h.repoURL.String()
+		h.pullClient = &puller{p}
+	}
 
 	// Get Client
 	h.getClient = action.NewGet(actionConfig)
@@ -293,16 +295,20 @@ func NewInstaller(config *rest.Config, modifiers ...InstallerModifierFn) (uxp.In
 func (h *installer) GetCurrentVersion() (string, error) {
 	var release *release.Release
 	var err error
-	release, err = h.getClient.Run(defaultChartName)
+	release, err = h.getClient.Run(h.chartName)
 	if err != nil && !errors.Is(err, driver.ErrReleaseNotFound) {
 		return "", err
 	}
 	if errors.Is(err, driver.ErrReleaseNotFound) {
-		// TODO(hasheddan): add logging indicating fallback to crossplane.
-		if release, err = h.getClient.Run(crossplaneChartName); err != nil {
-			return "", errors.Wrapf(err, errGetInstalledReleaseFmt, h.namespace)
+		if h.alternateChart != "" {
+			// TODO(hasheddan): add logging indicating fallback to crossplane.
+			if release, err = h.getClient.Run(h.alternateChart); err != nil {
+				return "", errors.Wrapf(err, errGetInstalledReleaseOrAlternateFmt, h.chartName, h.alternateChart, h.namespace)
+			}
+			h.releaseName = h.alternateChart
+		} else {
+			return "", errors.Wrapf(err, errGetInstalledReleaseFmt, h.chartName, h.namespace)
 		}
-		h.releaseName = crossplaneChartName
 	}
 	if release == nil || release.Chart == nil || release.Chart.Metadata == nil {
 		return "", errors.New(errVerifyInstalledVersion)
@@ -310,7 +316,7 @@ func (h *installer) GetCurrentVersion() (string, error) {
 	return release.Chart.Metadata.Version, nil
 }
 
-// Install installs UXP in the cluster.
+// Install installs in the cluster.
 func (h *installer) Install(version string, parameters map[string]interface{}) error {
 	// make sure no version is already installed
 	current, err := h.GetCurrentVersion()
@@ -340,15 +346,15 @@ func (h *installer) Install(version string, parameters map[string]interface{}) e
 	return err
 }
 
-// Upgrade upgrades an existing UXP installation to a new version.
+// Upgrade upgrades an existing installation to a new version.
 func (h *installer) Upgrade(version string, parameters map[string]interface{}) error {
 	// check if version exists
 	current, err := h.GetCurrentVersion()
 	if err != nil {
 		return err
 	}
-	if h.releaseName == crossplaneChartName && !equivalentVersions(current, version) && !h.force {
-		return errors.New(errUpgradeCrossplaneVersion)
+	if h.releaseName == h.alternateChart && !equivalentVersions(current, version) && !h.force {
+		return errors.Errorf(errUpgradeFromAlternateVersionFmt, h.alternateChart, h.chartName)
 	}
 
 	var helmChart *chart.Chart
@@ -375,7 +381,7 @@ func (h *installer) Upgrade(version string, parameters map[string]interface{}) e
 	return upErr
 }
 
-// Uninstall uninstalls a UXP installation.
+// Uninstall uninstalls an installation.
 func (h *installer) Uninstall() error {
 	_, err := h.uninstallClient.Run(h.chartName)
 	return err

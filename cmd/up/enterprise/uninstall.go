@@ -12,7 +12,7 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-package uxp
+package enterprise
 
 import (
 	"net/url"
@@ -23,10 +23,10 @@ import (
 
 // AfterApply sets default values in command after assignment and validation.
 func (c *uninstallCmd) AfterApply(insCtx *install.Context) error {
-	// NOTE(hasheddan): we always pass default repo URL because the repo URL is
-	// not considered during uninstall.
+	// NOTE(hasheddan): we do not specify credentials or that chart is from an
+	// OCI image as they are inconsequential at uninstall time.
 	mgr, err := helm.NewManager(insCtx.Kubeconfig,
-		chartName,
+		enterpriseChart,
 		&url.URL{},
 		helm.WithNamespace(insCtx.Namespace))
 	if err != nil {
@@ -36,7 +36,7 @@ func (c *uninstallCmd) AfterApply(insCtx *install.Context) error {
 	return nil
 }
 
-// uninstallCmd uninstalls UXP.
+// uninstallCmd uninstalls enterprise.
 type uninstallCmd struct {
 	mgr install.Manager
 }

@@ -12,26 +12,16 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-package uxp
+package enterprise
 
 import (
-	"net/url"
-
 	"github.com/alecthomas/kong"
 
 	"github.com/upbound/up/internal/install"
 	"github.com/upbound/up/internal/kube"
 )
 
-const (
-	chartName          = "universal-crossplane"
-	alternateChartName = "crossplane"
-)
-
-var (
-	uxpRepoURL, _         = url.Parse("https://charts.upbound.io/stable")
-	uxpUnstableRepoURL, _ = url.Parse("https://charts.upbound.io/main")
-)
+const enterpriseChart = "enterprise"
 
 // AfterApply constructs and binds Upbound-specific context to any subcommands
 // that have Run() methods that receive it.
@@ -47,13 +37,12 @@ func (c *Cmd) AfterApply(ctx *kong.Context) error {
 	return nil
 }
 
-// Cmd contains commands for managing UXP.
+// Cmd contains commands for managing enterprise.
 type Cmd struct {
-	Install   installCmd   `cmd:"" group:"uxp" help:"Install UXP."`
-	Uninstall uninstallCmd `cmd:"" group:"uxp" help:"Uninstall UXP."`
-	Upgrade   upgradeCmd   `cmd:"" group:"uxp" help:"Upgrade UXP."`
-	Connect   connectCmd   `cmd:"" group:"uxp" help:"Connect UXP to Upbound Cloud."`
+	Install   installCmd   `cmd:"" group:"enterprise" help:"Install enterprise."`
+	Uninstall uninstallCmd `cmd:"" group:"enterprise" help:"Uninstall enterprise."`
+	Upgrade   upgradeCmd   `cmd:"" group:"enterprise" help:"Upgrade enterprise."`
 
 	Kubeconfig string `type:"existingfile" help:"Override default kubeconfig path."`
-	Namespace  string `short:"n" env:"UXP_NAMESPACE" default:"upbound-system" help:"Kubernetes namespace for UXP."`
+	Namespace  string `short:"n" env:"ENTERPRISE_NAMESPACE" default:"upbound-enterprise" help:"Kubernetes namespace for enterprise."`
 }

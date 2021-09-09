@@ -12,14 +12,18 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-package uxp
+package install
 
-import "os"
+// Manager can install and manage Upbound software in a Kubernetes cluster.
+// TODO(hasheddan): support custom error types, such as AlreadyExists.
+type Manager interface {
+	GetCurrentVersion() (string, error)
+	Install(version string, parameters map[string]interface{}) error
+	Upgrade(version string, parameters map[string]interface{}) error
+	Uninstall() error
+}
 
-// ChartParams common parameters for installing/upgrading charts
-type ChartParams struct {
-	Unstable bool              `help:"Allow installing unstable UXP versions."`
-	Set      map[string]string `help:"Set parameters."`
-	File     *os.File          `short:"f" help:"Parameters file."`
-	Bundle   *os.File          `help:"Local bundle path."`
+// ParameterParser parses install and upgrade parameters.
+type ParameterParser interface {
+	Parse() (map[string]interface{}, error)
 }

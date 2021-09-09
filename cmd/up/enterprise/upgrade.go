@@ -12,14 +12,16 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-package uxp
+package enterprise
 
 import (
 	"io"
+	"net/url"
 
 	"github.com/pkg/errors"
 	"sigs.k8s.io/yaml"
 
+	"github.com/upbound/up/internal/input"
 	"github.com/upbound/up/internal/install"
 	"github.com/upbound/up/internal/install/helm"
 )
@@ -28,18 +30,29 @@ const (
 	errParseUpgradeParameters = "unable to parse upgrade parameters"
 )
 
+// BeforeApply sets default values in login before assignment and validation.
+func (c *upgradeCmd) BeforeApply() error {
+	c.prompter = input.NewPrompter()
+	return nil
+}
+
 // AfterApply sets default values in command after assignment and validation.
 func (c *upgradeCmd) AfterApply(insCtx *install.Context) error {
-	repo := uxpRepoURL
-	if c.Unstable {
-		repo = uxpUnstableRepoURL
+	id, err := c.prompter.Prompt("License ID", false)
+	if err != nil {
+		return err
+	}
+	token, err := c.prompter.Prompt("Token", true)
+	if err != nil {
+		return err
 	}
 	ins, err := helm.NewManager(insCtx.Kubeconfig,
-		chartName,
-		repo,
+		enterpriseChart,
+		c.Repo,
 		helm.WithNamespace(insCtx.Namespace),
+		helm.WithBasicAuth(id, token),
+		helm.IsOCI(),
 		helm.WithChart(c.Bundle),
-		helm.WithAlternateChart(alternateChartName),
 		helm.RollbackOnError(c.Rollback),
 		helm.Force(c.Force))
 	if err != nil {
@@ -64,16 +77,19 @@ func (c *upgradeCmd) AfterApply(insCtx *install.Context) error {
 	return nil
 }
 
-// upgradeCmd upgrades UXP.
+// upgradeCmd upgrades enterprise.
 type upgradeCmd struct {
-	mgr    install.Manager
-	parser install.ParameterParser
+	mgr      install.Manager
+	parser   install.ParameterParser
+	prompter input.Prompter
 
-	Version string `arg:"" optional:"" help:"UXP version to upgrade to."`
+	// NOTE(hasheddan): version is currently required for upgrade with OCI image
+	// as latest strategy is undetermined.
+	Version string `arg:"" help:"Enterprise version to upgrade to."`
 
-	Rollback bool `help:"Rollback to previously installed version on failed upgrade."`
-	Force    bool `help:"Force upgrade even if versions are incompatible."`
-	Unstable bool `help:"Allow installing unstable versions."`
+	Rollback bool     `help:"Rollback to previously installed version on failed upgrade."`
+	Force    bool     `help:"Force upgrade even if versions are incompatible."`
+	Repo     *url.URL `hidden:"" env:"ENTERPRISE_REPO" default:"registry.upbound.io/enterprise" help:"Set repo for enterprise."`
 
 	install.CommonParams
 }

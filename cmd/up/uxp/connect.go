@@ -26,7 +26,7 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/client-go/kubernetes"
 
-	"github.com/upbound/up/internal/uxp"
+	"github.com/upbound/up/internal/install"
 )
 
 const (
@@ -34,8 +34,8 @@ const (
 )
 
 // AfterApply sets default values in command before assignment and validation.
-func (c *connectCmd) AfterApply(uxpCtx *uxp.Context) error {
-	client, err := kubernetes.NewForConfig(uxpCtx.Kubeconfig)
+func (c *connectCmd) AfterApply(insCtx *install.Context) error {
+	client, err := kubernetes.NewForConfig(insCtx.Kubeconfig)
 	if err != nil {
 		return err
 	}
@@ -55,7 +55,7 @@ type connectCmd struct {
 }
 
 // Run executes the connect command.
-func (c *connectCmd) Run(kong *kong.Context, uxpCtx *uxp.Context) error {
+func (c *connectCmd) Run(kong *kong.Context, insCtx *install.Context) error {
 	// TODO(hasheddan): consider implementing a custom decoder
 	if c.CPToken == "-" {
 		b, err := io.ReadAll(c.stdin)
@@ -71,7 +71,7 @@ func (c *connectCmd) Run(kong *kong.Context, uxpCtx *uxp.Context) error {
 	// Create namespace if it does not exist.
 	_, err := c.kClient.CoreV1().Namespaces().Create(context.Background(), &corev1.Namespace{
 		ObjectMeta: metav1.ObjectMeta{
-			Name: uxpCtx.Namespace,
+			Name: insCtx.Namespace,
 		},
 	}, metav1.CreateOptions{})
 	if err != nil && !kerrors.IsAlreadyExists(err) {
@@ -85,9 +85,9 @@ func (c *connectCmd) Run(kong *kong.Context, uxpCtx *uxp.Context) error {
 			defaultSecretKey: c.CPToken,
 		},
 	}
-	_, err = c.kClient.CoreV1().Secrets(uxpCtx.Namespace).Create(context.Background(), secret, metav1.CreateOptions{})
+	_, err = c.kClient.CoreV1().Secrets(insCtx.Namespace).Create(context.Background(), secret, metav1.CreateOptions{})
 	if err != nil && kerrors.IsAlreadyExists(err) {
-		_, err = c.kClient.CoreV1().Secrets(uxpCtx.Namespace).Update(context.Background(), secret, metav1.UpdateOptions{})
+		_, err = c.kClient.CoreV1().Secrets(insCtx.Namespace).Update(context.Background(), secret, metav1.UpdateOptions{})
 	}
 	return err
 }
