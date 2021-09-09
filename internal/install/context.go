@@ -15,6 +15,8 @@
 package install
 
 import (
+	"os"
+
 	"k8s.io/client-go/rest"
 )
 
@@ -22,4 +24,11 @@ import (
 type Context struct {
 	Kubeconfig *rest.Config
 	Namespace  string
+}
+
+// CommonParams are common parameters for installing and upgrading.
+type CommonParams struct {
+	Set    map[string]string `help:"Set parameters."`
+	File   *os.File          `short:"f" help:"Parameters file."`
+	Bundle *os.File          `help:"Local bundle path."`
 }
