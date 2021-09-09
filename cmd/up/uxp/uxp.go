@@ -15,10 +15,22 @@
 package uxp
 
 import (
+	"net/url"
+
 	"github.com/alecthomas/kong"
 
 	"github.com/upbound/up/internal/install"
 	"github.com/upbound/up/internal/kube"
+)
+
+const (
+	chartName          = "universal-crossplane"
+	alternateChartName = "crossplane"
+)
+
+var (
+	uxpRepoURL, _         = url.Parse("https://charts.upbound.io/stable")
+	uxpUnstableRepoURL, _ = url.Parse("https://charts.upbound.io/main")
 )
 
 // AfterApply constructs and binds Upbound-specific context to any subcommands

@@ -36,10 +36,16 @@ const (
 
 // AfterApply sets default values in command after assignment and validation.
 func (c *installCmd) AfterApply(insCtx *install.Context) error {
+	repo := uxpRepoURL
+	if c.Unstable {
+		repo = uxpUnstableRepoURL
+	}
 	mgr, err := helm.NewManager(insCtx.Kubeconfig,
+		chartName,
+		repo,
 		helm.WithNamespace(insCtx.Namespace),
-		helm.AllowUnstableVersions(c.Unstable),
-		helm.WithChart(c.Bundle))
+		helm.WithChart(c.Bundle),
+		helm.WithAlternateChart(alternateChartName))
 	if err != nil {
 		return err
 	}
@@ -73,9 +79,10 @@ type installCmd struct {
 	parser  install.ParameterParser
 	kClient kubernetes.Interface
 
-	Version string `arg:"" optional:"" help:"UXP version to install."`
+	Version  string `arg:"" optional:"" help:"UXP version to install."`
+	Unstable bool   `help:"Allow installing unstable versions."`
 
-	ChartParams
+	install.CommonParams
 }
 
 // Run executes the install command.

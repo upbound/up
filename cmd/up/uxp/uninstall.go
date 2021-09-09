@@ -15,13 +15,19 @@
 package uxp
 
 import (
+	"net/url"
+
 	"github.com/upbound/up/internal/install"
 	"github.com/upbound/up/internal/install/helm"
 )
 
 // AfterApply sets default values in command after assignment and validation.
 func (c *uninstallCmd) AfterApply(insCtx *install.Context) error {
+	// NOTE(hasheddan): we always pass default repo URL because the repo URL is
+	// not considered during uninstall.
 	mgr, err := helm.NewManager(insCtx.Kubeconfig,
+		chartName,
+		&url.URL{},
 		helm.WithNamespace(insCtx.Namespace))
 	if err != nil {
 		return err

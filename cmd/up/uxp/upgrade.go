@@ -30,10 +30,16 @@ const (
 
 // AfterApply sets default values in command after assignment and validation.
 func (c *upgradeCmd) AfterApply(insCtx *install.Context) error {
+	repo := uxpRepoURL
+	if c.Unstable {
+		repo = uxpUnstableRepoURL
+	}
 	ins, err := helm.NewManager(insCtx.Kubeconfig,
+		chartName,
+		repo,
 		helm.WithNamespace(insCtx.Namespace),
-		helm.AllowUnstableVersions(c.Unstable),
 		helm.WithChart(c.Bundle),
+		helm.WithAlternateChart(alternateChartName),
 		helm.RollbackOnError(c.Rollback),
 		helm.Force(c.Force))
 	if err != nil {
@@ -67,8 +73,9 @@ type upgradeCmd struct {
 
 	Rollback bool `help:"Rollback to previously installed version on failed upgrade."`
 	Force    bool `help:"Force upgrade even if versions are incompatible."`
+	Unstable bool `help:"Allow installing unstable versions."`
 
-	ChartParams
+	install.CommonParams
 }
 
 // Run executes the upgrade command.
