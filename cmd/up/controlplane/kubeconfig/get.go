@@ -20,7 +20,6 @@ import (
 	"os"
 	"strings"
 
-	"github.com/alecthomas/kong"
 	"github.com/google/uuid"
 
 	"github.com/upbound/up/internal/kube"
@@ -45,7 +44,7 @@ type getCmd struct {
 }
 
 // Run executes the get command.
-func (c *getCmd) Run(kong *kong.Context, upCtx *upbound.Context) error {
+func (c *getCmd) Run(upCtx *upbound.Context) error {
 	// TODO(hasheddan): consider implementing a custom decoder
 	if c.Token == "-" {
 		b, err := io.ReadAll(c.stdin)

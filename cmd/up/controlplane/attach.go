@@ -46,7 +46,7 @@ type AttachCmd struct {
 }
 
 // Run executes the attach command.
-func (c *AttachCmd) Run(kong *kong.Context, client *cp.Client, token *tokens.Client, upCtx *upbound.Context) error {
+func (c *AttachCmd) Run(kongCtx *kong.Context, client *cp.Client, token *tokens.Client, upCtx *upbound.Context) error {
 	cpRes, err := client.Create(context.Background(), &cp.ControlPlaneCreateParameters{
 		Account:     upCtx.Account,
 		Name:        c.Name,
@@ -81,6 +81,6 @@ func (c *AttachCmd) Run(kong *kong.Context, client *cp.Client, token *tokens.Cli
 	if !ok {
 		return errors.New(errNoToken)
 	}
-	fmt.Fprintf(kong.Stdout, "%s\n", jwt)
+	fmt.Fprintf(kongCtx.Stdout, "%s\n", jwt)
 	return nil
 }

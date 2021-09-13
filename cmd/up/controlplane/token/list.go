@@ -38,16 +38,16 @@ type listCmd struct {
 }
 
 // Run executes the list command.
-func (c *listCmd) Run(kong *kong.Context, client *cp.Client, upCtx *upbound.Context) error {
+func (c *listCmd) Run(kongCtx *kong.Context, client *cp.Client, upCtx *upbound.Context) error {
 	res, err := client.GetTokens(context.Background(), c.ID)
 	if err != nil {
 		return err
 	}
 	if res == nil || len(res.DataSet) == 0 {
-		fmt.Fprintf(kong.Stdout, "%s\n", resNoTokens)
+		fmt.Fprintf(kongCtx.Stdout, "%s\n", resNoTokens)
 		return nil
 	}
-	w := printers.GetNewTabWriter(kong.Stdout)
+	w := printers.GetNewTabWriter(kongCtx.Stdout)
 	fmt.Fprintf(w, listRowFormat, "ID", "NAME", "CREATED")
 	for _, token := range res.DataSet {
 		fmt.Fprintf(w, listRowFormat, token.ID, token.AttributeSet["name"], token.Meta["createdAt"])

@@ -35,7 +35,7 @@ const (
 
 // AfterApply constructs and binds Upbound-specific context to any subcommands
 // that have Run() methods that receive it.
-func (c *createCmd) AfterApply(ctx *kong.Context) error {
+func (c *createCmd) AfterApply() error {
 	if c.Name == "" {
 		c.Name = namesgenerator.GetRandomName(0)
 	}
@@ -50,7 +50,7 @@ type createCmd struct {
 }
 
 // Run executes the create command.
-func (c *createCmd) Run(kong *kong.Context, client *tokens.Client, upCtx *upbound.Context) error {
+func (c *createCmd) Run(kongCtx *kong.Context, client *tokens.Client, upCtx *upbound.Context) error {
 	tRes, err := client.Create(context.Background(), &tokens.TokenCreateParameters{
 		Attributes: tokens.TokenAttributes{
 			Name: c.Name,
@@ -71,6 +71,6 @@ func (c *createCmd) Run(kong *kong.Context, client *tokens.Client, upCtx *upboun
 	if !ok {
 		return errors.New(errNoToken)
 	}
-	fmt.Fprintf(kong.Stdout, "%s\n", jwt)
+	fmt.Fprintf(kongCtx.Stdout, "%s\n", jwt)
 	return nil
 }

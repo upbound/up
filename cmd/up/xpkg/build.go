@@ -18,7 +18,6 @@ import (
 	"context"
 	"path/filepath"
 
-	"github.com/alecthomas/kong"
 	"github.com/crossplane/crossplane-runtime/pkg/parser"
 	"github.com/google/go-containerregistry/pkg/v1/tarball"
 	"github.com/pkg/errors"
@@ -40,7 +39,7 @@ const (
 
 // AfterApply constructs and binds Upbound-specific context to any subcommands
 // that have Run() methods that receive it.
-func (c *buildCmd) AfterApply(ctx *kong.Context) error {
+func (c *buildCmd) AfterApply() error {
 	c.fs = afero.NewOsFs()
 	return nil
 }

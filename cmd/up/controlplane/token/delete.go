@@ -17,7 +17,6 @@ package token
 import (
 	"context"
 
-	"github.com/alecthomas/kong"
 	"github.com/google/uuid"
 	"github.com/pkg/errors"
 
@@ -35,6 +34,6 @@ type deleteCmd struct {
 }
 
 // Run executes the delete command.
-func (c *deleteCmd) Run(kong *kong.Context, client *tokens.Client, upCtx *upbound.Context) error {
+func (c *deleteCmd) Run(client *tokens.Client, upCtx *upbound.Context) error {
 	return errors.Wrap(client.Delete(context.Background(), c.ID), errDeleteCPToken)
 }

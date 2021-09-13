@@ -57,12 +57,12 @@ func (c *loginCmd) BeforeApply() error { //nolint:unparam
 	return nil
 }
 
-func (c *loginCmd) AfterApply(ctx *kong.Context) error {
+func (c *loginCmd) AfterApply(kongCtx *kong.Context) error {
 	conf, src, err := config.Extract()
 	if err != nil {
 		return err
 	}
-	ctx.Bind(&upbound.Context{
+	kongCtx.Bind(&upbound.Context{
 		Profile:  c.Profile,
 		Account:  c.Account,
 		Endpoint: c.Endpoint,

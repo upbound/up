@@ -35,12 +35,12 @@ var (
 
 // AfterApply constructs and binds Upbound-specific context to any subcommands
 // that have Run() methods that receive it.
-func (c *Cmd) AfterApply(ctx *kong.Context) error {
+func (c *Cmd) AfterApply(kongCtx *kong.Context) error {
 	kubeconfig, err := kube.GetKubeConfig(c.Kubeconfig)
 	if err != nil {
 		return err
 	}
-	ctx.Bind(&install.Context{
+	kongCtx.Bind(&install.Context{
 		Kubeconfig: kubeconfig,
 		Namespace:  c.Namespace,
 	})

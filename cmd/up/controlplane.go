@@ -37,7 +37,7 @@ const (
 
 // AfterApply constructs and binds a control plane client to any subcommands
 // that have Run() methods that receive it.
-func (c *controlPlaneCmd) AfterApply(ctx *kong.Context) error {
+func (c *controlPlaneCmd) AfterApply(kongCtx *kong.Context) error {
 	// TODO(hasheddan): the majority of this logic can be used generically
 	// across upbound commands when others are implemented.
 	conf, src, err := config.Extract()
@@ -78,10 +78,10 @@ func (c *controlPlaneCmd) AfterApply(ctx *kong.Context) error {
 	if err != nil {
 		return err
 	}
-	ctx.Bind(upCtx)
-	ctx.Bind(cp.NewClient(cfg))
-	ctx.Bind(tokens.NewClient(cfg))
-	ctx.Bind(accounts.NewClient(cfg))
+	kongCtx.Bind(upCtx)
+	kongCtx.Bind(cp.NewClient(cfg))
+	kongCtx.Bind(tokens.NewClient(cfg))
+	kongCtx.Bind(accounts.NewClient(cfg))
 	return nil
 }
 
