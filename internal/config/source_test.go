@@ -29,7 +29,7 @@ import (
 
 func TestGetConfig(t *testing.T) {
 	testConf := &Config{
-		Cloud: Cloud{
+		Upbound: Upbound{
 			Default: "test",
 		},
 	}
@@ -97,7 +97,7 @@ func TestGetConfig(t *testing.T) {
 
 func TestUpdateConfig(t *testing.T) {
 	testConf := &Config{
-		Cloud: Cloud{
+		Upbound: Upbound{
 			Default: "test",
 		},
 	}
