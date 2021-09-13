@@ -37,6 +37,20 @@ type Config struct {
 	Upbound Upbound `json:"upbound"`
 }
 
+// Extract performs extraction of configuration from the default source, which
+// is the ~/.up/config.json file on the local filesystem.
+func Extract() (*Config, Source, error) {
+	src, err := NewFSSource()
+	if err != nil {
+		return nil, nil, err
+	}
+	conf, err := src.GetConfig()
+	if err != nil {
+		return nil, nil, err
+	}
+	return conf, src, nil
+}
+
 // Upbound contains configuration information for Upbound.
 type Upbound struct {
 	// Default indicates the default profile.
