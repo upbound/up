@@ -22,7 +22,7 @@ import (
 	"github.com/pkg/errors"
 )
 
-func TestAddOrUpdateCloudProfile(t *testing.T) {
+func TestAddOrUpdateUpboundProfile(t *testing.T) {
 	name := "cool-profile"
 	profOne := Profile{
 		ID:      "cool-user",
@@ -49,7 +49,7 @@ func TestAddOrUpdateCloudProfile(t *testing.T) {
 			cfg:    &Config{},
 			add:    profOne,
 			want: &Config{
-				Cloud: Cloud{
+				Upbound: Upbound{
 					Profiles: map[string]Profile{name: profOne},
 				},
 			},
@@ -58,13 +58,13 @@ func TestAddOrUpdateCloudProfile(t *testing.T) {
 			reason: "Updating an existing profile in the Config should not cause an error.",
 			name:   name,
 			cfg: &Config{
-				Cloud: Cloud{
+				Upbound: Upbound{
 					Profiles: map[string]Profile{name: profOne},
 				},
 			},
 			add: profTwo,
 			want: &Config{
-				Cloud: Cloud{
+				Upbound: Upbound{
 					Profiles: map[string]Profile{name: profTwo},
 				},
 			},
@@ -80,18 +80,18 @@ func TestAddOrUpdateCloudProfile(t *testing.T) {
 	}
 	for name, tc := range cases {
 		t.Run(name, func(t *testing.T) {
-			err := tc.cfg.AddOrUpdateCloudProfile(tc.name, tc.add)
+			err := tc.cfg.AddOrUpdateUpboundProfile(tc.name, tc.add)
 			if diff := cmp.Diff(tc.err, err, test.EquateErrors()); diff != "" {
-				t.Errorf("\n%s\nAddOrUpdateCloudProfile(...): -want error, +got error:\n%s", tc.reason, diff)
+				t.Errorf("\n%s\nAddOrUpdateUpboundProfile(...): -want error, +got error:\n%s", tc.reason, diff)
 			}
 			if diff := cmp.Diff(tc.want, tc.cfg); diff != "" {
-				t.Errorf("\n%s\nAddOrUpdateCloudProfile(...): -want, +got:\n%s", tc.reason, diff)
+				t.Errorf("\n%s\nAddOrUpdateUpboundProfile(...): -want, +got:\n%s", tc.reason, diff)
 			}
 		})
 	}
 }
 
-func TestGetDefaultCloudProfile(t *testing.T) {
+func TestGetDefaultUpboundProfile(t *testing.T) {
 	name := "cool-profile"
 	profOne := Profile{
 		ID:      "cool-user",
@@ -115,7 +115,7 @@ func TestGetDefaultCloudProfile(t *testing.T) {
 		"ErrorDefaultNotExist": {
 			reason: "If defined default does not exist an error should be returned.",
 			cfg: &Config{
-				Cloud: Cloud{
+				Upbound: Upbound{
 					Default: "test",
 				},
 			},
@@ -126,7 +126,7 @@ func TestGetDefaultCloudProfile(t *testing.T) {
 			reason: "If defined default exists it should be returned.",
 			name:   name,
 			cfg: &Config{
-				Cloud: Cloud{
+				Upbound: Upbound{
 					Default:  "cool-profile",
 					Profiles: map[string]Profile{name: profOne},
 				},
@@ -136,21 +136,21 @@ func TestGetDefaultCloudProfile(t *testing.T) {
 	}
 	for name, tc := range cases {
 		t.Run(name, func(t *testing.T) {
-			name, prof, err := tc.cfg.GetDefaultCloudProfile()
+			name, prof, err := tc.cfg.GetDefaultUpboundProfile()
 			if diff := cmp.Diff(tc.err, err, test.EquateErrors()); diff != "" {
-				t.Errorf("\n%s\nGetDefaultCloudProfile(...): -want error, +got error:\n%s", tc.reason, diff)
+				t.Errorf("\n%s\nGetDefaultUpboundProfile(...): -want error, +got error:\n%s", tc.reason, diff)
 			}
 			if diff := cmp.Diff(tc.name, name); diff != "" {
-				t.Errorf("\n%s\nGetDefaultCloudProfile(...): -want, +got:\n%s", tc.reason, diff)
+				t.Errorf("\n%s\nGetDefaultUpboundProfile(...): -want, +got:\n%s", tc.reason, diff)
 			}
 			if diff := cmp.Diff(tc.want, prof); diff != "" {
-				t.Errorf("\n%s\nGetDefaultCloudProfile(...): -want, +got:\n%s", tc.reason, diff)
+				t.Errorf("\n%s\nGetDefaultUpboundProfile(...): -want, +got:\n%s", tc.reason, diff)
 			}
 		})
 	}
 }
 
-func TestGetCloudProfile(t *testing.T) {
+func TestGetUpboundProfile(t *testing.T) {
 	name := "cool-profile"
 	profOne := Profile{
 		ID:      "cool-user",
@@ -176,7 +176,7 @@ func TestGetCloudProfile(t *testing.T) {
 			reason: "If profile exists it should be returned.",
 			name:   "cool-profile",
 			cfg: &Config{
-				Cloud: Cloud{
+				Upbound: Upbound{
 					Profiles: map[string]Profile{name: profOne},
 				},
 			},
@@ -185,18 +185,18 @@ func TestGetCloudProfile(t *testing.T) {
 	}
 	for name, tc := range cases {
 		t.Run(name, func(t *testing.T) {
-			prof, err := tc.cfg.GetCloudProfile(tc.name)
+			prof, err := tc.cfg.GetUpboundProfile(tc.name)
 			if diff := cmp.Diff(tc.err, err, test.EquateErrors()); diff != "" {
-				t.Errorf("\n%s\nGetCloudProfile(...): -want error, +got error:\n%s", tc.reason, diff)
+				t.Errorf("\n%s\nGetUpboundProfile(...): -want error, +got error:\n%s", tc.reason, diff)
 			}
 			if diff := cmp.Diff(tc.want, prof); diff != "" {
-				t.Errorf("\n%s\nGetCloudProfile(...): -want, +got:\n%s", tc.reason, diff)
+				t.Errorf("\n%s\nGetUpboundProfile(...): -want, +got:\n%s", tc.reason, diff)
 			}
 		})
 	}
 }
 
-func TestSetDefaultCloudProfile(t *testing.T) {
+func TestSetDefaultUpboundProfile(t *testing.T) {
 	name := "cool-user"
 	profOne := Profile{
 		Type:    UserProfileType,
@@ -219,7 +219,7 @@ func TestSetDefaultCloudProfile(t *testing.T) {
 			reason: "If profile exists it should be set as default.",
 			name:   "cool-user",
 			cfg: &Config{
-				Cloud: Cloud{
+				Upbound: Upbound{
 					Profiles: map[string]Profile{name: profOne},
 				},
 			},
@@ -227,9 +227,9 @@ func TestSetDefaultCloudProfile(t *testing.T) {
 	}
 	for name, tc := range cases {
 		t.Run(name, func(t *testing.T) {
-			err := tc.cfg.SetDefaultCloudProfile(tc.name)
+			err := tc.cfg.SetDefaultUpboundProfile(tc.name)
 			if diff := cmp.Diff(tc.err, err, test.EquateErrors()); diff != "" {
-				t.Errorf("\n%s\nGetCloudProfile(...): -want error, +got error:\n%s", tc.reason, diff)
+				t.Errorf("\n%s\nGetUpboundProfile(...): -want error, +got error:\n%s", tc.reason, diff)
 			}
 		})
 	}

@@ -21,7 +21,6 @@ import (
 
 	"github.com/alecthomas/kong"
 
-	"github.com/upbound/up/cmd/up/cloud"
 	"github.com/upbound/up/cmd/up/enterprise"
 	"github.com/upbound/up/cmd/up/uxp"
 	"github.com/upbound/up/cmd/up/xpkg"
@@ -43,8 +42,16 @@ func (v versionFlag) BeforeApply(ctx *kong.Context) error { // nolint:unparam
 var cli struct {
 	Version versionFlag `short:"v" name:"version" help:"Print version and exit."`
 
-	License    licenseCmd     `cmd:"" help:"Print Up license information."`
-	Cloud      cloud.Cmd      `cmd:"" help:"Interact with Upbound Cloud."`
+	License licenseCmd `cmd:"" help:"Print Up license information."`
+
+	// TODO(hasheddan): the following commands interact with the Upbound API,
+	// but handle building upboundCtx individually in order to avoid reading the
+	// configuration file for all commands that are nested under the root. We
+	// should investigate refactoring structure to allow deduplicating logic.
+	Login        loginCmd        `cmd:"" help:"Login to Upbound."`
+	Logout       logoutCmd       `cmd:"" help:"Logout of Upbound."`
+	ControlPlane controlPlaneCmd `cmd:"" name:"controlplane" aliases:"ctp" group:"controlplane" help:"Interact with control planes."`
+
 	Enterprise enterprise.Cmd `cmd:"" help:"Interact with Enterprise."`
 	UXP        uxp.Cmd        `cmd:"" help:"Interact with UXP."`
 	XPKG       xpkg.Cmd       `cmd:"" help:"Interact with UXP packages."`

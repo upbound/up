@@ -34,20 +34,34 @@ const (
 
 // Config is format for the up configuration file.
 type Config struct {
-	Cloud Cloud `json:"cloud"`
+	Upbound Upbound `json:"upbound"`
 }
 
-// Cloud contains configuration information for Upbound Cloud.
-type Cloud struct {
+// Extract performs extraction of configuration from the default source, which
+// is the ~/.up/config.json file on the local filesystem.
+func Extract() (*Config, Source, error) {
+	src, err := NewFSSource()
+	if err != nil {
+		return nil, nil, err
+	}
+	conf, err := src.GetConfig()
+	if err != nil {
+		return nil, nil, err
+	}
+	return conf, src, nil
+}
+
+// Upbound contains configuration information for Upbound.
+type Upbound struct {
 	// Default indicates the default profile.
 	Default string `json:"default"`
 
-	// Profiles contain sets of credentials for communicating with Upbound
-	// Cloud. Key is name of the profile.
+	// Profiles contain sets of credentials for communicating with Upbound. Key
+	// is name of the profile.
 	Profiles map[string]Profile `json:"profiles,omitempty"`
 }
 
-// ProfileType is a type of Upbound Cloud profile.
+// ProfileType is a type of Upbound profile.
 type ProfileType string
 
 // Types of profiles.
@@ -64,7 +78,7 @@ type Profile struct {
 	// Type is the type of the profile.
 	Type ProfileType `json:"type"`
 
-	// Session is a session token used to authenticate to Upbound Cloud.
+	// Session is a session token used to authenticate to Upbound.
 	Session string `json:"session,omitempty"`
 
 	// Account is the default account to use when this profile is selected.
@@ -79,50 +93,50 @@ func checkProfile(p Profile) error {
 	return nil
 }
 
-// AddOrUpdateCloudProfile adds or updates a cloud profile to the Config.
-func (c *Config) AddOrUpdateCloudProfile(name string, new Profile) error {
+// AddOrUpdateUpboundProfile adds or updates an Upbound profile to the Config.
+func (c *Config) AddOrUpdateUpboundProfile(name string, new Profile) error {
 	if err := checkProfile(new); err != nil {
 		return err
 	}
-	if c.Cloud.Profiles == nil {
-		c.Cloud.Profiles = map[string]Profile{}
+	if c.Upbound.Profiles == nil {
+		c.Upbound.Profiles = map[string]Profile{}
 	}
-	c.Cloud.Profiles[name] = new
+	c.Upbound.Profiles[name] = new
 	return nil
 }
 
-// GetDefaultCloudProfile gets the default cloud profile or returns an error if
+// GetDefaultUpboundProfile gets the default Upbound profile or returns an error if
 // default is not set or default profile does not exist.
-func (c *Config) GetDefaultCloudProfile() (string, Profile, error) {
-	if c.Cloud.Default == "" {
+func (c *Config) GetDefaultUpboundProfile() (string, Profile, error) {
+	if c.Upbound.Default == "" {
 		return "", Profile{}, errors.New(errNoDefaultSpecified)
 	}
-	p, ok := c.Cloud.Profiles[c.Cloud.Default]
+	p, ok := c.Upbound.Profiles[c.Upbound.Default]
 	if !ok {
 		return "", Profile{}, errors.New(errDefaultNotExist)
 	}
-	return c.Cloud.Default, p, nil
+	return c.Upbound.Default, p, nil
 }
 
-// GetCloudProfile gets a profile with a given identifier. If a profile does not
+// GetUpboundProfile gets a profile with a given identifier. If a profile does not
 // exist for the given identifier an error will be returned. Multiple profiles
 // should never exist for the same identifier, but in the case that they do, the
 // first will be returned.
-func (c *Config) GetCloudProfile(name string) (Profile, error) {
-	p, ok := c.Cloud.Profiles[name]
+func (c *Config) GetUpboundProfile(name string) (Profile, error) {
+	p, ok := c.Upbound.Profiles[name]
 	if !ok {
 		return Profile{}, errors.Errorf(errProfileNotFoundFmt, name)
 	}
 	return p, nil
 }
 
-// SetDefaultCloudProfile sets the default profile for communicating with
-// Upbound Cloud. Setting a default profile that does not exist will return an
+// SetDefaultUpboundProfile sets the default profile for communicating with
+// Upbound. Setting a default profile that does not exist will return an
 // error.
-func (c *Config) SetDefaultCloudProfile(name string) error {
-	if _, ok := c.Cloud.Profiles[name]; !ok {
+func (c *Config) SetDefaultUpboundProfile(name string) error {
+	if _, ok := c.Upbound.Profiles[name]; !ok {
 		return errors.Errorf(errProfileNotFoundFmt, name)
 	}
-	c.Cloud.Default = name
+	c.Upbound.Default = name
 	return nil
 }

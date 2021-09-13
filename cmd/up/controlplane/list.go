@@ -22,8 +22,7 @@ import (
 	"k8s.io/cli-runtime/pkg/printers"
 
 	"github.com/upbound/up-sdk-go/service/accounts"
-
-	"github.com/upbound/up/internal/cloud"
+	"github.com/upbound/up/internal/upbound"
 )
 
 const (
@@ -34,15 +33,15 @@ const (
 type ListCmd struct{}
 
 // Run executes the list command.
-func (c *ListCmd) Run(kong *kong.Context, client *accounts.Client, cloudCtx *cloud.Context) error {
-	cps, err := client.ListControlPlanes(context.Background(), cloudCtx.Account)
+func (c *ListCmd) Run(kongCtx *kong.Context, client *accounts.Client, upCtx *upbound.Context) error {
+	cps, err := client.ListControlPlanes(context.Background(), upCtx.Account)
 	if err != nil {
 		return err
 	}
 	if len(cps) == 0 {
 		return nil
 	}
-	w := printers.GetNewTabWriter(kong.Stdout)
+	w := printers.GetNewTabWriter(kongCtx.Stdout)
 	fmt.Fprintf(w, listRowFormat, "NAME", "ID", "SELF-HOSTED", "STATUS")
 	for _, cp := range cps {
 		fmt.Fprintf(w, listRowFormat, cp.ControlPlane.Name, cp.ControlPlane.ID, cp.ControlPlane.SelfHosted, cp.Status)

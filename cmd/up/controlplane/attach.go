@@ -27,8 +27,7 @@ import (
 
 	cp "github.com/upbound/up-sdk-go/service/controlplanes"
 	"github.com/upbound/up-sdk-go/service/tokens"
-
-	"github.com/upbound/up/internal/cloud"
+	"github.com/upbound/up/internal/upbound"
 )
 
 const (
@@ -47,9 +46,9 @@ type AttachCmd struct {
 }
 
 // Run executes the attach command.
-func (c *AttachCmd) Run(kong *kong.Context, client *cp.Client, token *tokens.Client, cloudCtx *cloud.Context) error {
+func (c *AttachCmd) Run(kongCtx *kong.Context, client *cp.Client, token *tokens.Client, upCtx *upbound.Context) error {
 	cpRes, err := client.Create(context.Background(), &cp.ControlPlaneCreateParameters{
-		Account:     cloudCtx.Account,
+		Account:     upCtx.Account,
 		Name:        c.Name,
 		Description: c.Description,
 		SelfHosted:  true,
@@ -82,6 +81,6 @@ func (c *AttachCmd) Run(kong *kong.Context, client *cp.Client, token *tokens.Cli
 	if !ok {
 		return errors.New(errNoToken)
 	}
-	fmt.Fprintf(kong.Stdout, "%s\n", jwt)
+	fmt.Fprintf(kongCtx.Stdout, "%s\n", jwt)
 	return nil
 }

@@ -12,7 +12,7 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-package cloud
+package main
 
 import (
 	"bytes"
@@ -20,17 +20,19 @@ import (
 	"encoding/json"
 	"io"
 	"net/http"
+	"net/url"
 	"os"
 	"strings"
 	"time"
 
+	"github.com/alecthomas/kong"
 	"github.com/golang-jwt/jwt"
 	"github.com/pkg/errors"
 
-	"github.com/upbound/up/internal/cloud"
 	"github.com/upbound/up/internal/config"
 	uphttp "github.com/upbound/up/internal/http"
 	"github.com/upbound/up/internal/input"
+	"github.com/upbound/up/internal/upbound"
 )
 
 const (
@@ -47,7 +49,7 @@ const (
 )
 
 // BeforeApply sets default values in login before assignment and validation.
-func (c *loginCmd) BeforeApply() error {
+func (c *loginCmd) BeforeApply() error { //nolint:unparam
 	// NOTE(hasheddan): client timeout is handled with request context.
 	c.client = &http.Client{}
 	c.stdin = os.Stdin
@@ -55,7 +57,18 @@ func (c *loginCmd) BeforeApply() error {
 	return nil
 }
 
-func (c *loginCmd) AfterApply() error {
+func (c *loginCmd) AfterApply(kongCtx *kong.Context) error {
+	conf, src, err := config.Extract()
+	if err != nil {
+		return err
+	}
+	kongCtx.Bind(&upbound.Context{
+		Profile:  c.Profile,
+		Account:  c.Account,
+		Endpoint: c.Endpoint,
+		Cfg:      conf,
+		CfgSrc:   src,
+	})
 	if c.Token != "" {
 		return nil
 	}
@@ -86,10 +99,15 @@ type loginCmd struct {
 	Username string `short:"u" env:"UP_USER" xor:"identifier" help:"Username used to execute command."`
 	Password string `short:"p" env:"UP_PASSWORD" help:"Password for specified user. '-' to read from stdin."`
 	Token    string `short:"t" env:"UP_TOKEN" xor:"identifier" help:"Token used to execute command. '-' to read from stdin."`
+
+	// Common Upbound API configuration
+	Endpoint *url.URL `env:"UP_ENDPOINT" default:"https://api.upbound.io" help:"Endpoint used for Upbound API."`
+	Profile  string   `env:"UP_PROFILE" help:"Profile used to execute command."`
+	Account  string   `short:"a" env:"UP_ACCOUNT" help:"Account used to execute command."`
 }
 
 // Run executes the login command.
-func (c *loginCmd) Run(cloudCtx *cloud.Context) error { // nolint:gocyclo
+func (c *loginCmd) Run(upCtx *upbound.Context) error { // nolint:gocyclo
 	if c.Token == "-" {
 		b, err := io.ReadAll(c.stdin)
 		if err != nil {
@@ -114,8 +132,8 @@ func (c *loginCmd) Run(cloudCtx *cloud.Context) error { // nolint:gocyclo
 	if err != nil {
 		return errors.Wrap(err, errLoginFailed)
 	}
-	cloudCtx.Endpoint.Path = loginPath
-	req, err := http.NewRequestWithContext(ctx, http.MethodPost, cloudCtx.Endpoint.String(), bytes.NewReader(jsonStr))
+	upCtx.Endpoint.Path = loginPath
+	req, err := http.NewRequestWithContext(ctx, http.MethodPost, upCtx.Endpoint.String(), bytes.NewReader(jsonStr))
 	if err != nil {
 		return errors.Wrap(err, errLoginFailed)
 	}
@@ -125,39 +143,39 @@ func (c *loginCmd) Run(cloudCtx *cloud.Context) error { // nolint:gocyclo
 		return errors.Wrap(err, errLoginFailed)
 	}
 	defer res.Body.Close() // nolint:errcheck
-	session, err := extractSession(res, cloud.CookieName)
+	session, err := extractSession(res, upbound.CookieName)
 	if err != nil {
 		return errors.Wrap(err, errLoginFailed)
 	}
 	// If profile is not set, we assume operation on profile designated as
 	// default in config.
-	if cloudCtx.Profile == "" {
-		cloudCtx.Profile = cloudCtx.Cfg.Cloud.Default
+	if upCtx.Profile == "" {
+		upCtx.Profile = upCtx.Cfg.Upbound.Default
 	}
 	// If no default profile is specified, the profile is named `default`.
-	if cloudCtx.Profile == "" {
-		cloudCtx.Profile = defaultProfileName
+	if upCtx.Profile == "" {
+		upCtx.Profile = defaultProfileName
 	}
 	// If no account is specified and profile type is user, set profile account
 	// to user ID if not an email address. This is for convenience if a user is
 	// using a personal account.
-	if cloudCtx.Account == "" && profType == config.UserProfileType && !isEmail(auth.ID) {
-		cloudCtx.Account = auth.ID
+	if upCtx.Account == "" && profType == config.UserProfileType && !isEmail(auth.ID) {
+		upCtx.Account = auth.ID
 	}
-	if err := cloudCtx.Cfg.AddOrUpdateCloudProfile(cloudCtx.Profile, config.Profile{
+	if err := upCtx.Cfg.AddOrUpdateUpboundProfile(upCtx.Profile, config.Profile{
 		ID:      auth.ID,
 		Type:    profType,
 		Session: session,
-		Account: cloudCtx.Account,
+		Account: upCtx.Account,
 	}); err != nil {
 		return errors.Wrap(err, errLoginFailed)
 	}
-	if len(cloudCtx.Cfg.Cloud.Profiles) == 1 {
-		if err := cloudCtx.Cfg.SetDefaultCloudProfile(cloudCtx.Profile); err != nil {
+	if len(upCtx.Cfg.Upbound.Profiles) == 1 {
+		if err := upCtx.Cfg.SetDefaultUpboundProfile(upCtx.Profile); err != nil {
 			return errors.Wrap(err, errLoginFailed)
 		}
 	}
-	return errors.Wrap(cloudCtx.CfgSrc.UpdateConfig(cloudCtx.Cfg), errUpdateConfig)
+	return errors.Wrap(upCtx.CfgSrc.UpdateConfig(upCtx.Cfg), errUpdateConfig)
 }
 
 // auth is the request body sent to authenticate a user or token.

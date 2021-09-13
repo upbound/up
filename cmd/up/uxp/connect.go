@@ -20,7 +20,6 @@ import (
 	"os"
 	"strings"
 
-	"github.com/alecthomas/kong"
 	corev1 "k8s.io/api/core/v1"
 	kerrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -55,7 +54,7 @@ type connectCmd struct {
 }
 
 // Run executes the connect command.
-func (c *connectCmd) Run(kong *kong.Context, insCtx *install.Context) error {
+func (c *connectCmd) Run(insCtx *install.Context) error {
 	// TODO(hasheddan): consider implementing a custom decoder
 	if c.CPToken == "-" {
 		b, err := io.ReadAll(c.stdin)
