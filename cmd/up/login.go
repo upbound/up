@@ -49,7 +49,7 @@ const (
 )
 
 // BeforeApply sets default values in login before assignment and validation.
-func (c *loginCmd) BeforeApply() error {
+func (c *loginCmd) BeforeApply() error { //nolint:unparam
 	// NOTE(hasheddan): client timeout is handled with request context.
 	c.client = &http.Client{}
 	c.stdin = os.Stdin
