@@ -12,7 +12,7 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-package cloud
+package upbound
 
 import (
 	"net/http"
@@ -25,13 +25,13 @@ import (
 
 const (
 	// UserAgent is the default user agent to use to make requests to the
-	// Upbound Cloud API.
+	// Upbound API.
 	UserAgent = "up-cli"
 	// CookieName is the default cookie name used to identify a session token.
 	CookieName = "SID"
 )
 
-// Context includes common data that Upbound Cloud consumers may utilize.
+// Context includes common data that Upbound consumers may utilize.
 type Context struct {
 	Profile  string
 	ID       string
@@ -41,20 +41,6 @@ type Context struct {
 	Endpoint *url.URL
 	Cfg      *config.Config
 	CfgSrc   config.Source
-}
-
-// ExtractConfig performs extraction of configuration from the default source,
-// which is the ~/.up/config.json file on the local filesystem.
-func ExtractConfig() (*config.Config, config.Source, error) {
-	src, err := config.NewFSSource()
-	if err != nil {
-		return nil, nil, err
-	}
-	conf, err := src.GetConfig()
-	if err != nil {
-		return nil, nil, err
-	}
-	return conf, src, nil
 }
 
 // BuildSDKConfig builds an Upbound SDK config suitable for usage with any
