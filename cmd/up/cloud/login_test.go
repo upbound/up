@@ -27,9 +27,9 @@ import (
 	"github.com/google/go-cmp/cmp"
 	"github.com/pkg/errors"
 
-	"github.com/upbound/up/internal/cloud"
 	"github.com/upbound/up/internal/config"
 	"github.com/upbound/up/internal/http/mocks"
+	"github.com/upbound/up/internal/upbound"
 )
 
 func TestRun(t *testing.T) {
@@ -39,7 +39,7 @@ func TestRun(t *testing.T) {
 	cases := map[string]struct {
 		reason string
 		cmd    *loginCmd
-		ctx    *cloud.Context
+		ctx    *upbound.Context
 		err    error
 	}{
 		"ErrorNoUserOrToken": {
@@ -58,7 +58,7 @@ func TestRun(t *testing.T) {
 				Username: "cool-user",
 				Password: "cool-pass",
 			},
-			ctx: &cloud.Context{
+			ctx: &upbound.Context{
 				Endpoint: defaultURL,
 			},
 			err: errors.Wrap(errBoom, errLoginFailed),

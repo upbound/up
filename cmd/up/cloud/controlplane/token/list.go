@@ -23,8 +23,7 @@ import (
 	"k8s.io/cli-runtime/pkg/printers"
 
 	cp "github.com/upbound/up-sdk-go/service/controlplanes"
-
-	"github.com/upbound/up/internal/cloud"
+	"github.com/upbound/up/internal/upbound"
 )
 
 const (
@@ -39,7 +38,7 @@ type listCmd struct {
 }
 
 // Run executes the list command.
-func (c *listCmd) Run(kong *kong.Context, client *cp.Client, cloudCtx *cloud.Context) error {
+func (c *listCmd) Run(kong *kong.Context, client *cp.Client, upCtx *upbound.Context) error {
 	res, err := client.GetTokens(context.Background(), c.ID)
 	if err != nil {
 		return err

@@ -18,7 +18,7 @@ import (
 	"context"
 
 	cp "github.com/upbound/up-sdk-go/service/controlplanes"
-	"github.com/upbound/up/internal/cloud"
+	"github.com/upbound/up/internal/upbound"
 )
 
 // CreateCmd creates a hosted control plane on Upbound Cloud.
@@ -29,9 +29,9 @@ type CreateCmd struct {
 }
 
 // Run executes the create command.
-func (c *CreateCmd) Run(client *cp.Client, cloudCtx *cloud.Context) error {
+func (c *CreateCmd) Run(client *cp.Client, upCtx *upbound.Context) error {
 	_, err := client.Create(context.Background(), &cp.ControlPlaneCreateParameters{
-		Account:     cloudCtx.Account,
+		Account:     upCtx.Account,
 		Name:        c.Name,
 		Description: c.Description,
 	})

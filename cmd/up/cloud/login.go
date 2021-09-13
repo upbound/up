@@ -27,10 +27,10 @@ import (
 	"github.com/golang-jwt/jwt"
 	"github.com/pkg/errors"
 
-	"github.com/upbound/up/internal/cloud"
 	"github.com/upbound/up/internal/config"
 	uphttp "github.com/upbound/up/internal/http"
 	"github.com/upbound/up/internal/input"
+	"github.com/upbound/up/internal/upbound"
 )
 
 const (
@@ -89,7 +89,7 @@ type loginCmd struct {
 }
 
 // Run executes the login command.
-func (c *loginCmd) Run(cloudCtx *cloud.Context) error { // nolint:gocyclo
+func (c *loginCmd) Run(upCtx *upbound.Context) error { // nolint:gocyclo
 	if c.Token == "-" {
 		b, err := io.ReadAll(c.stdin)
 		if err != nil {
@@ -114,8 +114,8 @@ func (c *loginCmd) Run(cloudCtx *cloud.Context) error { // nolint:gocyclo
 	if err != nil {
 		return errors.Wrap(err, errLoginFailed)
 	}
-	cloudCtx.Endpoint.Path = loginPath
-	req, err := http.NewRequestWithContext(ctx, http.MethodPost, cloudCtx.Endpoint.String(), bytes.NewReader(jsonStr))
+	upCtx.Endpoint.Path = loginPath
+	req, err := http.NewRequestWithContext(ctx, http.MethodPost, upCtx.Endpoint.String(), bytes.NewReader(jsonStr))
 	if err != nil {
 		return errors.Wrap(err, errLoginFailed)
 	}
@@ -125,39 +125,39 @@ func (c *loginCmd) Run(cloudCtx *cloud.Context) error { // nolint:gocyclo
 		return errors.Wrap(err, errLoginFailed)
 	}
 	defer res.Body.Close() // nolint:errcheck
-	session, err := extractSession(res, cloud.CookieName)
+	session, err := extractSession(res, upbound.CookieName)
 	if err != nil {
 		return errors.Wrap(err, errLoginFailed)
 	}
 	// If profile is not set, we assume operation on profile designated as
 	// default in config.
-	if cloudCtx.Profile == "" {
-		cloudCtx.Profile = cloudCtx.Cfg.Cloud.Default
+	if upCtx.Profile == "" {
+		upCtx.Profile = upCtx.Cfg.Upbound.Default
 	}
 	// If no default profile is specified, the profile is named `default`.
-	if cloudCtx.Profile == "" {
-		cloudCtx.Profile = defaultProfileName
+	if upCtx.Profile == "" {
+		upCtx.Profile = defaultProfileName
 	}
 	// If no account is specified and profile type is user, set profile account
 	// to user ID if not an email address. This is for convenience if a user is
 	// using a personal account.
-	if cloudCtx.Account == "" && profType == config.UserProfileType && !isEmail(auth.ID) {
-		cloudCtx.Account = auth.ID
+	if upCtx.Account == "" && profType == config.UserProfileType && !isEmail(auth.ID) {
+		upCtx.Account = auth.ID
 	}
-	if err := cloudCtx.Cfg.AddOrUpdateCloudProfile(cloudCtx.Profile, config.Profile{
+	if err := upCtx.Cfg.AddOrUpdateUpboundProfile(upCtx.Profile, config.Profile{
 		ID:      auth.ID,
 		Type:    profType,
 		Session: session,
-		Account: cloudCtx.Account,
+		Account: upCtx.Account,
 	}); err != nil {
 		return errors.Wrap(err, errLoginFailed)
 	}
-	if len(cloudCtx.Cfg.Cloud.Profiles) == 1 {
-		if err := cloudCtx.Cfg.SetDefaultCloudProfile(cloudCtx.Profile); err != nil {
+	if len(upCtx.Cfg.Upbound.Profiles) == 1 {
+		if err := upCtx.Cfg.SetDefaultUpboundProfile(upCtx.Profile); err != nil {
 			return errors.Wrap(err, errLoginFailed)
 		}
 	}
-	return errors.Wrap(cloudCtx.CfgSrc.UpdateConfig(cloudCtx.Cfg), errUpdateConfig)
+	return errors.Wrap(upCtx.CfgSrc.UpdateConfig(upCtx.Cfg), errUpdateConfig)
 }
 
 // auth is the request body sent to authenticate a user or token.

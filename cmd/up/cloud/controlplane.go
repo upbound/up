@@ -25,8 +25,8 @@ import (
 	"github.com/upbound/up/cmd/up/cloud/controlplane"
 	"github.com/upbound/up/cmd/up/cloud/controlplane/kubeconfig"
 	"github.com/upbound/up/cmd/up/cloud/controlplane/token"
-	"github.com/upbound/up/internal/cloud"
 	"github.com/upbound/up/internal/config"
+	"github.com/upbound/up/internal/upbound"
 )
 
 const (
@@ -35,34 +35,34 @@ const (
 
 // AfterApply constructs and binds a control plane client to any subcommands
 // that have Run() methods that receive it.
-func (c *controlPlaneCmd) AfterApply(ctx *kong.Context, cloudCtx *cloud.Context) error {
+func (c *controlPlaneCmd) AfterApply(ctx *kong.Context, upCtx *upbound.Context) error {
 	// TODO(hasheddan): the majority of this logic can be used generically
 	// across cloud commands when others are implemented.
 	var profile config.Profile
 	var name string
 	var err error
-	if cloudCtx.Profile == "" {
-		name, profile, err = cloudCtx.Cfg.GetDefaultCloudProfile()
+	if upCtx.Profile == "" {
+		name, profile, err = upCtx.Cfg.GetDefaultUpboundProfile()
 		if err != nil {
 			return err
 		}
-		cloudCtx.Profile = name
-		cloudCtx.ID = profile.ID
+		upCtx.Profile = name
+		upCtx.ID = profile.ID
 	} else {
-		profile, err = cloudCtx.Cfg.GetCloudProfile(cloudCtx.Profile)
+		profile, err = upCtx.Cfg.GetUpboundProfile(upCtx.Profile)
 		if err != nil {
 			return err
 		}
 	}
 	// If account has not already been set, use the profile default.
-	if cloudCtx.Account == "" {
-		cloudCtx.Account = profile.Account
+	if upCtx.Account == "" {
+		upCtx.Account = profile.Account
 	}
 	// If no account is set in profile, return an error.
-	if cloudCtx.Account == "" {
+	if upCtx.Account == "" {
 		return errors.New(errNoAccount)
 	}
-	cfg, err := cloud.BuildSDKConfig(profile.Session, cloudCtx.Endpoint)
+	cfg, err := upbound.BuildSDKConfig(profile.Session, upCtx.Endpoint)
 	if err != nil {
 		return err
 	}

@@ -23,8 +23,8 @@ import (
 	"github.com/alecthomas/kong"
 	"github.com/google/uuid"
 
-	"github.com/upbound/up/internal/cloud"
 	"github.com/upbound/up/internal/kube"
+	"github.com/upbound/up/internal/upbound"
 )
 
 // AfterApply sets default values in command before assignment and validation.
@@ -45,7 +45,7 @@ type getCmd struct {
 }
 
 // Run executes the get command.
-func (c *getCmd) Run(kong *kong.Context, cloudCtx *cloud.Context) error {
+func (c *getCmd) Run(kong *kong.Context, upCtx *upbound.Context) error {
 	// TODO(hasheddan): consider implementing a custom decoder
 	if c.Token == "-" {
 		b, err := io.ReadAll(c.stdin)

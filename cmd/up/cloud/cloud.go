@@ -19,17 +19,18 @@ import (
 
 	"github.com/alecthomas/kong"
 
-	"github.com/upbound/up/internal/cloud"
+	"github.com/upbound/up/internal/config"
+	"github.com/upbound/up/internal/upbound"
 )
 
 // AfterApply constructs and binds Upbound-specific context to any subcommands
 // that have Run() methods that receive it.
 func (c *Cmd) AfterApply(ctx *kong.Context) error {
-	conf, src, err := cloud.ExtractConfig()
+	conf, src, err := config.Extract()
 	if err != nil {
 		return err
 	}
-	ctx.Bind(&cloud.Context{
+	ctx.Bind(&upbound.Context{
 		Profile:  c.Profile,
 		Account:  c.Account,
 		Endpoint: c.Endpoint,

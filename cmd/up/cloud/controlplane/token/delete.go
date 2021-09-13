@@ -22,7 +22,7 @@ import (
 	"github.com/pkg/errors"
 
 	"github.com/upbound/up-sdk-go/service/tokens"
-	"github.com/upbound/up/internal/cloud"
+	"github.com/upbound/up/internal/upbound"
 )
 
 const (
@@ -35,6 +35,6 @@ type deleteCmd struct {
 }
 
 // Run executes the delete command.
-func (c *deleteCmd) Run(kong *kong.Context, client *tokens.Client, cloudCtx *cloud.Context) error {
+func (c *deleteCmd) Run(kong *kong.Context, client *tokens.Client, upCtx *upbound.Context) error {
 	return errors.Wrap(client.Delete(context.Background(), c.ID), errDeleteCPToken)
 }

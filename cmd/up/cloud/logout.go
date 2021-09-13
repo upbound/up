@@ -22,8 +22,8 @@ import (
 
 	"github.com/upbound/up-sdk-go"
 
-	"github.com/upbound/up/internal/cloud"
 	"github.com/upbound/up/internal/config"
+	"github.com/upbound/up/internal/upbound"
 )
 
 const (
@@ -33,21 +33,21 @@ const (
 )
 
 // AfterApply sets default values in login after assignment and validation.
-func (c *logoutCmd) AfterApply(cloudCtx *cloud.Context) error {
+func (c *logoutCmd) AfterApply(upCtx *upbound.Context) error {
 	var profile config.Profile
 	var err error
-	if cloudCtx.Profile == "" {
-		_, profile, err = cloudCtx.Cfg.GetDefaultCloudProfile()
+	if upCtx.Profile == "" {
+		_, profile, err = upCtx.Cfg.GetDefaultUpboundProfile()
 		if err != nil {
 			return err
 		}
 	} else {
-		profile, err = cloudCtx.Cfg.GetCloudProfile(cloudCtx.Profile)
+		profile, err = upCtx.Cfg.GetUpboundProfile(upCtx.Profile)
 		if err != nil {
 			return err
 		}
 	}
-	cfg, err := cloud.BuildSDKConfig(profile.Session, cloudCtx.Endpoint)
+	cfg, err := upbound.BuildSDKConfig(profile.Session, upCtx.Endpoint)
 	if err != nil {
 		return err
 	}
@@ -61,7 +61,7 @@ type logoutCmd struct {
 }
 
 // Run executes the logout command.
-func (c *logoutCmd) Run(cloudCtx *cloud.Context) error {
+func (c *logoutCmd) Run(upCtx *upbound.Context) error {
 	ctx, cancel := context.WithTimeout(context.Background(), defaultTimeout)
 	defer cancel()
 	req, err := c.client.NewRequest(ctx, http.MethodPost, logoutPath, "", nil)

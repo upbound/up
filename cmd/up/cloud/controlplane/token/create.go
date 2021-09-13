@@ -24,7 +24,7 @@ import (
 	"github.com/pkg/errors"
 
 	"github.com/upbound/up-sdk-go/service/tokens"
-	"github.com/upbound/up/internal/cloud"
+	"github.com/upbound/up/internal/upbound"
 )
 
 const (
@@ -50,7 +50,7 @@ type createCmd struct {
 }
 
 // Run executes the create command.
-func (c *createCmd) Run(kong *kong.Context, client *tokens.Client, cloudCtx *cloud.Context) error {
+func (c *createCmd) Run(kong *kong.Context, client *tokens.Client, upCtx *upbound.Context) error {
 	tRes, err := client.Create(context.Background(), &tokens.TokenCreateParameters{
 		Attributes: tokens.TokenAttributes{
 			Name: c.Name,
