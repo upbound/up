@@ -12,9 +12,11 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-package cloud
+package main
 
 import (
+	"net/url"
+
 	"github.com/alecthomas/kong"
 	"github.com/pkg/errors"
 
@@ -22,9 +24,9 @@ import (
 	cp "github.com/upbound/up-sdk-go/service/controlplanes"
 	"github.com/upbound/up-sdk-go/service/tokens"
 
-	"github.com/upbound/up/cmd/up/cloud/controlplane"
-	"github.com/upbound/up/cmd/up/cloud/controlplane/kubeconfig"
-	"github.com/upbound/up/cmd/up/cloud/controlplane/token"
+	"github.com/upbound/up/cmd/up/controlplane"
+	"github.com/upbound/up/cmd/up/controlplane/kubeconfig"
+	"github.com/upbound/up/cmd/up/controlplane/token"
 	"github.com/upbound/up/internal/config"
 	"github.com/upbound/up/internal/upbound"
 )
@@ -35,12 +37,22 @@ const (
 
 // AfterApply constructs and binds a control plane client to any subcommands
 // that have Run() methods that receive it.
-func (c *controlPlaneCmd) AfterApply(ctx *kong.Context, upCtx *upbound.Context) error {
+func (c *controlPlaneCmd) AfterApply(ctx *kong.Context) error {
 	// TODO(hasheddan): the majority of this logic can be used generically
-	// across cloud commands when others are implemented.
+	// across upbound commands when others are implemented.
+	conf, src, err := config.Extract()
+	if err != nil {
+		return err
+	}
+	upCtx := &upbound.Context{
+		Profile:  c.Profile,
+		Account:  c.Account,
+		Endpoint: c.Endpoint,
+		Cfg:      conf,
+		CfgSrc:   src,
+	}
 	var profile config.Profile
 	var name string
-	var err error
 	if upCtx.Profile == "" {
 		name, profile, err = upCtx.Cfg.GetDefaultUpboundProfile()
 		if err != nil {
@@ -66,6 +78,7 @@ func (c *controlPlaneCmd) AfterApply(ctx *kong.Context, upCtx *upbound.Context) 
 	if err != nil {
 		return err
 	}
+	ctx.Bind(upCtx)
 	ctx.Bind(cp.NewClient(cfg))
 	ctx.Bind(tokens.NewClient(cfg))
 	ctx.Bind(accounts.NewClient(cfg))
@@ -81,4 +94,9 @@ type controlPlaneCmd struct {
 
 	Kubeconfig kubeconfig.Cmd `cmd:"" name:"kubeconfig" help:"Manage control plane kubeconfig data."`
 	Token      token.Cmd      `cmd:"" name:"token" help:"Interact with control plane tokens."`
+
+	// Common Upbound API configuration
+	Endpoint *url.URL `env:"UP_ENDPOINT" default:"https://api.upbound.io" help:"Endpoint used for Upbound API."`
+	Profile  string   `env:"UP_PROFILE" help:"Profile used to execute command."`
+	Account  string   `short:"a" env:"UP_ACCOUNT" help:"Account used to execute command."`
 }

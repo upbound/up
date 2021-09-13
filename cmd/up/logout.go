@@ -12,11 +12,12 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-package cloud
+package main
 
 import (
 	"context"
 	"net/http"
+	"net/url"
 
 	"github.com/pkg/errors"
 
@@ -33,21 +34,24 @@ const (
 )
 
 // AfterApply sets default values in login after assignment and validation.
-func (c *logoutCmd) AfterApply(upCtx *upbound.Context) error {
+func (c *logoutCmd) AfterApply() error {
+	conf, _, err := config.Extract()
+	if err != nil {
+		return err
+	}
 	var profile config.Profile
-	var err error
-	if upCtx.Profile == "" {
-		_, profile, err = upCtx.Cfg.GetDefaultUpboundProfile()
+	if c.Profile == "" {
+		_, profile, err = conf.GetDefaultUpboundProfile()
 		if err != nil {
 			return err
 		}
 	} else {
-		profile, err = upCtx.Cfg.GetUpboundProfile(upCtx.Profile)
+		profile, err = conf.GetUpboundProfile(c.Profile)
 		if err != nil {
 			return err
 		}
 	}
-	cfg, err := upbound.BuildSDKConfig(profile.Session, upCtx.Endpoint)
+	cfg, err := upbound.BuildSDKConfig(profile.Session, c.Endpoint)
 	if err != nil {
 		return err
 	}
@@ -58,10 +62,15 @@ func (c *logoutCmd) AfterApply(upCtx *upbound.Context) error {
 // logoutCmd invalidates a stored session token for a given profile.
 type logoutCmd struct {
 	client up.Client
+
+	// Common Upbound API configuration
+	Endpoint *url.URL `env:"UP_ENDPOINT" default:"https://api.upbound.io" help:"Endpoint used for Upbound API."`
+	Profile  string   `env:"UP_PROFILE" help:"Profile used to execute command."`
+	Account  string   `short:"a" env:"UP_ACCOUNT" help:"Account used to execute command."`
 }
 
 // Run executes the logout command.
-func (c *logoutCmd) Run(upCtx *upbound.Context) error {
+func (c *logoutCmd) Run() error {
 	ctx, cancel := context.WithTimeout(context.Background(), defaultTimeout)
 	defer cancel()
 	req, err := c.client.NewRequest(ctx, http.MethodPost, logoutPath, "", nil)

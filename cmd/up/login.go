@@ -12,7 +12,7 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-package cloud
+package main
 
 import (
 	"bytes"
@@ -20,10 +20,12 @@ import (
 	"encoding/json"
 	"io"
 	"net/http"
+	"net/url"
 	"os"
 	"strings"
 	"time"
 
+	"github.com/alecthomas/kong"
 	"github.com/golang-jwt/jwt"
 	"github.com/pkg/errors"
 
@@ -55,7 +57,18 @@ func (c *loginCmd) BeforeApply() error {
 	return nil
 }
 
-func (c *loginCmd) AfterApply() error {
+func (c *loginCmd) AfterApply(ctx *kong.Context) error {
+	conf, src, err := config.Extract()
+	if err != nil {
+		return err
+	}
+	ctx.Bind(&upbound.Context{
+		Profile:  c.Profile,
+		Account:  c.Account,
+		Endpoint: c.Endpoint,
+		Cfg:      conf,
+		CfgSrc:   src,
+	})
 	if c.Token != "" {
 		return nil
 	}
@@ -86,6 +99,11 @@ type loginCmd struct {
 	Username string `short:"u" env:"UP_USER" xor:"identifier" help:"Username used to execute command."`
 	Password string `short:"p" env:"UP_PASSWORD" help:"Password for specified user. '-' to read from stdin."`
 	Token    string `short:"t" env:"UP_TOKEN" xor:"identifier" help:"Token used to execute command. '-' to read from stdin."`
+
+	// Common Upbound API configuration
+	Endpoint *url.URL `env:"UP_ENDPOINT" default:"https://api.upbound.io" help:"Endpoint used for Upbound API."`
+	Profile  string   `env:"UP_PROFILE" help:"Profile used to execute command."`
+	Account  string   `short:"a" env:"UP_ACCOUNT" help:"Account used to execute command."`
 }
 
 // Run executes the login command.
