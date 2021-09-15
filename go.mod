@@ -22,12 +22,12 @@ require (
 	github.com/upbound/dmv v0.0.0-20210914131200-5f5577146024
 	github.com/upbound/up-sdk-go v0.1.0
 	golang.org/x/term v0.0.0-20210220032956-6a3ed077a48d
-	helm.sh/helm/v3 v3.6.1-0.20210719095234-663c5698878c
-	k8s.io/api v0.21.0
-	k8s.io/apiextensions-apiserver v0.21.0
-	k8s.io/apimachinery v0.21.0
-	k8s.io/cli-runtime v0.21.0
-	k8s.io/client-go v0.21.0
+	helm.sh/helm/v3 v3.7.0
+	k8s.io/api v0.22.1
+	k8s.io/apiextensions-apiserver v0.22.1
+	k8s.io/apimachinery v0.22.1
+	k8s.io/cli-runtime v0.22.1
+	k8s.io/client-go v0.22.1
 	sigs.k8s.io/controller-runtime v0.8.0
 	sigs.k8s.io/yaml v1.2.0
 )
