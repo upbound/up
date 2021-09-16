@@ -126,7 +126,7 @@ type installCmd struct {
 
 	Repo      *url.URL `hidden:"" env:"ENTERPRISE_REPO" default:"registry.upbound.io/enterprise" help:"Set repo for enterprise."`
 	Registry  *url.URL `hidden:"" env:"ENTERPRISE_REGISTRY_ENDPOINT" default:"https://registry.upbound.io" help:"Set registry for authentication."`
-	DMV       *url.URL `hidden:"" env:"ENTERPRISE_DMV_ENDPOINT" default:"http://localhost:8080" help:"Set dmv for enterprise."`
+	DMV       *url.URL `hidden:"" env:"ENTERPRISE_DMV_ENDPOINT" default:"https://dmv.upbound.io" help:"Set dmv for enterprise."`
 	OrgID     string   `hidden:"" env:"ENTERPRISE_ORG_ID" default:"enterprise-dev" help:"Set orgID for enterprise."`
 	ProductID string   `hidden:"" env:"ENTERPRISE_PRODUCT_ID" default:"enterprise" help:"Set productID for enterprise."`
 

@@ -16,24 +16,26 @@ package license
 
 import (
 	"context"
+	"encoding/json"
+	"fmt"
+	"io"
 	"net/http"
 	"net/url"
-	"regexp"
-	"strings"
 
-	"github.com/deepmap/oapi-codegen/pkg/securityprovider"
 	"github.com/pkg/errors"
 
-	"github.com/upbound/dmv/api"
+	uphttp "github.com/upbound/up/internal/http"
 )
 
 const (
+	path = "/v1/accessKey/%s/%s:%s"
+
 	errGetAccessKey = "failed to acquire key"
 )
 
 // Response is the response returned from a successful access key request
 type Response struct {
-	AccessKey string `json:"access_key"`
+	AccessKey string `json:"key"`
 	Signature string `json:"signature"`
 }
 
@@ -45,23 +47,19 @@ type Provider interface {
 // NewProvider constructs a new dmv provider
 func NewProvider(modifiers ...ProviderModifierFn) Provider {
 
-	p := &dmv{}
+	p := &dmv{
+		client: &http.Client{},
+	}
 
 	for _, m := range modifiers {
 		m(p)
 	}
 
-	client, _ := api.NewClientWithResponses(
-		p.endpoint.String(),
-	)
-
-	p.client = client
-
 	return p
 }
 
 type dmv struct {
-	client   api.ClientWithResponsesInterface
+	client   uphttp.Client
 	endpoint *url.URL
 
 	orgID     string
@@ -94,38 +92,32 @@ func WithProductID(productID string) ProviderModifierFn {
 
 func (d *dmv) GetAccessKey(ctx context.Context, token, version string) (Response, error) {
 
-	// err always returns nil
-	tokenProvider, _ := securityprovider.NewSecurityProviderBearerToken(token)
+	d.endpoint.Path = fmt.Sprintf(path, d.orgID, d.productID, version)
 
-	res, err := d.client.GetAccessKeyWithResponse(
-		ctx,
-		d.orgID,
-		d.productID,
-		convertVersion(version),
-		tokenProvider.Intercept,
-	)
-
+	req, err := http.NewRequestWithContext(ctx, http.MethodGet, d.endpoint.String(), nil)
 	if err != nil {
 		return Response{}, errors.Wrap(err, errGetAccessKey)
 	}
 
-	if res.StatusCode() != http.StatusOK {
+	req.Header.Set("Content-Type", "application/json")
+	// add authorization header to the req
+	req.Header.Add("Authorization", fmt.Sprintf("Bearer %s", token))
+
+	res, err := d.client.Do(req)
+	if err != nil {
+		return Response{}, errors.Wrap(err, errGetAccessKey)
+	}
+	defer res.Body.Close() // nolint:errcheck
+
+	b, err := io.ReadAll(res.Body)
+	if err != nil {
 		return Response{}, errors.Wrap(err, errGetAccessKey)
 	}
 
-	return Response{
-		AccessKey: res.JSON200.Key,
-		Signature: res.JSON200.Signature,
-	}, nil
-}
-
-func convertVersion(version string) string {
-	// setup regex to match based on expected semver major.minor.patch exclusively
-	re := regexp.MustCompile(`^v\d.\d.\d`)
-	match := re.FindStringSubmatch(version)
-
-	if len(match) == 1 {
-		return strings.ReplaceAll(match[0], ".", "-")
+	var resp Response
+	if err := json.Unmarshal(b, &resp); err != nil {
+		return Response{}, errors.Wrap(err, errGetAccessKey)
 	}
-	return "invalid-version"
+
+	return resp, err
 }
