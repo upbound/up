@@ -18,6 +18,7 @@ import (
 	"context"
 	"net/http"
 	"net/url"
+	"regexp"
 	"strings"
 
 	"github.com/deepmap/oapi-codegen/pkg/securityprovider"
@@ -119,5 +120,12 @@ func (d *dmv) GetAccessKey(ctx context.Context, token, version string) (Response
 }
 
 func convertVersion(version string) string {
-	return strings.ReplaceAll(version, ".", "-")
+	// setup regex to match based on expected semver major.minor.patch exclusively
+	re := regexp.MustCompile(`^v\d.\d.\d`)
+	match := re.FindStringSubmatch(version)
+
+	if len(match) == 1 {
+		return strings.ReplaceAll(match[0], ".", "-")
+	}
+	return "invalid-version"
 }
