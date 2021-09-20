@@ -40,19 +40,19 @@ func TestGetAccessKey(t *testing.T) {
 	ctx := context.Background()
 
 	type want struct {
-		response Response
+		response *Response
 	}
 
 	cases := map[string]struct {
 		reason    string
-		provider  *dmv
+		provider  *DMV
 		want      want
 		clientErr error
 		err       error
 	}{
 		"SuccessfulAuth": {
 			reason: "A successful call to DMV should return the expected access key",
-			provider: &dmv{
+			provider: &DMV{
 				client: &mocks.MockClient{
 					DoFn: func(req *http.Request) (*http.Response, error) {
 						return &http.Response{
@@ -64,7 +64,7 @@ func TestGetAccessKey(t *testing.T) {
 				endpoint: defaultURL,
 			},
 			want: want{
-				response: Response{
+				response: &Response{
 					AccessKey: successToken,
 					Signature: successSig,
 				},
@@ -73,7 +73,7 @@ func TestGetAccessKey(t *testing.T) {
 
 		"ErrAuthFailed": {
 			reason: "If call to dmv fails an error should be returned.",
-			provider: &dmv{
+			provider: &DMV{
 				client: &mocks.MockClient{
 					DoFn: func(req *http.Request) (*http.Response, error) {
 						return nil, errBoom

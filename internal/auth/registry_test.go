@@ -38,18 +38,18 @@ func TestGetToken(t *testing.T) {
 	ctx := context.Background()
 
 	type want struct {
-		response Response
+		response *Response
 	}
 
 	cases := map[string]struct {
 		reason   string
-		provider *upboundRegistry
+		provider *UpboundRegistry
 		want     want
 		err      error
 	}{
 		"SuccessfulAuth": {
 			reason: "Providing a valid id and password should return a valid auth request.",
-			provider: &upboundRegistry{
+			provider: &UpboundRegistry{
 				client: &mocks.MockClient{
 					DoFn: func(req *http.Request) (*http.Response, error) {
 						return &http.Response{
@@ -63,14 +63,14 @@ func TestGetToken(t *testing.T) {
 				endpoint: defaultURL,
 			},
 			want: want{
-				response: Response{
+				response: &Response{
 					AccessToken: successToken,
 				},
 			},
 		},
 		"ErrAuthFailed": {
 			reason: "If call to registry fails an error should be returned.",
-			provider: &upboundRegistry{
+			provider: &UpboundRegistry{
 				client: &mocks.MockClient{
 					DoFn: func(req *http.Request) (*http.Response, error) {
 						return nil, errBoom

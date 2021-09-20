@@ -123,12 +123,15 @@ type installCmd struct {
 	Version string `arg:"" help:"Enterprise version to install."`
 
 	LicenseSecretName string `default:"upbound-enterprise-license" help:"Name of secret that will be populated with license data."`
+	SkipLicense       bool   `hidden:"" help:"Skip providing a license for enteprise install."`
 
 	Repo      *url.URL `hidden:"" env:"ENTERPRISE_REPO" default:"registry.upbound.io/enterprise" help:"Set repo for enterprise."`
 	Registry  *url.URL `hidden:"" env:"ENTERPRISE_REGISTRY_ENDPOINT" default:"https://registry.upbound.io" help:"Set registry for authentication."`
 	DMV       *url.URL `hidden:"" env:"ENTERPRISE_DMV_ENDPOINT" default:"https://dmv.upbound.io" help:"Set dmv for enterprise."`
-	OrgID     string   `hidden:"" env:"ENTERPRISE_ORG_ID" default:"enterprise-dev" help:"Set orgID for enterprise."`
+	OrgID     string   `hidden:"" env:"ENTERPRISE_ORG_ID" default:"enterprise" help:"Set orgID for enterprise."`
 	ProductID string   `hidden:"" env:"ENTERPRISE_PRODUCT_ID" default:"enterprise" help:"Set productID for enterprise."`
+
+	KeyVersionOverride string `hidden:"" env:"ENTERPRISE_KEY_VERSION" help:"Set the key version to use for enterprise install."`
 
 	install.CommonParams
 }
@@ -139,18 +142,8 @@ func (c *installCmd) Run(insCtx *install.Context) error {
 	ctx, cancel := context.WithTimeout(context.Background(), defaultTimeout)
 	defer cancel()
 
-	resp, err := c.auth.GetToken(ctx)
-	if err != nil {
-		return errors.Wrap(err, errGetRegistryToken)
-	}
-
-	acc, err := c.license.GetAccessKey(ctx, resp.AccessToken, c.Version)
-	if err != nil {
-		return errors.Wrap(err, errGetAccessKey)
-	}
-
 	// Create namespace if it does not exist.
-	_, err = c.kClient.CoreV1().Namespaces().Create(ctx, &corev1.Namespace{
+	_, err := c.kClient.CoreV1().Namespaces().Create(ctx, &corev1.Namespace{
 		ObjectMeta: metav1.ObjectMeta{
 			Name: insCtx.Namespace,
 		},
@@ -159,27 +152,8 @@ func (c *installCmd) Run(insCtx *install.Context) error {
 		return errors.Wrap(err, errCreateNamespace)
 	}
 
-	secret := &corev1.Secret{
-		ObjectMeta: metav1.ObjectMeta{
-			Name: c.LicenseSecretName,
-		},
-		StringData: map[string]string{
-			defaultSecretAccessKey: acc.AccessKey,
-			defaultSecretSignature: acc.Signature,
-		},
-	}
-	// Create license secret if it does not exist.
-	_, err = c.kClient.CoreV1().Secrets(insCtx.Namespace).Create(
-		ctx,
-		secret,
-		metav1.CreateOptions{},
-	)
-	if err != nil && kerrors.IsAlreadyExists(err) {
-		if _, err = c.kClient.CoreV1().Secrets(insCtx.Namespace).Update(
-			ctx,
-			secret,
-			metav1.UpdateOptions{},
-		); err != nil {
+	if !c.SkipLicense {
+		if err := c.applyLicense(ctx, insCtx.Namespace); err != nil {
 			return errors.Wrap(err, errCreateLicenseSecret)
 		}
 	}
@@ -192,5 +166,50 @@ func (c *installCmd) Run(insCtx *install.Context) error {
 	if err != nil {
 		return err
 	}
+	return err
+}
+
+func (c *installCmd) applyLicense(ctx context.Context, ns string) error {
+	resp, err := c.auth.GetToken(ctx)
+	if err != nil {
+		return errors.Wrap(err, errGetRegistryToken)
+	}
+
+	var v string
+	if c.KeyVersionOverride != "" {
+		v = c.KeyVersionOverride
+	} else {
+		v = c.Version
+	}
+
+	acc, err := c.license.GetAccessKey(ctx, resp.AccessToken, v)
+	if err != nil {
+		return errors.Wrap(err, errGetAccessKey)
+	}
+
+	secret := &corev1.Secret{
+		ObjectMeta: metav1.ObjectMeta{
+			Name: c.LicenseSecretName,
+		},
+		StringData: map[string]string{
+			defaultSecretAccessKey: acc.AccessKey,
+			defaultSecretSignature: acc.Signature,
+		},
+	}
+
+	// Create license secret if it does not exist.
+	_, err = c.kClient.CoreV1().Secrets(ns).Create(
+		ctx,
+		secret,
+		metav1.CreateOptions{},
+	)
+	if err != nil && kerrors.IsAlreadyExists(err) {
+		_, err = c.kClient.CoreV1().Secrets(ns).Update(
+			ctx,
+			secret,
+			metav1.UpdateOptions{},
+		)
+	}
+
 	return err
 }

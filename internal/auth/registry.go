@@ -48,13 +48,13 @@ type Response struct {
 
 // Provider defines an auth provider
 type Provider interface {
-	GetToken(context.Context) (Response, error)
+	GetToken(context.Context) (*Response, error)
 }
 
 // NewProvider constructs a new upboundRegistry provider
-func NewProvider(modifiers ...ProviderModifierFn) Provider {
+func NewProvider(modifiers ...ProviderModifierFn) *UpboundRegistry {
 
-	p := &upboundRegistry{
+	p := &UpboundRegistry{
 		client: &http.Client{},
 	}
 
@@ -65,7 +65,8 @@ func NewProvider(modifiers ...ProviderModifierFn) Provider {
 	return p
 }
 
-type upboundRegistry struct {
+// UpboundRegistry provides authentication using the Upbound Registry
+type UpboundRegistry struct {
 	client   uphttp.Client
 	endpoint *url.URL
 
@@ -79,11 +80,11 @@ type upboundRegistry struct {
 }
 
 // ProviderModifierFn modifies the provider.
-type ProviderModifierFn func(*upboundRegistry)
+type ProviderModifierFn func(*UpboundRegistry)
 
 // WithBasicAuth sets the username and password for the auth provider.
 func WithBasicAuth(username, password string) ProviderModifierFn {
-	return func(u *upboundRegistry) {
+	return func(u *UpboundRegistry) {
 		u.username = username
 		u.password = password
 	}
@@ -91,31 +92,32 @@ func WithBasicAuth(username, password string) ProviderModifierFn {
 
 // WithEndpoint sets endpoint for the auth provider.
 func WithEndpoint(endpoint *url.URL) ProviderModifierFn {
-	return func(u *upboundRegistry) {
+	return func(u *UpboundRegistry) {
 		u.endpoint = endpoint
 	}
 }
 
 // WithOrgID sets orgID for the auth provider.
 func WithOrgID(orgID string) ProviderModifierFn {
-	return func(u *upboundRegistry) {
+	return func(u *UpboundRegistry) {
 		u.orgID = orgID
 	}
 }
 
 // WithProductID sets productID for the auth provider.
 func WithProductID(productID string) ProviderModifierFn {
-	return func(u *upboundRegistry) {
+	return func(u *UpboundRegistry) {
 		u.productID = productID
 	}
 }
 
-func (u *upboundRegistry) GetToken(ctx context.Context) (Response, error) {
+// GetToken returns a JWT corresponding to the supplied username/password
+func (u *UpboundRegistry) GetToken(ctx context.Context) (*Response, error) {
 	u.endpoint.Path = path
 
 	req, err := http.NewRequestWithContext(ctx, http.MethodGet, u.endpoint.String(), nil)
 	if err != nil {
-		return Response{}, errors.Wrap(err, errAuthFailed)
+		return nil, errors.Wrap(err, errAuthFailed)
 	}
 
 	q := req.URL.Query()
@@ -129,19 +131,19 @@ func (u *upboundRegistry) GetToken(ctx context.Context) (Response, error) {
 
 	res, err := u.client.Do(req)
 	if err != nil {
-		return Response{}, errors.Wrap(err, errAuthFailed)
+		return nil, errors.Wrap(err, errAuthFailed)
 	}
 	defer res.Body.Close() // nolint:errcheck
 
 	b, err := io.ReadAll(res.Body)
 	if err != nil {
-		return Response{}, errors.Wrap(err, errAuthFailed)
+		return nil, errors.Wrap(err, errAuthFailed)
 	}
 
 	var resp Response
 	if err := json.Unmarshal(b, &resp); err != nil {
-		return Response{}, errors.Wrap(err, errAuthFailed)
+		return nil, errors.Wrap(err, errAuthFailed)
 	}
 
-	return resp, err
+	return &resp, err
 }

@@ -41,13 +41,13 @@ type Response struct {
 
 // Provider defines a license provider
 type Provider interface {
-	GetAccessKey(context.Context, string, string) (Response, error)
+	GetAccessKey(context.Context, string, string) (*Response, error)
 }
 
 // NewProvider constructs a new dmv provider
-func NewProvider(modifiers ...ProviderModifierFn) Provider {
+func NewProvider(modifiers ...ProviderModifierFn) *DMV {
 
-	p := &dmv{
+	p := &DMV{
 		client: &http.Client{},
 	}
 
@@ -58,7 +58,8 @@ func NewProvider(modifiers ...ProviderModifierFn) Provider {
 	return p
 }
 
-type dmv struct {
+// DMV represents the DMV specific license provider
+type DMV struct {
 	client   uphttp.Client
 	endpoint *url.URL
 
@@ -67,36 +68,38 @@ type dmv struct {
 }
 
 // ProviderModifierFn modifies the provider.
-type ProviderModifierFn func(*dmv)
+type ProviderModifierFn func(*DMV)
 
 // WithEndpoint sets endpoint for the license provider.
 func WithEndpoint(endpoint *url.URL) ProviderModifierFn {
-	return func(u *dmv) {
+	return func(u *DMV) {
 		u.endpoint = endpoint
 	}
 }
 
 // WithOrgID sets orgID for the license provider.
 func WithOrgID(orgID string) ProviderModifierFn {
-	return func(u *dmv) {
+	return func(u *DMV) {
 		u.orgID = orgID
 	}
 }
 
 // WithProductID sets productID for the license provider.
 func WithProductID(productID string) ProviderModifierFn {
-	return func(u *dmv) {
+	return func(u *DMV) {
 		u.productID = productID
 	}
 }
 
-func (d *dmv) GetAccessKey(ctx context.Context, token, version string) (Response, error) {
+// GetAccessKey returns the license access key corresponding to the supplied version if
+// the given token is valid.
+func (d *DMV) GetAccessKey(ctx context.Context, token, version string) (*Response, error) {
 
 	d.endpoint.Path = fmt.Sprintf(path, d.orgID, d.productID, version)
 
 	req, err := http.NewRequestWithContext(ctx, http.MethodGet, d.endpoint.String(), nil)
 	if err != nil {
-		return Response{}, errors.Wrap(err, errGetAccessKey)
+		return &Response{}, errors.Wrap(err, errGetAccessKey)
 	}
 
 	req.Header.Set("Content-Type", "application/json")
@@ -105,19 +108,19 @@ func (d *dmv) GetAccessKey(ctx context.Context, token, version string) (Response
 
 	res, err := d.client.Do(req)
 	if err != nil {
-		return Response{}, errors.Wrap(err, errGetAccessKey)
+		return nil, errors.Wrap(err, errGetAccessKey)
 	}
 	defer res.Body.Close() // nolint:errcheck
 
 	b, err := io.ReadAll(res.Body)
 	if err != nil {
-		return Response{}, errors.Wrap(err, errGetAccessKey)
+		return nil, errors.Wrap(err, errGetAccessKey)
 	}
 
 	var resp Response
 	if err := json.Unmarshal(b, &resp); err != nil {
-		return Response{}, errors.Wrap(err, errGetAccessKey)
+		return nil, errors.Wrap(err, errGetAccessKey)
 	}
 
-	return resp, err
+	return &resp, err
 }
