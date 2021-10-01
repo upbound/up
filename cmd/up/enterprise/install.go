@@ -16,6 +16,8 @@ package enterprise
 
 import (
 	"context"
+	"encoding/base64"
+	"encoding/json"
 	"io"
 	"net/url"
 	"time"
@@ -25,6 +27,7 @@ import (
 	kerrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/client-go/kubernetes"
+	"k8s.io/kubectl/pkg/cmd/create"
 	"sigs.k8s.io/yaml"
 
 	"github.com/upbound/up/internal/auth"
@@ -38,11 +41,13 @@ const (
 	defaultTimeout         = 30 * time.Second
 	defaultSecretAccessKey = "access_key"
 	defaultSecretSignature = "signature"
+	defaultImagePullSecret = "enterprise-pull-secret"
 
 	errReadParametersFile     = "unable to read parameters file"
 	errParseInstallParameters = "unable to parse install parameters"
 	errGetRegistryToken       = "failed to acquire auth token"
 	errGetAccessKey           = "failed to acquire access key"
+	errCreateImagePullSecret  = "failed to create image pull secret"
 	errCreateLicenseSecret    = "failed to create license secret"
 	errCreateNamespace        = "failed to create namespace"
 )
@@ -63,6 +68,8 @@ func (c *installCmd) AfterApply(insCtx *install.Context) error {
 	if err != nil {
 		return err
 	}
+	c.id = id
+	c.token = token
 
 	c.auth = auth.NewProvider(
 		auth.WithBasicAuth(id, token),
@@ -119,6 +126,8 @@ type installCmd struct {
 	prompter input.Prompter
 	auth     auth.Provider
 	license  license.Provider
+	id       string
+	token    string
 
 	Version string `arg:"" help:"Enterprise version to install."`
 
@@ -142,8 +151,13 @@ func (c *installCmd) Run(insCtx *install.Context) error {
 	ctx, cancel := context.WithTimeout(context.Background(), defaultTimeout)
 	defer cancel()
 
+	params, err := c.parser.Parse()
+	if err != nil {
+		return errors.Wrap(err, errParseInstallParameters)
+	}
+
 	// Create namespace if it does not exist.
-	_, err := c.kClient.CoreV1().Namespaces().Create(ctx, &corev1.Namespace{
+	_, err = c.kClient.CoreV1().Namespaces().Create(ctx, &corev1.Namespace{
 		ObjectMeta: metav1.ObjectMeta{
 			Name: insCtx.Namespace,
 		},
@@ -152,16 +166,18 @@ func (c *installCmd) Run(insCtx *install.Context) error {
 		return errors.Wrap(err, errCreateNamespace)
 	}
 
+	// Create or update image pull secret.
+	if err := c.applyImagePullSecret(ctx, insCtx.Namespace); err != nil {
+		return errors.Wrap(err, errCreateImagePullSecret)
+	}
+
+	// Create or update access key secret unless skip license is specified.
 	if !c.SkipLicense {
 		if err := c.applyLicense(ctx, insCtx.Namespace); err != nil {
 			return errors.Wrap(err, errCreateLicenseSecret)
 		}
 	}
 
-	params, err := c.parser.Parse()
-	if err != nil {
-		return errors.Wrap(err, errParseInstallParameters)
-	}
 	err = c.mgr.Install(c.Version, params)
 	if err != nil {
 		return err
@@ -175,11 +191,9 @@ func (c *installCmd) applyLicense(ctx context.Context, ns string) error {
 		return errors.Wrap(err, errGetRegistryToken)
 	}
 
-	var v string
+	v := c.Version
 	if c.KeyVersionOverride != "" {
 		v = c.KeyVersionOverride
-	} else {
-		v = c.Version
 	}
 
 	acc, err := c.license.GetAccessKey(ctx, resp.AccessToken, v)
@@ -198,18 +212,49 @@ func (c *installCmd) applyLicense(ctx context.Context, ns string) error {
 	}
 
 	// Create license secret if it does not exist.
-	_, err = c.kClient.CoreV1().Secrets(ns).Create(
-		ctx,
-		secret,
-		metav1.CreateOptions{},
-	)
+	_, err = c.kClient.CoreV1().Secrets(ns).Create(ctx, secret, metav1.CreateOptions{})
 	if err != nil && kerrors.IsAlreadyExists(err) {
-		_, err = c.kClient.CoreV1().Secrets(ns).Update(
-			ctx,
-			secret,
-			metav1.UpdateOptions{},
-		)
+		_, err = c.kClient.CoreV1().Secrets(ns).Update(ctx, secret, metav1.UpdateOptions{})
 	}
 
 	return err
+}
+
+func (c *installCmd) applyImagePullSecret(ctx context.Context, ns string) error {
+	regAuth := &create.DockerConfigJSON{
+		Auths: map[string]create.DockerConfigEntry{
+			c.Registry.String(): {
+				Username: c.id,
+				Password: c.token,
+				Auth:     encodeDockerConfigFieldAuth(c.id, c.token),
+			},
+		},
+	}
+	regAuthJSON, err := json.Marshal(regAuth)
+	if err != nil {
+		return err
+	}
+	secret := &corev1.Secret{
+		ObjectMeta: metav1.ObjectMeta{
+			Name: defaultImagePullSecret,
+		},
+		Type: corev1.SecretTypeDockerConfigJson,
+		Data: map[string][]byte{
+			corev1.DockerConfigJsonKey: regAuthJSON,
+		},
+	}
+	_, err = c.kClient.CoreV1().Secrets(ns).Create(ctx, secret, metav1.CreateOptions{})
+	if err != nil && kerrors.IsAlreadyExists(err) {
+		_, err = c.kClient.CoreV1().Secrets(ns).Update(ctx, secret, metav1.UpdateOptions{})
+	}
+	return err
+}
+
+// encodeDockerConfigFieldAuth returns base64 encoding of the username and
+// password string
+// NOTE(hasheddan): this function comes directly from kubectl
+// https://github.com/kubernetes/kubectl/blob/0f88fc6b598b7e883a391a477215afb080ec7733/pkg/cmd/create/create_secret_docker.go#L305
+func encodeDockerConfigFieldAuth(username, password string) string {
+	fieldValue := username + ":" + password
+	return base64.StdEncoding.EncodeToString([]byte(fieldValue))
 }
