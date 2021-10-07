@@ -53,8 +53,7 @@ func (c *upgradeCmd) AfterApply(insCtx *install.Context) error {
 		helm.WithBasicAuth(id, token),
 		helm.IsOCI(),
 		helm.WithChart(c.Bundle),
-		helm.RollbackOnError(c.Rollback),
-		helm.Force(c.Force))
+		helm.RollbackOnError(c.Rollback))
 	if err != nil {
 		return err
 	}
@@ -88,7 +87,6 @@ type upgradeCmd struct {
 	Version string `arg:"" help:"Enterprise version to upgrade to."`
 
 	Rollback bool     `help:"Rollback to previously installed version on failed upgrade."`
-	Force    bool     `help:"Force upgrade even if versions are incompatible."`
 	Repo     *url.URL `hidden:"" env:"ENTERPRISE_REPO" default:"registry.upbound.io/enterprise" help:"Set repo for enterprise."`
 
 	install.CommonParams

@@ -4,7 +4,7 @@ This document outlines common workflows of `up` users while using the CLI. It
 serves as light documentation for users, but its primary purpose is to guide
 design decisions and feature implementations based on common user experience.
 
-## Upbound Cloud Login
+## Upbound Login
 
 > Though a variety of login methods are demonstrated below, users are highly
 > encouraged to provide sensitive data either interactively or by reading from
@@ -13,23 +13,23 @@ design decisions and feature implementations based on common user experience.
 Interactively be prompted for username and password:
 
 ```
-$ up cloud login
+$ up login
 ```
 
 Interactively be prompted for password:
 
 ```
-$ up cloud login -u hasheddan
+$ up login -u hasheddan
 ```
 
 Login with sensitive data from file:
 
 ```
-cat password.txt | up cloud login -u hasheddan -p -
+cat password.txt | up login -u hasheddan -p -
 ```
 
 ```
-cat token.txt | up cloud login -t -
+cat token.txt | up login -t -
 ```
 
 Login with data from environment variables:
@@ -38,58 +38,58 @@ Login with data from environment variables:
 export UP_USER=hasheddan
 export UP_PASSWORD=supersecret
 
-up cloud login -u hasheddan
+up login -u hasheddan
 ```
 
 ```
 export UP_TOKEN=supersecrettoken
 
-up cloud login
+up login
 ```
 
 Login with username and password:
 
 ```
-$ up cloud login --username=hasheddan --password=supersecret
+$ up login --username=hasheddan --password=supersecret
 ```
 
 Login with API token:
 
 ```
-$ up cloud login --token=supersecrettoken
+$ up login --token=supersecrettoken
 ```
 
 Login with specified profile name:
 
 ```
-$ up cloud login --profile=dev
+$ up login --profile=dev
 ```
 
 ```
-$ up cloud login --username=hasheddan --password=supersecret --profile=dev
+$ up login --username=hasheddan --password=supersecret --profile=dev
 ```
 
 ```
-$ up cloud login --token=supersecrettoken --profile=dev
+$ up login --token=supersecrettoken --profile=dev
 ```
 
 ## Hosted Control Plane
 
-Create hosted control plane on Upbound Cloud:
+Create hosted control plane in Upbound:
 
 ```
-$ up cloud controlplane create my-hosted-cp
+$ up controlplane create my-hosted-cp
 ```
 
 ```
-$ up cloud ctp create my-hosted-cp
+$ up ctp create my-hosted-cp
 ```
 
 ## Self-Hosted Control Plane
 
-Creating a self-hosted control plane on Upbound Cloud consists of three primary
-steps: installing UXP, creating a self-hosted control plane on Upbound Cloud
-(i.e. "attaching"), and connecting UXP to that control plane.
+Creating a self-hosted control plane in Upbound consists of three primary steps:
+installing UXP, creating a self-hosted control plane in Upbound (i.e.
+"attaching"), and connecting UXP to that control plane.
 
 ### Installing UXP
 
@@ -150,22 +150,22 @@ $ up uxp upgrade vX.Y.Z-up.N -n crossplane-system
 
 ### Attaching a Self-Hosted Control PLane
 
-Attach a self-hosted control plane on Upbound Cloud:
+Attach a self-hosted control plane in Upbound:
 
 ```
-$ up cloud controlplane attach my-self-hosted-cp
+$ up controlplane attach my-self-hosted-cp
 <control-plane-token>
 ```
 
 ```
-$ up cloud ctp attach my-self-hosted-cp
+$ up ctp attach my-self-hosted-cp
 <control-plane-token>
 ```
 
 Self-hosted control planes can be created with "view only" permissions:
 
 ```
-$ up cloud ctp attach my-self-hosted-cp --view-only
+$ up ctp attach my-self-hosted-cp --view-only
 <control-plane-token>
 ```
 
@@ -180,11 +180,11 @@ $ up uxp connect <control-plane-token>
 Most users pipe the attach command into the connect one:
 
 ```
-$ up cloud controlplane attach my-self-hosted-cp | up uxp connect -
+$ up controlplane attach my-self-hosted-cp | up uxp connect -
 ```
 
 ```
-$ up cloud ctp attach my-self-hosted-cp | up uxp connect -
+$ up ctp attach my-self-hosted-cp | up uxp connect -
 ```
 
 <!-- Named Links -->
