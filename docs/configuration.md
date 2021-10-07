@@ -6,8 +6,10 @@ configuration file in `~/.up/config.json`.
 
 ## Upbound Configuration
 
-Currently, only configuration information for interacting with Upbound is stored. The
-sections below detail the format and how to interact with it. In the future, additional configuration may be supported for managing UXP and package installations.
+Currently, only configuration information for interacting with Upbound is
+stored. The sections below detail the format and how to interact with it. In the
+future, additional configuration may be supported for managing UXP and package
+installations.
 
 ### Format
 

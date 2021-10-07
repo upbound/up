@@ -4,8 +4,8 @@
     <img align="right" style="margin-left: 20px" src="docs/media/logo.png" width=200 />
 </a>
 
-`up` is the official CLI for interacting with [Upbound Cloud] and [Universal
-Crossplane (UXP)].
+`up` is the official CLI for interacting with [Upbound Cloud], Upbound
+Enterprise, and [Universal Crossplane (UXP)].
 
 ## Install
 
@@ -39,20 +39,19 @@ curl -sLo up.rpm https://cli.upbound.io/stable/${VERSION}/rpm/linux_${ARCH}/up.r
 
 ## Setup
 
-Users typically begin by either logging in to [Upbound Cloud] or installing
-[UXP].
+Users typically begin by either logging in to Upbound or installing [UXP].
 
-### Upbound Cloud Login
+### Upbound Login
 
 `up` uses profiles to manage sets of credentials for interacting with [Upbound
-Cloud]. You can read more about how to manage multiple profiles in the
-[configuration documentation]. If no `--profile` flag is provided when logging
-in the profile designated as default will be updated, and if no profiles exist a
-new one will be created with name `default` and it will be designated as the
-default profile.
+Cloud] and Upbound Enterprise. You can read more about how to manage multiple
+profiles in the [configuration documentation]. If no `--profile` flag is
+provided when logging in the profile designated as default will be updated, and
+if no profiles exist a new one will be created with name `default` and it will
+be designated as the default profile.
 
 ```
-up cloud login
+up login
 ```
 
 ### Install Universal Crossplane
