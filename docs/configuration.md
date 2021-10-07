@@ -4,15 +4,15 @@
 that should be persisted between commands. `up` stores this information in a
 configuration file in `~/.up/config.json`.
 
-## Upbound Cloud Configuration
+## Upbound Configuration
 
-Currently, only configuration information for [Upbound Cloud] is stored. The
-sections below detail the format and how to interact with it.
+Currently, only configuration information for interacting with Upbound is stored. The
+sections below detail the format and how to interact with it. In the future, additional configuration may be supported for managing UXP and package installations.
 
 ### Format
 
 `up` allows users to define profiles that contain sets of preferences and
-credentials for interacting with [Upbound Cloud]. This enables easily executing
+credentials for interacting with Upbound. This enables easily executing
 commands as different users, or in different accounts. In the example below,
 five profiles are defined: `default`, `dev`, `staging`, `prod`, and `ci`. Any
 `up cloud` commands will use the specified profile when pass `--profile` or
@@ -21,7 +21,7 @@ profile specified as `default`, which in this case is actually named `default`.
 
 ```json
 {
-  "cloud": {
+  "upbound": {
     "default": "default",
     "profiles": {
       "default": {
@@ -57,14 +57,23 @@ profile specified as `default`, which in this case is actually named `default`.
 }
 ```
 
+### Specifying Upbound Instance
+
+Because Upbound offers both a hosted and self-hosted product, users may be
+logging in and interacting with [Upbound Cloud] or their own Upbound Enterprise
+installation. `up` assumes by default that a user is interacting with Upbound
+Cloud and will use `https://api.upbound.io` as the endpoint. However, all
+commands that interact with Upbound also accept an `--endpoint` / `UP_ENDPOINT`,
+which overrides the API endpoint.
+
 ### Adding or Updating Profile
 
-To add or update a profile, users can execute `up cloud login` with the
-appropriate credentials and a profile name specified. For instance, the
-following command would add a new profile named `test`:
+To add or update a profile, users can execute `up login` with the appropriate
+credentials and a profile name specified. For instance, the following command
+would add a new profile named `test`:
 
 ```
-up cloud login --profile test -u hasheddan -p cool-password
+up login --profile test -u hasheddan -p cool-password
 ```
 
 If no `--profile` is specified, the profile named `default` will be added or

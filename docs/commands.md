@@ -7,14 +7,12 @@ interacts.
 
 Groups:
 - [Top-Level](#top-level)
-- [Cloud](#cloud)
-  - [Control Plane](#subgroup-control-plane)
+- [Control Plane](#control-plane)
+- [Enterprise](#enterprise)
 - [UXP](#uxp)
 - [XPKG](#xpkg)
 
 ## Top-Level
-
-**Commands**
 
 Top-level commands do not belong in any subgroup, and are generally used to
 configure `up` itself.
@@ -24,20 +22,6 @@ Format: `up <cmd> ...`
 - `license`
     - Behavior: Prints license information for the `up` binary, which is under
       the [Upbound Software License].
-
-**Flags:**
-
-Top-level flags can be passed for any top-level or group-specific command.
-
-- `-h,--help`: Print help and exit.
-- `-v,--version`: Print current `up` version and exit.
-
-## Cloud
-
-Format: `up cloud <cmd> ...`
-
-Commands in the **Cloud** group are used to interact with Upbound Cloud.
-
 - `login`
     - Flags:
         - `-p,--password = STRING` (Env: `UP_PASS`): Password for specified
@@ -46,6 +30,14 @@ Commands in the **Cloud** group are used to interact with Upbound Cloud.
           perform the login. If `-` is given the value will be read from stdin.
         - `-u,--username = STRING` (Env: `UP_USER`): User with which to perform
           the login. Email can also be used as username.
+        - `-a,--account = STRING` (Env: `UP_ACCOUNT`): Account with which to
+          perform the specified command. Can be either an organization or a
+          personal account.
+        - `--endpoint = URL` (Env: `UP_ENDPOINT`) (Default:
+          `https://api.upbound.io`): Endpoint to use when communicating with the
+          Upbound API.
+        - `--profile = STRING` (Env: `UP_PROFILE`); Profile with which to
+          perform the specified command.
     - Behavior: Acquires a session token based on the provided information. If
       only username is provided, the user will be prompted for a password. If
       neither username or password is provided, the user will be prompted for
@@ -53,13 +45,51 @@ Commands in the **Cloud** group are used to interact with Upbound Cloud.
       acquired session token will be stored in `~/.up/config.json`. Interactive
       input is disabled if stdin is not an interactive terminal.
 - `logout`
+    - Flags:
+       - `-a,--account = STRING` (Env: `UP_ACCOUNT`): Account with which to
+          perform the specified command. Can be either an organization or a
+          personal account.
+        - `--endpoint = URL` (Env: `UP_ENDPOINT`) (Default:
+          `https://api.upbound.io`): Endpoint to use when communicating with the
+          Upbound API.
+        - `--profile = STRING` (Env: `UP_PROFILE`); Profile with which to
+          perform the specified command.
     - Behavior: Invalidates the session token for the default profile or one
       specified with `--profile`.
 
+**Flags:**
+
+Top-level flags can be passed for any top-level or group-specific command.
+
+- `-h,--help`: Print help and exit.
+- `-v,--version`: Print current `up` version and exit.
+
+## Control Plane
+
+Format: `up controlplane <cmd> ...` Alias: `up ctp <cmd> ...`
+
+- `attach <name>`
+    - Flags:
+      - `-d,--description = STRING`: Control plane description.
+      - `--view-only`: creates the self-hosted control plane as view only.
+    - Behavior: Creates a self-hosted control plane in Upbound and returns token
+      to connect a UXP instance to it. The name of the token is randomly
+      generated.
+- `create <name>`
+    - Flags:
+        - `--description = STRING`: Control plane description.
+    - Behavior: Creates a hosted control plane in Upbound.
+- `delete <id>`
+    - Behavior: Deletes a control plane in Upbound. If control plane is hosted,
+      the UXP cluster will be deleted. If the control plane is self-hosted, the
+      UXP cluster will begin failing to connect to Upbound.
+- `list`
+    - Behavior: Lists all control planes for the configured account.
+
 **Group Flags**
 
-Group flags can be passed for any command in the **Cloud** group. Some commands
-may choose not to utilize the group flags when not relevant.
+Group flags can be passed for any command in the **Control Plane** group. Some
+commands may choose not to utilize the group flags when not relevant.
 
 - `-a,--account = STRING` (Env: `UP_ACCOUNT`): Account with which to perform the
   specified command. Can be either an organization or a personal account.
@@ -68,33 +98,10 @@ may choose not to utilize the group flags when not relevant.
 - `--profile = STRING` (Env: `UP_PROFILE`); Profile with which to perform the
   specified command.
 
-### Subgroup: Control Plane
-
-Format: `up cloud controlplane <cmd> ...` Alias: `up cloud ctp <cmd> ...`
-
-- `attach <name>`
-    - Flags:
-      - `-d,--description = STRING`: Control plane description.
-      - `--view-only`: creates the self-hosted control plane as view only.
-    - Behavior: Creates a self-hosted control plane on Upbound Cloud and returns
-      token to connect a UXP instance to it. The name of the token is randomly
-      generated.
-- `create <name>`
-    - Flags:
-        - `--description = STRING`: Control plane description.
-    - Behavior: Creates a hosted control plane on Upbound Cloud.
-- `delete <id>`
-    - Behavior: Deletes a control plane on Upbound Cloud. If control plane is
-      hosted, the UXP cluster will be deleted. If the control plane is
-      self-hosted, the UXP cluster will begin failing to connect to Upbound
-      Cloud.
-- `list`
-    - Behavior: Lists all control planes for the
-      configured account.
-
 **Subgroup: Kubeconfig**
 
-Format: `up cloud controlplane kubeconfig <cmd> ...` Alias: `up cloud ctp kubeconfig <cmd>...`
+Format: `up controlplane kubeconfig <cmd> ...` Alias: `up ctp kubeconfig
+<cmd>...`
 
 - `get <control-plane-ID>`
     - Flags:
@@ -112,7 +119,7 @@ Format: `up cloud controlplane kubeconfig <cmd> ...` Alias: `up cloud ctp kubeco
 
 **Subgroup: Token**
 
-Format: `up cloud controlplane token <cmd> ...` Alias: `up cloud ctp token <cmd>...`
+Format: `up controlplane token <cmd> ...` Alias: `up ctp token <cmd>...`
 
 - `create <control-plane-ID>`
     - Flags:
@@ -125,12 +132,65 @@ Format: `up cloud controlplane token <cmd> ...` Alias: `up cloud ctp token <cmd>
 - `list <control-plane-ID>`
     - Behavior: Lists all tokens for the specified control plane.
 
+## Enterprise
+
+Format: `up enterprise <cmd> ...`
+
+Commands in the **Enterprise** group are used to install and manage Upbound
+Enterprise - a self-hosted, single-tenant Upbound instance. Installing and
+upgrading Upbound Enterprise requires an Upbound customer license. Users will be
+prompted for their License ID and Token on installation.
+
+- `install <version>`
+    - Flags:
+        - `--license-secret-name = STRING` (Default:
+          `upbound-enterprise-license`): Allows setting the name of the license
+          `Secret` that is created on installation. The default value is
+          expected, so passing an alternate value for this flag usually requires
+          modifying the installation configuration using one of the following
+          flags.
+        - `--set = KEY=VALUE`: Set install parameters for Upbound Enterprise.
+          Flag can be passed multiple times and multiple key-value pairs can be
+          provided in a comma-separated list.
+        - `-f,--file = FILE`: YAML file with parameters for Upbound Enterprise
+          install. Follows format of Helm-style values file.
+    - Behavior: Installs Upbound Enterprise into cluster specified by currently
+      configured `kubeconfig`. When using Helm as install engine, the command
+      mirrors the behavior of `helm install`. If `[version]` is not provided,
+      the latest chart version will be used from the either the stable or
+      unstable repository.
+- `upgrade <version>` 
+    - Flags:
+        - `--rollback = BOOL`: Indicates that the upgrade should be rolled back
+          in case of failure.
+        - `--set = KEY=VALUE`: Set install parameters for Upbound Enterprise.
+          Flag can be passed multiple times and multiple key-value pairs can be
+          provided in a comma-separated list.
+        - `-f,--file = FILE`: YAML file with parameters for Upbound Enterprise
+          install. Follows format of Helm-style values file.
+    - Behavior: Upgrades Upbound Enterprise in cluster specified by currently
+      configured `kubeconfig` in the specified namespace.
+- `uninstall` 
+    - Behavior: Uninstalls Upbound Enterprise from the cluster specified by
+      currently configured `kubeconfig`.
+
+**Group Flags**
+
+Group flags can be passed for any command in the **Enterprise** group. Some
+commands may choose not to utilize the group flags when not relevant.
+
+- `--kubeconfig = STRING`: sets `kubeconfig` path. Same defaults as `kubectl`
+  are used if not provided.
+- `-n,--namespace = STRING` (Env: `ENTERPRISE_NAMESPACE`) (Default:
+  `upbound-enterprise`): Kubernetes namespace used for installing and managing
+  Upbound Enterprise.
+
 ## UXP
 
 Format: `up uxp <cmd> ...`
 
 Commands in the **UXP** group are used to install and manage Upbound Universal
-Crossplane, as well as connect it to Upbound Cloud.
+Crossplane, as well as connect it to Upbound.
 
 - `install [version]`
     - Flags:
