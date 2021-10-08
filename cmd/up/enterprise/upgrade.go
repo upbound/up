@@ -15,15 +15,19 @@
 package enterprise
 
 import (
+	"context"
 	"io"
-	"net/url"
 
 	"github.com/pkg/errors"
+	"k8s.io/client-go/kubernetes"
 	"sigs.k8s.io/yaml"
 
+	"github.com/upbound/up/internal/auth"
 	"github.com/upbound/up/internal/input"
 	"github.com/upbound/up/internal/install"
 	"github.com/upbound/up/internal/install/helm"
+	"github.com/upbound/up/internal/kube"
+	"github.com/upbound/up/internal/license"
 )
 
 const (
@@ -46,6 +50,26 @@ func (c *upgradeCmd) AfterApply(insCtx *install.Context) error {
 	if err != nil {
 		return err
 	}
+	c.id = id
+	c.token = token
+	client, err := kubernetes.NewForConfig(insCtx.Kubeconfig)
+	if err != nil {
+		return err
+	}
+	secret := kube.NewSecretApplicator(client)
+	c.pullSecret = newImagePullApplicator(secret)
+	auth := auth.NewProvider(
+		auth.WithBasicAuth(id, token),
+		auth.WithEndpoint(c.Registry),
+		auth.WithOrgID(c.OrgID),
+		auth.WithProductID(c.ProductID),
+	)
+	license := license.NewProvider(
+		license.WithEndpoint(c.DMV),
+		license.WithOrgID(c.OrgID),
+		license.WithProductID(c.ProductID),
+	)
+	c.access = newAccessKeyApplicator(auth, license, secret)
 	ins, err := helm.NewManager(insCtx.Kubeconfig,
 		enterpriseChart,
 		c.Repo,
@@ -78,25 +102,49 @@ func (c *upgradeCmd) AfterApply(insCtx *install.Context) error {
 
 // upgradeCmd upgrades enterprise.
 type upgradeCmd struct {
-	mgr      install.Manager
-	parser   install.ParameterParser
-	prompter input.Prompter
+	mgr        install.Manager
+	parser     install.ParameterParser
+	prompter   input.Prompter
+	access     *accessKeyApplicator
+	pullSecret *imagePullApplicator
+	id         string
+	token      string
 
 	// NOTE(hasheddan): version is currently required for upgrade with OCI image
 	// as latest strategy is undetermined.
 	Version string `arg:"" help:"Enterprise version to upgrade to."`
 
-	Rollback bool     `help:"Rollback to previously installed version on failed upgrade."`
-	Repo     *url.URL `hidden:"" env:"ENTERPRISE_REPO" default:"registry.upbound.io/enterprise" help:"Set repo for enterprise."`
+	Rollback bool `help:"Rollback to previously installed version on failed upgrade."`
 
+	commonParams
 	install.CommonParams
 }
 
 // Run executes the upgrade command.
 func (c *upgradeCmd) Run(insCtx *install.Context) error {
+	ctx, cancel := context.WithTimeout(context.Background(), defaultTimeout)
+	defer cancel()
+
 	params, err := c.parser.Parse()
 	if err != nil {
 		return errors.Wrap(err, errParseUpgradeParameters)
 	}
+
+	// Create or update image pull secret.
+	if err := c.pullSecret.apply(ctx, defaultImagePullSecret, insCtx.Namespace, c.id, c.token, c.Registry.String()); err != nil {
+		return errors.Wrap(err, errCreateImagePullSecret)
+	}
+
+	// Create or update access key secret unless skip license is specified.
+	if !c.SkipLicense {
+		keyVersion := c.Version
+		if c.KeyVersionOverride != "" {
+			keyVersion = c.KeyVersionOverride
+		}
+		if err := c.access.apply(ctx, c.LicenseSecretName, insCtx.Namespace, keyVersion); err != nil {
+			return errors.Wrap(err, errCreateLicenseSecret)
+		}
+	}
+
 	return c.mgr.Upgrade(c.Version, params)
 }
