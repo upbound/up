@@ -6,17 +6,19 @@ require (
 	github.com/Masterminds/semver v1.5.0
 	github.com/Masterminds/semver/v3 v3.1.1
 	github.com/alecthomas/kong v0.2.17
-	github.com/crossplane/crossplane v1.2.2
-	github.com/crossplane/crossplane-runtime v0.14.0
+	github.com/crossplane/crossplane v1.5.0
+	github.com/crossplane/crossplane-runtime v0.15.1-0.20210913015452-6a7a44ac50aa
 	github.com/docker/docker v20.10.7+incompatible
+	github.com/ghodss/yaml v1.0.0
 	github.com/golang-jwt/jwt v3.2.1+incompatible
 	github.com/google/addlicense v0.0.0-20210428195630-6d92264d7170
 	github.com/google/go-cmp v0.5.6
 	github.com/google/go-containerregistry v0.6.0
 	github.com/google/uuid v1.2.0
 	github.com/goreleaser/nfpm/v2 v2.5.1
-	github.com/mattn/go-colorable v0.1.8 // indirect
 	github.com/pkg/errors v0.9.1
+	github.com/sourcegraph/go-lsp v0.0.0-20200429204803-219e11d77f5d
+	github.com/sourcegraph/jsonrpc2 v0.1.0
 	github.com/spf13/afero v1.6.0
 	github.com/spf13/cobra v1.2.1
 	github.com/upbound/up-sdk-go v0.1.0
@@ -28,7 +30,7 @@ require (
 	k8s.io/cli-runtime v0.22.1
 	k8s.io/client-go v0.22.1
 	k8s.io/kubectl v0.22.1
-	sigs.k8s.io/controller-runtime v0.8.0
+	sigs.k8s.io/controller-runtime v0.9.6
 	sigs.k8s.io/yaml v1.2.0
 )
 
