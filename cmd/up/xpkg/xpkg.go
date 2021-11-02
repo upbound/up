@@ -17,5 +17,6 @@ package xpkg
 // Cmd contains commands for interacting with xpkgs.
 type Cmd struct {
 	Build buildCmd `cmd:"" group:"xpkg" help:"Build a package."`
+	Init  initCmd  `cmd:"" group:"xpkg" help:"Initialize a package."`
 	Push  pushCmd  `cmd:"" group:"xpkg" help:"Push a package."`
 }

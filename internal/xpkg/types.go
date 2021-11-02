@@ -12,9 +12,24 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-package xpls
+package xpkg
 
-// Cmd --
-type Cmd struct {
-	Serve serveCmd `cmd:"" group:"xpls" help:"run a server for Crossplane definitions using the Language Server Protocol."`
+// Package represents the types of packages we support.
+type Package string
+
+const (
+	// Configuration represents a configuration package.
+	Configuration Package = "configuration"
+	// Provider represents a provider package.
+	Provider Package = "provider"
+)
+
+// IsValid is a helper function for determining if the Package
+// is a valid type of package.
+func (p Package) IsValid() bool {
+	switch p {
+	case Configuration, Provider:
+		return true
+	}
+	return false
 }
