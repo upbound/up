@@ -1,0 +1,418 @@
+// Copyright 2021 Upbound Inc
+//
+// Licensed under the Apache License, Version 2.0 (the "License");
+// you may not use this file except in compliance with the License.
+// You may obtain a copy of the License at
+//
+//      http://www.apache.org/licenses/LICENSE-2.0
+//
+// Unless required by applicable law or agreed to in writing, software
+// distributed under the License is distributed on an "AS IS" BASIS,
+// WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+// See the License for the specific language governing permissions and
+// limitations under the License.
+
+package dep
+
+import (
+	"syscall"
+	"testing"
+
+	"github.com/google/go-cmp/cmp"
+	"github.com/google/go-cmp/cmp/cmpopts"
+	"github.com/pkg/errors"
+	"github.com/spf13/afero"
+	"k8s.io/utils/pointer"
+
+	"github.com/crossplane/crossplane-runtime/pkg/test"
+	metav1 "github.com/crossplane/crossplane/apis/pkg/meta/v1"
+	apimetav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+)
+
+func TestUpsert(t *testing.T) {
+	type args struct {
+		fs       afero.Fs
+		metaFile metav1.Pkg
+		dep      metav1.Dependency
+	}
+
+	type want struct {
+		deps []metav1.Dependency
+		err  error
+	}
+
+	cases := map[string]struct {
+		reason string
+		args   args
+		want   want
+	}{
+		"AddEntryNoPrior": {
+			reason: "Should not return an error if package is created at path.",
+			args: args{
+				fs:  afero.NewMemMapFs(),
+				dep: New("crossplane/provider-gcp@v1.0.0"),
+				metaFile: &metav1.Configuration{
+					TypeMeta: apimetav1.TypeMeta{
+						APIVersion: "meta.pkg.crossplane.io/v1",
+						Kind:       "Configuration",
+					},
+					ObjectMeta: apimetav1.ObjectMeta{
+						Name: "getting-started-with-aws",
+					},
+					Spec: metav1.ConfigurationSpec{
+						MetaSpec: metav1.MetaSpec{
+							Crossplane: &metav1.CrossplaneConstraints{
+								Version: ">=1.0.0-0",
+							},
+						},
+					},
+				},
+			},
+			want: want{
+				deps: []metav1.Dependency{
+					{
+						Provider: pointer.String("crossplane/provider-gcp"),
+						Version:  "v1.0.0",
+					},
+				},
+			},
+		},
+		"InsertNewEntry": {
+			reason: "Should not return an error if package is created at path.",
+			args: args{
+				fs:  afero.NewMemMapFs(),
+				dep: New("crossplane/provider-gcp@v1.0.0"),
+				metaFile: &metav1.Provider{
+					TypeMeta: apimetav1.TypeMeta{
+						APIVersion: "meta.pkg.crossplane.io/v1",
+						Kind:       "Configuration",
+					},
+					ObjectMeta: apimetav1.ObjectMeta{
+						Name: "getting-started-with-aws",
+					},
+					Spec: metav1.ProviderSpec{
+						MetaSpec: metav1.MetaSpec{
+							Crossplane: &metav1.CrossplaneConstraints{
+								Version: ">=1.0.0-0",
+							},
+							DependsOn: []metav1.Dependency{
+								{
+									Provider: pointer.String("crossplane/provider-aws"),
+									Version:  ">=1.0.5",
+								},
+							},
+						},
+					},
+				},
+			},
+			want: want{
+				deps: []metav1.Dependency{
+					{
+						Provider: pointer.String("crossplane/provider-aws"),
+						Version:  ">=1.0.5",
+					},
+					{
+						Provider: pointer.String("crossplane/provider-gcp"),
+						Version:  "v1.0.0",
+					},
+				},
+			},
+		},
+	}
+
+	for name, tc := range cases {
+		t.Run(name, func(t *testing.T) {
+			// init workspace that is specific to this test
+			ws := newTestWS(tc.args.fs)
+			// write the meta file to the fs
+			_ = ws.writeMetaPkg(tc.args.metaFile)
+
+			err := ws.Upsert(tc.args.dep)
+
+			if diff := cmp.Diff(tc.want.err, err, test.EquateErrors()); diff != "" {
+				t.Errorf("\n%s\nUpsert(...): -want err, +got err:\n%s", tc.reason, diff)
+			}
+
+			p, _ := ws.readPkgMeta()
+
+			resultDeps := p.GetDependencies()
+
+			if diff := cmp.Diff(tc.want.deps, resultDeps, cmpopts.SortSlices(func(i, j int) bool {
+				return *resultDeps[i].Provider < *resultDeps[j].Provider
+			})); diff != "" {
+				t.Errorf("\n%s\nUpsert(...): -want err, +got err:\n%s", tc.reason, diff)
+			}
+
+		})
+	}
+}
+
+func TestUpsertDeps(t *testing.T) {
+	type args struct {
+		dep metav1.Dependency
+		pkg metav1.Pkg
+	}
+
+	type want struct {
+		deps []metav1.Dependency
+		err  error
+	}
+
+	cases := map[string]struct {
+		reason string
+		args   args
+		want   want
+	}{
+		"EmptyDependencyList": {
+			reason: "Should return an updated deps list with the included provider.",
+			args: args{
+				dep: New("crossplane/provider-aws@v1.0.0"),
+				pkg: &metav1.Configuration{
+					Spec: metav1.ConfigurationSpec{
+						MetaSpec: metav1.MetaSpec{
+							DependsOn: []metav1.Dependency{},
+						},
+					},
+				},
+			},
+			want: want{
+				deps: []metav1.Dependency{
+					{
+						Provider: pointer.StringPtr("crossplane/provider-aws"),
+						Version:  "v1.0.0",
+					},
+				},
+			},
+		},
+		"InsertIntoDependencyList": {
+			reason: "Should return an updated deps list with 2 entries.",
+			args: args{
+				dep: New("crossplane/provider-gcp@v1.0.1"),
+				pkg: &metav1.Configuration{
+					Spec: metav1.ConfigurationSpec{
+						MetaSpec: metav1.MetaSpec{
+							DependsOn: []metav1.Dependency{
+								{
+									Provider: pointer.String("crossplane/provider-aws"),
+									Version:  "v1.0.0",
+								},
+							},
+						},
+					},
+				},
+			},
+			want: want{
+				deps: []metav1.Dependency{
+					{
+						Provider: pointer.String("crossplane/provider-aws"),
+						Version:  "v1.0.0",
+					},
+					{
+						Provider: pointer.String("crossplane/provider-gcp"),
+						Version:  "v1.0.1",
+					},
+				},
+			},
+		},
+		"UpdateDependencyList": {
+			reason: "Should return an updated deps list with the provider version updated.",
+			args: args{
+				dep: New("crossplane/provider-aws@v1.0.1"),
+				pkg: &metav1.Provider{
+					Spec: metav1.ProviderSpec{
+						MetaSpec: metav1.MetaSpec{
+							DependsOn: []metav1.Dependency{
+								{
+									Provider: pointer.String("crossplane/provider-aws"),
+									Version:  "v1.0.0",
+								},
+							},
+						},
+					},
+				},
+			},
+			want: want{
+				deps: []metav1.Dependency{
+					{
+						Provider: pointer.String("crossplane/provider-aws"),
+						Version:  "v1.0.1",
+					},
+				},
+			},
+		},
+		"UseDefaultTag": {
+			reason: "Should return an error indicating the package name is invalid.",
+			args: args{
+				dep: New("crossplane/provider-aws"),
+				pkg: &metav1.Provider{
+					Spec: metav1.ProviderSpec{
+						MetaSpec: metav1.MetaSpec{
+							DependsOn: []metav1.Dependency{
+								{
+									Provider: pointer.String("crossplane/provider-aws"),
+									Version:  "v1.0.0",
+								},
+							},
+						},
+					},
+				},
+			},
+			want: want{
+				deps: []metav1.Dependency{
+					{
+						Provider: pointer.String("crossplane/provider-aws"),
+						Version:  defaultVer,
+					},
+				},
+			},
+		},
+	}
+
+	for name, tc := range cases {
+		t.Run(name, func(t *testing.T) {
+
+			err := upsertDeps(tc.args.dep, tc.args.pkg)
+
+			if diff := cmp.Diff(tc.want.err, err, test.EquateErrors()); diff != "" {
+				t.Errorf("\n%s\nUpsertDeps(...): -want err, +got err:\n%s", tc.reason, diff)
+			}
+
+			if tc.args.pkg != nil {
+				if diff := cmp.Diff(tc.want.deps, tc.args.pkg.GetDependencies()); diff != "" {
+					t.Errorf("\n%s\nUpsertDeps(...): -want err, +got err:\n%s", tc.reason, diff)
+				}
+			}
+		})
+	}
+}
+
+func TestRWMetaFile(t *testing.T) {
+
+	cfgMetaFile := &metav1.Configuration{
+		TypeMeta: apimetav1.TypeMeta{
+			APIVersion: "meta.pkg.crossplane.io/v1",
+			Kind:       "Configuration",
+		},
+		ObjectMeta: apimetav1.ObjectMeta{
+			Name: "getting-started-with-aws",
+		},
+		Spec: metav1.ConfigurationSpec{
+			MetaSpec: metav1.MetaSpec{
+				Crossplane: &metav1.CrossplaneConstraints{
+					Version: ">=1.0.0-0",
+				},
+				DependsOn: []metav1.Dependency{
+					{
+						Provider: pointer.String("crossplane/provider-aws"),
+						Version:  "v1.0.0",
+					},
+				},
+			},
+		},
+	}
+
+	providerMetaFile := &metav1.Provider{
+		TypeMeta: apimetav1.TypeMeta{
+			APIVersion: "meta.pkg.crossplane.io/v1",
+			Kind:       "Provider",
+		},
+		ObjectMeta: apimetav1.ObjectMeta{
+			Name: "getting-started-with-aws",
+		},
+		Spec: metav1.ProviderSpec{
+			Controller: metav1.ControllerSpec{
+				Image: "crossplane/provider-aws",
+			},
+			MetaSpec: metav1.MetaSpec{
+				Crossplane: &metav1.CrossplaneConstraints{
+					Version: ">=1.0.0-0",
+				},
+				DependsOn: []metav1.Dependency{
+					{
+						Provider: pointer.String("crossplane/provider-aws"),
+						Version:  "v1.0.0",
+					},
+				},
+			},
+		},
+	}
+
+	type args struct {
+		fs       afero.Fs
+		metaFile metav1.Pkg
+	}
+
+	type want struct {
+		metaFile  metav1.Pkg
+		readErr   error
+		writerErr error
+	}
+
+	cases := map[string]struct {
+		reason string
+		args   args
+		want   want
+	}{
+		"NoPriorCfgFile": {
+			reason: "Should create file and read it back in without modification.",
+			args: args{
+				fs:       afero.NewMemMapFs(),
+				metaFile: cfgMetaFile,
+			},
+			want: want{
+				metaFile: cfgMetaFile,
+			},
+		},
+		"NoPriorProviderFile": {
+			reason: "Should create file and read it back in without modification.",
+			args: args{
+				fs:       afero.NewMemMapFs(),
+				metaFile: providerMetaFile,
+			},
+			want: want{
+				metaFile: providerMetaFile,
+			},
+		},
+		"ErrReturnedWhenCannotWrite": {
+			reason: "Should return an error if we cannot write to the fs.",
+			args: args{
+				fs:       afero.NewReadOnlyFs(afero.NewMemMapFs()),
+				metaFile: providerMetaFile,
+			},
+			want: want{
+				writerErr: syscall.EPERM,
+				readErr:   errors.Wrap(errors.New("open /Users/tnthornton/codez/up-ls/internal/dep: file does not exist"), errInitBackend),
+			},
+		},
+	}
+
+	for name, tc := range cases {
+		t.Run(name, func(t *testing.T) {
+			// init workspace that is specific to this test
+			ws := newTestWS(tc.args.fs)
+
+			err := ws.writeMetaPkg(tc.args.metaFile)
+
+			if diff := cmp.Diff(tc.want.writerErr, err, test.EquateErrors()); diff != "" {
+				t.Errorf("\n%s\nRWMetaFile(...): -want err, +got err:\n%s", tc.reason, diff)
+			}
+
+			// read meta file
+			pkg, err := ws.readPkgMeta()
+			if diff := cmp.Diff(tc.want.readErr, err, test.EquateErrors()); diff != "" {
+				t.Errorf("\n%s\nRWMetaFile(...): -want err, +got err:\n%s", tc.reason, diff)
+			}
+
+			if diff := cmp.Diff(tc.want.metaFile, pkg); diff != "" {
+				t.Errorf("\n%s\nRWMetaFile(...): -want err, +got err:\n%s", tc.reason, diff)
+			}
+
+		})
+	}
+}
+
+func newTestWS(fs afero.Fs) *Workspace {
+	ws := NewWorkspace(fs)
+	ws.Init()
+	return ws
+}

@@ -14,10 +14,26 @@
 
 package xpkg
 
-// Cmd contains commands for interacting with xpkgs.
-type Cmd struct {
-	Build buildCmd `cmd:"" group:"xpkg" help:"Build a package."`
-	Init  initCmd  `cmd:"" group:"xpkg" help:"Initialize a package."`
-	Dep   depCmd   `cmd:"" group:"xpkg" help:"Manage package dependencies."`
-	Push  pushCmd  `cmd:"" group:"xpkg" help:"Push a package."`
+import (
+	"strings"
+
+	"github.com/google/go-containerregistry/pkg/name"
+	"github.com/pkg/errors"
+)
+
+const (
+	errInvalidPkgName = "invalid package dependency supplied"
+)
+
+// ValidDep --
+func ValidDep(pkg string) (bool, error) {
+
+	upkg := strings.ReplaceAll(pkg, "@", ":")
+
+	_, err := name.ParseReference(upkg)
+	if err != nil {
+		return false, errors.Wrap(err, errInvalidPkgName)
+	}
+
+	return true, nil
 }
