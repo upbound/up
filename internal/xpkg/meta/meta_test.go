@@ -12,10 +12,11 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-package templates
+package meta
 
 import (
 	"errors"
+	"fmt"
 	"testing"
 
 	"github.com/crossplane/crossplane-runtime/pkg/test"
@@ -45,7 +46,9 @@ func TestConfigTemplate(t *testing.T) {
 			want: []byte(`apiVersion: meta.pkg.crossplane.io/v1
 kind: Configuration
 metadata:
-  name: test`),
+  name: test
+spec: {}
+`),
 			err: nil,
 		},
 		"NameNotProvided": {
@@ -66,7 +69,8 @@ metadata:
   name: test
 spec:
   crossplane:
-    version: >=v1.0.0-1`),
+    version: '>=v1.0.0-1'
+`),
 			err: nil,
 		},
 		"DependsOnProvidedNoCrossplaneVersion": {
@@ -86,8 +90,9 @@ metadata:
   name: test
 spec:
   dependsOn:
-    - provider: crossplane/provider-aws
-      version: >=v0.14.0`),
+  - provider: crossplane/provider-aws
+    version: '>=v0.14.0'
+`),
 			err: nil,
 		},
 		"MultipleDependsOnProvidedNoCrossplaneVersion": {
@@ -111,10 +116,11 @@ metadata:
   name: test
 spec:
   dependsOn:
-    - provider: crossplane/provider-aws
-      version: >=v0.14.0
-    - provider: crossplane/provider-gcp
-      version: >=v0.15.0`),
+  - provider: crossplane/provider-aws
+    version: '>=v0.14.0'
+  - provider: crossplane/provider-gcp
+    version: '>=v0.15.0'
+`),
 			err: nil,
 		},
 		"MultipleDependsOnProvidedCrossplaneVersionProvided": {
@@ -139,12 +145,13 @@ metadata:
   name: test
 spec:
   crossplane:
-    version: >=v1.0.0-1
+    version: '>=v1.0.0-1'
   dependsOn:
-    - provider: crossplane/provider-aws
-      version: >=v0.14.0
-    - provider: crossplane/provider-gcp
-      version: >=v0.15.0`),
+  - provider: crossplane/provider-aws
+    version: '>=v0.14.0'
+  - provider: crossplane/provider-gcp
+    version: '>=v0.15.0'
+`),
 			err: nil,
 		},
 	}
@@ -152,6 +159,8 @@ spec:
 	for name, tc := range cases {
 		t.Run(name, func(t *testing.T) {
 			got, err := NewConfigXPkg(tc.ctx)
+
+			fmt.Println(string(got))
 
 			if diff := cmp.Diff(tc.err, err, test.EquateErrors()); diff != "" {
 				t.Errorf("\n%s\nNewConfigXPkg(...): -want error, +got error:\n%s", tc.reason, diff)
@@ -198,7 +207,8 @@ metadata:
   name: test
 spec:
   controller:
-    image: docker.io/provider-aws-controller:v1.0.0`),
+    image: docker.io/provider-aws-controller:v1.0.0
+`),
 		},
 		"NameAndControllerImageAndCrossplaneConstraint": {
 			reason: "We should return a Provider with name, controller image, and crossplane constraint filled in.",
@@ -212,10 +222,11 @@ kind: Provider
 metadata:
   name: test
 spec:
-  crossplane:
-    version: >=1.0.1-0
   controller:
-    image: docker.io/provider-aws-controller:v1.0.0`),
+    image: docker.io/provider-aws-controller:v1.0.0
+  crossplane:
+    version: '>=1.0.1-0'
+`),
 		},
 	}
 

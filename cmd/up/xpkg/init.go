@@ -25,7 +25,7 @@ import (
 
 	"github.com/upbound/up/internal/input"
 	"github.com/upbound/up/internal/xpkg"
-	"github.com/upbound/up/internal/xpkg/templates"
+	"github.com/upbound/up/internal/xpkg/meta"
 )
 
 const (
@@ -97,12 +97,12 @@ func (c *initCmd) Run() error {
 	fileBody := []byte{}
 	switch c.Type {
 	case string(xpkg.Configuration):
-		fileBody, err = templates.NewConfigXPkg(c.ctx)
+		fileBody, err = meta.NewConfigXPkg(c.ctx)
 		if err != nil {
 			return err
 		}
 	case string(xpkg.Provider):
-		fileBody, err = templates.NewProviderXPkg(c.ctx)
+		fileBody, err = meta.NewProviderXPkg(c.ctx)
 		if err != nil {
 			return err
 		}
