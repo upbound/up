@@ -41,9 +41,9 @@ import (
 // paths to extract GVK and name from objects that conform to Kubernetes
 // standard.
 var (
-	gvPath *yaml.Path
-	kPath  *yaml.Path
-	nPath  *yaml.Path
+	gvPath   *yaml.Path
+	kindPath *yaml.Path
+	namePath *yaml.Path
 )
 
 // builds static YAML path strings ahead of usage.
@@ -53,11 +53,11 @@ func init() {
 	if err != nil {
 		panic(err)
 	}
-	kPath, err = yaml.PathString("$.kind")
+	kindPath, err = yaml.PathString("$.kind")
 	if err != nil {
 		panic(err)
 	}
-	nPath, err = yaml.PathString("$.metadata.name")
+	namePath, err = yaml.PathString("$.metadata.name")
 	if err != nil {
 		panic(err)
 	}
@@ -199,25 +199,28 @@ func (w *Workspace) parseFile(path string) error {
 		if err != nil {
 			return err
 		}
-		if gvNode.GetToken() == nil {
+		gvTok := gvNode.GetToken()
+		if gvTok == nil {
 			continue
 		}
-		kNode, err := kPath.FilterNode(doc.Body)
+		kindNode, err := kindPath.FilterNode(doc.Body)
 		if err != nil {
 			return err
 		}
-		if kNode.GetToken() == nil {
+		kindTok := kindNode.GetToken()
+		if kindTok == nil {
 			continue
 		}
-		nNode, err := nPath.FilterNode(doc.Body)
+		nameNode, err := namePath.FilterNode(doc.Body)
 		if err != nil {
 			return err
 		}
-		if nNode.GetToken() == nil {
+		nameTok := nameNode.GetToken()
+		if nameTok == nil {
 			continue
 		}
-		gvk := schema.FromAPIVersionAndKind(gvNode.GetToken().Value, kNode.GetToken().Value)
-		w.nodes[nodeID(nNode.GetToken().Value, gvk)] = &PackageNode{
+		gvk := schema.FromAPIVersionAndKind(gvTok.Value, kindTok.Value)
+		w.nodes[nodeID(nameTok.Value, gvk)] = &PackageNode{
 			ast:      doc.Body,
 			fileName: path,
 			gvk:      gvk,
@@ -244,7 +247,7 @@ func AllNodes(nodes map[NodeIdentifier]Node) []Node {
 // for any validation errors encountered.
 // TODO(hasheddan): consider decoupling forming diagnostics from getting
 // validation errors.
-func (w *Workspace) Validate(fn NodeFilterFn) ([]lsp.Diagnostic, error) {
+func (w *Workspace) Validate(fn NodeFilterFn) ([]lsp.Diagnostic, error) { // nolint:gocyclo
 	w.mu.RLock()
 	defer w.mu.RUnlock()
 	diags := []lsp.Diagnostic{}
@@ -308,7 +311,7 @@ func (w *Workspace) Validate(fn NodeFilterFn) ([]lsp.Diagnostic, error) {
 // TODO(hasheddan): we currently assume that the cache holds objects in their
 // CRD form, but it is more likely that we will need to extract them from
 // packages.
-func validatorsFromDir(path string) (map[schema.GroupVersionKind]*validate.SchemaValidator, error) {
+func validatorsFromDir(path string) (map[schema.GroupVersionKind]*validate.SchemaValidator, error) { // nolint:gocyclo
 	validators := map[schema.GroupVersionKind]*validate.SchemaValidator{}
 	if err := fs.WalkDir(os.DirFS(path), ".", func(p string, d fs.DirEntry, err error) error {
 		if err != nil {
@@ -317,8 +320,13 @@ func validatorsFromDir(path string) (map[schema.GroupVersionKind]*validate.Schem
 		if d.IsDir() {
 			return nil
 		}
-		f, err := os.Open(filepath.Join(path, p))
-		defer f.Close()
+		// NOTE(hasheddan): filepath.Join cleans result, so we ignore gosec
+		// warning here.
+		f, err := os.Open(filepath.Join(path, p)) // nolint:gosec
+		if err != nil {
+			return err
+		}
+		defer f.Close() // nolint:errcheck,gosec
 		yr := apimachyaml.NewYAMLReader(bufio.NewReader(f))
 		for {
 			b, err := yr.Read()

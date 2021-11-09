@@ -19,8 +19,9 @@ import (
 
 	"github.com/crossplane/crossplane-runtime/pkg/logging"
 	"github.com/sourcegraph/jsonrpc2"
-	"github.com/upbound/up/internal/xpls"
 	"sigs.k8s.io/controller-runtime/pkg/log/zap"
+
+	"github.com/upbound/up/internal/xpls"
 )
 
 // serveCmd starts the language server.

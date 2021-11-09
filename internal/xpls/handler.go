@@ -42,7 +42,7 @@ const (
 // HomeDirFn indicates the location of a user's home directory.
 type HomeDirFn func() (string, error)
 
-// A handler handles LSP requests.
+// A Handler handles LSP requests.
 type Handler struct {
 	root      string
 	cacheDir  string
@@ -100,7 +100,7 @@ func NewHandler(opts ...HandlerOpt) (*Handler, error) {
 }
 
 // Handle handles LSP requests. It panics if we cannot initialize the workspace.
-func (h *Handler) Handle(ctx context.Context, c *jsonrpc2.Conn, r *jsonrpc2.Request) {
+func (h *Handler) Handle(ctx context.Context, c *jsonrpc2.Conn, r *jsonrpc2.Request) { // nolint:gocyclo
 	log := h.log.WithValues("request", r)
 	switch r.Method {
 	case "initialize":
@@ -170,7 +170,7 @@ func (h *Handler) Handle(ctx context.Context, c *jsonrpc2.Conn, r *jsonrpc2.Requ
 			URI:         params.TextDocument.URI,
 			Diagnostics: diags,
 		}); err != nil {
-			h.log.Debug(errParseWorkspace, "error", err)
+			h.log.Debug(errPublishDiagnostics, "error", err)
 		}
 	}
 }
