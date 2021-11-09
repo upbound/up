@@ -83,7 +83,6 @@ type initCmd struct {
 	fs       afero.Fs
 	prompter input.Prompter
 
-	CreateRoot  bool   `optional:"" short:"c" help:"Indicates if the target directory should be created." default:"false"`
 	PackageRoot string `optional:"" short:"p" help:"Path to directory to write new package." default:"."`
 	Type        string `optional:"" short:"t" help:"Type of package to be initialized." default:"configuration" enum:"configuration,provider"`
 }
@@ -112,7 +111,6 @@ func (c *initCmd) Run() error {
 	writer := xpkg.NewFileWriter(
 		xpkg.WithFs(c.fs),
 		xpkg.WithRoot(root),
-		xpkg.WithCreateRoot(c.CreateRoot),
 		xpkg.WithFileBody(fileBody),
 	)
 

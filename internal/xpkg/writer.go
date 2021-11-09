@@ -29,10 +29,9 @@ const (
 
 // Writer defines a writer that is used for creating package meta files.
 type Writer struct {
-	createRoot bool
-	fileBody   []byte
-	fs         afero.Fs
-	root       string
+	fileBody []byte
+	fs       afero.Fs
+	root     string
 }
 
 // NewFileWriter returns a new Writer.
@@ -48,14 +47,6 @@ func NewFileWriter(opts ...Option) *Writer {
 
 // Option modifies the Writer.
 type Option func(*Writer)
-
-// WithCreateRoot specifies whether or not to create the configured root
-// directory if it does not yet exist.
-func WithCreateRoot(create bool) Option {
-	return func(w *Writer) {
-		w.createRoot = create
-	}
-}
 
 // WithFs specifies the afero.Fs that is being used.
 func WithFs(fs afero.Fs) Option {
@@ -92,17 +83,13 @@ func (w *Writer) NewMetaFile() error {
 		return errors.New(errAlreadyExists)
 	}
 
-	// return err if directory does not exist and we're not instructed to create it
 	exists, err = afero.DirExists(w.fs, w.root)
 	if err != nil {
 		return err
 	}
 
-	if !exists && !w.createRoot {
-		return errors.New(errRootDoesNotExist)
-	}
-
-	if !exists && w.createRoot {
+	// create directory if it doesn't exist
+	if !exists {
 		if err := w.fs.MkdirAll(w.root, os.ModePerm); err != nil {
 			return err
 		}

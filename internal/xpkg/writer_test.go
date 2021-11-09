@@ -38,26 +38,12 @@ func TestNewMetaFile(t *testing.T) {
 		writer *Writer
 		want   want
 	}{
-		"DoesNotExist": {
-			reason: "We should return an error root does not exist and createRoot is false.",
+		"SuccessDirectoryDoesNotExist": {
+			reason: "We should create the directory if it doesn't exist.",
 			writer: NewFileWriter(
 				WithRoot("/test"),
 				WithFs(fs),
 			),
-			want: want{
-				err: errors.New(errRootDoesNotExist),
-			},
-		},
-		"DoesNotExist_ShouldCreate": {
-			reason: "We should return nil if the target directory does not exist and we should create the target directory.",
-			writer: NewFileWriter(
-				WithRoot("/tmp/other/test"),
-				WithFs(fs),
-				WithCreateRoot(true),
-			),
-			want: want{
-				err: nil,
-			},
 		},
 		"AlreadyExists": {
 			reason: "We should return an error if a meta file already exists at the given location.",
