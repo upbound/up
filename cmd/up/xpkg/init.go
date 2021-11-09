@@ -195,5 +195,8 @@ func (c *initCmd) initProviderPkg() error {
 // and expand in the prompt package if we find it useful elsewhere.
 // for example: reprompt if not given y/n (yes/no)
 func inputYes(include string) bool {
-	return strings.ToLower(include)[0:1] == "y"
+	if len(include) > 0 {
+		return strings.ToLower(include)[0:1] == "y"
+	}
+	return false
 }
