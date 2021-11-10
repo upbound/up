@@ -57,29 +57,54 @@ type Workspace struct {
 	fs             afero.Fs
 	fsBackend      *parser.FsBackend
 	metaFileExists bool
-	wd             string
+	wd             WorkingDirFn
+	root           string
 }
 
 // NewWorkspace establishees a workspace for acting on current ws entries
-func NewWorkspace(fs afero.Fs) *Workspace {
-	wd, _ := os.Getwd()
+func NewWorkspace(opts ...WSOption) (*Workspace, error) {
+	ws := &Workspace{
+		fs: afero.NewOsFs(),
+		wd: os.Getwd,
+	}
 
-	return &Workspace{
-		fs: fs,
-		wd: wd,
+	for _, o := range opts {
+		o(ws)
+	}
+
+	wd, err := ws.wd()
+	if err != nil {
+		return nil, err
+	}
+
+	ws.root = wd
+
+	return ws, nil
+}
+
+// WorkingDirFn indicates the location of the working directory.
+type WorkingDirFn func() (string, error)
+
+// WSOption is used to modify a Workspace.
+type WSOption func(*Workspace)
+
+// WithFS configures the workspace with the given filesystem.
+func WithFS(fs afero.Fs) WSOption {
+	return func(ws *Workspace) {
+		ws.fs = fs
 	}
 }
 
 // Init initializes the workspace
 func (w *Workspace) Init() error {
-	exists, err := afero.Exists(w.fs, filepath.Join(w.wd, xpkg.MetaFile))
+	exists, err := afero.Exists(w.fs, filepath.Join(w.root, xpkg.MetaFile))
 	if err != nil {
 		return errors.Wrap(err, errMetaFileDoesNotExist)
 	}
 
 	backend := parser.NewFsBackend(
 		w.fs,
-		parser.FsDir(w.wd),
+		parser.FsDir(w.root),
 		parser.FsFilters(
 			parser.SkipDirs(),
 			parser.SkipNotYAML(),
@@ -205,7 +230,7 @@ func (w *Workspace) writeMetaPkg(p v1.Pkg) error {
 		}
 	}
 
-	return afero.WriteFile(w.fs, filepath.Join(w.wd, xpkg.MetaFile), data, os.ModePerm)
+	return afero.WriteFile(w.fs, filepath.Join(w.root, xpkg.MetaFile), data, os.ModePerm)
 }
 
 // cleanNullTs is a helper function for cleaning the erroneous

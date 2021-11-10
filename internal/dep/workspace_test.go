@@ -381,7 +381,7 @@ func TestRWMetaFile(t *testing.T) {
 			},
 			want: want{
 				writerErr: syscall.EPERM,
-				readErr:   errors.Wrap(errors.New("open /Users/tnthornton/codez/up-ls/internal/dep: file does not exist"), errInitBackend),
+				readErr:   errors.New(errNotExactlyOneMeta),
 			},
 		},
 	}
@@ -412,7 +412,14 @@ func TestRWMetaFile(t *testing.T) {
 }
 
 func newTestWS(fs afero.Fs) *Workspace {
-	ws := NewWorkspace(fs)
+	ws, _ := NewWorkspace(
+		WithFS(fs),
+		func(w *Workspace) {
+			w.wd = func() (string, error) {
+				return "/", nil
+			}
+		},
+	)
 	ws.Init()
 	return ws
 }

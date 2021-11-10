@@ -43,7 +43,12 @@ func (c *depCmd) AfterApply(kongCtx *kong.Context) error {
 	c.c = cache
 	c.f = dep.NewLocalFetcher()
 	c.r = dep.NewResolver(dep.WithFetcher(c.f))
-	c.ws = dep.NewWorkspace(fs)
+
+	ws, err := dep.NewWorkspace(dep.WithFS(fs))
+	if err != nil {
+		return err
+	}
+	c.ws = ws
 
 	// don't resolve the given dependency if we want to clean the cache
 	if !c.CleanCache {
