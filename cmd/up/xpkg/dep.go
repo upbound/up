@@ -30,13 +30,20 @@ import (
 // that have Run() methods that receive it.
 func (c *depCmd) AfterApply(kongCtx *kong.Context) error {
 	ctx := context.Background()
+	fs := afero.NewOsFs()
 
-	c.fs = afero.NewOsFs()
+	cache, err := cache.NewLocal(
+		cache.WithFS(fs),
+		cache.WithRoot(c.CacheDir),
+	)
+	if err != nil {
+		return err
+	}
 
-	c.c = cache.NewLocal(c.fs, c.CacheDir)
+	c.c = cache
 	c.f = dep.NewLocalFetcher()
 	c.r = dep.NewResolver(dep.WithFetcher(c.f))
-	c.ws = dep.NewWorkspace(c.fs)
+	c.ws = dep.NewWorkspace(fs)
 
 	// don't resolve the given dependency if we want to clean the cache
 	if !c.CleanCache {
@@ -66,7 +73,6 @@ func (c *depCmd) AfterApply(kongCtx *kong.Context) error {
 type depCmd struct {
 	c  *cache.Local
 	d  v1.Dependency
-	fs afero.Fs
 	f  *dep.LocalFetcher
 	r  *dep.Resolver
 	ws *dep.Workspace
@@ -93,7 +99,7 @@ func (c *depCmd) Run(ctx context.Context) error {
 	}
 
 	// add xpkg to cache
-	if err := c.c.Store(cache.NewKey(c.d), i); err != nil {
+	if err := c.c.Store(c.d, i); err != nil {
 		return err
 	}
 

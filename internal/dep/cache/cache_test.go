@@ -24,6 +24,7 @@ import (
 	"testing"
 
 	"github.com/google/go-cmp/cmp"
+	"github.com/upbound/up/internal/dep"
 	"k8s.io/utils/pointer"
 
 	ociname "github.com/google/go-containerregistry/pkg/name"
@@ -44,8 +45,17 @@ var (
 func TestGet(t *testing.T) {
 	fs := afero.NewMemMapFs()
 
+	cRoot := "/cache"
+
+	cache, _ := NewLocal(
+		WithFS(fs),
+		WithRoot(cRoot),
+		// override HomeDirFn
+		rootIsHome,
+	)
+
 	manualAddEntry(fs, entry{
-		root:  "/cache",
+		root:  cRoot,
 		path:  "index.docker.io/crossplane/provider-aws@v0.20.1-alpha",
 		image: empty.Image,
 		tag:   "crossplane/provider-aws:v0.20.1-alpha",
@@ -53,7 +63,7 @@ func TestGet(t *testing.T) {
 
 	type args struct {
 		cache *Local
-		key   Key
+		key   metav1.Dependency
 	}
 	cases := map[string]struct {
 		reason string
@@ -63,25 +73,21 @@ func TestGet(t *testing.T) {
 		"Success": {
 			reason: "Should not return an error if package exists at path.",
 			args: args{
-				cache: NewLocal(fs, "/cache"),
-				key: NewKey(
-					metav1.Dependency{
-						Provider: &providerAws,
-						Version:  "v0.20.1-alpha",
-					},
-				),
+				cache: cache,
+				key: metav1.Dependency{
+					Provider: &providerAws,
+					Version:  "v0.20.1-alpha",
+				},
 			},
 		},
 		"ErrNotExist": {
 			reason: "Should return error if package does not exist at path.",
 			args: args{
-				cache: NewLocal(fs, "/cache"),
-				key: NewKey(
-					metav1.Dependency{
-						Provider: &providerAws,
-						Version:  "v0.20.1-alpha1",
-					},
-				),
+				cache: cache,
+				key: metav1.Dependency{
+					Provider: &providerAws,
+					Version:  "v0.20.1-alpha1",
+				},
 			},
 			want: &os.PathError{Op: "open", Path: "/cache/index.docker.io/crossplane/provider-aws@v0.20.1-alpha1", Err: afero.ErrFileNotFound},
 		},
@@ -100,7 +106,17 @@ func TestGet(t *testing.T) {
 
 func TestStore(t *testing.T) {
 	fs := afero.NewMemMapFs()
-	cache := NewLocal(fs, "/cache")
+	cache, _ := NewLocal(
+		WithFS(fs),
+		WithRoot("/cache"),
+		rootIsHome,
+	)
+
+	readOnlyCache, _ := NewLocal(
+		WithFS(afero.NewReadOnlyFs(fs)),
+		WithRoot("/new-cache/"),
+		rootIsHome,
+	)
 
 	existsd := metav1.Dependency{
 		Provider: pointer.String("crossplane/exist-xpkg"),
@@ -109,8 +125,8 @@ func TestStore(t *testing.T) {
 
 	type args struct {
 		cache *Local
-		key   Key
-		img   v1.Image
+		key   metav1.Dependency
+		val   v1.Image
 	}
 	type want struct {
 		err      error
@@ -126,8 +142,8 @@ func TestStore(t *testing.T) {
 			reason: "Should not return an error if package is created at path.",
 			args: args{
 				cache: cache,
-				key:   NewKey(existsd),
-				img:   empty.Image,
+				key:   existsd,
+				val:   empty.Image,
 			},
 			want: want{
 				numFiles: 1,
@@ -137,8 +153,8 @@ func TestStore(t *testing.T) {
 			reason: "Should not return an error if we're replacing the pre-existing image.",
 			args: args{
 				cache: cache,
-				key:   NewKey(existsd),
-				img:   newEmptyImage([]byte("stuff and things")),
+				key:   existsd,
+				val:   newEmptyImage([]byte("stuff and things")),
 			},
 			want: want{
 				numFiles: 1,
@@ -147,9 +163,9 @@ func TestStore(t *testing.T) {
 		"ErrFailedCreate": {
 			reason: "Should return an error if file creation fails.",
 			args: args{
-				cache: NewLocal(afero.NewReadOnlyFs(fs), "/new-cache/"),
-				key:   NewKey(existsd),
-				img:   empty.Image,
+				cache: readOnlyCache,
+				key:   existsd,
+				val:   empty.Image,
 			},
 			want: want{
 				err:      syscall.EPERM,
@@ -160,13 +176,13 @@ func TestStore(t *testing.T) {
 
 	for name, tc := range cases {
 		t.Run(name, func(t *testing.T) {
-			err := tc.args.cache.Store(tc.args.key, tc.args.img)
+			err := tc.args.cache.Store(tc.args.key, tc.args.val)
 
 			if diff := cmp.Diff(tc.want.err, err, test.EquateErrors()); diff != "" {
 				t.Errorf("\n%s\nStore(...): -want err, +got err:\n%s", tc.reason, diff)
 			}
 
-			tag, _ := ociname.NewTag(tc.args.key.imgTag)
+			tag, _ := ociname.NewTag(dep.ImgTag(tc.args.key))
 			files, _ := afero.ReadDir(fs, tc.args.cache.dir(&tag))
 
 			if diff := cmp.Diff(tc.want.numFiles, len(files)); diff != "" {
@@ -178,6 +194,17 @@ func TestStore(t *testing.T) {
 
 func TestDelete(t *testing.T) {
 	fs := afero.NewMemMapFs()
+	cache, _ := NewLocal(
+		WithFS(fs),
+		WithRoot("/cache"),
+		rootIsHome,
+	)
+
+	readOnlyCache, _ := NewLocal(
+		WithFS(afero.NewReadOnlyFs(fs)),
+		WithRoot("/cache"),
+		rootIsHome,
+	)
 
 	manualAddEntry(fs, entry{
 		root:  "/cache",
@@ -188,7 +215,7 @@ func TestDelete(t *testing.T) {
 
 	type args struct {
 		cache *Local
-		key   Key
+		key   metav1.Dependency
 	}
 	cases := map[string]struct {
 		reason string
@@ -198,36 +225,30 @@ func TestDelete(t *testing.T) {
 		"Success": {
 			reason: "Should not return an error if package is deleted at path.",
 			args: args{
-				cache: NewLocal(fs, "/cache"),
-				key: NewKey(
-					metav1.Dependency{
-						Provider: &providerAws,
-						Version:  "v0.20.1-alpha",
-					},
-				),
+				cache: cache,
+				key: metav1.Dependency{
+					Provider: &providerAws,
+					Version:  "v0.20.1-alpha",
+				},
 			},
 		},
 		"SuccessNotExist": {
 			reason: "Should not return an error if package does not exist.",
 			args: args{
-				cache: NewLocal(fs, "/cache"),
-				key: NewKey(
-					metav1.Dependency{
-						Provider: pointer.String("not-exists/not-exists"),
-					},
-				),
+				cache: cache,
+				key: metav1.Dependency{
+					Provider: pointer.String("not-exists/not-exists"),
+				},
 			},
 		},
 		"ErrFailedDelete": {
 			reason: "Should return an error if file deletion fails.",
 			args: args{
-				cache: NewLocal(afero.NewReadOnlyFs(fs), "/cache"),
-				key: NewKey(
-					metav1.Dependency{
-						Provider: &providerAws,
-						Version:  "v0.20.1-alpha",
-					},
-				),
+				cache: readOnlyCache,
+				key: metav1.Dependency{
+					Provider: &providerAws,
+					Version:  "v0.20.1-alpha",
+				},
 			},
 			want: syscall.EPERM,
 		},
@@ -246,7 +267,15 @@ func TestDelete(t *testing.T) {
 
 func TestClean(t *testing.T) {
 	fs := afero.NewMemMapFs()
-	cacheDir := resolveHome("~/.up/cache")
+	cache, _ := NewLocal(
+		WithFS(fs),
+		WithRoot("~/.up/cache"),
+	)
+	readOnlyCache, _ := NewLocal(
+		WithFS(afero.NewReadOnlyFs(fs)),
+		WithRoot("/cache"),
+		rootIsHome,
+	)
 
 	type args struct {
 		cache *Local
@@ -266,7 +295,7 @@ func TestClean(t *testing.T) {
 		"Success": {
 			reason: "Should not return an error if cache was cleaned.",
 			args: args{
-				cache: NewLocal(fs, cacheDir),
+				cache: cache,
 			},
 			want: want{
 				preCleanFileCnt:  2,
@@ -276,7 +305,7 @@ func TestClean(t *testing.T) {
 		"ErrFailedClean": {
 			reason: "Should return an error if we failed to clean the cache.",
 			args: args{
-				cache: NewLocal(afero.NewReadOnlyFs(fs), "/cache"),
+				cache: readOnlyCache,
 			},
 			want: want{
 				preCleanFileCnt:  2,
@@ -291,20 +320,20 @@ func TestClean(t *testing.T) {
 
 			// add a few entries to cache
 			manualAddEntry(fs, entry{
-				root:  cacheDir,
+				root:  tc.args.cache.root,
 				path:  "index.docker.io/crossplane/provider-aws@v0.20.1-alpha",
 				image: empty.Image,
 				tag:   "crossplane/provider-aws:v0.20.1-alpha",
 			})
 
 			manualAddEntry(fs, entry{
-				root:  cacheDir,
+				root:  tc.args.cache.root,
 				path:  "index.docker.io/crossplane/provider-gcp@v0.14.2",
 				image: empty.Image,
 				tag:   "crossplane/provider-gcp:v0.14.2",
 			})
 
-			c := cacheFileCnt(fs, cacheDir)
+			c := cacheFileCnt(fs, tc.args.cache.root)
 
 			if diff := cmp.Diff(tc.want.preCleanFileCnt, c); diff != "" {
 				t.Errorf("\n%s\nClean(...): -want err, +got err:\n%s", tc.reason, diff)
@@ -316,7 +345,7 @@ func TestClean(t *testing.T) {
 				t.Errorf("\n%s\nClean(...): -want err, +got err:\n%s", tc.reason, diff)
 			}
 
-			c = cacheFileCnt(fs, cacheDir)
+			c = cacheFileCnt(fs, tc.args.cache.root)
 
 			if diff := cmp.Diff(tc.want.postCleanFileCnt, c); diff != "" {
 				t.Errorf("\n%s\nClean(...): -want err, +got err:\n%s", tc.reason, diff)
@@ -330,7 +359,11 @@ func TestDir(t *testing.T) {
 	tag2, _ := ociname.NewTag("gcr.io/crossplane/provider-gcp:v1.0.0")
 	tag3, _ := ociname.NewTag("registry.upbound.io/examples-aws/getting-started:v0.14.0-240.g6a7366f")
 
-	c := NewLocal(afero.NewMemMapFs(), "/cache")
+	c, _ := NewLocal(
+		WithFS(afero.NewMemMapFs()),
+		WithRoot("/cache"),
+		rootIsHome,
+	)
 
 	type args struct {
 		tag *ociname.Tag
@@ -418,4 +451,10 @@ func manualAddEntry(fs afero.Fs, e entry) {
 	cf, _ := fs.Create(path)
 	tag, _ := ociname.NewTag(e.tag)
 	tarball.Write(tag, empty.Image, cf)
+}
+
+var rootIsHome = func(l *Local) {
+	l.home = func() (string, error) {
+		return "/", nil
+	}
 }

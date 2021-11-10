@@ -29,15 +29,16 @@ import (
 
 	metav1 "github.com/crossplane/crossplane/apis/pkg/meta/v1"
 
+	"github.com/upbound/up/internal/config"
 	"github.com/upbound/up/internal/dep"
 	"github.com/upbound/up/internal/xpkg"
 )
 
 // A Cache caches OCI images.
 type Cache interface {
-	Get(Key) (v1.Image, error)
-	Store(Key, v1.Image) error
-	Delete(Key) error
+	Get(metav1.Dependency) (v1.Image, error)
+	Store(metav1.Dependency, v1.Image) error
+	Delete(metav1.Dependency) error
 
 	Clean() error
 }
@@ -45,57 +46,67 @@ type Cache interface {
 // Local stores and retrieves OCI images in a filesystem-backed cache in a
 // thread-safe manner.
 type Local struct {
-	fs afero.Fs
-
-	root string
+	fs   afero.Fs
+	home config.HomeDirFn
 	mu   sync.RWMutex
+	root string
+	path string
 }
 
 // NewLocal creates a new LocalCache.
-func NewLocal(fs afero.Fs, root string) *Local {
-	return &Local{
-		fs:   fs,
-		root: resolveHome(root),
-	}
-}
-
-func resolveHome(root string) string {
-	tilde := "~/"
-
-	if strings.HasPrefix(root, tilde) {
-		rootsplit := strings.Split(root, tilde)
-		home, _ := os.UserHomeDir()
-		return filepath.Join(home, rootsplit[1])
+func NewLocal(opts ...Option) (*Local, error) {
+	l := &Local{
+		fs:   afero.NewOsFs(),
+		home: os.UserHomeDir,
 	}
 
-	return root
-}
-
-// Key represents a cache key that is composed of a package's image tag
-// and its name.
-type Key struct {
-	imgTag string
-}
-
-// NewKey returns a new cache key
-func NewKey(d metav1.Dependency) Key {
-	return Key{
-		imgTag: dep.ImgTag(d),
+	for _, o := range opts {
+		o(l)
 	}
-}
 
-// Get retrieves an image from the LocalCache.
-func (c *Local) Get(k Key) (v1.Image, error) {
-	c.mu.RLock()
-	defer c.mu.RUnlock()
-	t, err := name.NewTag(k.imgTag)
+	home, err := l.home()
 	if err != nil {
 		return nil, err
 	}
 
-	d := c.dir(&t)
+	root, err := filepath.Abs(filepath.Join(home, l.path))
+	if err != nil {
+		return nil, err
+	}
+	l.root = root
+	return l, nil
+}
 
-	l, err := c.currentFile(d)
+// Option represents an option that can be applied to Local
+type Option func(*Local)
+
+// WithFS defines the filessystem that is configured for Local
+func WithFS(fs afero.Fs) Option {
+	return func(l *Local) {
+		l.fs = fs
+	}
+}
+
+// WithRoot defines the root of the cache
+func WithRoot(root string) Option {
+	return func(l *Local) {
+		// in the event ~/cache/dir is passed in trim ~/ to avoid $HOME/~/cache/dir
+		l.path = strings.TrimPrefix(root, "~/")
+	}
+}
+
+// Get retrieves an image from the LocalCache.
+func (c *Local) Get(k metav1.Dependency) (v1.Image, error) {
+	c.mu.RLock()
+	defer c.mu.RUnlock()
+	t, err := name.NewTag(dep.ImgTag(k))
+	if err != nil {
+		return nil, err
+	}
+
+	dir := c.dir(&t)
+
+	l, err := c.currentFile(dir)
 	if os.IsNotExist(err) {
 		return nil, err
 	}
@@ -108,15 +119,17 @@ func (c *Local) Get(k Key) (v1.Image, error) {
 
 // Store saves an image to the LocalCache. If a file currently
 // exists at that location, we overwrite the current file.
-func (c *Local) Store(k Key, v v1.Image) error { // nolint:gocyclo
+func (c *Local) Store(k metav1.Dependency, v v1.Image) error { // nolint:gocyclo
 	c.mu.Lock()
 	defer c.mu.Unlock()
-	ref, err := name.ParseReference(k.imgTag)
+	imgTag := dep.ImgTag(k)
+
+	ref, err := name.ParseReference(imgTag)
 	if err != nil {
 		return err
 	}
 
-	t, err := name.NewTag(k.imgTag)
+	t, err := name.NewTag(imgTag)
 	if err != nil {
 		return err
 	}
@@ -158,11 +171,11 @@ func (c *Local) Store(k Key, v v1.Image) error { // nolint:gocyclo
 }
 
 // Delete removes an image from the ImageCache.
-func (c *Local) Delete(k Key) error {
+func (c *Local) Delete(k metav1.Dependency) error {
 	c.mu.Lock()
 	defer c.mu.Unlock()
 
-	t, err := name.NewTag(k.imgTag)
+	t, err := name.NewTag(dep.ImgTag(k))
 	if err != nil {
 		return err
 	}
