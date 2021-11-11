@@ -30,7 +30,7 @@ const (
 	defaultVer = ">=v0.0.0"
 
 	errInvalidConstraint  = "invalid dependency constraint"
-	errInvalidProviderRef = "invalid provider reference"
+	errInvalidProviderRef = "invalid package reference"
 	errFailedToFetchTags  = "failed to fetch tags"
 	errNoMatchingVersion  = "supplied version does not match an existing version"
 )

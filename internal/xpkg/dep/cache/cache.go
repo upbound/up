@@ -80,7 +80,7 @@ func NewLocal(opts ...Option) (*Local, error) {
 // Option represents an option that can be applied to Local
 type Option func(*Local)
 
-// WithFS defines the filessystem that is configured for Local
+// WithFS defines the filesystem that is configured for Local
 func WithFS(fs afero.Fs) Option {
 	return func(l *Local) {
 		l.fs = fs

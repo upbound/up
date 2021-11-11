@@ -33,16 +33,10 @@ import (
 	"github.com/upbound/up/internal/xpkg"
 )
 
-// TODO(@tnthornton) there are a few errors below that are copied from other
-// packages due to the errors not being exposed publicly. We should consider
-// how we want to account for this. Most likely it makes the most sense
-// to have the code that is expressing these errors refactored to be more
-// general so we can reuse it here.
 const (
 	errInvalidMetaFile      = "invalid meta type supplied"
 	errMetaFileDoesNotExist = "meta file does not exist"
-	errMetaNotConfiguration = "meta file not configuration type"
-	errMetaNotProvider      = "meta file not provider type"
+	errMetaContainsDupeDep  = "meta file contains duplicate dependency"
 )
 
 // Workspace defines our view of the current directory
@@ -124,20 +118,26 @@ func (w *Workspace) Upsert(d v1beta1.Dependency) error {
 func upsertDeps(d v1beta1.Dependency, p v1.Pkg) error {
 	deps := p.GetDependencies()
 
-	seen := false
+	processed := false
 	for i := range deps {
 		// modify the underlying slice
 		dep := deps[i]
 		if dep.Provider != nil && *dep.Provider == d.Package {
+			if processed {
+				return errors.New(errMetaContainsDupeDep)
+			}
 			deps[i].Version = d.Constraints
-			seen = true
+			processed = true
 		} else if dep.Configuration != nil && *dep.Configuration == d.Package {
+			if processed {
+				return errors.New(errMetaContainsDupeDep)
+			}
 			deps[i].Version = d.Constraints
-			seen = true
+			processed = true
 		}
 	}
 
-	if !seen {
+	if !processed {
 
 		dep := v1.Dependency{
 			Version: d.Constraints,
@@ -169,49 +169,59 @@ func (w *Workspace) readPkgMeta() (v1.Pkg, error) {
 		return nil, errors.Wrap(err, errMetaFileDoesNotExist)
 	}
 
+	unmarshalFns := []packageUnmarshal{
+		configUnmarshal,
+		providerUnmarshal,
+	}
+
 	var p interface{}
-	p, err = parseConfigPkg(b)
-	// check if we parsed a provider package instead of a configuration package
-	if err != nil {
-		if err.Error() != errMetaNotConfiguration {
+
+	for _, u := range unmarshalFns {
+		pkg, ok, err := u(b)
+		if !ok && err != nil {
 			return nil, err
 		}
-
-		p, err = parseProviderPkg(b)
-		if err != nil {
-			return nil, err
+		if ok {
+			p = pkg
+			break
 		}
 	}
 
 	return p.(v1.Pkg), nil
 }
 
-func parseConfigPkg(b []byte) (*v1.Configuration, error) {
+type packageUnmarshal func(b []byte) (interface{}, bool, error)
+
+func configUnmarshal(b []byte) (interface{}, bool, error) {
 	var c v1.Configuration
+
 	err := yaml.Unmarshal(b, &c)
 	if err != nil {
-		return nil, err
+		return nil, false, err
 	}
 
+	// we were able to unmarshal but we didn't get the expected type,
+	// return ok = false
 	if c.Kind != v1.ConfigurationKind {
-		return nil, errors.New(errMetaNotConfiguration)
+		return nil, false, nil
 	}
-
-	return &c, nil
+	return &c, true, nil
 }
 
-func parseProviderPkg(b []byte) (*v1.Provider, error) {
+func providerUnmarshal(b []byte) (interface{}, bool, error) {
 	var p v1.Provider
 	err := yaml.Unmarshal(b, &p)
 	if err != nil {
-		return nil, err
+		return nil, false, err
 	}
 
+	// we were able to unmarshal but we didn't get the expected type,
+	// return ok = false
 	if p.Kind != v1.ProviderKind {
-		return nil, errors.New(errMetaNotProvider)
+		return nil, false, nil
 	}
 
-	return &p, nil
+	return &p, true, nil
 }
 
 // writeMetaPkg writes to the current meta file (crossplane.yaml).

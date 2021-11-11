@@ -280,6 +280,33 @@ func TestUpsertDeps(t *testing.T) {
 				},
 			},
 		},
+		"DuplicateDep": {
+			reason: "Should return an error indicating duplicate dependencies detected.",
+			args: args{
+				dep: New("crossplane/provider-aws",
+					string(v1beta1.ProviderPackageType),
+				),
+				pkg: &metav1.Provider{
+					Spec: metav1.ProviderSpec{
+						MetaSpec: metav1.MetaSpec{
+							DependsOn: []metav1.Dependency{
+								{
+									Provider: pointer.String("crossplane/provider-aws"),
+									Version:  "v1.0.0",
+								},
+								{
+									Provider: pointer.String("crossplane/provider-aws"),
+									Version:  "v1.0.1",
+								},
+							},
+						},
+					},
+				},
+			},
+			want: want{
+				err: errors.New(errMetaContainsDupeDep),
+			},
+		},
 	}
 
 	for name, tc := range cases {
@@ -291,7 +318,7 @@ func TestUpsertDeps(t *testing.T) {
 				t.Errorf("\n%s\nUpsertDeps(...): -want err, +got err:\n%s", tc.reason, diff)
 			}
 
-			if tc.args.pkg != nil {
+			if tc.want.deps != nil {
 				if diff := cmp.Diff(tc.want.deps, tc.args.pkg.GetDependencies()); diff != "" {
 					t.Errorf("\n%s\nUpsertDeps(...): -want err, +got err:\n%s", tc.reason, diff)
 				}

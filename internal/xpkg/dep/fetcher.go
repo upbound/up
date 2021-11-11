@@ -23,10 +23,6 @@ import (
 	"github.com/google/go-containerregistry/pkg/v1/remote"
 )
 
-// TODO @(tnthornton) we don't currently supply auth creds to invoke the remote
-// calls. We should account for this at some point to ensure we can support
-// things like private registries.
-
 type fetcher interface {
 	Fetch(ctx context.Context, ref name.Reference, secrets ...string) (v1.Image, error)
 	Head(ctx context.Context, ref name.Reference, secrets ...string) (*v1.Descriptor, error)
