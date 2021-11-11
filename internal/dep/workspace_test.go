@@ -26,6 +26,7 @@ import (
 
 	"github.com/crossplane/crossplane-runtime/pkg/test"
 	metav1 "github.com/crossplane/crossplane/apis/pkg/meta/v1"
+	"github.com/crossplane/crossplane/apis/pkg/v1beta1"
 	apimetav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 )
 
@@ -33,7 +34,7 @@ func TestUpsert(t *testing.T) {
 	type args struct {
 		fs       afero.Fs
 		metaFile metav1.Pkg
-		dep      metav1.Dependency
+		dep      v1beta1.Dependency
 	}
 
 	type want struct {
@@ -49,8 +50,11 @@ func TestUpsert(t *testing.T) {
 		"AddEntryNoPrior": {
 			reason: "Should not return an error if package is created at path.",
 			args: args{
-				fs:  afero.NewMemMapFs(),
-				dep: New("crossplane/provider-gcp@v1.0.0"),
+				fs: afero.NewMemMapFs(),
+				dep: New(
+					"crossplane/provider-gcp@v1.0.0",
+					string(v1beta1.ConfigurationPackageType),
+				),
 				metaFile: &metav1.Configuration{
 					TypeMeta: apimetav1.TypeMeta{
 						APIVersion: "meta.pkg.crossplane.io/v1",
@@ -71,8 +75,8 @@ func TestUpsert(t *testing.T) {
 			want: want{
 				deps: []metav1.Dependency{
 					{
-						Provider: pointer.String("crossplane/provider-gcp"),
-						Version:  "v1.0.0",
+						Configuration: pointer.String("crossplane/provider-gcp"),
+						Version:       "v1.0.0",
 					},
 				},
 			},
@@ -80,8 +84,10 @@ func TestUpsert(t *testing.T) {
 		"InsertNewEntry": {
 			reason: "Should not return an error if package is created at path.",
 			args: args{
-				fs:  afero.NewMemMapFs(),
-				dep: New("crossplane/provider-gcp@v1.0.0"),
+				fs: afero.NewMemMapFs(),
+				dep: New("crossplane/provider-gcp@v1.0.0",
+					string(v1beta1.ProviderPackageType),
+				),
 				metaFile: &metav1.Provider{
 					TypeMeta: apimetav1.TypeMeta{
 						APIVersion: "meta.pkg.crossplane.io/v1",
@@ -149,7 +155,7 @@ func TestUpsert(t *testing.T) {
 
 func TestUpsertDeps(t *testing.T) {
 	type args struct {
-		dep metav1.Dependency
+		dep v1beta1.Dependency
 		pkg metav1.Pkg
 	}
 
@@ -166,7 +172,9 @@ func TestUpsertDeps(t *testing.T) {
 		"EmptyDependencyList": {
 			reason: "Should return an updated deps list with the included provider.",
 			args: args{
-				dep: New("crossplane/provider-aws@v1.0.0"),
+				dep: New("crossplane/provider-aws@v1.0.0",
+					string(v1beta1.ProviderPackageType),
+				),
 				pkg: &metav1.Configuration{
 					Spec: metav1.ConfigurationSpec{
 						MetaSpec: metav1.MetaSpec{
@@ -187,14 +195,16 @@ func TestUpsertDeps(t *testing.T) {
 		"InsertIntoDependencyList": {
 			reason: "Should return an updated deps list with 2 entries.",
 			args: args{
-				dep: New("crossplane/provider-gcp@v1.0.1"),
+				dep: New("crossplane/provider-gcp@v1.0.1",
+					string(v1beta1.ProviderPackageType),
+				),
 				pkg: &metav1.Configuration{
 					Spec: metav1.ConfigurationSpec{
 						MetaSpec: metav1.MetaSpec{
 							DependsOn: []metav1.Dependency{
 								{
-									Provider: pointer.String("crossplane/provider-aws"),
-									Version:  "v1.0.0",
+									Configuration: pointer.String("crossplane/provider-aws"),
+									Version:       "v1.0.0",
 								},
 							},
 						},
@@ -204,8 +214,8 @@ func TestUpsertDeps(t *testing.T) {
 			want: want{
 				deps: []metav1.Dependency{
 					{
-						Provider: pointer.String("crossplane/provider-aws"),
-						Version:  "v1.0.0",
+						Configuration: pointer.String("crossplane/provider-aws"),
+						Version:       "v1.0.0",
 					},
 					{
 						Provider: pointer.String("crossplane/provider-gcp"),
@@ -217,14 +227,16 @@ func TestUpsertDeps(t *testing.T) {
 		"UpdateDependencyList": {
 			reason: "Should return an updated deps list with the provider version updated.",
 			args: args{
-				dep: New("crossplane/provider-aws@v1.0.1"),
+				dep: New("crossplane/provider-aws@v1.0.1",
+					string(v1beta1.ConfigurationPackageType),
+				),
 				pkg: &metav1.Provider{
 					Spec: metav1.ProviderSpec{
 						MetaSpec: metav1.MetaSpec{
 							DependsOn: []metav1.Dependency{
 								{
-									Provider: pointer.String("crossplane/provider-aws"),
-									Version:  "v1.0.0",
+									Configuration: pointer.String("crossplane/provider-aws"),
+									Version:       "v1.0.0",
 								},
 							},
 						},
@@ -234,8 +246,8 @@ func TestUpsertDeps(t *testing.T) {
 			want: want{
 				deps: []metav1.Dependency{
 					{
-						Provider: pointer.String("crossplane/provider-aws"),
-						Version:  "v1.0.1",
+						Configuration: pointer.String("crossplane/provider-aws"),
+						Version:       "v1.0.1",
 					},
 				},
 			},
@@ -243,7 +255,9 @@ func TestUpsertDeps(t *testing.T) {
 		"UseDefaultTag": {
 			reason: "Should return an error indicating the package name is invalid.",
 			args: args{
-				dep: New("crossplane/provider-aws"),
+				dep: New("crossplane/provider-aws",
+					string(v1beta1.ProviderPackageType),
+				),
 				pkg: &metav1.Provider{
 					Spec: metav1.ProviderSpec{
 						MetaSpec: metav1.MetaSpec{
@@ -303,8 +317,8 @@ func TestRWMetaFile(t *testing.T) {
 				},
 				DependsOn: []metav1.Dependency{
 					{
-						Provider: pointer.String("crossplane/provider-aws"),
-						Version:  "v1.0.0",
+						Configuration: pointer.String("crossplane/provider-aws"),
+						Version:       "v1.0.0",
 					},
 				},
 			},

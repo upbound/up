@@ -18,35 +18,46 @@ import (
 	"fmt"
 	"strings"
 
-	v1 "github.com/crossplane/crossplane/apis/pkg/meta/v1"
+	"github.com/crossplane/crossplane/apis/pkg/v1beta1"
 )
 
 const (
 	packageTagFmt = "%s:%s"
 )
 
-// New returns a new v1.Dependency based on the given package name
+// New returns a new v1beta1.Dependency based on the given package name
+// and PackageType (reprented as a string).
 // Expects names of the form source@version where @version can be
 // left blank in order to indicate 'latest'.
-func New(pkg string) v1.Dependency {
+func New(pkg, t string) v1beta1.Dependency {
 	// if the passed in ver was blank use the default to pass
 	// constraint checks and grab latest semver
 	version := defaultVer
 
 	ps := strings.Split(pkg, "@")
 
-	provider := ps[0]
+	source := ps[0]
 	if len(ps) == 2 {
 		version = ps[1]
 	}
 
-	return v1.Dependency{
-		Provider: &provider,
-		Version:  version,
+	d := v1beta1.Dependency{
+		Package:     source,
+		Type:        v1beta1.ProviderPackageType,
+		Constraints: version,
 	}
+
+	if strings.Title(strings.ToLower(t)) == string(v1beta1.ConfigurationPackageType) {
+		d.Type = v1beta1.ConfigurationPackageType
+	}
+
+	return d
 }
 
 // ImgTag returns the full image tag "source:version" of the given dependency
-func ImgTag(d v1.Dependency) string {
-	return fmt.Sprintf(packageTagFmt, *d.Provider, d.Version)
+func ImgTag(d v1beta1.Dependency) string {
+	// NOTE(@tnthornton) this should ONLY be used after the version constraint
+	// has been resolved for the given dependency. Using a semver range is not
+	// a valid tag format and will cause lookups to this string to fail.
+	return fmt.Sprintf(packageTagFmt, d.Identifier(), d.Constraints)
 }

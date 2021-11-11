@@ -16,7 +16,6 @@ package meta
 
 import (
 	"errors"
-	"fmt"
 	"testing"
 
 	"github.com/crossplane/crossplane-runtime/pkg/test"
@@ -159,8 +158,6 @@ spec:
 	for name, tc := range cases {
 		t.Run(name, func(t *testing.T) {
 			got, err := NewConfigXPkg(tc.ctx)
-
-			fmt.Println(string(got))
 
 			if diff := cmp.Diff(tc.err, err, test.EquateErrors()); diff != "" {
 				t.Errorf("\n%s\nNewConfigXPkg(...): -want error, +got error:\n%s", tc.reason, diff)

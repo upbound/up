@@ -18,7 +18,7 @@ import (
 	"context"
 
 	"github.com/alecthomas/kong"
-	v1 "github.com/crossplane/crossplane/apis/pkg/meta/v1"
+	"github.com/crossplane/crossplane/apis/pkg/v1beta1"
 	"github.com/spf13/afero"
 
 	"github.com/upbound/up/internal/dep"
@@ -58,7 +58,7 @@ func (c *depCmd) AfterApply(kongCtx *kong.Context) error {
 			return err
 		}
 
-		c.d = dep.New(c.Package)
+		c.d = dep.New(c.Package, c.Type)
 
 		// determine the version (using resolver) to use based on the supplied constraints
 		v, err := c.r.ResolveTag(ctx, c.d)
@@ -66,7 +66,7 @@ func (c *depCmd) AfterApply(kongCtx *kong.Context) error {
 			return err
 		}
 
-		c.d.Version = v
+		c.d.Constraints = v
 	}
 
 	// workaround interfaces not being bindable ref: https://github.com/alecthomas/kong/issues/48
@@ -77,7 +77,7 @@ func (c *depCmd) AfterApply(kongCtx *kong.Context) error {
 // depCmd manages crossplane dependencies.
 type depCmd struct {
 	c  *cache.Local
-	d  v1.Dependency
+	d  v1beta1.Dependency
 	f  *dep.LocalFetcher
 	r  *dep.Resolver
 	ws *dep.Workspace
@@ -86,6 +86,7 @@ type depCmd struct {
 	CleanCache bool   `short:"c" help:"Clean dep cache."`
 
 	Package string `arg:"" optional:"" help:"Package to be added."`
+	Type    string `short:"t" optional:"" help:"The dependency type to be added." enum:"configuration,provider" default:"provider"`
 }
 
 // Run executes the dep command.

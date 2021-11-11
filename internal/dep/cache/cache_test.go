@@ -25,7 +25,6 @@ import (
 
 	"github.com/google/go-cmp/cmp"
 	"github.com/upbound/up/internal/dep"
-	"k8s.io/utils/pointer"
 
 	ociname "github.com/google/go-containerregistry/pkg/name"
 	v1 "github.com/google/go-containerregistry/pkg/v1"
@@ -35,7 +34,7 @@ import (
 	"github.com/spf13/afero"
 
 	"github.com/crossplane/crossplane-runtime/pkg/test"
-	metav1 "github.com/crossplane/crossplane/apis/pkg/meta/v1"
+	"github.com/crossplane/crossplane/apis/pkg/v1beta1"
 )
 
 var (
@@ -63,7 +62,7 @@ func TestGet(t *testing.T) {
 
 	type args struct {
 		cache *Local
-		key   metav1.Dependency
+		key   v1beta1.Dependency
 	}
 	cases := map[string]struct {
 		reason string
@@ -74,9 +73,9 @@ func TestGet(t *testing.T) {
 			reason: "Should not return an error if package exists at path.",
 			args: args{
 				cache: cache,
-				key: metav1.Dependency{
-					Provider: &providerAws,
-					Version:  "v0.20.1-alpha",
+				key: v1beta1.Dependency{
+					Package:     providerAws,
+					Constraints: "v0.20.1-alpha",
 				},
 			},
 		},
@@ -84,9 +83,9 @@ func TestGet(t *testing.T) {
 			reason: "Should return error if package does not exist at path.",
 			args: args{
 				cache: cache,
-				key: metav1.Dependency{
-					Provider: &providerAws,
-					Version:  "v0.20.1-alpha1",
+				key: v1beta1.Dependency{
+					Package:     providerAws,
+					Constraints: "v0.20.1-alpha1",
 				},
 			},
 			want: &os.PathError{Op: "open", Path: "/cache/index.docker.io/crossplane/provider-aws@v0.20.1-alpha1", Err: afero.ErrFileNotFound},
@@ -118,14 +117,15 @@ func TestStore(t *testing.T) {
 		rootIsHome,
 	)
 
-	existsd := metav1.Dependency{
-		Provider: pointer.String("crossplane/exist-xpkg"),
-		Version:  "latest",
+	existsd := v1beta1.Dependency{
+		Package:     "crossplane/exist-xpkg",
+		Type:        v1beta1.ProviderPackageType,
+		Constraints: "latest",
 	}
 
 	type args struct {
 		cache *Local
-		key   metav1.Dependency
+		key   v1beta1.Dependency
 		val   v1.Image
 	}
 	type want struct {
@@ -215,7 +215,7 @@ func TestDelete(t *testing.T) {
 
 	type args struct {
 		cache *Local
-		key   metav1.Dependency
+		key   v1beta1.Dependency
 	}
 	cases := map[string]struct {
 		reason string
@@ -226,9 +226,9 @@ func TestDelete(t *testing.T) {
 			reason: "Should not return an error if package is deleted at path.",
 			args: args{
 				cache: cache,
-				key: metav1.Dependency{
-					Provider: &providerAws,
-					Version:  "v0.20.1-alpha",
+				key: v1beta1.Dependency{
+					Package:     providerAws,
+					Constraints: "v0.20.1-alpha",
 				},
 			},
 		},
@@ -236,8 +236,8 @@ func TestDelete(t *testing.T) {
 			reason: "Should not return an error if package does not exist.",
 			args: args{
 				cache: cache,
-				key: metav1.Dependency{
-					Provider: pointer.String("not-exists/not-exists"),
+				key: v1beta1.Dependency{
+					Package: "not-exists/not-exists",
 				},
 			},
 		},
@@ -245,9 +245,9 @@ func TestDelete(t *testing.T) {
 			reason: "Should return an error if file deletion fails.",
 			args: args{
 				cache: readOnlyCache,
-				key: metav1.Dependency{
-					Provider: &providerAws,
-					Version:  "v0.20.1-alpha",
+				key: v1beta1.Dependency{
+					Package:     providerAws,
+					Constraints: "v0.20.1-alpha",
 				},
 			},
 			want: syscall.EPERM,

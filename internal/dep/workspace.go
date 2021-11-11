@@ -34,6 +34,7 @@ import (
 
 	"github.com/crossplane/crossplane-runtime/pkg/parser"
 	v1 "github.com/crossplane/crossplane/apis/pkg/meta/v1"
+	"github.com/crossplane/crossplane/apis/pkg/v1beta1"
 
 	"github.com/upbound/up/internal/xpkg"
 )
@@ -126,7 +127,7 @@ func (w *Workspace) MetaExists() bool {
 // Upsert will add an entry to the meta file, if the meta file exists and
 // does not yet have an entry for the given package. If an entry does exist,
 // the entry will be updated to the given package version.
-func (w *Workspace) Upsert(d v1.Dependency) error {
+func (w *Workspace) Upsert(d v1beta1.Dependency) error {
 	p, err := w.readPkgMeta()
 	if err != nil {
 		return err
@@ -140,23 +141,35 @@ func (w *Workspace) Upsert(d v1.Dependency) error {
 	return w.writeMetaPkg(p)
 }
 
-func upsertDeps(d v1.Dependency, p v1.Pkg) error {
+func upsertDeps(d v1beta1.Dependency, p v1.Pkg) error {
 	deps := p.GetDependencies()
 
 	seen := false
 	for i := range deps {
 		// modify the underlying slice
-		if *deps[i].Provider == *d.Provider {
-			deps[i].Version = d.Version
+		dep := deps[i]
+		if dep.Provider != nil && *dep.Provider == d.Package {
+			deps[i].Version = d.Constraints
+			seen = true
+		} else if dep.Configuration != nil && *dep.Configuration == d.Package {
+			deps[i].Version = d.Constraints
 			seen = true
 		}
 	}
 
 	if !seen {
-		deps = append(deps, v1.Dependency{
-			Provider: d.Provider,
-			Version:  d.Version,
-		})
+
+		dep := v1.Dependency{
+			Version: d.Constraints,
+		}
+
+		if d.Type == v1beta1.ProviderPackageType {
+			dep.Provider = &d.Package
+		} else {
+			dep.Configuration = &d.Package
+		}
+
+		deps = append(deps, dep)
 	}
 
 	switch v := p.(type) {

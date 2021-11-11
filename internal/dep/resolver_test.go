@@ -19,18 +19,17 @@ import (
 	"testing"
 
 	"github.com/crossplane/crossplane-runtime/pkg/test"
-	metav1 "github.com/crossplane/crossplane/apis/pkg/meta/v1"
+	"github.com/crossplane/crossplane/apis/pkg/v1beta1"
 	"github.com/google/go-cmp/cmp"
 	"github.com/google/go-containerregistry/pkg/name"
 	v1 "github.com/google/go-containerregistry/pkg/v1"
 	"github.com/pkg/errors"
-	"k8s.io/utils/pointer"
 )
 
 func TestResolveTag(t *testing.T) {
 
 	type args struct {
-		dep     metav1.Dependency
+		dep     v1beta1.Dependency
 		fetcher fetcher
 	}
 
@@ -47,9 +46,9 @@ func TestResolveTag(t *testing.T) {
 		"SuccessTagFound": {
 			reason: "Should return tag.",
 			args: args{
-				dep: metav1.Dependency{
-					Provider: pointer.String("crossplane/provider-aws"),
-					Version:  ">=v0.1.1",
+				dep: v1beta1.Dependency{
+					Package:     "crossplane/provider-aws",
+					Constraints: ">=v0.1.1",
 				},
 				fetcher: NewMockFetcher(
 					WithTags(
@@ -67,9 +66,9 @@ func TestResolveTag(t *testing.T) {
 		"SuccessNoVersionSupplied": {
 			reason: "Should return tag.",
 			args: args{
-				dep: metav1.Dependency{
-					Provider: pointer.String("crossplane/provider-aws"),
-					Version:  "",
+				dep: v1beta1.Dependency{
+					Package:     "crossplane/provider-aws",
+					Constraints: "",
 				},
 				fetcher: NewMockFetcher(
 					WithTags(
@@ -87,9 +86,9 @@ func TestResolveTag(t *testing.T) {
 		"ErrorInvalidTag": {
 			reason: "Should return an error if dep has invalid constraint.",
 			args: args{
-				dep: metav1.Dependency{
-					Provider: pointer.String("crossplane/provider-aws"),
-					Version:  "alpha",
+				dep: v1beta1.Dependency{
+					Package:     "crossplane/provider-aws",
+					Constraints: "alpha",
 				},
 				fetcher: NewMockFetcher(
 					WithError(
@@ -104,9 +103,9 @@ func TestResolveTag(t *testing.T) {
 		"ErrorInvalidReference": {
 			reason: "Should return an error if dep has invalid provider.",
 			args: args{
-				dep: metav1.Dependency{
-					Provider: pointer.String(""),
-					Version:  "v1.0.0",
+				dep: v1beta1.Dependency{
+					Package:     "",
+					Constraints: "v1.0.0",
 				},
 				fetcher: NewMockFetcher(
 					WithError(
@@ -121,9 +120,9 @@ func TestResolveTag(t *testing.T) {
 		"ErrorFailedToFetchTags": {
 			reason: "Should return an error if we could not fetch tags.",
 			args: args{
-				dep: metav1.Dependency{
-					Provider: pointer.String("crossplane/provider-aws"),
-					Version:  "v1.0.0",
+				dep: v1beta1.Dependency{
+					Package:     "crossplane/provider-aws",
+					Constraints: "v1.0.0",
 				},
 				fetcher: NewMockFetcher(
 					WithError(

@@ -27,7 +27,7 @@ import (
 	"github.com/google/go-containerregistry/pkg/v1/tarball"
 	"github.com/spf13/afero"
 
-	metav1 "github.com/crossplane/crossplane/apis/pkg/meta/v1"
+	"github.com/crossplane/crossplane/apis/pkg/v1beta1"
 
 	"github.com/upbound/up/internal/config"
 	"github.com/upbound/up/internal/dep"
@@ -36,9 +36,9 @@ import (
 
 // A Cache caches OCI images.
 type Cache interface {
-	Get(metav1.Dependency) (v1.Image, error)
-	Store(metav1.Dependency, v1.Image) error
-	Delete(metav1.Dependency) error
+	Get(v1beta1.Dependency) (v1.Image, error)
+	Store(v1beta1.Dependency, v1.Image) error
+	Delete(v1beta1.Dependency) error
 
 	Clean() error
 }
@@ -96,7 +96,7 @@ func WithRoot(root string) Option {
 }
 
 // Get retrieves an image from the LocalCache.
-func (c *Local) Get(k metav1.Dependency) (v1.Image, error) {
+func (c *Local) Get(k v1beta1.Dependency) (v1.Image, error) {
 	c.mu.RLock()
 	defer c.mu.RUnlock()
 	t, err := name.NewTag(dep.ImgTag(k))
@@ -119,7 +119,7 @@ func (c *Local) Get(k metav1.Dependency) (v1.Image, error) {
 
 // Store saves an image to the LocalCache. If a file currently
 // exists at that location, we overwrite the current file.
-func (c *Local) Store(k metav1.Dependency, v v1.Image) error { // nolint:gocyclo
+func (c *Local) Store(k v1beta1.Dependency, v v1.Image) error { // nolint:gocyclo
 	c.mu.Lock()
 	defer c.mu.Unlock()
 	imgTag := dep.ImgTag(k)
@@ -171,7 +171,7 @@ func (c *Local) Store(k metav1.Dependency, v v1.Image) error { // nolint:gocyclo
 }
 
 // Delete removes an image from the ImageCache.
-func (c *Local) Delete(k metav1.Dependency) error {
+func (c *Local) Delete(k v1beta1.Dependency) error {
 	c.mu.Lock()
 	defer c.mu.Unlock()
 

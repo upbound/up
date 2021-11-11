@@ -18,7 +18,7 @@ import (
 	"fmt"
 	"testing"
 
-	metav1 "github.com/crossplane/crossplane/apis/pkg/meta/v1"
+	"github.com/crossplane/crossplane/apis/pkg/v1beta1"
 	"github.com/google/go-cmp/cmp"
 )
 
@@ -27,10 +27,11 @@ func TestNew(t *testing.T) {
 
 	type args struct {
 		pkg string
+		t   string
 	}
 
 	type want struct {
-		dep metav1.Dependency
+		dep v1beta1.Dependency
 	}
 
 	cases := map[string]struct {
@@ -43,9 +44,10 @@ func TestNew(t *testing.T) {
 				pkg: providerAws,
 			},
 			want: want{
-				dep: metav1.Dependency{
-					Provider: &providerAws,
-					Version:  defaultVer,
+				dep: v1beta1.Dependency{
+					Package:     providerAws,
+					Type:        v1beta1.ProviderPackageType,
+					Constraints: defaultVer,
 				},
 			},
 		},
@@ -54,20 +56,23 @@ func TestNew(t *testing.T) {
 				pkg: fmt.Sprintf("%s@%s", providerAws, "v1.0.0"),
 			},
 			want: want{
-				dep: metav1.Dependency{
-					Provider: &providerAws,
-					Version:  "v1.0.0",
+				dep: v1beta1.Dependency{
+					Package:     providerAws,
+					Type:        v1beta1.ProviderPackageType,
+					Constraints: "v1.0.0",
 				},
 			},
 		},
 		"VersionConstraintSupplied": {
 			args: args{
 				pkg: fmt.Sprintf("%s@%s", providerAws, ">=v1.0.0"),
+				t:   "configuration",
 			},
 			want: want{
-				dep: metav1.Dependency{
-					Provider: &providerAws,
-					Version:  ">=v1.0.0",
+				dep: v1beta1.Dependency{
+					Package:     providerAws,
+					Type:        v1beta1.ConfigurationPackageType,
+					Constraints: ">=v1.0.0",
 				},
 			},
 		},
@@ -76,7 +81,7 @@ func TestNew(t *testing.T) {
 	for name, tc := range cases {
 		t.Run(name, func(t *testing.T) {
 
-			d := New(tc.args.pkg)
+			d := New(tc.args.pkg, tc.args.t)
 
 			if diff := cmp.Diff(tc.want.dep, d); diff != "" {
 				t.Errorf("\n%s\nNew(...): -want err, +got err:\n%s", tc.reason, diff)

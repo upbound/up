@@ -23,7 +23,7 @@ import (
 	v1 "github.com/google/go-containerregistry/pkg/v1"
 	"github.com/pkg/errors"
 
-	metav1 "github.com/crossplane/crossplane/apis/pkg/meta/v1"
+	"github.com/crossplane/crossplane/apis/pkg/v1beta1"
 )
 
 const (
@@ -60,16 +60,17 @@ func WithFetcher(f fetcher) ResolverOption {
 }
 
 // ResolveImage --
-func (r *Resolver) ResolveImage(ctx context.Context, dep metav1.Dependency) (v1.Image, error) {
+func (r *Resolver) ResolveImage(ctx context.Context, dep v1beta1.Dependency) (v1.Image, error) {
 
 	tag, err := r.ResolveTag(ctx, dep)
 	if err != nil {
 		return nil, err
 	}
 
-	remoteImageRef, err := name.ParseReference(ImgTag(metav1.Dependency{
-		Provider: dep.Provider,
-		Version:  tag,
+	remoteImageRef, err := name.ParseReference(ImgTag(v1beta1.Dependency{
+		Package:     dep.Package,
+		Type:        dep.Type,
+		Constraints: tag,
 	}))
 	if err != nil {
 		return nil, err
@@ -79,19 +80,19 @@ func (r *Resolver) ResolveImage(ctx context.Context, dep metav1.Dependency) (v1.
 }
 
 // ResolveTag --
-func (r *Resolver) ResolveTag(ctx context.Context, dep metav1.Dependency) (string, error) {
+func (r *Resolver) ResolveTag(ctx context.Context, dep v1beta1.Dependency) (string, error) {
 	// if the passed in version was blank use the default to pass
 	// constraint checks and grab latest semver
-	if dep.Version == "" {
-		dep.Version = defaultVer
+	if dep.Constraints == "" {
+		dep.Constraints = defaultVer
 	}
 
-	c, err := semver.NewConstraint(dep.Version)
+	c, err := semver.NewConstraint(dep.Constraints)
 	if err != nil {
 		return "", errors.Wrap(err, errInvalidConstraint)
 	}
 
-	ref, err := name.ParseReference(*dep.Provider)
+	ref, err := name.ParseReference(dep.Identifier())
 	if err != nil {
 		return "", errors.Wrap(err, errInvalidProviderRef)
 	}
