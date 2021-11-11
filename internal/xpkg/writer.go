@@ -23,8 +23,7 @@ import (
 )
 
 const (
-	errAlreadyExists    = "directory contains pre-existing meta file"
-	errRootDoesNotExist = "target directory does not exist"
+	errAlreadyExists = "directory contains pre-existing meta file"
 )
 
 // Writer defines a writer that is used for creating package meta files.

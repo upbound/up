@@ -91,7 +91,7 @@ func TestUpsert(t *testing.T) {
 				metaFile: &metav1.Provider{
 					TypeMeta: apimetav1.TypeMeta{
 						APIVersion: "meta.pkg.crossplane.io/v1",
-						Kind:       "Configuration",
+						Kind:       "Provider",
 					},
 					ObjectMeta: apimetav1.ObjectMeta{
 						Name: "getting-started-with-aws",
@@ -395,7 +395,7 @@ func TestRWMetaFile(t *testing.T) {
 			},
 			want: want{
 				writerErr: syscall.EPERM,
-				readErr:   errors.New(errNotExactlyOneMeta),
+				readErr:   errors.Wrap(errors.New("open /crossplane.yaml: file does not exist"), errMetaFileDoesNotExist),
 			},
 		},
 	}

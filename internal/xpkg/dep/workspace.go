@@ -15,10 +15,7 @@
 package dep
 
 import (
-	"bufio"
-	"context"
 	encjson "encoding/json"
-	"io"
 	"os"
 	"path/filepath"
 
@@ -28,11 +25,8 @@ import (
 	sigsyaml "sigs.k8s.io/yaml"
 
 	apimetav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
-	"k8s.io/apimachinery/pkg/runtime"
-	"k8s.io/apimachinery/pkg/runtime/serializer/json"
 	"k8s.io/apimachinery/pkg/util/yaml"
 
-	"github.com/crossplane/crossplane-runtime/pkg/parser"
 	v1 "github.com/crossplane/crossplane/apis/pkg/meta/v1"
 	"github.com/crossplane/crossplane/apis/pkg/v1beta1"
 
@@ -45,18 +39,15 @@ import (
 // to have the code that is expressing these errors refactored to be more
 // general so we can reuse it here.
 const (
-	errInitBackend          = "could not initialize filesystem backend"
 	errInvalidMetaFile      = "invalid meta type supplied"
 	errMetaFileDoesNotExist = "meta file does not exist"
-	errNotExactlyOneMeta    = "not exactly one package meta type"
-	errNotMeta              = "meta type is not a package"
-	errParserPackage        = "failed to parse package"
+	errMetaNotConfiguration = "meta file not configuration type"
+	errMetaNotProvider      = "meta file not provider type"
 )
 
 // Workspace defines our view of the current directory
 type Workspace struct {
 	fs             afero.Fs
-	fsBackend      *parser.FsBackend
 	metaFileExists bool
 	wd             WorkingDirFn
 	root           string
@@ -103,17 +94,6 @@ func (w *Workspace) Init() error {
 		return errors.Wrap(err, errMetaFileDoesNotExist)
 	}
 
-	backend := parser.NewFsBackend(
-		w.fs,
-		parser.FsDir(w.root),
-		parser.FsFilters(
-			parser.SkipDirs(),
-			parser.SkipNotYAML(),
-			parser.SkipEmpty(),
-		),
-	)
-
-	w.fsBackend = backend
 	w.metaFileExists = exists
 
 	return nil
@@ -183,32 +163,55 @@ func upsertDeps(d v1beta1.Dependency, p v1.Pkg) error {
 }
 
 func (w *Workspace) readPkgMeta() (v1.Pkg, error) {
-	// Get YAML stream.
-	r, err := w.fsBackend.Init(context.Background())
 
+	b, err := afero.ReadFile(w.fs, filepath.Join(w.root, xpkg.MetaFile))
+	if err != nil && os.IsNotExist(err) {
+		return nil, errors.Wrap(err, errMetaFileDoesNotExist)
+	}
+
+	var p interface{}
+	p, err = parseConfigPkg(b)
+	// check if we parsed a provider package instead of a configuration package
 	if err != nil {
-		return nil, errors.Wrap(err, errInitBackend)
+		if err.Error() != errMetaNotConfiguration {
+			return nil, err
+		}
+
+		p, err = parseProviderPkg(b)
+		if err != nil {
+			return nil, err
+		}
 	}
 
-	defer func() { _ = r.Close() }()
+	return p.(v1.Pkg), nil
+}
 
-	metas, err := parse(r)
+func parseConfigPkg(b []byte) (*v1.Configuration, error) {
+	var c v1.Configuration
+	err := yaml.Unmarshal(b, &c)
 	if err != nil {
-		return nil, errors.Wrap(err, errParserPackage)
+		return nil, err
 	}
 
-	if len(metas) != 1 {
-		return nil, errors.New(errNotExactlyOneMeta)
+	if c.Kind != v1.ConfigurationKind {
+		return nil, errors.New(errMetaNotConfiguration)
 	}
 
-	o := metas[0]
+	return &c, nil
+}
 
-	pkg, ok := xpkg.TryConvertToPkg(o, &v1.Provider{}, &v1.Configuration{})
-	if !ok {
-		return nil, errors.New(errNotMeta)
+func parseProviderPkg(b []byte) (*v1.Provider, error) {
+	var p v1.Provider
+	err := yaml.Unmarshal(b, &p)
+	if err != nil {
+		return nil, err
 	}
 
-	return pkg, nil
+	if p.Kind != v1.ProviderKind {
+		return nil, errors.New(errMetaNotProvider)
+	}
+
+	return &p, nil
 }
 
 // writeMetaPkg writes to the current meta file (crossplane.yaml).
@@ -263,46 +266,4 @@ func cleanNullTs(p v1.Pkg) ([]byte, error) {
 	delete(m["metadata"].(map[string]interface{}), "creationTimestamp")
 
 	return sigsyaml.Marshal(m)
-}
-
-// parse attempts to decode objects recognized by the meta scheme.
-// ref: https://github.com/crossplane/crossplane-runtime/blob/master/pkg/parser/parser.go#L94
-// current impl does too much for our use case (parses beyond the meta file).
-//
-// @TODO(@tnthornton) see if we can find a happy middle ground between the two
-// impls to reduce duplication.
-func parse(reader io.ReadCloser) ([]runtime.Object, error) { //nolint:gocyclo
-	defer func() { _ = reader.Close() }()
-
-	metaScheme, err := xpkg.BuildMetaScheme()
-	if err != nil {
-		return nil, err
-	}
-	yr := yaml.NewYAMLReader(bufio.NewReader(reader))
-	dm := json.NewSerializerWithOptions(
-		json.DefaultMetaFactory,
-		metaScheme,
-		metaScheme,
-		json.SerializerOptions{Yaml: true},
-	)
-
-	metas := []runtime.Object{}
-
-	for {
-		bytes, err := yr.Read()
-		if err != nil && err != io.EOF {
-			return nil, err
-		}
-		if err == io.EOF {
-			break
-		}
-		if len(bytes) == 0 {
-			continue
-		}
-		m, _, _ := dm.Decode(bytes, nil, nil)
-		if m != nil {
-			metas = append(metas, m)
-		}
-	}
-	return metas, nil
 }
