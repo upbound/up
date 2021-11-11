@@ -21,9 +21,9 @@ import (
 	"github.com/crossplane/crossplane/apis/pkg/v1beta1"
 	"github.com/spf13/afero"
 
-	"github.com/upbound/up/internal/dep"
-	"github.com/upbound/up/internal/dep/cache"
 	"github.com/upbound/up/internal/xpkg"
+	"github.com/upbound/up/internal/xpkg/dep"
+	"github.com/upbound/up/internal/xpkg/dep/cache"
 )
 
 // AfterApply constructs and binds Upbound-specific context to any subcommands

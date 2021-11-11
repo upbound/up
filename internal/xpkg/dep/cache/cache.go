@@ -30,8 +30,8 @@ import (
 	"github.com/crossplane/crossplane/apis/pkg/v1beta1"
 
 	"github.com/upbound/up/internal/config"
-	"github.com/upbound/up/internal/dep"
 	"github.com/upbound/up/internal/xpkg"
+	"github.com/upbound/up/internal/xpkg/dep"
 )
 
 // A Cache caches OCI images.
