@@ -24,16 +24,18 @@ import (
 	"github.com/spf13/afero"
 	"k8s.io/utils/pointer"
 
+	apimetav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/runtime"
+
 	"github.com/crossplane/crossplane-runtime/pkg/test"
 	metav1 "github.com/crossplane/crossplane/apis/pkg/meta/v1"
 	"github.com/crossplane/crossplane/apis/pkg/v1beta1"
-	apimetav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 )
 
 func TestUpsert(t *testing.T) {
 	type args struct {
 		fs       afero.Fs
-		metaFile metav1.Pkg
+		metaFile runtime.Object
 		dep      v1beta1.Dependency
 	}
 
@@ -51,7 +53,7 @@ func TestUpsert(t *testing.T) {
 			reason: "Should not return an error if package is created at path.",
 			args: args{
 				fs: afero.NewMemMapFs(),
-				dep: New(
+				dep: NewWithType(
 					"crossplane/provider-gcp@v1.0.0",
 					string(v1beta1.ConfigurationPackageType),
 				),
@@ -85,7 +87,8 @@ func TestUpsert(t *testing.T) {
 			reason: "Should not return an error if package is created at path.",
 			args: args{
 				fs: afero.NewMemMapFs(),
-				dep: New("crossplane/provider-gcp@v1.0.0",
+				dep: NewWithType(
+					"crossplane/provider-gcp@v1.0.0",
 					string(v1beta1.ProviderPackageType),
 				),
 				metaFile: &metav1.Provider{
@@ -140,8 +143,9 @@ func TestUpsert(t *testing.T) {
 			}
 
 			p, _ := ws.readPkgMeta()
+			pkg := p.(metav1.Pkg)
 
-			resultDeps := p.GetDependencies()
+			resultDeps := pkg.GetDependencies()
 
 			if diff := cmp.Diff(tc.want.deps, resultDeps, cmpopts.SortSlices(func(i, j int) bool {
 				return *resultDeps[i].Provider < *resultDeps[j].Provider
@@ -156,7 +160,7 @@ func TestUpsert(t *testing.T) {
 func TestUpsertDeps(t *testing.T) {
 	type args struct {
 		dep v1beta1.Dependency
-		pkg metav1.Pkg
+		pkg runtime.Object
 	}
 
 	type want struct {
@@ -172,7 +176,8 @@ func TestUpsertDeps(t *testing.T) {
 		"EmptyDependencyList": {
 			reason: "Should return an updated deps list with the included provider.",
 			args: args{
-				dep: New("crossplane/provider-aws@v1.0.0",
+				dep: NewWithType(
+					"crossplane/provider-aws@v1.0.0",
 					string(v1beta1.ProviderPackageType),
 				),
 				pkg: &metav1.Configuration{
@@ -195,7 +200,8 @@ func TestUpsertDeps(t *testing.T) {
 		"InsertIntoDependencyList": {
 			reason: "Should return an updated deps list with 2 entries.",
 			args: args{
-				dep: New("crossplane/provider-gcp@v1.0.1",
+				dep: NewWithType(
+					"crossplane/provider-gcp@v1.0.1",
 					string(v1beta1.ProviderPackageType),
 				),
 				pkg: &metav1.Configuration{
@@ -227,7 +233,8 @@ func TestUpsertDeps(t *testing.T) {
 		"UpdateDependencyList": {
 			reason: "Should return an updated deps list with the provider version updated.",
 			args: args{
-				dep: New("crossplane/provider-aws@v1.0.1",
+				dep: NewWithType(
+					"crossplane/provider-aws@v1.0.1",
 					string(v1beta1.ConfigurationPackageType),
 				),
 				pkg: &metav1.Provider{
@@ -255,7 +262,8 @@ func TestUpsertDeps(t *testing.T) {
 		"UseDefaultTag": {
 			reason: "Should return an error indicating the package name is invalid.",
 			args: args{
-				dep: New("crossplane/provider-aws",
+				dep: NewWithType(
+					"crossplane/provider-aws",
 					string(v1beta1.ProviderPackageType),
 				),
 				pkg: &metav1.Provider{
@@ -283,7 +291,8 @@ func TestUpsertDeps(t *testing.T) {
 		"DuplicateDep": {
 			reason: "Should return an error indicating duplicate dependencies detected.",
 			args: args{
-				dep: New("crossplane/provider-aws",
+				dep: NewWithType(
+					"crossplane/provider-aws",
 					string(v1beta1.ProviderPackageType),
 				),
 				pkg: &metav1.Provider{
@@ -319,7 +328,8 @@ func TestUpsertDeps(t *testing.T) {
 			}
 
 			if tc.want.deps != nil {
-				if diff := cmp.Diff(tc.want.deps, tc.args.pkg.GetDependencies()); diff != "" {
+				p := tc.args.pkg.(metav1.Pkg)
+				if diff := cmp.Diff(tc.want.deps, p.GetDependencies()); diff != "" {
 					t.Errorf("\n%s\nUpsertDeps(...): -want err, +got err:\n%s", tc.reason, diff)
 				}
 			}
@@ -380,7 +390,7 @@ func TestRWMetaFile(t *testing.T) {
 
 	type args struct {
 		fs       afero.Fs
-		metaFile metav1.Pkg
+		metaFile runtime.Object
 	}
 
 	type want struct {

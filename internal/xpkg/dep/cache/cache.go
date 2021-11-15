@@ -15,6 +15,7 @@
 package cache
 
 import (
+	"bytes"
 	"fmt"
 	"io"
 	"os"
@@ -24,21 +25,30 @@ import (
 
 	"github.com/google/go-containerregistry/pkg/name"
 	v1 "github.com/google/go-containerregistry/pkg/v1"
-	"github.com/google/go-containerregistry/pkg/v1/tarball"
 	"github.com/spf13/afero"
 
+	apimetav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"sigs.k8s.io/yaml"
+
+	"github.com/crossplane/crossplane-runtime/pkg/errors"
 	"github.com/crossplane/crossplane/apis/pkg/v1beta1"
 
 	"github.com/upbound/up/internal/config"
-	"github.com/upbound/up/internal/xpkg"
 	"github.com/upbound/up/internal/xpkg/dep"
+)
+
+const (
+	errFailedToAddEntry  = "failed to add entry to cache"
+	errFailedToFindEntry = "failed to find entry"
+
+	errOpenPackageStream = "failed to open package stream file"
 )
 
 // A Cache caches OCI images.
 type Cache interface {
-	Get(v1beta1.Dependency) (v1.Image, error)
+	Get(v1beta1.Dependency) (*Entry, error)
+	GetPkgType(v1beta1.Dependency) (string, error)
 	Store(v1beta1.Dependency, v1.Image) error
-	Delete(v1beta1.Dependency) error
 
 	Clean() error
 }
@@ -96,7 +106,7 @@ func WithRoot(root string) Option {
 }
 
 // Get retrieves an image from the LocalCache.
-func (c *Local) Get(k v1beta1.Dependency) (v1.Image, error) {
+func (c *Local) Get(k v1beta1.Dependency) (*Entry, error) {
 	c.mu.RLock()
 	defer c.mu.RUnlock()
 	t, err := name.NewTag(dep.ImgTag(k))
@@ -104,74 +114,38 @@ func (c *Local) Get(k v1beta1.Dependency) (v1.Image, error) {
 		return nil, err
 	}
 
-	dir := c.dir(&t)
+	return c.CurrentEntry(c.resolvePath(&t))
+}
 
-	l, err := c.currentFile(dir)
-	if os.IsNotExist(err) {
-		return nil, err
+// GetPkgType retrieves the package type for the given dependency's meta file
+func (c *Local) GetPkgType(k v1beta1.Dependency) (string, error) {
+	e, err := c.Get(k)
+	if err != nil {
+		return "", err
 	}
 
-	return tarball.Image(
-		c.opener(l),
-		&t,
-	)
+	b := new(bytes.Buffer)
+	_, err = io.Copy(b, e.Meta())
+	if err != nil {
+		return "", err
+	}
+
+	// var o metav1.Configuration
+
+	o := struct {
+		apimetav1.TypeMeta
+	}{}
+
+	if err := yaml.Unmarshal(b.Bytes(), &o); err != nil {
+		return "", err
+	}
+
+	return o.Kind, nil
 }
 
 // Store saves an image to the LocalCache. If a file currently
 // exists at that location, we overwrite the current file.
-func (c *Local) Store(k v1beta1.Dependency, v v1.Image) error { // nolint:gocyclo
-	c.mu.Lock()
-	defer c.mu.Unlock()
-	imgTag := dep.ImgTag(k)
-
-	ref, err := name.ParseReference(imgTag)
-	if err != nil {
-		return err
-	}
-
-	t, err := name.NewTag(imgTag)
-	if err != nil {
-		return err
-	}
-
-	d := c.dir(&t)
-
-	// make sure the directory structure exists for this entry
-	if err := c.fs.MkdirAll(d, os.ModePerm); err != nil {
-		return err
-	}
-
-	h, err := v.Digest()
-	if err != nil {
-		return err
-	}
-
-	// does an older file exist?
-	cur, err := c.currentFile(d)
-	if err != nil {
-		return err
-	}
-
-	// clean up old file if one exists
-	if cur != "" {
-		if err = c.fs.Remove(cur); err != nil && !os.IsNotExist(err) {
-			return err
-		}
-	}
-
-	cf, err := c.fs.Create(c.newFile(d, h.String()))
-	if err != nil {
-		return err
-	}
-
-	if err := tarball.Write(ref, v, cf); err != nil {
-		return err
-	}
-	return cf.Close()
-}
-
-// Delete removes an image from the ImageCache.
-func (c *Local) Delete(k v1beta1.Dependency) error {
+func (c *Local) Store(k v1beta1.Dependency, v v1.Image) error {
 	c.mu.Lock()
 	defer c.mu.Unlock()
 
@@ -180,16 +154,46 @@ func (c *Local) Delete(k v1beta1.Dependency) error {
 		return err
 	}
 
-	l, err := c.currentFile(c.dir(&t))
+	path := c.resolvePath(&t)
+
+	curr, err := c.CurrentEntry(path)
 	if err != nil && !os.IsNotExist(err) {
+		return errors.Wrap(err, errFailedToFindEntry)
+	}
+
+	e, err := c.NewEntry(v)
+	if err != nil {
 		return err
 	}
 
-	err = c.fs.Remove(l)
-	if os.IsNotExist(err) {
-		return nil
+	// TODO(@tnthornton) we can add a check to skip persisting if we already
+	// have the latest version of the dependency stored.
+
+	// clean the current entry
+	if err := curr.Clean(); err != nil {
+		return err
 	}
-	return err
+
+	return c.add(e, path)
+}
+
+// add the given entry to the supplied path (to)
+func (c *Local) add(e *Entry, to string) error {
+	if err := c.ensureDirExists(filepath.Join(c.root, to)); err != nil {
+		return err
+	}
+
+	e.setPath(to)
+
+	if _, _, _, err := e.flush(); err != nil {
+		return errors.Wrap(err, errFailedToAddEntry)
+	}
+
+	if err := e.setDigest(); err != nil {
+		return errors.Wrap(err, errFailedToAddEntry)
+	}
+
+	return nil
 }
 
 // Clean removes all entries from the cache. Returns nil if the directory DNE.
@@ -200,32 +204,19 @@ func (c *Local) Clean() error {
 	return c.fs.RemoveAll(c.root)
 }
 
-func (c *Local) opener(path string) tarball.Opener {
-	return func() (io.ReadCloser, error) {
-		return c.fs.Open(path)
-	}
+// ensureDirExists ensures the target directory corresponding to the given path exists.
+func (c *Local) ensureDirExists(path string) error {
+	return c.fs.MkdirAll(path, os.ModePerm)
 }
 
-// example tag: index.docker.io/crossplane/provider-aws:v0.20.1-alpha
-func (c *Local) dir(tag *name.Tag) string {
+// resolvePath resolves the given image tag to a directory path following our
+// convention.
+// example:
+//   tag: crossplane/provider-aws:v0.20.1-alpha
+//   path: index.docker.io/crossplane/provider-aws@v0.20.1-alpha
+func (c *Local) resolvePath(tag *name.Tag) string {
 	return filepath.Join(
-		c.root,
 		tag.RegistryStr(),
 		fmt.Sprintf("%s@%s", tag.RepositoryStr(), tag.TagStr()),
 	)
-}
-
-func (c *Local) currentFile(path string) (string, error) {
-	files, err := afero.ReadDir(c.fs, path)
-	if err != nil {
-		return "", err
-	}
-	if len(files) > 0 {
-		return filepath.Join(path, files[0].Name()), nil
-	}
-	return "", nil
-}
-
-func (c *Local) newFile(path, digest string) string {
-	return filepath.Join(path, digest) + xpkg.XpkgExtension
 }

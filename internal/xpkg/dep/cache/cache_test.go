@@ -17,9 +17,9 @@ package cache
 import (
 	"archive/tar"
 	"bytes"
-	"fmt"
+	"crypto/sha256"
+	"io"
 	"os"
-	"path/filepath"
 	"syscall"
 	"testing"
 
@@ -35,40 +35,45 @@ import (
 	"github.com/crossplane/crossplane-runtime/pkg/test"
 	"github.com/crossplane/crossplane/apis/pkg/v1beta1"
 
-	"github.com/upbound/up/internal/xpkg/dep"
+	"github.com/upbound/up/internal/xpkg"
 )
 
 var (
 	providerAws = "crossplane/provider-aws"
+
+	testProviderMetaYaml = "testdata/provider_meta.yaml"
+	testProviderPkgYaml  = "testdata/provider_package.yaml"
 )
 
 func TestGet(t *testing.T) {
 	fs := afero.NewMemMapFs()
-
-	cRoot := "/cache"
+	i := newPackageImage(testProviderPkgYaml)
 
 	cache, _ := NewLocal(
 		WithFS(fs),
-		WithRoot(cRoot),
+		WithRoot("/cache"),
 		// override HomeDirFn
 		rootIsHome,
 	)
 
-	manualAddEntry(fs, entry{
-		root:  cRoot,
-		path:  "index.docker.io/crossplane/provider-aws@v0.20.1-alpha",
-		image: empty.Image,
-		tag:   "crossplane/provider-aws:v0.20.1-alpha",
-	})
+	e, _ := cache.NewEntry(i)
+
+	cache.add(e, "index.docker.io/crossplane/provider-aws@v0.20.1-alpha")
 
 	type args struct {
 		cache *Local
 		key   v1beta1.Dependency
 	}
+
+	type want struct {
+		err error
+		val *Entry
+	}
+
 	cases := map[string]struct {
 		reason string
 		args   args
-		want   error
+		want   want
 	}{
 		"Success": {
 			reason: "Should not return an error if package exists at path.",
@@ -77,6 +82,11 @@ func TestGet(t *testing.T) {
 				key: v1beta1.Dependency{
 					Package:     providerAws,
 					Constraints: "v0.20.1-alpha",
+				},
+			},
+			want: want{
+				val: &Entry{
+					sha: digest(i),
 				},
 			},
 		},
@@ -89,49 +99,47 @@ func TestGet(t *testing.T) {
 					Constraints: "v0.20.1-alpha1",
 				},
 			},
-			want: &os.PathError{Op: "open", Path: "/cache/index.docker.io/crossplane/provider-aws@v0.20.1-alpha1", Err: afero.ErrFileNotFound},
+			want: want{
+				err: &os.PathError{Op: "open", Path: "/cache/index.docker.io/crossplane/provider-aws@v0.20.1-alpha1", Err: afero.ErrFileNotFound},
+			},
 		},
 	}
 
 	for name, tc := range cases {
 		t.Run(name, func(t *testing.T) {
-			_, err := tc.args.cache.Get(tc.args.key)
+			e, err := tc.args.cache.Get(tc.args.key)
 
-			if diff := cmp.Diff(tc.want, err, test.EquateErrors()); diff != "" {
+			if tc.want.val != nil {
+				if diff := cmp.Diff(tc.want.val.Digest(), e.Digest()); diff != "" {
+					t.Errorf("\n%s\nGet(...): -want err, +got err:\n%s", tc.reason, diff)
+				}
+			}
+
+			if diff := cmp.Diff(tc.want.err, err, test.EquateErrors()); diff != "" {
 				t.Errorf("\n%s\nGet(...): -want err, +got err:\n%s", tc.reason, diff)
 			}
 		})
 	}
 }
 
-func TestStore(t *testing.T) {
-	fs := afero.NewMemMapFs()
+func TestGetPkgType(t *testing.T) {
 	cache, _ := NewLocal(
-		WithFS(fs),
+		WithFS(afero.NewMemMapFs()),
 		WithRoot("/cache"),
 		rootIsHome,
 	)
 
-	readOnlyCache, _ := NewLocal(
-		WithFS(afero.NewReadOnlyFs(fs)),
-		WithRoot("/new-cache/"),
-		rootIsHome,
-	)
-
-	existsd := v1beta1.Dependency{
-		Package:     "crossplane/exist-xpkg",
-		Type:        v1beta1.ProviderPackageType,
-		Constraints: "latest",
-	}
+	e, _ := cache.NewEntry(newPackageImage(testProviderPkgYaml))
+	cache.add(e, "index.docker.io/crossplane/provider-aws@v0.20.1-alpha")
 
 	type args struct {
 		cache *Local
 		key   v1beta1.Dependency
-		val   v1.Image
 	}
+
 	type want struct {
-		err      error
-		numFiles int
+		err     error
+		pkgType v1beta1.PackageType
 	}
 
 	cases := map[string]struct {
@@ -140,127 +148,196 @@ func TestStore(t *testing.T) {
 		want   want
 	}{
 		"Success": {
-			reason: "Should not return an error if package is created at path.",
+			reason: "Should not return an error if package exists at path.",
 			args: args{
 				cache: cache,
-				key:   existsd,
-				val:   empty.Image,
+				key: v1beta1.Dependency{
+					Package:     providerAws,
+					Constraints: "v0.20.1-alpha",
+				},
 			},
 			want: want{
-				numFiles: 1,
+				pkgType: v1beta1.ProviderPackageType,
 			},
 		},
-		"Replace": {
-			reason: "Should not return an error if we're replacing the pre-existing image.",
+		"ErrNotExist": {
+			reason: "Should return error if package does not exist at path.",
 			args: args{
 				cache: cache,
-				key:   existsd,
-				val:   newEmptyImage([]byte("stuff and things")),
+				key: v1beta1.Dependency{
+					Package:     providerAws,
+					Constraints: "v0.20.1-alpha1",
+				},
 			},
 			want: want{
-				numFiles: 1,
-			},
-		},
-		"ErrFailedCreate": {
-			reason: "Should return an error if file creation fails.",
-			args: args{
-				cache: readOnlyCache,
-				key:   existsd,
-				val:   empty.Image,
-			},
-			want: want{
-				err:      syscall.EPERM,
-				numFiles: 0,
+				err: &os.PathError{Op: "open", Path: "/cache/index.docker.io/crossplane/provider-aws@v0.20.1-alpha1", Err: afero.ErrFileNotFound},
 			},
 		},
 	}
 
 	for name, tc := range cases {
 		t.Run(name, func(t *testing.T) {
-			err := tc.args.cache.Store(tc.args.key, tc.args.val)
+			pt, err := tc.args.cache.GetPkgType(tc.args.key)
 
 			if diff := cmp.Diff(tc.want.err, err, test.EquateErrors()); diff != "" {
-				t.Errorf("\n%s\nStore(...): -want err, +got err:\n%s", tc.reason, diff)
+				t.Errorf("\n%s\nGet(...): -want err, +got err:\n%s", tc.reason, diff)
 			}
 
-			tag, _ := ociname.NewTag(dep.ImgTag(tc.args.key))
-			files, _ := afero.ReadDir(fs, tc.args.cache.dir(&tag))
-
-			if diff := cmp.Diff(tc.want.numFiles, len(files)); diff != "" {
-				t.Errorf("\n%s\nStore(...): -want err, +got err:\n%s", tc.reason, diff)
+			if diff := cmp.Diff(string(tc.want.pkgType), pt); diff != "" {
+				t.Errorf("\n%s\nGet(...): -want err, +got err:\n%s", tc.reason, diff)
 			}
 		})
 	}
 }
 
-func TestDelete(t *testing.T) {
-	fs := afero.NewMemMapFs()
-	cache, _ := NewLocal(
-		WithFS(fs),
-		WithRoot("/cache"),
-		rootIsHome,
-	)
+func TestStore(t *testing.T) {
+	dep1 := v1beta1.Dependency{
+		Package:     "crossplane/exist-xpkg",
+		Type:        v1beta1.ProviderPackageType,
+		Constraints: "latest",
+	}
 
-	readOnlyCache, _ := NewLocal(
-		WithFS(afero.NewReadOnlyFs(fs)),
-		WithRoot("/cache"),
-		rootIsHome,
-	)
+	dep2 := v1beta1.Dependency{
+		Package:     "crossplane/dep2-xpkg",
+		Type:        v1beta1.ProviderPackageType,
+		Constraints: "latest",
+	}
 
-	manualAddEntry(fs, entry{
-		root:  "/cache",
-		path:  "index.docker.io/crossplane/provider-aws@v0.20.1-alpha",
-		image: empty.Image,
-		tag:   "crossplane/provider-aws:v0.20.1-alpha",
-	})
+	type setup struct {
+		dep v1beta1.Dependency
+		img v1.Image
+	}
 
 	type args struct {
 		cache *Local
-		key   v1beta1.Dependency
+		dep   v1beta1.Dependency
+		img   v1.Image
+		setup *setup
 	}
+
+	type want struct {
+		metaSha        [32]byte
+		pkgDigest      string
+		cacheFileCount int
+		err            error
+	}
+
 	cases := map[string]struct {
 		reason string
 		args   args
-		want   error
+		want   want
 	}{
 		"Success": {
-			reason: "Should not return an error if package is deleted at path.",
+			reason: "Should have crossplane.yaml and the expected number of files if successful.",
 			args: args{
-				cache: cache,
-				key: v1beta1.Dependency{
-					Package:     providerAws,
-					Constraints: "v0.20.1-alpha",
-				},
+				cache: newLocalCache(
+					WithFS(afero.NewMemMapFs()),
+					WithRoot("/tmp/cache"),
+					rootIsHome,
+				),
+				dep: dep1,
+				img: newPackageImage(testProviderPkgYaml),
+			},
+			want: want{
+				metaSha:        sha256.Sum256(metaTestData()),
+				pkgDigest:      digest(newPackageImage(testProviderPkgYaml)),
+				cacheFileCount: 4,
 			},
 		},
-		"SuccessNotExist": {
-			reason: "Should not return an error if package does not exist.",
+		"AddSecondDependency": {
+			reason: "Should not return an error if we have multiple packages in cache.",
 			args: args{
-				cache: cache,
-				key: v1beta1.Dependency{
-					Package: "not-exists/not-exists",
+				cache: newLocalCache(
+					WithFS(afero.NewMemMapFs()),
+					WithRoot("/tmp/cache"),
+					rootIsHome,
+				),
+				dep: dep2,
+				img: newPackageImage(testProviderPkgYaml),
+				setup: &setup{
+					dep: dep1,
+					img: newPackageImage(testProviderPkgYaml),
 				},
+			},
+			want: want{
+				metaSha:        sha256.Sum256(metaTestData()),
+				pkgDigest:      digest(newPackageImage(testProviderPkgYaml)),
+				cacheFileCount: 8,
 			},
 		},
-		"ErrFailedDelete": {
-			reason: "Should return an error if file deletion fails.",
+		"Replace": {
+			reason: "Should not return an error if we're replacing the pre-existing image.",
 			args: args{
-				cache: readOnlyCache,
-				key: v1beta1.Dependency{
-					Package:     providerAws,
-					Constraints: "v0.20.1-alpha",
+				cache: newLocalCache(
+					WithFS(afero.NewMemMapFs()),
+					WithRoot("/tmp/cache"),
+					rootIsHome,
+				),
+				dep: dep1,
+				img: newPackageImage(testProviderPkgYaml),
+				setup: &setup{
+					dep: dep1,
+					img: newPackageImage(testProviderPkgYaml),
 				},
 			},
-			want: syscall.EPERM,
+			want: want{
+				metaSha:        sha256.Sum256(metaTestData()),
+				pkgDigest:      digest(newPackageImage(testProviderPkgYaml)),
+				cacheFileCount: 4,
+			},
+		},
+		"ErrFailedCreate": {
+			reason: "Should return an error if file creation fails.",
+			args: args{
+				cache: newLocalCache(
+					WithFS(afero.NewReadOnlyFs(afero.NewMemMapFs())),
+					WithRoot("/tmp/cache"),
+					rootIsHome,
+				),
+				dep: dep1,
+				img: newPackageImage(testProviderPkgYaml),
+			},
+			want: want{
+				err:            syscall.EPERM,
+				cacheFileCount: 0,
+			},
 		},
 	}
 
 	for name, tc := range cases {
 		t.Run(name, func(t *testing.T) {
-			err := tc.args.cache.Delete(tc.args.key)
+			if tc.args.setup != nil {
+				// establish a pre-existing entry
+				err := tc.args.cache.Store(tc.args.setup.dep, tc.args.setup.img)
+				if diff := cmp.Diff(nil, err, test.EquateErrors()); diff != "" {
+					t.Errorf("\n%s\nStore(...): -want err, +got err:\n%s", tc.reason, diff)
+				}
+			}
 
-			if diff := cmp.Diff(tc.want, err, test.EquateErrors()); diff != "" {
-				t.Errorf("\n%s\nDelete(...): -want err, +got err:\n%s", tc.reason, diff)
+			err := tc.args.cache.Store(tc.args.dep, tc.args.img)
+			if diff := cmp.Diff(tc.want.err, err, test.EquateErrors()); diff != "" {
+				t.Errorf("\n%s\nStore(...): -want err, +got err:\n%s", tc.reason, diff)
+			}
+
+			if tc.want.err == nil {
+
+				e, _ := tc.args.cache.Get(tc.args.dep)
+
+				b := new(bytes.Buffer)
+				_, _ = io.Copy(b, e.Meta())
+				got := sha256.Sum256(b.Bytes())
+
+				if diff := cmp.Diff(tc.want.metaSha, got); diff != "" {
+					t.Errorf("\n%s\nStore(...): -want err, +got err:\n%s", tc.reason, diff)
+				}
+
+				if diff := cmp.Diff(tc.want.pkgDigest, e.Digest()); diff != "" {
+					t.Errorf("\n%s\nStore(...): -want err, +got err:\n%s", tc.reason, diff)
+				}
+
+				if diff := cmp.Diff(tc.want.cacheFileCount, cacheFileCnt(tc.args.cache.fs, tc.args.cache.root)); diff != "" {
+					t.Errorf("\n%s\nStore(...): -want err, +got err:\n%s", tc.reason, diff)
+				}
 			}
 		})
 	}
@@ -274,8 +351,7 @@ func TestClean(t *testing.T) {
 	)
 	readOnlyCache, _ := NewLocal(
 		WithFS(afero.NewReadOnlyFs(fs)),
-		WithRoot("/cache"),
-		rootIsHome,
+		WithRoot("~/.up/cache"),
 	)
 
 	type args struct {
@@ -299,7 +375,7 @@ func TestClean(t *testing.T) {
 				cache: cache,
 			},
 			want: want{
-				preCleanFileCnt:  2,
+				preCleanFileCnt:  8,
 				postCleanFileCnt: 0,
 			},
 		},
@@ -309,8 +385,8 @@ func TestClean(t *testing.T) {
 				cache: readOnlyCache,
 			},
 			want: want{
-				preCleanFileCnt:  2,
-				postCleanFileCnt: 2,
+				preCleanFileCnt:  8,
+				postCleanFileCnt: 8,
 				err:              syscall.EPERM,
 			},
 		},
@@ -318,21 +394,12 @@ func TestClean(t *testing.T) {
 
 	for name, tc := range cases {
 		t.Run(name, func(t *testing.T) {
-
 			// add a few entries to cache
-			manualAddEntry(fs, entry{
-				root:  tc.args.cache.root,
-				path:  "index.docker.io/crossplane/provider-aws@v0.20.1-alpha",
-				image: empty.Image,
-				tag:   "crossplane/provider-aws:v0.20.1-alpha",
-			})
+			e1, _ := cache.NewEntry(newPackageImage(testProviderPkgYaml))
+			cache.add(e1, "index.docker.io/crossplane/provider-aws@v0.20.1-alpha")
 
-			manualAddEntry(fs, entry{
-				root:  tc.args.cache.root,
-				path:  "index.docker.io/crossplane/provider-gcp@v0.14.2",
-				image: empty.Image,
-				tag:   "crossplane/provider-gcp:v0.14.2",
-			})
+			e2, _ := cache.NewEntry(newPackageImage(testProviderPkgYaml))
+			cache.add(e2, "index.docker.io/crossplane/provider-gcp@v0.14.2")
 
 			c := cacheFileCnt(fs, tc.args.cache.root)
 
@@ -355,7 +422,7 @@ func TestClean(t *testing.T) {
 	}
 }
 
-func TestDir(t *testing.T) {
+func TestResolvePath(t *testing.T) {
 	tag1, _ := ociname.NewTag("crossplane/provider-aws:v0.20.1-alpha")
 	tag2, _ := ociname.NewTag("gcr.io/crossplane/provider-gcp:v1.0.0")
 	tag3, _ := ociname.NewTag("registry.upbound.io/examples-aws/getting-started:v0.14.0-240.g6a7366f")
@@ -379,45 +446,55 @@ func TestDir(t *testing.T) {
 			args: args{
 				tag: &tag1,
 			},
-			want: "/cache/index.docker.io/crossplane/provider-aws@v0.20.1-alpha",
+			want: "index.docker.io/crossplane/provider-aws@v0.20.1-alpha",
 		},
 		"SuccessGCR": {
 			reason: "Should return formatted cache path with packageName as filename.",
 			args: args{
 				tag: &tag2,
 			},
-			want: "/cache/gcr.io/crossplane/provider-gcp@v1.0.0",
+			want: "gcr.io/crossplane/provider-gcp@v1.0.0",
 		},
 		"SuccessUpboundRegistry": {
 			reason: "Should return formatted cache path with packageName as filename.",
 			args: args{
 				tag: &tag3,
 			},
-			want: "/cache/registry.upbound.io/examples-aws/getting-started@v0.14.0-240.g6a7366f",
+			want: "registry.upbound.io/examples-aws/getting-started@v0.14.0-240.g6a7366f",
 		},
 	}
 
 	for name, tc := range cases {
 		t.Run(name, func(t *testing.T) {
-			d := c.dir(tc.args.tag)
+			d := c.resolvePath(tc.args.tag)
 
 			if diff := cmp.Diff(tc.want, d); diff != "" {
-				t.Errorf("\n%s\nBuildPath(...): -want err, +got err:\n%s", tc.reason, diff)
+				t.Errorf("\n%s\nResolvePath(...): -want err, +got err:\n%s", tc.reason, diff)
 			}
 		})
 	}
 }
 
-func newEmptyImage(contents []byte) v1.Image {
+func newPackageImage(path string) v1.Image {
+	pack, _ := os.Open(path)
+
+	info, _ := pack.Stat()
+
 	buf := new(bytes.Buffer)
-	w := tar.NewWriter(buf)
 
-	w.Write(contents)
+	tw := tar.NewWriter(buf)
+	hdr := &tar.Header{
+		Name: xpkg.StreamFile,
+		Mode: int64(xpkg.StreamFileMode),
+		Size: info.Size(),
+	}
+	_ = tw.WriteHeader(hdr)
+	_, _ = io.Copy(tw, pack)
+	_ = tw.Close()
+	packLayer, _ := tarball.LayerFromReader(buf)
+	packImg, _ := mutate.AppendLayers(empty.Image, packLayer)
 
-	layer, _ := tarball.LayerFromReader(buf)
-	newImg, _ := mutate.AppendLayers(empty.Image, layer)
-
-	return newImg
+	return packImg
 }
 
 func cacheFileCnt(fs afero.Fs, dir string) int {
@@ -436,26 +513,29 @@ func cacheFileCnt(fs afero.Fs, dir string) int {
 	return cnt
 }
 
-type entry struct {
-	root  string
-	path  string
-	image v1.Image
-	tag   string
+func digest(i v1.Image) string {
+	h, _ := i.Digest()
+	return h.String()
 }
 
-func manualAddEntry(fs afero.Fs, e entry) {
-	d, _ := e.image.Digest()
-	basepath := filepath.Join(e.root, e.path)
-	fs.MkdirAll(basepath, os.ModePerm)
+func metaTestData() []byte {
+	meta, _ := os.Open(testProviderMetaYaml)
 
-	path := filepath.Join(basepath, fmt.Sprintf("%s.xpkg", d.String()))
-	cf, _ := fs.Create(path)
-	tag, _ := ociname.NewTag(e.tag)
-	tarball.Write(tag, empty.Image, cf)
+	buf := new(bytes.Buffer)
+	_, _ = io.Copy(buf, meta)
+
+	return buf.Bytes()
 }
 
-var rootIsHome = func(l *Local) {
-	l.home = func() (string, error) {
-		return "/", nil
+var (
+	rootIsHome = func(l *Local) {
+		l.home = func() (string, error) {
+			return "/", nil
+		}
 	}
-}
+
+	newLocalCache = func(opts ...Option) *Local {
+		c, _ := NewLocal(opts...)
+		return c
+	}
+)

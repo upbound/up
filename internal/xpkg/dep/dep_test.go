@@ -81,7 +81,7 @@ func TestNew(t *testing.T) {
 	for name, tc := range cases {
 		t.Run(name, func(t *testing.T) {
 
-			d := New(tc.args.pkg, tc.args.t)
+			d := NewWithType(tc.args.pkg, tc.args.t)
 
 			if diff := cmp.Diff(tc.want.dep, d); diff != "" {
 				t.Errorf("\n%s\nNew(...): -want err, +got err:\n%s", tc.reason, diff)

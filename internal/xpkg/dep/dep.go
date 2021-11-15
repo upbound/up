@@ -26,10 +26,10 @@ const (
 )
 
 // New returns a new v1beta1.Dependency based on the given package name
-// and PackageType (reprented as a string).
 // Expects names of the form source@version where @version can be
 // left blank in order to indicate 'latest'.
-func New(pkg, t string) v1beta1.Dependency {
+func New(pkg string) v1beta1.Dependency {
+
 	// if the passed in ver was blank use the default to pass
 	// constraint checks and grab latest semver
 	version := defaultVer
@@ -41,12 +41,20 @@ func New(pkg, t string) v1beta1.Dependency {
 		version = ps[1]
 	}
 
-	d := v1beta1.Dependency{
+	return v1beta1.Dependency{
 		Package:     source,
-		Type:        v1beta1.ProviderPackageType,
 		Constraints: version,
 	}
+}
 
+// NewWithType returns a new v1beta1.Dependency based on the given package
+// name and PackageType (represented as a string).
+// Expects names of the form source@version where @version can be
+// left blank in order to indicate 'latest'.
+func NewWithType(pkg string, t string) v1beta1.Dependency {
+	d := New(pkg)
+
+	d.Type = v1beta1.ProviderPackageType
 	if strings.Title(strings.ToLower(t)) == string(v1beta1.ConfigurationPackageType) {
 		d.Type = v1beta1.ConfigurationPackageType
 	}

@@ -58,7 +58,7 @@ func (c *depCmd) AfterApply(kongCtx *kong.Context) error {
 			return err
 		}
 
-		c.d = dep.New(c.Package, c.Type)
+		c.d = dep.New(c.Package)
 
 		// determine the version (using resolver) to use based on the supplied constraints
 		v, err := c.r.ResolveTag(ctx, c.d)
@@ -86,7 +86,6 @@ type depCmd struct {
 	CleanCache bool   `short:"c" help:"Clean dep cache."`
 
 	Package string `arg:"" optional:"" help:"Package to be added."`
-	Type    string `short:"t" optional:"" help:"The dependency type to be added." enum:"configuration,provider" default:"provider"`
 }
 
 // Run executes the dep command.
@@ -116,7 +115,15 @@ func (c *depCmd) Run(ctx context.Context) error {
 
 	// if a meta file exists in the ws, update it
 	if c.ws.MetaExists() {
-		// `crossplane.yaml file exists in the workspace, upsert the new dependency`
+		// crossplane.yaml file exists in the workspace, upsert the new dependency
+
+		// get the package from the cache so we can determine its type
+		pt, err := c.c.GetPkgType(c.d)
+		if err != nil {
+			return err
+		}
+		c.d.Type = v1beta1.PackageType(pt)
+
 		if err := c.ws.Upsert(c.d); err != nil {
 			return err
 		}

@@ -15,6 +15,7 @@
 package dep
 
 import (
+	"context"
 	encjson "encoding/json"
 	"os"
 	"path/filepath"
@@ -25,8 +26,9 @@ import (
 	sigsyaml "sigs.k8s.io/yaml"
 
 	apimetav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
-	"k8s.io/apimachinery/pkg/util/yaml"
+	"k8s.io/apimachinery/pkg/runtime"
 
+	"github.com/crossplane/crossplane-runtime/pkg/parser"
 	v1 "github.com/crossplane/crossplane/apis/pkg/meta/v1"
 	"github.com/crossplane/crossplane/apis/pkg/v1beta1"
 
@@ -34,17 +36,23 @@ import (
 )
 
 const (
+	errBuildMetaScheme   = "failed to build meta scheme for workspace"
+	errBuildObjectScheme = "failed to build object scheme for workspace"
+
 	errInvalidMetaFile      = "invalid meta type supplied"
 	errMetaFileDoesNotExist = "meta file does not exist"
 	errMetaContainsDupeDep  = "meta file contains duplicate dependency"
+	errNotExactlyOneMeta    = "not exactly one package meta type"
+	errNotAPackage          = "invalid package type supplied"
 )
 
 // Workspace defines our view of the current directory
 type Workspace struct {
 	fs             afero.Fs
 	metaFileExists bool
-	wd             WorkingDirFn
+	parser         *parser.PackageParser
 	root           string
+	wd             WorkingDirFn
 }
 
 // NewWorkspace establishees a workspace for acting on current ws entries
@@ -90,6 +98,17 @@ func (w *Workspace) Init() error {
 
 	w.metaFileExists = exists
 
+	metaScheme, err := xpkg.BuildMetaScheme()
+	if err != nil {
+		return errors.New(errBuildMetaScheme)
+	}
+	objScheme, err := xpkg.BuildObjectScheme()
+	if err != nil {
+		return errors.New(errBuildObjectScheme)
+	}
+
+	w.parser = parser.New(metaScheme, objScheme)
+
 	return nil
 }
 
@@ -115,7 +134,11 @@ func (w *Workspace) Upsert(d v1beta1.Dependency) error {
 	return w.writeMetaPkg(p)
 }
 
-func upsertDeps(d v1beta1.Dependency, p v1.Pkg) error { // nolint:gocyclo
+func upsertDeps(d v1beta1.Dependency, o runtime.Object) error { // nolint:gocyclo
+	p, ok := o.(v1.Pkg)
+	if !ok {
+		return errors.New(errNotAPackage)
+	}
 	deps := p.GetDependencies()
 
 	processed := false
@@ -162,72 +185,30 @@ func upsertDeps(d v1beta1.Dependency, p v1.Pkg) error { // nolint:gocyclo
 	return nil
 }
 
-func (w *Workspace) readPkgMeta() (v1.Pkg, error) {
+func (w *Workspace) readPkgMeta() (runtime.Object, error) {
 
-	b, err := afero.ReadFile(w.fs, filepath.Join(w.root, xpkg.MetaFile))
+	mf, err := w.fs.Open(filepath.Join(w.root, xpkg.MetaFile))
 	if err != nil && os.IsNotExist(err) {
 		return nil, errors.Wrap(err, errMetaFileDoesNotExist)
 	}
 
-	unmarshalFns := []packageUnmarshal{
-		configUnmarshal,
-		providerUnmarshal,
-	}
-
-	var p interface{}
-
-	for _, u := range unmarshalFns {
-		pkg, ok, err := u(b)
-		if !ok && err != nil {
-			return nil, err
-		}
-		if ok {
-			p = pkg
-			break
-		}
-	}
-
-	return p.(v1.Pkg), nil
-}
-
-type packageUnmarshal func(b []byte) (interface{}, bool, error)
-
-func configUnmarshal(b []byte) (interface{}, bool, error) {
-	var c v1.Configuration
-
-	err := yaml.Unmarshal(b, &c)
+	pkg, err := w.parser.Parse(context.Background(), mf)
 	if err != nil {
-		return nil, false, err
+		return nil, err
 	}
 
-	// we were able to unmarshal but we didn't get the expected type,
-	// return ok = false
-	if c.Kind != v1.ConfigurationKind {
-		return nil, false, nil
-	}
-	return &c, true, nil
-}
-
-func providerUnmarshal(b []byte) (interface{}, bool, error) {
-	var p v1.Provider
-	err := yaml.Unmarshal(b, &p)
-	if err != nil {
-		return nil, false, err
+	metas := pkg.GetMeta()
+	if len(metas) != 1 {
+		return nil, errors.New(errNotExactlyOneMeta)
 	}
 
-	// we were able to unmarshal but we didn't get the expected type,
-	// return ok = false
-	if p.Kind != v1.ProviderKind {
-		return nil, false, nil
-	}
-
-	return &p, true, nil
+	return metas[0], nil
 }
 
 // writeMetaPkg writes to the current meta file (crossplane.yaml).
 // If the file currently exists, it will be overwritten rather than
 // appended to.
-func (w *Workspace) writeMetaPkg(p v1.Pkg) error {
+func (w *Workspace) writeMetaPkg(p runtime.Object) error {
 	data, err := sigsyaml.Marshal(p)
 	if err != nil {
 		return err
@@ -262,7 +243,7 @@ func (w *Workspace) writeMetaPkg(p v1.Pkg) error {
 // cleanNullTs is a helper function for cleaning the erroneous
 // `creationTimestamp: null` from the marshaled data that we're
 // going to writer to the meta file.
-func cleanNullTs(p v1.Pkg) ([]byte, error) {
+func cleanNullTs(p runtime.Object) ([]byte, error) {
 	ob, err := encjson.Marshal(p)
 	if err != nil {
 		return nil, err
