@@ -309,13 +309,13 @@ func TestStore(t *testing.T) {
 		t.Run(name, func(t *testing.T) {
 			if tc.args.setup != nil {
 				// establish a pre-existing entry
-				err := tc.args.cache.Store(tc.args.setup.dep, tc.args.setup.img)
+				_, err := tc.args.cache.Store(tc.args.setup.dep, tc.args.setup.img)
 				if diff := cmp.Diff(nil, err, test.EquateErrors()); diff != "" {
 					t.Errorf("\n%s\nStore(...): -want err, +got err:\n%s", tc.reason, diff)
 				}
 			}
 
-			err := tc.args.cache.Store(tc.args.dep, tc.args.img)
+			_, err := tc.args.cache.Store(tc.args.dep, tc.args.img)
 			if diff := cmp.Diff(tc.want.err, err, test.EquateErrors()); diff != "" {
 				t.Errorf("\n%s\nStore(...): -want err, +got err:\n%s", tc.reason, diff)
 			}

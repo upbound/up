@@ -12,7 +12,7 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-package dep
+package workspace
 
 import (
 	"context"
@@ -33,6 +33,7 @@ import (
 	"github.com/crossplane/crossplane/apis/pkg/v1beta1"
 
 	"github.com/upbound/up/internal/xpkg"
+	"github.com/upbound/up/internal/xpkg/dep/manager"
 )
 
 const (
@@ -55,8 +56,8 @@ type Workspace struct {
 	wd             WorkingDirFn
 }
 
-// NewWorkspace establishees a workspace for acting on current ws entries
-func NewWorkspace(opts ...WSOption) (*Workspace, error) {
+// New establishees a workspace for acting on current ws entries
+func New(opts ...WSOption) (*Workspace, error) {
 	ws := &Workspace{
 		fs: afero.NewOsFs(),
 		wd: os.Getwd,
@@ -143,7 +144,12 @@ func (w *Workspace) DependsOn() ([]v1beta1.Dependency, error) {
 
 	pkg := p.(v1.Pkg)
 
-	return convertToV1beta1(pkg.GetDependencies()), nil
+	out := make([]v1beta1.Dependency, len(pkg.GetDependencies()))
+	for i, d := range pkg.GetDependencies() {
+		out[i] = manager.ConvertToV1beta1(d)
+	}
+
+	return out, nil
 }
 
 func upsertDeps(d v1beta1.Dependency, o runtime.Object) error { // nolint:gocyclo
@@ -269,26 +275,4 @@ func cleanNullTs(p runtime.Object) ([]byte, error) {
 	delete(m["metadata"].(map[string]interface{}), "creationTimestamp")
 
 	return sigsyaml.Marshal(m)
-}
-
-func convertToV1beta1(in []v1.Dependency) []v1beta1.Dependency {
-	out := make([]v1beta1.Dependency, len(in))
-	for i, d := range in {
-		betaD := v1beta1.Dependency{
-			Constraints: d.Version,
-		}
-		if d.Provider != nil && d.Configuration == nil {
-			betaD.Package = *d.Provider
-			betaD.Type = v1beta1.ProviderPackageType
-		}
-
-		if d.Configuration != nil && d.Provider == nil {
-			betaD.Package = *d.Configuration
-			betaD.Type = v1beta1.ConfigurationPackageType
-		}
-
-		out[i] = betaD
-	}
-
-	return out
 }

@@ -32,7 +32,7 @@ func New(pkg string) v1beta1.Dependency {
 
 	// if the passed in ver was blank use the default to pass
 	// constraint checks and grab latest semver
-	version := defaultVer
+	version := DefaultVer
 
 	ps := strings.Split(pkg, "@")
 
@@ -63,7 +63,7 @@ func NewWithType(pkg string, t string) v1beta1.Dependency {
 }
 
 // ImgTag returns the full image tag "source:version" of the given dependency
-func ImgTag(d v1beta1.Dependency) string {
+func ImgTag(d *v1beta1.Dependency) string {
 	// NOTE(@tnthornton) this should ONLY be used after the version constraint
 	// has been resolved for the given dependency. Using a semver range is not
 	// a valid tag format and will cause lookups to this string to fail.

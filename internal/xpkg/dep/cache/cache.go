@@ -119,7 +119,7 @@ func WithRoot(root string) Option {
 func (c *Local) Get(k v1beta1.Dependency) (*Entry, error) {
 	c.mu.RLock()
 	defer c.mu.RUnlock()
-	t, err := name.NewTag(dep.ImgTag(k))
+	t, err := name.NewTag(dep.ImgTag(&k))
 	if err != nil {
 		return nil, err
 	}
@@ -139,36 +139,44 @@ func (c *Local) GetPkgType(k v1beta1.Dependency) (string, error) {
 
 // Store saves an image to the LocalCache. If a file currently
 // exists at that location, we overwrite the current file.
-func (c *Local) Store(k v1beta1.Dependency, v v1.Image) error {
+// TODO(@tnthornton) does passing in v1.Image make sense here still?
+// While the API on it's face is nice and clean, it makes tests alittle harder.
+// One could argue that we should push image ingestion and parsing to the
+// edges of the system and only after they've successfully been parsed allow
+// them in to be handled by the rest of the system.
+func (c *Local) Store(k v1beta1.Dependency, v v1.Image) (*Entry, error) {
 	c.mu.Lock()
 	defer c.mu.Unlock()
 
-	t, err := name.NewTag(dep.ImgTag(k))
+	t, err := name.NewTag(dep.ImgTag(&k))
 	if err != nil {
-		return err
+		return nil, err
 	}
 
 	path := c.resolvePath(&t)
 
 	curr, err := c.CurrentEntry(path)
 	if err != nil && !os.IsNotExist(err) {
-		return errors.Wrap(err, errFailedToFindEntry)
+		return nil, errors.Wrap(err, errFailedToFindEntry)
 	}
 
 	e, err := c.NewEntry(v)
 	if err != nil {
-		return err
+		return nil, err
 	}
-
-	// TODO(@tnthornton) we can add a check to skip persisting if we already
-	// have the latest version of the dependency stored.
 
 	// clean the current entry
 	if err := curr.Clean(); err != nil {
-		return err
+		return nil, err
 	}
 
-	return c.add(e, path)
+	if err := c.add(e, path); err != nil {
+		return nil, err
+	}
+
+	// TODO(@tnthornton) this is a little bit of a bummer, maybe we could hydrate
+	// e on add...
+	return c.CurrentEntry(path)
 }
 
 // add the given entry to the supplied path (to)

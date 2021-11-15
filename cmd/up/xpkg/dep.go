@@ -18,13 +18,14 @@ import (
 	"context"
 
 	"github.com/alecthomas/kong"
-	"github.com/crossplane/crossplane/apis/pkg/v1beta1"
 	"github.com/pkg/errors"
 	"github.com/spf13/afero"
 
 	"github.com/upbound/up/internal/xpkg"
 	"github.com/upbound/up/internal/xpkg/dep"
 	"github.com/upbound/up/internal/xpkg/dep/cache"
+	"github.com/upbound/up/internal/xpkg/dep/manager"
+	"github.com/upbound/up/internal/xpkg/dep/workspace"
 )
 
 const (
@@ -45,35 +46,26 @@ func (c *depCmd) AfterApply(kongCtx *kong.Context) error {
 		return err
 	}
 
-	c.c = cache
-	c.f = dep.NewLocalFetcher()
-	c.r = dep.NewResolver(dep.WithFetcher(c.f))
+	f := dep.NewLocalFetcher()
+	r := dep.NewResolver(dep.WithFetcher(f))
 
-	ws, err := dep.NewWorkspace(dep.WithFS(fs))
+	c.m = manager.New(
+		manager.WithCache(cache),
+		manager.WithFetcher(f),
+		manager.WithResolver(r),
+	)
+
+	if err := c.m.Init(); err != nil {
+		return err
+	}
+
+	c.c = cache
+
+	ws, err := workspace.New(workspace.WithFS(fs))
 	if err != nil {
 		return err
 	}
 	c.ws = ws
-
-	// don't resolve the given dependency if we want to clean the cache or there
-	// wasn't a dependency passed in on the commandline
-	if !c.CleanCache && c.Package != "" {
-		// exit early check if we were supplied an invalid package string
-		_, err := xpkg.ValidDep(c.Package)
-		if err != nil {
-			return err
-		}
-
-		c.d = dep.New(c.Package)
-
-		// determine the version (using resolver) to use based on the supplied constraints
-		v, err := c.r.ResolveTag(ctx, c.d)
-		if err != nil {
-			return err
-		}
-
-		c.d.Constraints = v
-	}
 
 	// workaround interfaces not being bindable ref: https://github.com/alecthomas/kong/issues/48
 	kongCtx.BindTo(ctx, (*context.Context)(nil))
@@ -83,10 +75,8 @@ func (c *depCmd) AfterApply(kongCtx *kong.Context) error {
 // depCmd manages crossplane dependencies.
 type depCmd struct {
 	c  *cache.Local
-	d  v1beta1.Dependency
-	f  *dep.LocalFetcher
-	r  *dep.Resolver
-	ws *dep.Workspace
+	m  *manager.Manager
+	ws *workspace.Workspace
 
 	CacheDir   string `short:"d" help:"Directory used for caching package images." default:"~/.up/cache/" env:"CACHE_DIR"`
 	CleanCache bool   `short:"c" help:"Clean dep cache."`
@@ -112,13 +102,16 @@ func (c *depCmd) Run(ctx context.Context) error {
 }
 
 func (c *depCmd) userSuppliedDep(ctx context.Context) error {
-	i, err := c.r.ResolveImage(ctx, c.d)
+	// exit early check if we were supplied an invalid package string
+	_, err := xpkg.ValidDep(c.Package)
 	if err != nil {
 		return err
 	}
 
-	// add xpkg to cache
-	if err := c.c.Store(c.d, i); err != nil {
+	d := dep.New(c.Package)
+
+	ud, err := c.m.Resolve(ctx, d)
+	if err != nil {
 		return err
 	}
 
@@ -127,18 +120,9 @@ func (c *depCmd) userSuppliedDep(ctx context.Context) error {
 		return err
 	}
 
-	// if a meta file exists in the ws, update it
 	if c.ws.MetaExists() {
 		// crossplane.yaml file exists in the workspace, upsert the new dependency
-
-		// get the package from the cache so we can determine its type
-		pt, err := c.c.GetPkgType(c.d)
-		if err != nil {
-			return err
-		}
-		c.d.Type = v1beta1.PackageType(pt)
-
-		if err := c.ws.Upsert(c.d); err != nil {
+		if err := c.ws.Upsert(ud); err != nil {
 			return err
 		}
 	}
@@ -161,21 +145,7 @@ func (c *depCmd) metaSuppliedDeps(ctx context.Context) error {
 	}
 
 	for _, d := range deps {
-		// resolve the constraint to a static version
-		v, err := c.r.ResolveTag(ctx, d)
-		if err != nil {
-			return err
-		}
-
-		d.Constraints = v
-
-		i, err := c.r.ResolveImage(ctx, d)
-		if err != nil {
-			return err
-		}
-
-		// add xpkg to cache
-		if err := c.c.Store(d, i); err != nil {
+		if _, err := c.m.Resolve(ctx, d); err != nil {
 			return err
 		}
 	}

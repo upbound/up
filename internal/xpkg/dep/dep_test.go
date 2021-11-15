@@ -47,7 +47,7 @@ func TestNew(t *testing.T) {
 				dep: v1beta1.Dependency{
 					Package:     providerAws,
 					Type:        v1beta1.ProviderPackageType,
-					Constraints: defaultVer,
+					Constraints: DefaultVer,
 				},
 			},
 		},

@@ -122,7 +122,7 @@ func TestResolveTag(t *testing.T) {
 			args: args{
 				dep: v1beta1.Dependency{
 					Package:     "crossplane/provider-aws",
-					Constraints: "v1.0.0",
+					Constraints: ">=v1.0.0",
 				},
 				fetcher: NewMockFetcher(
 					WithError(

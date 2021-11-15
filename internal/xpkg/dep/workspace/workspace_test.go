@@ -12,7 +12,7 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-package dep
+package workspace
 
 import (
 	"syscall"
@@ -30,6 +30,8 @@ import (
 	"github.com/crossplane/crossplane-runtime/pkg/test"
 	metav1 "github.com/crossplane/crossplane/apis/pkg/meta/v1"
 	"github.com/crossplane/crossplane/apis/pkg/v1beta1"
+
+	"github.com/upbound/up/internal/xpkg/dep"
 )
 
 func TestUpsert(t *testing.T) {
@@ -53,7 +55,7 @@ func TestUpsert(t *testing.T) {
 			reason: "Should not return an error if package is created at path.",
 			args: args{
 				fs: afero.NewMemMapFs(),
-				dep: NewWithType(
+				dep: dep.NewWithType(
 					"crossplane/provider-gcp@v1.0.0",
 					string(v1beta1.ConfigurationPackageType),
 				),
@@ -87,7 +89,7 @@ func TestUpsert(t *testing.T) {
 			reason: "Should not return an error if package is created at path.",
 			args: args{
 				fs: afero.NewMemMapFs(),
-				dep: NewWithType(
+				dep: dep.NewWithType(
 					"crossplane/provider-gcp@v1.0.0",
 					string(v1beta1.ProviderPackageType),
 				),
@@ -176,7 +178,7 @@ func TestUpsertDeps(t *testing.T) {
 		"EmptyDependencyList": {
 			reason: "Should return an updated deps list with the included provider.",
 			args: args{
-				dep: NewWithType(
+				dep: dep.NewWithType(
 					"crossplane/provider-aws@v1.0.0",
 					string(v1beta1.ProviderPackageType),
 				),
@@ -200,7 +202,7 @@ func TestUpsertDeps(t *testing.T) {
 		"InsertIntoDependencyList": {
 			reason: "Should return an updated deps list with 2 entries.",
 			args: args{
-				dep: NewWithType(
+				dep: dep.NewWithType(
 					"crossplane/provider-gcp@v1.0.1",
 					string(v1beta1.ProviderPackageType),
 				),
@@ -233,7 +235,7 @@ func TestUpsertDeps(t *testing.T) {
 		"UpdateDependencyList": {
 			reason: "Should return an updated deps list with the provider version updated.",
 			args: args{
-				dep: NewWithType(
+				dep: dep.NewWithType(
 					"crossplane/provider-aws@v1.0.1",
 					string(v1beta1.ConfigurationPackageType),
 				),
@@ -262,7 +264,7 @@ func TestUpsertDeps(t *testing.T) {
 		"UseDefaultTag": {
 			reason: "Should return an error indicating the package name is invalid.",
 			args: args{
-				dep: NewWithType(
+				dep: dep.NewWithType(
 					"crossplane/provider-aws",
 					string(v1beta1.ProviderPackageType),
 				),
@@ -283,7 +285,7 @@ func TestUpsertDeps(t *testing.T) {
 				deps: []metav1.Dependency{
 					{
 						Provider: pointer.String("crossplane/provider-aws"),
-						Version:  defaultVer,
+						Version:  dep.DefaultVer,
 					},
 				},
 			},
@@ -291,7 +293,7 @@ func TestUpsertDeps(t *testing.T) {
 		"DuplicateDep": {
 			reason: "Should return an error indicating duplicate dependencies detected.",
 			args: args{
-				dep: NewWithType(
+				dep: dep.NewWithType(
 					"crossplane/provider-aws",
 					string(v1beta1.ProviderPackageType),
 				),
@@ -611,7 +613,7 @@ func TestDependsOn(t *testing.T) {
 }
 
 func newTestWS(fs afero.Fs) *Workspace {
-	ws, _ := NewWorkspace(
+	ws, _ := New(
 		WithFS(fs),
 		func(w *Workspace) {
 			w.wd = func() (string, error) {

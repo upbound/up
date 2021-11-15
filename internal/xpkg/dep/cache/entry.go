@@ -69,10 +69,11 @@ type Entry struct {
 	pkg       *parser.Package
 	pkgType   pkgv1beta1.PackageType
 	sha       string
+	ver       string
 }
 
 // NewEntry --
-// TODO maybe pull this into cache.go
+// TODO(@tnthornton) maybe pull this into cache.go
 func (c *Local) NewEntry(i v1.Image) (*Entry, error) {
 	d, err := i.Digest()
 	if err != nil {
@@ -102,9 +103,8 @@ func (c *Local) NewEntry(i v1.Image) (*Entry, error) {
 	}, nil
 }
 
-// TODO maybe pull this into cache.go
-
 // CurrentEntry retrieves the current Entry at the given path.
+// TODO(@tnthornton) maybe pull this into cache.go
 func (c *Local) CurrentEntry(path string) (*Entry, error) {
 
 	e := &Entry{
@@ -144,6 +144,9 @@ func (c *Local) CurrentEntry(path string) (*Entry, error) {
 			continue
 		}
 	}
+
+	e.ver = resolveVer(path)
+
 	return e, nil
 }
 
@@ -210,6 +213,11 @@ func (e *Entry) Objects() []runtime.Object {
 // Type returns the pkgv1beta1.PackageType of package for this entry.
 func (e *Entry) Type() pkgv1beta1.PackageType {
 	return e.pkgType
+}
+
+// Version returns the package version.
+func (e *Entry) Version() string {
+	return e.ver
 }
 
 // flush writes the package contents to disk.
@@ -338,4 +346,8 @@ func (e *Entry) Clean() error {
 
 func (e *Entry) location() string {
 	return filepath.Join(e.cacheRoot, e.path)
+}
+
+func resolveVer(path string) string {
+	return strings.Split(path, "@")[1]
 }
