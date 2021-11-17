@@ -134,6 +134,18 @@ func (w *Workspace) Upsert(d v1beta1.Dependency) error {
 	return w.writeMetaPkg(p)
 }
 
+// DependsOn returns a slice of v1beta1.Dependency that this workspace depends on.
+func (w *Workspace) DependsOn() ([]v1beta1.Dependency, error) {
+	p, err := w.readPkgMeta()
+	if err != nil {
+		return nil, err
+	}
+
+	pkg := p.(v1.Pkg)
+
+	return convertToV1beta1(pkg.GetDependencies()), nil
+}
+
 func upsertDeps(d v1beta1.Dependency, o runtime.Object) error { // nolint:gocyclo
 	p, ok := o.(v1.Pkg)
 	if !ok {
@@ -257,4 +269,26 @@ func cleanNullTs(p runtime.Object) ([]byte, error) {
 	delete(m["metadata"].(map[string]interface{}), "creationTimestamp")
 
 	return sigsyaml.Marshal(m)
+}
+
+func convertToV1beta1(in []v1.Dependency) []v1beta1.Dependency {
+	out := make([]v1beta1.Dependency, len(in))
+	for i, d := range in {
+		betaD := v1beta1.Dependency{
+			Constraints: d.Version,
+		}
+		if d.Provider != nil && d.Configuration == nil {
+			betaD.Package = *d.Provider
+			betaD.Type = v1beta1.ProviderPackageType
+		}
+
+		if d.Configuration != nil && d.Provider == nil {
+			betaD.Package = *d.Configuration
+			betaD.Type = v1beta1.ConfigurationPackageType
+		}
+
+		out[i] = betaD
+	}
+
+	return out
 }

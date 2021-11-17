@@ -462,6 +462,154 @@ func TestRWMetaFile(t *testing.T) {
 	}
 }
 
+func TestDependsOn(t *testing.T) {
+	type args struct {
+		fs       afero.Fs
+		metaFile runtime.Object
+	}
+
+	type want struct {
+		deps []v1beta1.Dependency
+		err  error
+	}
+
+	cases := map[string]struct {
+		reason string
+		args   args
+		want   want
+	}{
+		"SingleDependency": {
+			reason: "Should return a slice with a single entry.",
+			args: args{
+				fs: afero.NewMemMapFs(),
+				metaFile: &metav1.Configuration{
+					TypeMeta: apimetav1.TypeMeta{
+						APIVersion: "meta.pkg.crossplane.io/v1",
+						Kind:       "Configuration",
+					},
+					ObjectMeta: apimetav1.ObjectMeta{
+						Name: "getting-started-with-aws",
+					},
+					Spec: metav1.ConfigurationSpec{
+						MetaSpec: metav1.MetaSpec{
+							Crossplane: &metav1.CrossplaneConstraints{
+								Version: ">=1.0.0-0",
+							},
+							DependsOn: []metav1.Dependency{
+								{
+									Provider: pointer.String("crossplane/provider-aws"),
+									Version:  "v1.0.0",
+								},
+							},
+						},
+					},
+				},
+			},
+			want: want{
+				deps: []v1beta1.Dependency{
+					{
+						Package:     "crossplane/provider-aws",
+						Type:        v1beta1.ProviderPackageType,
+						Constraints: "v1.0.0",
+					},
+				},
+			},
+		},
+		"MultipleDependencies": {
+			reason: "Should return a slice with multiple entries.",
+			args: args{
+				fs: afero.NewMemMapFs(),
+				metaFile: &metav1.Provider{
+					TypeMeta: apimetav1.TypeMeta{
+						APIVersion: "meta.pkg.crossplane.io/v1",
+						Kind:       "Provider",
+					},
+					ObjectMeta: apimetav1.ObjectMeta{
+						Name: "getting-started-with-aws",
+					},
+					Spec: metav1.ProviderSpec{
+						MetaSpec: metav1.MetaSpec{
+							Crossplane: &metav1.CrossplaneConstraints{
+								Version: ">=1.0.0-0",
+							},
+							DependsOn: []metav1.Dependency{
+								{
+									Configuration: pointer.String("crossplane/provider-gcp"),
+									Version:       ">=v1.0.1",
+								},
+								{
+									Provider: pointer.String("crossplane/provider-aws"),
+									Version:  "v1.0.0",
+								},
+							},
+						},
+					},
+				},
+			},
+			want: want{
+				deps: []v1beta1.Dependency{
+					{
+						Package:     "crossplane/provider-gcp",
+						Type:        v1beta1.ConfigurationPackageType,
+						Constraints: ">=v1.0.1",
+					},
+					{
+						Package:     "crossplane/provider-aws",
+						Type:        v1beta1.ProviderPackageType,
+						Constraints: "v1.0.0",
+					},
+				},
+			},
+		},
+		"NoDependencies": {
+			reason: "Should return an empty slice.",
+			args: args{
+				fs: afero.NewMemMapFs(),
+				metaFile: &metav1.Provider{
+					TypeMeta: apimetav1.TypeMeta{
+						APIVersion: "meta.pkg.crossplane.io/v1",
+						Kind:       "Provider",
+					},
+					ObjectMeta: apimetav1.ObjectMeta{
+						Name: "getting-started-with-aws",
+					},
+					Spec: metav1.ProviderSpec{
+						MetaSpec: metav1.MetaSpec{
+							Crossplane: &metav1.CrossplaneConstraints{
+								Version: ">=1.0.0-0",
+							},
+						},
+					},
+				},
+			},
+			want: want{
+				deps: []v1beta1.Dependency{},
+			},
+		},
+	}
+
+	for name, tc := range cases {
+		t.Run(name, func(t *testing.T) {
+			// init workspace that is specific to this test
+			ws := newTestWS(tc.args.fs)
+
+			ws.writeMetaPkg(tc.args.metaFile)
+
+			got, err := ws.DependsOn()
+			if diff := cmp.Diff(tc.want.err, err, test.EquateErrors()); diff != "" {
+				t.Errorf("\n%s\nDependsOn(...): -want err, +got err:\n%s", tc.reason, diff)
+			}
+
+			if diff := cmp.Diff(tc.want.deps, got, cmpopts.SortSlices(func(i, j int) bool {
+				return got[i].Package < got[j].Package
+			})); diff != "" {
+				t.Errorf("\n%s\nDependsOn(...): -want err, +got err:\n%s", tc.reason, diff)
+			}
+
+		})
+	}
+}
+
 func newTestWS(fs afero.Fs) *Workspace {
 	ws, _ := NewWorkspace(
 		WithFS(fs),

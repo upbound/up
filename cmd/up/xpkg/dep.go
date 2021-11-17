@@ -19,11 +19,16 @@ import (
 
 	"github.com/alecthomas/kong"
 	"github.com/crossplane/crossplane/apis/pkg/v1beta1"
+	"github.com/pkg/errors"
 	"github.com/spf13/afero"
 
 	"github.com/upbound/up/internal/xpkg"
 	"github.com/upbound/up/internal/xpkg/dep"
 	"github.com/upbound/up/internal/xpkg/dep/cache"
+)
+
+const (
+	errMetaFileNotFound = "crossplane.yaml file not found in current directory"
 )
 
 // AfterApply constructs and binds Upbound-specific context to any subcommands
@@ -50,8 +55,9 @@ func (c *depCmd) AfterApply(kongCtx *kong.Context) error {
 	}
 	c.ws = ws
 
-	// don't resolve the given dependency if we want to clean the cache
-	if !c.CleanCache {
+	// don't resolve the given dependency if we want to clean the cache or there
+	// wasn't a dependency passed in on the commandline
+	if !c.CleanCache && c.Package != "" {
 		// exit early check if we were supplied an invalid package string
 		_, err := xpkg.ValidDep(c.Package)
 		if err != nil {
@@ -98,6 +104,14 @@ func (c *depCmd) Run(ctx context.Context) error {
 		return c.c.Clean()
 	}
 
+	if c.d != (v1beta1.Dependency{}) {
+		return c.userSuppliedDep(ctx)
+	}
+
+	return c.metaSuppliedDeps(ctx)
+}
+
+func (c *depCmd) userSuppliedDep(ctx context.Context) error {
 	i, err := c.r.ResolveImage(ctx, c.d)
 	if err != nil {
 		return err
@@ -125,6 +139,43 @@ func (c *depCmd) Run(ctx context.Context) error {
 		c.d.Type = v1beta1.PackageType(pt)
 
 		if err := c.ws.Upsert(c.d); err != nil {
+			return err
+		}
+	}
+
+	return nil
+}
+
+func (c *depCmd) metaSuppliedDeps(ctx context.Context) error {
+	if err := c.ws.Init(); err != nil {
+		return err
+	}
+
+	if !c.ws.MetaExists() {
+		return errors.New(errMetaFileNotFound)
+	}
+
+	deps, err := c.ws.DependsOn()
+	if err != nil {
+		return err
+	}
+
+	for _, d := range deps {
+		// resolve the constraint to a static version
+		v, err := c.r.ResolveTag(ctx, d)
+		if err != nil {
+			return err
+		}
+
+		d.Constraints = v
+
+		i, err := c.r.ResolveImage(ctx, d)
+		if err != nil {
+			return err
+		}
+
+		// add xpkg to cache
+		if err := c.c.Store(d, i); err != nil {
 			return err
 		}
 	}
