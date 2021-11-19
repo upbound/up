@@ -63,7 +63,6 @@ func init() {
 
 const (
 	errMissingValidatorFmt  = "could not find validator for node: %s"
-	errParseNode            = "failed to parse node"
 	errCompositionResources = "resources in Composition are malformed"
 )
 
