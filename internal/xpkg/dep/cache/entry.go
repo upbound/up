@@ -282,6 +282,7 @@ func (e *Entry) writeObjects(objs []runtime.Object) (int, int, error) { // nolin
 		if err != nil {
 			return crdc, xrdc, err
 		}
+		defer crdf.Close() // nolint:errcheck
 
 		crdb, err := crdf.Write(b)
 		if err != nil {
