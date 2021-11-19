@@ -24,6 +24,7 @@ import (
 	"testing"
 
 	"github.com/google/go-cmp/cmp"
+	"sigs.k8s.io/yaml"
 
 	ociname "github.com/google/go-containerregistry/pkg/name"
 	v1 "github.com/google/go-containerregistry/pkg/v1"
@@ -323,9 +324,8 @@ func TestStore(t *testing.T) {
 
 				e, _ := tc.args.cache.Get(tc.args.dep)
 
-				b := new(bytes.Buffer)
-				_, _ = io.Copy(b, e.Meta())
-				got := sha256.Sum256(b.Bytes())
+				b, _ := yaml.Marshal(e.Meta())
+				got := sha256.Sum256(b)
 
 				if diff := cmp.Diff(tc.want.metaSha, got); diff != "" {
 					t.Errorf("\n%s\nStore(...): -want err, +got err:\n%s", tc.reason, diff)

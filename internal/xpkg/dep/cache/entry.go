@@ -18,6 +18,7 @@ import (
 	"archive/tar"
 	"context"
 	"fmt"
+	"io"
 	"os"
 	"path/filepath"
 	"strings"
@@ -37,6 +38,7 @@ import (
 	xpv1 "github.com/crossplane/crossplane/apis/apiextensions/v1"
 	"github.com/crossplane/crossplane/apis/apiextensions/v1beta1"
 	metav1 "github.com/crossplane/crossplane/apis/pkg/meta/v1"
+	pkgv1beta1 "github.com/crossplane/crossplane/apis/pkg/v1beta1"
 
 	"github.com/upbound/up/internal/xpkg"
 )
@@ -62,18 +64,11 @@ const (
 type Entry struct {
 	cacheRoot string
 	fs        afero.Fs
-	sha       string
-	meta      afero.File
-	pkgParser *parser.PackageParser
-	pkgYaml   afero.File
 	path      string
+	pkg       *parser.Package
+	pkgType   pkgv1beta1.PackageType
+	sha       string
 }
-
-// given an image, resolve:
-// - digest
-// - afero.File to package.yaml (xpkg.StreamFile)
-//
-// - add new functions writeMeta, writeCRDs, writeXRDs (invoke on cache.add(entry, path))
 
 // NewEntry --
 // TODO maybe pull this into cache.go
@@ -85,27 +80,21 @@ func (c *Local) NewEntry(i v1.Image) (*Entry, error) {
 
 	r := mutate.Extract(i)
 	fs := tarfs.New(tar.NewReader(r))
-	pack, err := fs.Open(xpkg.StreamFile)
+	pkgYaml, err := fs.Open(xpkg.StreamFile)
 	if err != nil {
 		return nil, errors.Wrap(err, errOpenPackageStream)
 	}
 
-	metaScheme, err := xpkg.BuildMetaScheme()
+	pkg, pt, err := c.parse(pkgYaml)
 	if err != nil {
-		return nil, errors.New(errBuildMetaScheme)
+		return nil, err
 	}
-	objScheme, err := xpkg.BuildObjectScheme()
-	if err != nil {
-		return nil, errors.New(errBuildObjectScheme)
-	}
-
-	parser := parser.New(metaScheme, objScheme)
 
 	return &Entry{
 		cacheRoot: c.root,
 		fs:        c.fs,
-		pkgParser: parser,
-		pkgYaml:   pack,
+		pkg:       pkg,
+		pkgType:   pt,
 		sha:       d.String(),
 	}, nil
 }
@@ -140,11 +129,46 @@ func (c *Local) CurrentEntry(path string) (*Entry, error) {
 				return nil, err
 			}
 
-			e.meta = m
+			pkg, pt, err := c.parse(m)
+			if err != nil {
+				return nil, err
+			}
+
+			e.pkg = pkg
+			e.pkgType = pt
 			continue
 		}
 	}
 	return e, nil
+}
+
+func (c *Local) parse(r io.ReadCloser) (*parser.Package, pkgv1beta1.PackageType, error) {
+	var pkgType pkgv1beta1.PackageType
+	// parse package.yaml
+	pkg, err := c.parser.Parse(context.Background(), r)
+	if err != nil {
+		return nil, pkgType, errors.Wrap(err, errFailedToParsePkgYaml)
+	}
+
+	metas := pkg.GetMeta()
+	if len(metas) != 1 {
+		return nil, pkgType, errors.New(errNotExactlyOneMeta)
+	}
+
+	meta := metas[0]
+	var linter parser.Linter
+	if meta.GetObjectKind().GroupVersionKind().Kind == metav1.ConfigurationKind {
+		linter = xpkg.NewConfigurationLinter()
+		pkgType = pkgv1beta1.ConfigurationPackageType
+	} else {
+		linter = xpkg.NewProviderLinter()
+		pkgType = pkgv1beta1.ProviderPackageType
+	}
+	if err := linter.Lint(pkg); err != nil {
+		return nil, pkgType, errors.Wrap(err, errLintPackage)
+	}
+
+	return pkg, pkgType, nil
 }
 
 // Digest returns the current SHA digest filename for the entry.
@@ -164,42 +188,32 @@ func (e *Entry) setDigest() error {
 	return nil
 }
 
-// Meta returns the file reference for the meta file for an entry.
-func (e *Entry) Meta() afero.File {
-	return e.meta
+// Meta returns the parsed meta object for an entry.
+func (e *Entry) Meta() runtime.Object {
+	return e.pkg.GetMeta()[0]
+}
+
+// Objects returns the slice of parsed objects for an entry. The slice can
+// contain CRDs or XRDs depending on the package type.
+func (e *Entry) Objects() []runtime.Object {
+	return e.pkg.GetObjects()
+}
+
+// Type returns the pkgv1beta1.PackageType of package for this entry.
+func (e *Entry) Type() pkgv1beta1.PackageType {
+	return e.pkgType
 }
 
 // flush writes the package contents to disk.
 // In addition to error, flush returns the number of meta, CRD, and XRD files
 // written to the entry on disk.
 func (e *Entry) flush() (int, int, int, error) {
-	// parse package.yaml
-	p, err := e.pkgParser.Parse(context.Background(), e.pkgYaml)
-	if err != nil {
-		return 0, 0, 0, errors.Wrap(err, errFailedToParsePkgYaml)
-	}
 
-	metas := p.GetMeta()
-	if len(metas) != 1 {
-		return 0, 0, 0, errors.New(errNotExactlyOneMeta)
-	}
-
-	meta := metas[0]
-	var linter parser.Linter
-	if meta.GetObjectKind().GroupVersionKind().Kind == metav1.ConfigurationKind {
-		linter = xpkg.NewConfigurationLinter()
-	} else {
-		linter = xpkg.NewProviderLinter()
-	}
-	if err := linter.Lint(p); err != nil {
-		return 0, 0, 0, errors.Wrap(err, errLintPackage)
-	}
-
-	mNum, err := e.writeMeta(meta)
+	mNum, err := e.writeMeta(e.Meta())
 	if err != nil {
 		return mNum, 0, 0, err
 	}
-	cNum, xNum, err := e.writeObjects(p.GetObjects())
+	cNum, xNum, err := e.writeObjects(e.Objects())
 	if err != nil {
 		return mNum, cNum, xNum, err
 	}
@@ -286,46 +300,6 @@ func (e *Entry) writeObjects(objs []runtime.Object) (int, int, error) { // nolin
 
 	return crdc, xrdc, nil
 }
-
-// writeXRDs writes out the CRDs that came from the package.yaml
-// func (e *Entry) writeXRDs(objs []runtime.Object) (int, error) {
-// 	fc := 0
-// 	for _, o := range objs {
-// 		b, err := yaml.Marshal(o)
-// 		if err != nil {
-// 			return fc, err
-// 		}
-
-// 		if err := xpkg.IsXRD(o); err != nil {
-// 			// not an xrd skip
-// 			continue
-// 		}
-
-// 		name := ""
-// 		switch crd := o.(type) {
-
-// 		default:
-// 			return 0, errors.New(errObjectNotCRD)
-// 		}
-
-// 		crdf, err := e.fs.Create(filepath.Join(e.location(), fmt.Sprintf(crdNameFmt, name)))
-// 		if err != nil {
-// 			return fc, err
-// 		}
-
-// 		crdb, err := crdf.Write(b)
-// 		if err != nil {
-// 			return fc, err
-// 		}
-
-// 		if crdb == 0 {
-// 			return fc, errors.New(errFailedToCreateCRD)
-// 		}
-// 		fc++
-// 	}
-
-// 	return fc, nil
-// }
 
 // Path returns the path this entry represents.
 func (e *Entry) Path() string {

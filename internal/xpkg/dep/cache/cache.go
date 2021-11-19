@@ -15,9 +15,7 @@
 package cache
 
 import (
-	"bytes"
 	"fmt"
-	"io"
 	"os"
 	"path/filepath"
 	"strings"
@@ -27,13 +25,12 @@ import (
 	v1 "github.com/google/go-containerregistry/pkg/v1"
 	"github.com/spf13/afero"
 
-	apimetav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
-	"sigs.k8s.io/yaml"
-
 	"github.com/crossplane/crossplane-runtime/pkg/errors"
+	"github.com/crossplane/crossplane-runtime/pkg/parser"
 	"github.com/crossplane/crossplane/apis/pkg/v1beta1"
 
 	"github.com/upbound/up/internal/config"
+	"github.com/upbound/up/internal/xpkg"
 	"github.com/upbound/up/internal/xpkg/dep"
 )
 
@@ -56,11 +53,12 @@ type Cache interface {
 // Local stores and retrieves OCI images in a filesystem-backed cache in a
 // thread-safe manner.
 type Local struct {
-	fs   afero.Fs
-	home config.HomeDirFn
-	mu   sync.RWMutex
-	root string
-	path string
+	fs     afero.Fs
+	home   config.HomeDirFn
+	mu     sync.RWMutex
+	root   string
+	path   string
+	parser *parser.PackageParser
 }
 
 // NewLocal creates a new LocalCache.
@@ -84,6 +82,18 @@ func NewLocal(opts ...Option) (*Local, error) {
 		return nil, err
 	}
 	l.root = root
+
+	metaScheme, err := xpkg.BuildMetaScheme()
+	if err != nil {
+		return nil, errors.New(errBuildMetaScheme)
+	}
+	objScheme, err := xpkg.BuildObjectScheme()
+	if err != nil {
+		return nil, errors.New(errBuildObjectScheme)
+	}
+
+	l.parser = parser.New(metaScheme, objScheme)
+
 	return l, nil
 }
 
@@ -124,23 +134,7 @@ func (c *Local) GetPkgType(k v1beta1.Dependency) (string, error) {
 		return "", err
 	}
 
-	b := new(bytes.Buffer)
-	_, err = io.Copy(b, e.Meta())
-	if err != nil {
-		return "", err
-	}
-
-	// var o metav1.Configuration
-
-	o := struct {
-		apimetav1.TypeMeta
-	}{}
-
-	if err := yaml.Unmarshal(b.Bytes(), &o); err != nil {
-		return "", err
-	}
-
-	return o.Kind, nil
+	return string(e.Type()), nil
 }
 
 // Store saves an image to the LocalCache. If a file currently
