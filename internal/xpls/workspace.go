@@ -292,18 +292,14 @@ func (w *Workspace) Validate(fn NodeFilterFn) ([]lsp.Diagnostic, error) { // nol
 		if err := k8syaml.Unmarshal(b, node); err != nil {
 			return nil, err
 		}
-		nDiags, err := validationDiagnostics(v.Validate(node), n.GetAST(), node.GroupVersionKind())
-		if err != nil {
-			return nil, err
-		}
-		diags = append(diags, nDiags...)
+		diags = append(diags, validationDiagnostics(v.Validate(node), n.GetAST(), node.GroupVersionKind())...)
 	}
 	return diags, nil
 }
 
 // validationDiagnostics generates language server diagnostics from validation
 // errors.
-func validationDiagnostics(res *validate.Result, n ast.Node, gvk schema.GroupVersionKind) ([]lsp.Diagnostic, error) {
+func validationDiagnostics(res *validate.Result, n ast.Node, gvk schema.GroupVersionKind) []lsp.Diagnostic {
 	diags := []lsp.Diagnostic{}
 	for _, err := range res.Errors {
 		if err, ok := err.(*verrors.Validation); ok {
@@ -315,6 +311,9 @@ func validationDiagnostics(res *validate.Result, n ast.Node, gvk schema.GroupVer
 				if err.Code() == verrors.RequiredFailCode {
 					errPath = err.Name[:strings.LastIndex(err.Name, ".")]
 				}
+				// TODO(hasheddan): a general error should be surfaced if we
+				// cannot determine the location in the document causing the
+				// error.
 				path, err := yaml.PathString("$." + errPath)
 				if err != nil {
 					continue
@@ -348,7 +347,7 @@ func validationDiagnostics(res *validate.Result, n ast.Node, gvk schema.GroupVer
 			}
 		}
 	}
-	return diags, nil
+	return diags
 }
 
 // validatorsFromDir loads all validators from the specified directory.
