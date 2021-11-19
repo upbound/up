@@ -165,7 +165,12 @@ func (w *Workspace) Parse() error {
 			return nil
 		}
 		fileName := filepath.Join(w.root, p)
-		return w.parseFile(fileName)
+		// We attempt to parse subsequent documents if we encounter an error
+		// in a preceding one.
+		// TODO(hasheddan): errors should be aggregated and returned as
+		// diagnostics.
+		_ = w.parseFile(fileName)
+		return nil
 	})
 }
 
@@ -185,7 +190,11 @@ func (w *Workspace) parseFile(path string) error {
 	}
 	for _, doc := range f.Docs {
 		if _, err := w.parseDoc(doc, path); err != nil {
-			return err
+			// We attempt to parse subsequent documents if we encounter an error
+			// in a preceding one.
+			// TODO(hasheddan): errors should be aggregated and returned as
+			// diagnostics.
+			continue
 		}
 	}
 	return nil
@@ -214,16 +223,20 @@ func (w *Workspace) parseDoc(n ast.Node, path string) (NodeIdentifier, error) {
 		}
 		seq, ok := resNode.(*ast.SequenceNode)
 		if !ok {
-			// TODO(hasheddan): need to only provide diagnostic about this one place
+			// NOTE(hasheddan): if the Composition's resources field is not a
+			// sequence node, we skip parsing embedded resources because the
+			// Composition itself is malformed.
 			return NodeIdentifier{}, errors.New(errCompositionResources)
 		}
 		for _, s := range seq.Values {
 			sNode, err := compBase.FilterNode(s)
 			if err != nil {
-				return NodeIdentifier{}, err
+				// TODO(hasheddan): surface this error as a diagnostic.
+				continue
 			}
 			id, err := w.parseDoc(sNode, path)
 			if err != nil {
+				// TODO(hasheddan): surface this error as a diagnostic.
 				continue
 			}
 			dependants[id] = struct{}{}
