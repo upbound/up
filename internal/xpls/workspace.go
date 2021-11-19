@@ -16,6 +16,7 @@ package xpls
 
 import (
 	"bufio"
+	"fmt"
 	"io"
 	"io/fs"
 	"os"
@@ -24,6 +25,7 @@ import (
 	"sync"
 
 	"github.com/crossplane/crossplane-runtime/pkg/errors"
+	xpextv1 "github.com/crossplane/crossplane/apis/apiextensions/v1"
 	"github.com/goccy/go-yaml"
 	"github.com/goccy/go-yaml/ast"
 	"github.com/goccy/go-yaml/parser"
@@ -31,6 +33,7 @@ import (
 	ext "k8s.io/apiextensions-apiserver/pkg/apis/apiextensions"
 	extv1 "k8s.io/apiextensions-apiserver/pkg/apis/apiextensions/v1"
 	"k8s.io/apiextensions-apiserver/pkg/apiserver/validation"
+	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	apimachyaml "k8s.io/apimachinery/pkg/util/yaml"
 	verrors "k8s.io/kube-openapi/pkg/validation/errors"
@@ -41,41 +44,37 @@ import (
 // paths to extract GVK and name from objects that conform to Kubernetes
 // standard.
 var (
-	gvPath   *yaml.Path
-	kindPath *yaml.Path
-	namePath *yaml.Path
+	compResources *yaml.Path
+	compBase      *yaml.Path
 )
 
 // builds static YAML path strings ahead of usage.
 func init() {
 	var err error
-	gvPath, err = yaml.PathString("$.apiVersion")
+	compResources, err = yaml.PathString("$.spec.resources")
 	if err != nil {
 		panic(err)
 	}
-	kindPath, err = yaml.PathString("$.kind")
-	if err != nil {
-		panic(err)
-	}
-	namePath, err = yaml.PathString("$.metadata.name")
+	compBase, err = yaml.PathString("$.base")
 	if err != nil {
 		panic(err)
 	}
 }
 
 const (
-	errMissingValidatorFmt = "could not find validator for node: %s"
-	errParseNode           = "failed to parse node"
+	errMissingValidatorFmt  = "could not find validator for node: %s"
+	errParseNode            = "failed to parse node"
+	errCompositionResources = "resources in Composition are malformed"
 )
 
 // A PackageNode represents a concrete node in an xpkg.
 // TODO(hasheddan): PackageNode should be refactored into separate
 // implementations for each node type (e.g. XRD, Composition, CRD, etc.).
 type PackageNode struct {
-	ast      ast.Node
-	nested   []ast.Node
-	fileName string
-	gvk      schema.GroupVersionKind
+	ast        ast.Node
+	fileName   string
+	obj        *unstructured.Unstructured
+	dependants map[NodeIdentifier]struct{}
 }
 
 // GetAST gets the YAML AST node for this package node.
@@ -97,13 +96,7 @@ func (p *PackageNode) GetDependants() []NodeIdentifier {
 
 // GetGVK returns the GroupVersionKind of this node.
 func (p *PackageNode) GetGVK() schema.GroupVersionKind {
-	return p.gvk
-}
-
-// GetNested returns the YAML AST nodes for all nested objects in a package
-// node.
-func (p *PackageNode) GetNested() []ast.Node {
-	return p.nested
+	return p.obj.GroupVersionKind()
 }
 
 // NodeIdentifier is the unique identifier of a node in a workspace.
@@ -126,7 +119,6 @@ type Node interface {
 	GetFileName() string
 	GetDependants() []NodeIdentifier
 	GetGVK() schema.GroupVersionKind
-	GetNested() []ast.Node
 }
 
 // A Workspace represents a single xpkg workspace. It is safe for multi-threaded
@@ -193,40 +185,59 @@ func (w *Workspace) parseFile(path string) error {
 		return err
 	}
 	for _, doc := range f.Docs {
-		// NOTE(hasheddan): currently we just skip a workspace node in the case
-		// that we cannot construct its unique identifier.
-		gvNode, err := gvPath.FilterNode(doc.Body)
-		if err != nil {
+		if _, err := w.parseDoc(doc, path); err != nil {
 			return err
-		}
-		gvTok := gvNode.GetToken()
-		if gvTok == nil {
-			continue
-		}
-		kindNode, err := kindPath.FilterNode(doc.Body)
-		if err != nil {
-			return err
-		}
-		kindTok := kindNode.GetToken()
-		if kindTok == nil {
-			continue
-		}
-		nameNode, err := namePath.FilterNode(doc.Body)
-		if err != nil {
-			return err
-		}
-		nameTok := nameNode.GetToken()
-		if nameTok == nil {
-			continue
-		}
-		gvk := schema.FromAPIVersionAndKind(gvTok.Value, kindTok.Value)
-		w.nodes[nodeID(nameTok.Value, gvk)] = &PackageNode{
-			ast:      doc.Body,
-			fileName: path,
-			gvk:      gvk,
 		}
 	}
 	return nil
+}
+
+// parseDoc recursively parses a YAML document into PackageNodes. Embedded nodes
+// are added to the parent's list of dependants.
+func (w *Workspace) parseDoc(n ast.Node, path string) (NodeIdentifier, error) {
+	b, err := n.MarshalYAML()
+	if err != nil {
+		return NodeIdentifier{}, err
+	}
+	obj := &unstructured.Unstructured{}
+	// NOTE(hasheddan): unmarshal returns an error if Kind is not defined.
+	if err := k8syaml.Unmarshal(b, obj); err != nil {
+		return NodeIdentifier{}, err
+	}
+	dependants := map[NodeIdentifier]struct{}{}
+	if obj.GetKind() == xpextv1.CompositionKind {
+		if doc, ok := n.(*ast.DocumentNode); ok {
+			n = doc.Body
+		}
+		resNode, err := compResources.FilterNode(n)
+		if err != nil {
+			return NodeIdentifier{}, err
+		}
+		seq, ok := resNode.(*ast.SequenceNode)
+		if !ok {
+			// TODO(hasheddan): need to only provide diagnostic about this one place
+			return NodeIdentifier{}, errors.New(errCompositionResources)
+		}
+		for _, s := range seq.Values {
+			sNode, err := compBase.FilterNode(s)
+			if err != nil {
+				return NodeIdentifier{}, err
+			}
+			id, err := w.parseDoc(sNode, path)
+			if err != nil {
+				continue
+			}
+			dependants[id] = struct{}{}
+		}
+	}
+	id := nodeID(obj.GetName(), obj.GroupVersionKind())
+	w.nodes[id] = &PackageNode{
+		ast:        n,
+		fileName:   path,
+		obj:        obj,
+		dependants: dependants,
+	}
+	return id, nil
 }
 
 // A NodeFilterFn filters the node on which we perform validation.
@@ -256,50 +267,71 @@ func (w *Workspace) Validate(fn NodeFilterFn) ([]lsp.Diagnostic, error) { // nol
 		if !ok {
 			return nil, errors.Errorf(errMissingValidatorFmt, n.GetGVK())
 		}
-		var node interface{}
-		if err := yaml.NewDecoder(n.GetAST()).Decode(&node); err != nil {
-			return nil, errors.Wrap(err, errParseNode)
+		node := &unstructured.Unstructured{}
+		b, err := n.GetAST().MarshalYAML()
+		if err != nil {
+			return nil, err
 		}
-		for _, err := range v.Validate(node).Errors {
-			if err, ok := err.(*verrors.Validation); ok {
-				// TODO(hasheddan): handle the case where error occurs and we
-				// don't have a valid path.
-				vErr := err
-				if len(err.Name) > 0 && err.Name != "." {
-					errPath := err.Name
-					if err.Code() == verrors.RequiredFailCode {
-						errPath = err.Name[:strings.LastIndex(err.Name, ".")]
-					}
-					path, err := yaml.PathString("$." + errPath)
-					if err != nil {
-						continue
-					}
-					node, err := path.FilterNode(n.GetAST())
-					if err != nil {
-						continue
-					}
-					tok := node.GetToken()
-					if tok != nil {
-						// TODO(hasheddan): token position reflects file line
-						// and column by NOT being zero-indexed, but VSCode
-						// interprets ranges with zero-indexing. We should
-						// develop a more robust solution for this conversion.
-						diags = append(diags, lsp.Diagnostic{
-							Range: lsp.Range{
-								Start: lsp.Position{
-									Line:      tok.Position.Line - 1,
-									Character: tok.Position.Column - 1,
-								},
-								End: lsp.Position{
-									Line:      tok.Position.Line - 1,
-									Character: tok.Position.Column + len(tok.Value) - 1,
-								},
+		// TODO(hasheddan): we cannot make use of strict unmarshal to identify
+		// extraneous fields because we don't have the underlying Go types. In
+		// the future, we would like to provide warnings on fields that are
+		// extraneous, but we will likely need to augment the OpenAPI validation
+		// to do so.
+		if err := k8syaml.Unmarshal(b, node); err != nil {
+			return nil, err
+		}
+		nDiags, err := validationDiagnostics(v.Validate(node), n.GetAST(), node.GroupVersionKind())
+		if err != nil {
+			return nil, err
+		}
+		diags = append(diags, nDiags...)
+	}
+	return diags, nil
+}
+
+// validationDiagnostics generates language server diagnostics from validation
+// errors.
+func validationDiagnostics(res *validate.Result, n ast.Node, gvk schema.GroupVersionKind) ([]lsp.Diagnostic, error) {
+	diags := []lsp.Diagnostic{}
+	for _, err := range res.Errors {
+		if err, ok := err.(*verrors.Validation); ok {
+			// TODO(hasheddan): handle the case where error occurs and we
+			// don't have a valid path.
+			vErr := err
+			if len(err.Name) > 0 && err.Name != "." {
+				errPath := err.Name
+				if err.Code() == verrors.RequiredFailCode {
+					errPath = err.Name[:strings.LastIndex(err.Name, ".")]
+				}
+				path, err := yaml.PathString("$." + errPath)
+				if err != nil {
+					continue
+				}
+				node, err := path.FilterNode(n)
+				if err != nil {
+					continue
+				}
+				tok := node.GetToken()
+				if tok != nil {
+					// TODO(hasheddan): token position reflects file line
+					// and column by NOT being zero-indexed, but VSCode
+					// interprets ranges with zero-indexing. We should
+					// develop a more robust solution for this conversion.
+					diags = append(diags, lsp.Diagnostic{
+						Range: lsp.Range{
+							Start: lsp.Position{
+								Line:      tok.Position.Line - 1,
+								Character: tok.Position.Column - 1,
 							},
-							Message:  vErr.Error(),
-							Severity: lsp.Error,
-							Source:   serverName,
-						})
-					}
+							End: lsp.Position{
+								Line:      tok.Position.Line - 1,
+								Character: tok.Position.Column + len(tok.Value) - 1,
+							},
+						},
+						Message:  fmt.Sprintf("%s (%s)", vErr.Error(), gvk),
+						Severity: lsp.Error,
+						Source:   serverName,
+					})
 				}
 			}
 		}
