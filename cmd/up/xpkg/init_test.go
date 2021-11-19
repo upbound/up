@@ -15,9 +15,17 @@
 package xpkg
 
 import (
+	"os"
+	"path/filepath"
 	"testing"
 
 	"github.com/google/go-cmp/cmp"
+	"github.com/pkg/errors"
+	"github.com/spf13/afero"
+
+	"github.com/crossplane/crossplane-runtime/pkg/test"
+
+	"github.com/upbound/up/internal/xpkg"
 )
 
 func TestInputYes(t *testing.T) {
@@ -79,6 +87,66 @@ func TestInputYes(t *testing.T) {
 
 			if diff := cmp.Diff(tc.want.output, y); diff != "" {
 				t.Errorf("\n%s\nInputYes(...): -want, +got:\n%s", tc.reason, diff)
+			}
+		})
+	}
+}
+
+func TestMetaFileInRoot(t *testing.T) {
+
+	type args struct {
+		metaExists bool
+		fs         afero.Fs
+	}
+
+	type want struct {
+		err error
+	}
+
+	cases := map[string]struct {
+		reason string
+		args   args
+		want   want
+	}{
+		"MetaFileNotInRoot": {
+			args: args{
+				metaExists: false,
+				fs:         afero.NewMemMapFs(),
+			},
+			want: want{
+				err: nil,
+			},
+		},
+		"MetaFileInRoot": {
+			args: args{
+				metaExists: true,
+				fs:         afero.NewMemMapFs(),
+			},
+			want: want{
+				err: errors.New(errAlreadyExists),
+			},
+		},
+	}
+
+	for name, tc := range cases {
+		t.Run(name, func(t *testing.T) {
+
+			c := initCmd{
+				fs:   tc.args.fs,
+				root: "/tmp",
+			}
+
+			if tc.args.metaExists {
+				err := afero.WriteFile(tc.args.fs, filepath.Join(c.root, xpkg.MetaFile), []byte{}, os.ModePerm)
+				if diff := cmp.Diff(nil, err, test.EquateErrors()); diff != "" {
+					t.Errorf("\n%s\nMetaFileInRoot(...): -want, +got:\n%s", tc.reason, diff)
+				}
+			}
+
+			got := c.metaFileInRoot()
+
+			if diff := cmp.Diff(tc.want.err, got, test.EquateErrors()); diff != "" {
+				t.Errorf("\n%s\nMetaFileInRoot(...): -want, +got:\n%s", tc.reason, diff)
 			}
 		})
 	}

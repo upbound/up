@@ -43,13 +43,14 @@ func (c *initCmd) BeforeApply() error {
 // that have Run() methods that receive it.
 func (c *initCmd) AfterApply() error {
 	c.fs = afero.NewOsFs()
-	// validate if current directory does not contain crossplane.yaml
-	exists, err := afero.Exists(c.fs, c.PackageRoot)
+	root, err := filepath.Abs(c.PackageRoot) // root
 	if err != nil {
 		return err
 	}
-	if exists {
-		return errors.New(errAlreadyExists)
+
+	c.root = root
+	if err := c.metaFileInRoot(); err != nil {
+		return err
 	}
 
 	// validate provided package type
@@ -82,6 +83,7 @@ type initCmd struct {
 	ctx      xpkg.InitContext
 	fs       afero.Fs
 	prompter input.Prompter
+	root     string
 
 	PackageRoot string `optional:"" short:"p" help:"Path to directory to write new package." default:"."`
 	Type        string `optional:"" short:"t" help:"Type of package to be initialized." default:"configuration" enum:"configuration,provider"`
@@ -89,12 +91,9 @@ type initCmd struct {
 
 // Run executes the init command.
 func (c *initCmd) Run() error {
-	root, err := filepath.Abs(c.PackageRoot) // root
-	if err != nil {
-		return err
-	}
-
 	fileBody := []byte{}
+	var err error
+
 	switch c.Type {
 	case string(xpkg.Configuration):
 		fileBody, err = meta.NewConfigXPkg(c.ctx)
@@ -110,7 +109,7 @@ func (c *initCmd) Run() error {
 
 	writer := xpkg.NewFileWriter(
 		xpkg.WithFs(c.fs),
-		xpkg.WithRoot(root),
+		xpkg.WithRoot(c.root),
 		xpkg.WithFileBody(fileBody),
 	)
 
@@ -188,6 +187,19 @@ func (c *initCmd) initProviderPkg() error {
 	}
 	c.ctx.CtrlImage = image
 
+	return nil
+}
+
+func (c *initCmd) metaFileInRoot() error {
+	// validate if current directory does not contain crossplane.yaml
+	exists, err := afero.Exists(c.fs, filepath.Join(c.root, xpkg.MetaFile))
+	if err != nil {
+		return err
+	}
+
+	if exists {
+		return errors.New(errAlreadyExists)
+	}
 	return nil
 }
 

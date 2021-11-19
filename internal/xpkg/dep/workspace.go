@@ -115,7 +115,7 @@ func (w *Workspace) Upsert(d v1beta1.Dependency) error {
 	return w.writeMetaPkg(p)
 }
 
-func upsertDeps(d v1beta1.Dependency, p v1.Pkg) error {
+func upsertDeps(d v1beta1.Dependency, p v1.Pkg) error { // nolint:gocyclo
 	deps := p.GetDependencies()
 
 	processed := false
