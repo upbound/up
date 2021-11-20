@@ -64,6 +64,7 @@ const (
 type Entry struct {
 	cacheRoot string
 	fs        afero.Fs
+	meta      runtime.Object
 	path      string
 	pkg       *parser.Package
 	pkgType   pkgv1beta1.PackageType
@@ -93,9 +94,11 @@ func (c *Local) NewEntry(i v1.Image) (*Entry, error) {
 	return &Entry{
 		cacheRoot: c.root,
 		fs:        c.fs,
-		pkg:       pkg,
-		pkgType:   pt,
-		sha:       d.String(),
+		// pkg.meta has a len of 1 otherwise we would have an error from parse
+		meta:    pkg.GetMeta()[0],
+		pkg:     pkg,
+		pkgType: pt,
+		sha:     d.String(),
 	}, nil
 }
 
@@ -129,11 +132,13 @@ func (c *Local) CurrentEntry(path string) (*Entry, error) {
 				return nil, err
 			}
 
+			// pkg.meta has a len of 1 otherwise we would have an error from parse
 			pkg, pt, err := c.parse(m)
 			if err != nil {
 				return nil, err
 			}
 
+			e.meta = pkg.GetMeta()[0]
 			e.pkg = pkg
 			e.pkgType = pt
 			continue
@@ -190,13 +195,16 @@ func (e *Entry) setDigest() error {
 
 // Meta returns the parsed meta object for an entry.
 func (e *Entry) Meta() runtime.Object {
-	return e.pkg.GetMeta()[0]
+	return e.meta
 }
 
 // Objects returns the slice of parsed objects for an entry. The slice can
 // contain CRDs or XRDs depending on the package type.
 func (e *Entry) Objects() []runtime.Object {
-	return e.pkg.GetObjects()
+	if e.pkg != nil {
+		return e.pkg.GetObjects()
+	}
+	return []runtime.Object{}
 }
 
 // Type returns the pkgv1beta1.PackageType of package for this entry.
@@ -228,6 +236,7 @@ func (e *Entry) writeMeta(o runtime.Object) (int, error) {
 	if err != nil {
 		return 0, errors.Wrap(err, errFailedToCreateMeta)
 	}
+	defer cf.Close() // nolint:errcheck
 
 	b, err := yaml.Marshal(o)
 	if err != nil {
