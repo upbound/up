@@ -71,7 +71,7 @@ func (r *Resolver) ResolveImage(ctx context.Context, dep v1beta1.Dependency) (v1
 		return nil, err
 	}
 
-	remoteImageRef, err := name.ParseReference(ImgTag(&v1beta1.Dependency{
+	remoteImageRef, err := name.ParseReference(ImgTag(v1beta1.Dependency{
 		Package:     dep.Package,
 		Type:        dep.Type,
 		Constraints: tag,

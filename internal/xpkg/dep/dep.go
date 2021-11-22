@@ -63,9 +63,9 @@ func NewWithType(pkg string, t string) v1beta1.Dependency {
 }
 
 // ImgTag returns the full image tag "source:version" of the given dependency
-func ImgTag(d *v1beta1.Dependency) string {
+func ImgTag(d v1beta1.Dependency) string {
 	// NOTE(@tnthornton) this should ONLY be used after the version constraint
 	// has been resolved for the given dependency. Using a semver range is not
 	// a valid tag format and will cause lookups to this string to fail.
-	return fmt.Sprintf(packageTagFmt, d.Identifier(), d.Constraints)
+	return fmt.Sprintf(packageTagFmt, d.Package, d.Constraints)
 }

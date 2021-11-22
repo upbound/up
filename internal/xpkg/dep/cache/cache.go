@@ -119,7 +119,7 @@ func WithRoot(root string) Option {
 func (c *Local) Get(k v1beta1.Dependency) (*Entry, error) {
 	c.mu.RLock()
 	defer c.mu.RUnlock()
-	t, err := name.NewTag(dep.ImgTag(&k))
+	t, err := name.NewTag(dep.ImgTag(k))
 	if err != nil {
 		return nil, err
 	}
@@ -148,7 +148,7 @@ func (c *Local) Store(k v1beta1.Dependency, v v1.Image) (*Entry, error) {
 	c.mu.Lock()
 	defer c.mu.Unlock()
 
-	t, err := name.NewTag(dep.ImgTag(&k))
+	t, err := name.NewTag(dep.ImgTag(k))
 	if err != nil {
 		return nil, err
 	}

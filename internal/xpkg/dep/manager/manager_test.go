@@ -161,8 +161,8 @@ func TestResolveTransitiveDependencies(t *testing.T) {
 	for n, tc := range cases {
 		t.Run(n, func(t *testing.T) {
 
-			ref, _ := name.ParseReference(dep.ImgTag(&tc.args.root.dep))
-			lref, _ := name.ParseReference(dep.ImgTag(&tc.args.leaf.dep))
+			ref, _ := name.ParseReference(dep.ImgTag(tc.args.root.dep))
+			lref, _ := name.ParseReference(dep.ImgTag(tc.args.leaf.dep))
 
 			sut := New(
 				WithCache(c),
