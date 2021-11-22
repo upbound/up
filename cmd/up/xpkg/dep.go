@@ -104,7 +104,7 @@ func (c *depCmd) Run(ctx context.Context) error {
 		return c.c.Clean()
 	}
 
-	if c.d != (v1beta1.Dependency{}) {
+	if c.Package != "" {
 		return c.userSuppliedDep(ctx)
 	}
 
