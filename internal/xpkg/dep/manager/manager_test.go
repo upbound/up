@@ -168,12 +168,12 @@ func TestResolveTransitiveDependencies(t *testing.T) {
 				WithCache(c),
 				WithResolver(
 					dep.NewResolver(
-						func(r *dep.Resolver) {
-							r.F = NewMockFetcher(
+						dep.WithFetcher(
+							NewMockFetcher(
 								WithMeta(ref, tc.args.root.meta),
 								WithMeta(lref, tc.args.leaf.meta),
-							)
-						},
+							),
+						),
 					),
 				),
 			)

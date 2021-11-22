@@ -41,7 +41,7 @@ const (
 
 // Resolver --
 type Resolver struct {
-	F fetcher
+	f Fetcher
 }
 
 // NewResolver returns a new Resolver.
@@ -57,9 +57,9 @@ func NewResolver(opts ...ResolverOption) *Resolver {
 type ResolverOption func(*Resolver)
 
 // WithFetcher modifies the Resolver and adds the given fetcher.
-func WithFetcher(f fetcher) ResolverOption {
+func WithFetcher(f Fetcher) ResolverOption {
 	return func(r *Resolver) {
-		r.F = f
+		r.f = f
 	}
 }
 
@@ -80,7 +80,7 @@ func (r *Resolver) ResolveImage(ctx context.Context, dep v1beta1.Dependency) (v1
 		return nil, err
 	}
 
-	return r.F.Fetch(ctx, remoteImageRef)
+	return r.f.Fetch(ctx, remoteImageRef)
 }
 
 // ResolveTag resolves the tag corresponding to the given v1beta1.Dependency.
@@ -118,7 +118,7 @@ func (r *Resolver) ResolveTag(ctx context.Context, dep v1beta1.Dependency) (stri
 		return "", errors.Wrap(err, errInvalidProviderRef)
 	}
 
-	tags, err := r.F.Tags(ctx, ref)
+	tags, err := r.f.Tags(ctx, ref)
 	if err != nil {
 		return "", errors.Wrap(err, errFailedToFetchTags)
 	}
@@ -160,7 +160,7 @@ func (r *Resolver) ResolveDigest(ctx context.Context, d v1beta1.Dependency) (str
 		return "", errors.Wrap(err, errInvalidProviderRef)
 	}
 
-	desc, err := r.F.Head(ctx, ref)
+	desc, err := r.f.Head(ctx, ref)
 	if err != nil {
 		e, ok := err.(*transport.Error)
 		if !ok {

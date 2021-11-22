@@ -99,7 +99,7 @@ func (p *PackageNode) GetGVK() schema.GroupVersionKind {
 	return p.obj.GroupVersionKind()
 }
 
-// GetGVK returns the GroupVersionKind of this node.
+// GetObject returns the GroupVersionKind of this node.
 func (p *PackageNode) GetObject() metav1.Object {
 	return p.obj
 }

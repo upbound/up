@@ -32,12 +32,14 @@ import (
 const (
 	errBuildMetaScheme   = "failed to build meta scheme for manager"
 	errBuildObjectScheme = "failed to build object scheme for manager"
+
+	errNotMeta = "meta type is not a package"
 )
 
 // Manager defines a dependency Manager
 type Manager struct {
 	c *cache.Local
-	f *dep.LocalFetcher
+	f dep.Fetcher
 	p *parser.PackageParser
 	r *dep.Resolver
 }
@@ -80,7 +82,7 @@ func WithCache(c *cache.Local) Option {
 }
 
 // WithFetcher sets the supplied dep.LocalFetcher on the Manager.
-func WithFetcher(f *dep.LocalFetcher) Option {
+func WithFetcher(f dep.Fetcher) Option {
 	return func(m *Manager) {
 		m.f = f
 	}
@@ -123,7 +125,7 @@ func (m *Manager) resolveAllDeps(ctx context.Context, e *cache.Entry) error {
 
 	pkg, ok := xpkg.TryConvertToPkg(e.Meta(), &metav1.Provider{}, &metav1.Configuration{})
 	if !ok {
-		return errors.New("not meta")
+		return errors.New(errNotMeta)
 	}
 
 	if len(pkg.GetDependencies()) == 0 {

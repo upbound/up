@@ -23,7 +23,8 @@ import (
 	"github.com/google/go-containerregistry/pkg/v1/remote"
 )
 
-type fetcher interface {
+// Fetcher --
+type Fetcher interface {
 	Fetch(ctx context.Context, ref name.Reference, secrets ...string) (v1.Image, error)
 	Head(ctx context.Context, ref name.Reference, secrets ...string) (*v1.Descriptor, error)
 	Tags(ctx context.Context, ref name.Reference, secrets ...string) ([]string, error)

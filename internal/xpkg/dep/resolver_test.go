@@ -30,7 +30,7 @@ func TestResolveTag(t *testing.T) {
 
 	type args struct {
 		dep     v1beta1.Dependency
-		fetcher fetcher
+		fetcher Fetcher
 	}
 
 	type want struct {
