@@ -33,6 +33,7 @@ import (
 	ext "k8s.io/apiextensions-apiserver/pkg/apis/apiextensions"
 	extv1 "k8s.io/apiextensions-apiserver/pkg/apis/apiextensions/v1"
 	"k8s.io/apiextensions-apiserver/pkg/apiserver/validation"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	apimachyaml "k8s.io/apimachinery/pkg/util/yaml"
@@ -98,6 +99,11 @@ func (p *PackageNode) GetGVK() schema.GroupVersionKind {
 	return p.obj.GroupVersionKind()
 }
 
+// GetGVK returns the GroupVersionKind of this node.
+func (p *PackageNode) GetObject() metav1.Object {
+	return p.obj
+}
+
 // NodeIdentifier is the unique identifier of a node in a workspace.
 type NodeIdentifier struct {
 	name string
@@ -118,6 +124,7 @@ type Node interface {
 	GetFileName() string
 	GetDependants() []NodeIdentifier
 	GetGVK() schema.GroupVersionKind
+	GetObject() metav1.Object
 }
 
 // A Workspace represents a single xpkg workspace. It is safe for multi-threaded
@@ -209,6 +216,11 @@ func (w *Workspace) parseDoc(n ast.Node, path string) (NodeIdentifier, error) {
 	}
 	obj := &unstructured.Unstructured{}
 	// NOTE(hasheddan): unmarshal returns an error if Kind is not defined.
+	// TODO(hasheddan): we cannot make use of strict unmarshal to identify
+	// extraneous fields because we don't have the underlying Go types. In
+	// the future, we would like to provide warnings on fields that are
+	// extraneous, but we will likely need to augment the OpenAPI validation
+	// to do so.
 	if err := k8syaml.Unmarshal(b, obj); err != nil {
 		return NodeIdentifier{}, err
 	}
@@ -279,20 +291,7 @@ func (w *Workspace) Validate(fn NodeFilterFn) ([]lsp.Diagnostic, error) { // nol
 		if !ok {
 			return nil, errors.Errorf(errMissingValidatorFmt, n.GetGVK())
 		}
-		node := &unstructured.Unstructured{}
-		b, err := n.GetAST().MarshalYAML()
-		if err != nil {
-			return nil, err
-		}
-		// TODO(hasheddan): we cannot make use of strict unmarshal to identify
-		// extraneous fields because we don't have the underlying Go types. In
-		// the future, we would like to provide warnings on fields that are
-		// extraneous, but we will likely need to augment the OpenAPI validation
-		// to do so.
-		if err := k8syaml.Unmarshal(b, node); err != nil {
-			return nil, err
-		}
-		diags = append(diags, validationDiagnostics(v.Validate(node), n.GetAST(), node.GroupVersionKind())...)
+		diags = append(diags, validationDiagnostics(v.Validate(n.GetObject()), n.GetAST(), n.GetGVK())...)
 	}
 	return diags, nil
 }
