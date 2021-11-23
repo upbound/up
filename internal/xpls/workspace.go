@@ -225,10 +225,13 @@ func (w *Workspace) parseDoc(n ast.Node, path string) (NodeIdentifier, error) {
 		return NodeIdentifier{}, err
 	}
 	dependants := map[NodeIdentifier]struct{}{}
+	// NOTE(hasheddan): if we are at document root (i.e. this is a
+	// DocumentNode), we must set the underlying ast.Node to the document body
+	// so that we can access child nodes generically in validation.
+	if doc, ok := n.(*ast.DocumentNode); ok {
+		n = doc.Body
+	}
 	if obj.GetKind() == xpextv1.CompositionKind {
-		if doc, ok := n.(*ast.DocumentNode); ok {
-			n = doc.Body
-		}
 		resNode, err := compResources.FilterNode(n)
 		if err != nil {
 			return NodeIdentifier{}, err
