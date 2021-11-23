@@ -18,32 +18,20 @@ import (
 	"context"
 	"os"
 
-	"github.com/crossplane/crossplane-runtime/pkg/parser"
 	"github.com/crossplane/crossplane/apis/pkg/v1beta1"
-	"github.com/pkg/errors"
 
-	metav1 "github.com/crossplane/crossplane/apis/pkg/meta/v1"
-
-	"github.com/upbound/up/internal/xpkg"
-	"github.com/upbound/up/internal/xpkg/dep"
 	"github.com/upbound/up/internal/xpkg/dep/cache"
 	"github.com/upbound/up/internal/xpkg/dep/resolver/image"
+	"github.com/upbound/up/internal/xpkg/dep/resolver/xpkg"
 	xpkgparser "github.com/upbound/up/internal/xpkg/parser"
-)
-
-const (
-	errBuildMetaScheme   = "failed to build meta scheme for manager"
-	errBuildObjectScheme = "failed to build object scheme for manager"
-
-	errNotMeta = "meta type is not a package"
 )
 
 // Manager defines a dependency Manager
 type Manager struct {
-	c *cache.Local
-	f dep.Fetcher
-	p *parser.PackageParser
-	r *image.Resolver
+	c  *cache.Local
+	f  image.Fetcher
+	r  *image.Resolver
+	rx *xpkg.Resolver
 }
 
 // New returns a new Manager
@@ -61,8 +49,13 @@ func New(opts ...Option) (*Manager, error) {
 	}
 
 	m.c = c
-	m.f = dep.NewLocalFetcher()
-	m.p = p
+	m.f = image.NewLocalFetcher()
+	m.rx = xpkg.NewResolver(xpkg.WithParser(p))
+
+	for _, o := range opts {
+		o(m)
+	}
+
 	return m, nil
 }
 
@@ -77,7 +70,7 @@ func WithCache(c *cache.Local) Option {
 }
 
 // WithFetcher sets the supplied dep.LocalFetcher on the Manager.
-func WithFetcher(f dep.Fetcher) Option {
+func WithFetcher(f image.Fetcher) Option {
 	return func(m *Manager) {
 		m.f = f
 	}
@@ -96,7 +89,7 @@ func WithResolver(r *image.Resolver) Option {
 func (m *Manager) Resolve(ctx context.Context, d v1beta1.Dependency) (v1beta1.Dependency, error) {
 	ud := v1beta1.Dependency{}
 
-	e, err := m.retrieveEntry(ctx, d)
+	e, err := m.retrievePkg(ctx, d)
 	if err != nil {
 		return ud, nil
 	}
@@ -116,22 +109,15 @@ func (m *Manager) Resolve(ctx context.Context, d v1beta1.Dependency) (v1beta1.De
 
 // resolveAllDeps recursively resolves the transitive dependencies
 // for a given Entry.
-func (m *Manager) resolveAllDeps(ctx context.Context, e *cache.Entry) error {
+func (m *Manager) resolveAllDeps(ctx context.Context, p *xpkg.ParsedPackage) error {
 
-	pkg, ok := xpkg.TryConvertToPkg(e.Meta(), &metav1.Provider{}, &metav1.Configuration{})
-	if !ok {
-		return errors.New(errNotMeta)
-	}
-
-	if len(pkg.GetDependencies()) == 0 {
+	if len(p.Dependencies()) == 0 {
 		// no remaining dependencies to resolve
 		return nil
 	}
 
-	for _, d := range pkg.GetDependencies() {
-		cd := ConvertToV1beta1(d)
-
-		e, err := m.retrieveEntry(ctx, cd)
+	for _, d := range p.Dependencies() {
+		e, err := m.retrievePkg(ctx, d)
 		if err != nil {
 			return err
 		}
@@ -144,36 +130,41 @@ func (m *Manager) resolveAllDeps(ctx context.Context, e *cache.Entry) error {
 	return nil
 }
 
-func (m *Manager) storePkg(ctx context.Context, d v1beta1.Dependency) (*cache.Entry, error) {
+func (m *Manager) storePkg(ctx context.Context, d v1beta1.Dependency) (*xpkg.ParsedPackage, error) {
 	// this is expensive
-	i, err := m.r.ResolveImage(ctx, d)
+	t, i, err := m.r.ResolveImage(ctx, d)
+	if err != nil {
+		return nil, err
+	}
+
+	p, err := m.rx.FromImage(d.Package, t, i)
 	if err != nil {
 		return nil, err
 	}
 
 	// add xpkg to cache
-	e, err := m.c.Store(d, i)
+	err = m.c.Store(d, p)
 	if err != nil {
 		return nil, err
 	}
 
-	return e, nil
+	return p, nil
 }
 
-func (m *Manager) retrieveEntry(ctx context.Context, d v1beta1.Dependency) (*cache.Entry, error) {
+func (m *Manager) retrievePkg(ctx context.Context, d v1beta1.Dependency) (*xpkg.ParsedPackage, error) {
 	// resolve version prior to Get
 	if err := m.finalizeDepVersion(ctx, &d); err != nil {
 		return nil, err
 	}
 
-	e, err := m.c.Get(d)
+	p, err := m.c.Get(d)
 	if err != nil && !os.IsNotExist(err) {
 		return nil, err
 	}
 
 	if os.IsNotExist(err) {
 		// root dependency does not yet exist in cache, store it
-		e, err = m.storePkg(ctx, d)
+		p, err = m.storePkg(ctx, d)
 		if err != nil {
 			return nil, err
 		}
@@ -184,16 +175,16 @@ func (m *Manager) retrieveEntry(ctx context.Context, d v1beta1.Dependency) (*cac
 			return nil, err
 		}
 
-		if e.Digest() != digest {
+		if p.Digest() != digest {
 			// digest is different, update what we have
-			e, err = m.storePkg(ctx, d)
+			p, err = m.storePkg(ctx, d)
 			if err != nil {
 				return nil, err
 			}
 		}
 	}
 
-	return e, nil
+	return p, nil
 }
 
 // finalizeDepVersion sets the resolved tag version on the supplied v1beta1.Dependency.

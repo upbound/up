@@ -12,7 +12,7 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-package dep
+package image
 
 import (
 	"context"
@@ -22,13 +22,6 @@ import (
 	v1 "github.com/google/go-containerregistry/pkg/v1"
 	"github.com/google/go-containerregistry/pkg/v1/remote"
 )
-
-// Fetcher --
-type Fetcher interface {
-	Fetch(ctx context.Context, ref name.Reference, secrets ...string) (v1.Image, error)
-	Head(ctx context.Context, ref name.Reference, secrets ...string) (*v1.Descriptor, error)
-	Tags(ctx context.Context, ref name.Reference, secrets ...string) ([]string, error)
-}
 
 // LocalFetcher --
 type LocalFetcher struct{}

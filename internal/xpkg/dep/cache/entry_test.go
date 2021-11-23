@@ -17,16 +17,18 @@ package cache
 import (
 	"testing"
 
-	"github.com/crossplane/crossplane-runtime/pkg/errors"
-	"github.com/crossplane/crossplane-runtime/pkg/test"
 	"github.com/google/go-cmp/cmp"
-	v1 "github.com/google/go-containerregistry/pkg/v1"
-	"github.com/google/go-containerregistry/pkg/v1/empty"
 	"github.com/spf13/afero"
-)
 
-const (
-	testConfigPkgYaml = "testdata/config_package.yaml"
+	apiextv1 "k8s.io/apiextensions-apiserver/pkg/apis/apiextensions/v1"
+	apimetav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/runtime"
+
+	"github.com/crossplane/crossplane-runtime/pkg/test"
+	xpapiextv1 "github.com/crossplane/crossplane/apis/apiextensions/v1"
+	xpmetav1 "github.com/crossplane/crossplane/apis/pkg/meta/v1"
+
+	"github.com/upbound/up/internal/xpkg/dep/resolver/xpkg"
 )
 
 func TestFlush(t *testing.T) {
@@ -39,15 +41,14 @@ func TestFlush(t *testing.T) {
 	)
 
 	type args struct {
-		img v1.Image
+		pkg *xpkg.ParsedPackage
 	}
 
 	type want struct {
-		metaCount   int
-		crdCount    int
-		xrdCount    int
-		newEntryErr error
-		flushErr    error
+		metaCount int
+		crdCount  int
+		xrdCount  int
+		flushErr  error
 	}
 
 	cases := map[string]struct {
@@ -58,7 +59,37 @@ func TestFlush(t *testing.T) {
 		"ProviderSuccess": {
 			reason: "Should produce the expected number of definitions from test provider package.",
 			args: args{
-				img: newPackageImage(testProviderPkgYaml),
+				pkg: &xpkg.ParsedPackage{
+					MetaObj: &xpmetav1.Provider{
+						TypeMeta: apimetav1.TypeMeta{
+							APIVersion: "meta.pkg.crossplane.io/v1alpha1",
+							Kind:       "Provider",
+						},
+						ObjectMeta: apimetav1.ObjectMeta{
+							Name: "provider-aws",
+						},
+					},
+					Objs: []runtime.Object{
+						&apiextv1.CustomResourceDefinition{
+							TypeMeta: apimetav1.TypeMeta{
+								APIVersion: "apiextensions.k8s.io/v1",
+								Kind:       "CustomResourceDefinition",
+							},
+							ObjectMeta: apimetav1.ObjectMeta{
+								Name: "crd1",
+							},
+						},
+						&apiextv1.CustomResourceDefinition{
+							TypeMeta: apimetav1.TypeMeta{
+								APIVersion: "apiextensions.k8s.io/v1",
+								Kind:       "CustomResourceDefinition",
+							},
+							ObjectMeta: apimetav1.ObjectMeta{
+								Name: "crd2",
+							},
+						},
+					},
+				},
 			},
 			want: want{
 				metaCount: 1,
@@ -69,7 +100,37 @@ func TestFlush(t *testing.T) {
 		"ConfigurationSuccess": {
 			reason: "Should produce the expected number of definitions from test configuration package.",
 			args: args{
-				img: newPackageImage(testConfigPkgYaml),
+				pkg: &xpkg.ParsedPackage{
+					MetaObj: &xpmetav1.Provider{
+						TypeMeta: apimetav1.TypeMeta{
+							APIVersion: "meta.pkg.crossplane.io/v1alpha1",
+							Kind:       "Configuration",
+						},
+						ObjectMeta: apimetav1.ObjectMeta{
+							Name: "platform-ref-aws",
+						},
+					},
+					Objs: []runtime.Object{
+						&xpapiextv1.CompositeResourceDefinition{
+							TypeMeta: apimetav1.TypeMeta{
+								APIVersion: "apiextensions.crossplane.io/v1",
+								Kind:       "CompositeResourceDefinition",
+							},
+							ObjectMeta: apimetav1.ObjectMeta{
+								Name: "xrd1",
+							},
+						},
+						&xpapiextv1.CompositeResourceDefinition{
+							TypeMeta: apimetav1.TypeMeta{
+								APIVersion: "apiextensions.crossplane.io/v1",
+								Kind:       "CompositeResourceDefinition",
+							},
+							ObjectMeta: apimetav1.ObjectMeta{
+								Name: "xrd2",
+							},
+						},
+					},
+				},
 			},
 			want: want{
 				metaCount: 1,
@@ -77,44 +138,30 @@ func TestFlush(t *testing.T) {
 				xrdCount:  2,
 			},
 		},
-		"ErrFailedToParsePackageYaml": {
-			reason: "Should error if we aren't able to parse the package.yaml in the given package.",
-			args: args{
-				img: empty.Image,
-			},
-			want: want{
-				newEntryErr: errors.Wrap(errors.New("open package.yaml: no such file or directory"), errOpenPackageStream),
-			},
-		},
 	}
 
 	for name, tc := range cases {
 		t.Run(name, func(t *testing.T) {
-			e, err := cache.NewEntry(tc.args.img)
+			e := cache.newEntry(tc.args.pkg)
 
-			if diff := cmp.Diff(tc.want.newEntryErr, err, test.EquateErrors()); diff != "" {
+			stats, err := e.flush()
+
+			if diff := cmp.Diff(tc.want.metaCount, stats.metas); diff != "" {
 				t.Errorf("\n%s\nFlush(...): -want err, +got err:\n%s", tc.reason, diff)
 			}
 
-			if e != nil {
-				mc, cc, xc, err := e.flush()
-
-				if diff := cmp.Diff(tc.want.metaCount, mc); diff != "" {
-					t.Errorf("\n%s\nFlush(...): -want err, +got err:\n%s", tc.reason, diff)
-				}
-
-				if diff := cmp.Diff(tc.want.crdCount, cc); diff != "" {
-					t.Errorf("\n%s\nFlush(...): -want err, +got err:\n%s", tc.reason, diff)
-				}
-
-				if diff := cmp.Diff(tc.want.xrdCount, xc); diff != "" {
-					t.Errorf("\n%s\nFlush(...): -want err, +got err:\n%s", tc.reason, diff)
-				}
-
-				if diff := cmp.Diff(tc.want.flushErr, err, test.EquateErrors()); diff != "" {
-					t.Errorf("\n%s\nFlush(...): -want err, +got err:\n%s", tc.reason, diff)
-				}
+			if diff := cmp.Diff(tc.want.crdCount, stats.crds); diff != "" {
+				t.Errorf("\n%s\nFlush(...): -want err, +got err:\n%s", tc.reason, diff)
 			}
+
+			if diff := cmp.Diff(tc.want.xrdCount, stats.xrds); diff != "" {
+				t.Errorf("\n%s\nFlush(...): -want err, +got err:\n%s", tc.reason, diff)
+			}
+
+			if diff := cmp.Diff(tc.want.flushErr, err, test.EquateErrors()); diff != "" {
+				t.Errorf("\n%s\nFlush(...): -want err, +got err:\n%s", tc.reason, diff)
+			}
+
 		})
 	}
 }

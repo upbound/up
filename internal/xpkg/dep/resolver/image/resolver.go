@@ -25,7 +25,6 @@ import (
 	v1 "github.com/google/go-containerregistry/pkg/v1"
 	"github.com/google/go-containerregistry/pkg/v1/remote/transport"
 	"github.com/pkg/errors"
-	"github.com/upbound/up/internal/xpkg/dep"
 
 	"github.com/crossplane/crossplane/apis/pkg/v1beta1"
 )
@@ -58,7 +57,7 @@ type Resolver struct {
 // NewResolver returns a new Resolver.
 func NewResolver(opts ...ResolverOption) *Resolver {
 	r := &Resolver{
-		f: dep.NewLocalFetcher(),
+		f: NewLocalFetcher(),
 	}
 
 	for _, o := range opts {
@@ -78,23 +77,24 @@ func WithFetcher(f Fetcher) ResolverOption {
 }
 
 // ResolveImage resolves the image corresponding to the given v1beta1.Dependency.
-func (r *Resolver) ResolveImage(ctx context.Context, dep v1beta1.Dependency) (v1.Image, error) {
+func (r *Resolver) ResolveImage(ctx context.Context, dep v1beta1.Dependency) (string, v1.Image, error) {
 
 	tag, err := r.ResolveTag(ctx, dep)
 	if err != nil {
-		return nil, err
+		return "", nil, err
 	}
 
-	remoteImageRef, err := name.ParseReference(ImgTag(v1beta1.Dependency{
+	remoteImageRef, err := name.ParseReference(FullTag(v1beta1.Dependency{
 		Package:     dep.Package,
 		Type:        dep.Type,
 		Constraints: tag,
 	}))
 	if err != nil {
-		return nil, err
+		return "", nil, err
 	}
 
-	return r.f.Fetch(ctx, remoteImageRef)
+	i, err := r.f.Fetch(ctx, remoteImageRef)
+	return tag, i, err
 }
 
 // ResolveTag resolves the tag corresponding to the given v1beta1.Dependency.
@@ -189,8 +189,8 @@ func (r *Resolver) ResolveDigest(ctx context.Context, d v1beta1.Dependency) (str
 	return desc.Digest.String(), nil
 }
 
-// ImgTag returns the full image tag "source:version" of the given dependency
-func ImgTag(d v1beta1.Dependency) string {
+// FullTag returns the full image tag "source:version" of the given dependency
+func FullTag(d v1beta1.Dependency) string {
 	// NOTE(@tnthornton) this should ONLY be used after the version constraint
 	// has been resolved for the given dependency. Using a semver range is not
 	// a valid tag format and will cause lookups to this string to fail.

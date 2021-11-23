@@ -16,12 +16,16 @@ package xpkg
 
 import (
 	"archive/tar"
+	"bytes"
 	"context"
 	"io"
+	"path/filepath"
+	"strings"
 
 	v1 "github.com/google/go-containerregistry/pkg/v1"
 	"github.com/google/go-containerregistry/pkg/v1/mutate"
 	"github.com/pkg/errors"
+	"github.com/spf13/afero"
 	"github.com/spf13/afero/tarfs"
 	"k8s.io/apimachinery/pkg/runtime"
 
@@ -38,69 +42,15 @@ const (
 	errOpenPackageStream            = "failed to open package stream file"
 	errFaileToAcquireDigest         = "failed to pull digest from image"
 	errFailedToConvertMetaToPackage = "failed to convert meta to package"
+	errInvalidPath                  = "invalid path provided for package lookup"
+	errNotExactlyOneMeta            = "not exactly one package meta type"
 
-	errNotExactlyOneMeta = "not exactly one package meta type"
+	digestPrefix = "sha256:"
 )
 
 // Resolver represents a xpkg Resolver
 type Resolver struct {
 	p *parser.PackageParser
-}
-
-// ParsedPackage represents an xpkg that has been parsed from a v1.Image
-type ParsedPackage struct {
-	// The SHA digest corresponding to the package.
-	digest string
-	// The package dependencies derived from .Spec.DependsOn.
-	deps []v1beta1.Dependency
-	// The meta file that corresponds to the package.
-	meta runtime.Object
-	// The N corresponding objects (CRDs, XRDs, Compositions) depending on the package type.
-	objects []runtime.Object
-	// The type of Package.
-	ptype v1beta1.PackageType
-	// The container registry.
-	reg string
-	// The resolved version, e.g. v0.20.0
-	ver string
-}
-
-// Digest returns the package's digest derived from the package image.
-func (p *ParsedPackage) Digest() string {
-	return p.digest
-}
-
-// Dependencies returns the package's dependencies.
-func (p *ParsedPackage) Dependencies() []v1beta1.Dependency {
-	return p.deps
-}
-
-// Meta returns the runtime.Object corresponding to the meta file.
-func (p *ParsedPackage) Meta() runtime.Object {
-	return p.meta
-}
-
-// Objects returns the slice of runtime.Objects corresponding to CRDs, XRDs, and
-// Compositions contained in the package.
-func (p *ParsedPackage) Objects() []runtime.Object {
-	return p.objects
-}
-
-// Type returns the package's type.
-func (p *ParsedPackage) Type() v1beta1.PackageType {
-	return p.ptype
-}
-
-// Registry returns the registry path where the package image is located.
-// e.g. index.docker.io/crossplane/provider-aws
-func (p *ParsedPackage) Registry() string {
-	return p.reg
-}
-
-// Version returns the version for the package image.
-// e.g. v0.20.0
-func (p *ParsedPackage) Version() string {
-	return p.ver
 }
 
 // NewResolver returns a new Resolver
@@ -145,27 +95,47 @@ func (r *Resolver) FromImage(reg, ver string, i v1.Image) (*ParsedPackage, error
 		return nil, err
 	}
 
-	deps, err := determineDeps(pkg.meta)
+	return finalizePkg(reg, ver, digest.String(), pkg)
+}
+
+// FromDir takes an afero.Fs and a path to a directory and returns a ParsedPackage
+// based on the directories contents for consumption by upstream callers.
+func (r *Resolver) FromDir(fs afero.Fs, path string) (*ParsedPackage, error) {
+	parts := strings.Split(path, "@")
+	if len(parts) != 2 {
+		return nil, errors.New(errInvalidPath)
+	}
+
+	files, err := afero.ReadDir(fs, path)
 	if err != nil {
 		return nil, err
 	}
 
-	pkg.deps = deps
-	pkg.digest = digest.String()
-	pkg.reg = reg
-	pkg.ver = ver
+	buf := new(bytes.Buffer)
+	var digest string
+	for _, f := range files {
+		if strings.HasPrefix(f.Name(), digestPrefix) {
+			digest = f.Name()
+			continue
+		}
+		b, err := afero.ReadFile(fs, filepath.Join(path, f.Name()))
+		if err != nil {
+			return nil, err
+		}
 
-	return pkg, nil
-}
+		buf.Write(b)
+		buf.Write([]byte("\n---\n"))
+	}
 
-// FromDir takes a path to a directory and returns a ParsedPackage based on the
-// directories contents for consumption by upstream callers.
-func (r *Resolver) FromDir(path string) (*ParsedPackage, error) {
-	return nil, nil
+	pkg, err := r.parse(io.NopCloser(bytes.NewReader(buf.Bytes())))
+	if err != nil {
+		return nil, err
+	}
+
+	return finalizePkg(parts[0], parts[1], digest, pkg)
 }
 
 func (r *Resolver) parse(reader io.ReadCloser) (*ParsedPackage, error) {
-	var pkgType v1beta1.PackageType
 	// parse package.yaml
 	pkg, err := r.p.Parse(context.Background(), reader)
 	if err != nil {
@@ -179,6 +149,7 @@ func (r *Resolver) parse(reader io.ReadCloser) (*ParsedPackage, error) {
 
 	meta := metas[0]
 	var linter parser.Linter
+	var pkgType v1beta1.PackageType
 	if meta.GetObjectKind().GroupVersionKind().Kind == xpmetav1.ConfigurationKind {
 		linter = xpkg.NewConfigurationLinter()
 		pkgType = v1beta1.ConfigurationPackageType
@@ -191,12 +162,26 @@ func (r *Resolver) parse(reader io.ReadCloser) (*ParsedPackage, error) {
 	}
 
 	p := &ParsedPackage{
-		meta:    meta,
-		objects: pkg.GetObjects(),
-		ptype:   pkgType,
+		MetaObj: meta,
+		Objs:    pkg.GetObjects(),
+		PType:   pkgType,
 	}
 
 	return p, nil
+}
+
+func finalizePkg(reg, ver, digest string, pkg *ParsedPackage) (*ParsedPackage, error) {
+	deps, err := determineDeps(pkg.MetaObj)
+	if err != nil {
+		return nil, err
+	}
+
+	pkg.Deps = deps
+	pkg.SHA = digest
+	pkg.Reg = reg
+	pkg.Ver = ver
+
+	return pkg, nil
 }
 
 func determineDeps(o runtime.Object) ([]v1beta1.Dependency, error) {

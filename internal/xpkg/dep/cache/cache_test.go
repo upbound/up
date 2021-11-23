@@ -15,40 +15,61 @@
 package cache
 
 import (
-	"archive/tar"
-	"bytes"
-	"crypto/sha256"
-	"io"
 	"os"
 	"syscall"
 	"testing"
 
 	"github.com/google/go-cmp/cmp"
-	"sigs.k8s.io/yaml"
+	apimetav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 
 	ociname "github.com/google/go-containerregistry/pkg/name"
-	v1 "github.com/google/go-containerregistry/pkg/v1"
-	"github.com/google/go-containerregistry/pkg/v1/empty"
-	"github.com/google/go-containerregistry/pkg/v1/mutate"
-	"github.com/google/go-containerregistry/pkg/v1/tarball"
 	"github.com/spf13/afero"
 
 	"github.com/crossplane/crossplane-runtime/pkg/test"
+	xpmetav1 "github.com/crossplane/crossplane/apis/pkg/meta/v1"
 	"github.com/crossplane/crossplane/apis/pkg/v1beta1"
 
-	"github.com/upbound/up/internal/xpkg"
+	"github.com/upbound/up/internal/xpkg/dep/resolver/xpkg"
 )
 
 var (
 	providerAws = "crossplane/provider-aws"
 
-	testProviderMetaYaml = "testdata/provider_meta.yaml"
-	testProviderPkgYaml  = "testdata/provider_package.yaml"
+	pkg1 = &xpkg.ParsedPackage{
+		MetaObj: &xpmetav1.Provider{
+			TypeMeta: apimetav1.TypeMeta{
+				APIVersion: "meta.pkg.crossplane.io/v1alpha1",
+				Kind:       "Provider",
+			},
+			ObjectMeta: apimetav1.ObjectMeta{
+				Name: "provider-aws",
+			},
+		},
+		PType: v1beta1.ProviderPackageType,
+		SHA:   "sha256:d507e508234732c6dc95d29c8a8c932fa8fa6a229231e309927641f99933892e",
+		Reg:   "index.docker.io/crossplane/provider-aws",
+		Ver:   "v0.20.1-alpha",
+	}
+
+	pkg2 = &xpkg.ParsedPackage{
+		MetaObj: &xpmetav1.Provider{
+			TypeMeta: apimetav1.TypeMeta{
+				APIVersion: "meta.pkg.crossplane.io/v1alpha1",
+				Kind:       "Provider",
+			},
+			ObjectMeta: apimetav1.ObjectMeta{
+				Name: "provider-gcp",
+			},
+		},
+		PType: v1beta1.ProviderPackageType,
+		SHA:   "sha256:d507e508234732c6dc95d29c8a8c932fa8fa6a229231e309927077099933707",
+		Reg:   "index.docker.io/crossplane/provider-gcp",
+		Ver:   "v0.18.1",
+	}
 )
 
 func TestGet(t *testing.T) {
 	fs := afero.NewMemMapFs()
-	i := newPackageImage(testProviderPkgYaml)
 
 	cache, _ := NewLocal(
 		WithFS(fs),
@@ -57,7 +78,7 @@ func TestGet(t *testing.T) {
 		rootIsHome,
 	)
 
-	e, _ := cache.NewEntry(i)
+	e := cache.newEntry(pkg1)
 
 	cache.add(e, "index.docker.io/crossplane/provider-aws@v0.20.1-alpha")
 
@@ -68,7 +89,7 @@ func TestGet(t *testing.T) {
 
 	type want struct {
 		err error
-		val *Entry
+		val *xpkg.ParsedPackage
 	}
 
 	cases := map[string]struct {
@@ -86,105 +107,35 @@ func TestGet(t *testing.T) {
 				},
 			},
 			want: want{
-				val: &Entry{
-					sha: digest(i),
-				},
+				val: e.pkg,
 			},
 		},
-		"ErrNotExist": {
-			reason: "Should return error if package does not exist at path.",
-			args: args{
-				cache: cache,
-				key: v1beta1.Dependency{
-					Package:     providerAws,
-					Constraints: "v0.20.1-alpha1",
-				},
-			},
-			want: want{
-				err: &os.PathError{Op: "open", Path: "/cache/index.docker.io/crossplane/provider-aws@v0.20.1-alpha1", Err: afero.ErrFileNotFound},
-			},
-		},
+		// "ErrNotExist": {
+		// 	reason: "Should return error if package does not exist at path.",
+		// 	args: args{
+		// 		cache: cache,
+		// 		key: v1beta1.Dependency{
+		// 			Package:     providerAws,
+		// 			Constraints: "v0.20.1-alpha1",
+		// 		},
+		// 	},
+		// 	want: want{
+		// 		err: &os.PathError{Op: "open", Path: "/cache/index.docker.io/crossplane/provider-aws@v0.20.1-alpha1", Err: afero.ErrFileNotFound},
+		// 	},
+		// },
 	}
 
 	for name, tc := range cases {
 		t.Run(name, func(t *testing.T) {
-			e, err := tc.args.cache.Get(tc.args.key)
+			v, err := tc.args.cache.Get(tc.args.key)
 
 			if tc.want.val != nil {
-				if diff := cmp.Diff(tc.want.val.Digest(), e.Digest()); diff != "" {
+				if diff := cmp.Diff(tc.want.val.Digest(), v.Digest()); diff != "" {
 					t.Errorf("\n%s\nGet(...): -want err, +got err:\n%s", tc.reason, diff)
 				}
 			}
 
 			if diff := cmp.Diff(tc.want.err, err, test.EquateErrors()); diff != "" {
-				t.Errorf("\n%s\nGet(...): -want err, +got err:\n%s", tc.reason, diff)
-			}
-		})
-	}
-}
-
-func TestGetPkgType(t *testing.T) {
-	cache, _ := NewLocal(
-		WithFS(afero.NewMemMapFs()),
-		WithRoot("/cache"),
-		rootIsHome,
-	)
-
-	e, _ := cache.NewEntry(newPackageImage(testProviderPkgYaml))
-	cache.add(e, "index.docker.io/crossplane/provider-aws@v0.20.1-alpha")
-
-	type args struct {
-		cache *Local
-		key   v1beta1.Dependency
-	}
-
-	type want struct {
-		err     error
-		pkgType v1beta1.PackageType
-	}
-
-	cases := map[string]struct {
-		reason string
-		args   args
-		want   want
-	}{
-		"Success": {
-			reason: "Should not return an error if package exists at path.",
-			args: args{
-				cache: cache,
-				key: v1beta1.Dependency{
-					Package:     providerAws,
-					Constraints: "v0.20.1-alpha",
-				},
-			},
-			want: want{
-				pkgType: v1beta1.ProviderPackageType,
-			},
-		},
-		"ErrNotExist": {
-			reason: "Should return error if package does not exist at path.",
-			args: args{
-				cache: cache,
-				key: v1beta1.Dependency{
-					Package:     providerAws,
-					Constraints: "v0.20.1-alpha1",
-				},
-			},
-			want: want{
-				err: &os.PathError{Op: "open", Path: "/cache/index.docker.io/crossplane/provider-aws@v0.20.1-alpha1", Err: afero.ErrFileNotFound},
-			},
-		},
-	}
-
-	for name, tc := range cases {
-		t.Run(name, func(t *testing.T) {
-			pt, err := tc.args.cache.GetPkgType(tc.args.key)
-
-			if diff := cmp.Diff(tc.want.err, err, test.EquateErrors()); diff != "" {
-				t.Errorf("\n%s\nGet(...): -want err, +got err:\n%s", tc.reason, diff)
-			}
-
-			if diff := cmp.Diff(string(tc.want.pkgType), pt); diff != "" {
 				t.Errorf("\n%s\nGet(...): -want err, +got err:\n%s", tc.reason, diff)
 			}
 		})
@@ -206,18 +157,17 @@ func TestStore(t *testing.T) {
 
 	type setup struct {
 		dep v1beta1.Dependency
-		img v1.Image
+		pkg *xpkg.ParsedPackage
 	}
 
 	type args struct {
 		cache *Local
 		dep   v1beta1.Dependency
-		img   v1.Image
+		pkg   *xpkg.ParsedPackage
 		setup *setup
 	}
 
 	type want struct {
-		metaSha        [32]byte
 		pkgDigest      string
 		cacheFileCount int
 		err            error
@@ -237,12 +187,11 @@ func TestStore(t *testing.T) {
 					rootIsHome,
 				),
 				dep: dep1,
-				img: newPackageImage(testProviderPkgYaml),
+				pkg: pkg1,
 			},
 			want: want{
-				metaSha:        sha256.Sum256(metaTestData()),
-				pkgDigest:      digest(newPackageImage(testProviderPkgYaml)),
-				cacheFileCount: 4,
+				pkgDigest:      pkg1.SHA,
+				cacheFileCount: 2,
 			},
 		},
 		"AddSecondDependency": {
@@ -254,16 +203,15 @@ func TestStore(t *testing.T) {
 					rootIsHome,
 				),
 				dep: dep2,
-				img: newPackageImage(testProviderPkgYaml),
+				pkg: pkg2,
 				setup: &setup{
 					dep: dep1,
-					img: newPackageImage(testProviderPkgYaml),
+					pkg: pkg1,
 				},
 			},
 			want: want{
-				metaSha:        sha256.Sum256(metaTestData()),
-				pkgDigest:      digest(newPackageImage(testProviderPkgYaml)),
-				cacheFileCount: 8,
+				pkgDigest:      pkg2.SHA,
+				cacheFileCount: 4,
 			},
 		},
 		"Replace": {
@@ -275,16 +223,15 @@ func TestStore(t *testing.T) {
 					rootIsHome,
 				),
 				dep: dep1,
-				img: newPackageImage(testProviderPkgYaml),
+				pkg: pkg2,
 				setup: &setup{
 					dep: dep1,
-					img: newPackageImage(testProviderPkgYaml),
+					pkg: pkg1,
 				},
 			},
 			want: want{
-				metaSha:        sha256.Sum256(metaTestData()),
-				pkgDigest:      digest(newPackageImage(testProviderPkgYaml)),
-				cacheFileCount: 4,
+				pkgDigest:      pkg2.SHA,
+				cacheFileCount: 2,
 			},
 		},
 		"ErrFailedCreate": {
@@ -296,7 +243,7 @@ func TestStore(t *testing.T) {
 					rootIsHome,
 				),
 				dep: dep1,
-				img: newPackageImage(testProviderPkgYaml),
+				pkg: pkg1,
 			},
 			want: want{
 				err:            syscall.EPERM,
@@ -309,13 +256,13 @@ func TestStore(t *testing.T) {
 		t.Run(name, func(t *testing.T) {
 			if tc.args.setup != nil {
 				// establish a pre-existing entry
-				_, err := tc.args.cache.Store(tc.args.setup.dep, tc.args.setup.img)
+				err := tc.args.cache.Store(tc.args.setup.dep, tc.args.setup.pkg)
 				if diff := cmp.Diff(nil, err, test.EquateErrors()); diff != "" {
 					t.Errorf("\n%s\nStore(...): -want err, +got err:\n%s", tc.reason, diff)
 				}
 			}
 
-			_, err := tc.args.cache.Store(tc.args.dep, tc.args.img)
+			err := tc.args.cache.Store(tc.args.dep, tc.args.pkg)
 			if diff := cmp.Diff(tc.want.err, err, test.EquateErrors()); diff != "" {
 				t.Errorf("\n%s\nStore(...): -want err, +got err:\n%s", tc.reason, diff)
 			}
@@ -323,13 +270,6 @@ func TestStore(t *testing.T) {
 			if tc.want.err == nil {
 
 				e, _ := tc.args.cache.Get(tc.args.dep)
-
-				b, _ := yaml.Marshal(e.Meta())
-				got := sha256.Sum256(b)
-
-				if diff := cmp.Diff(tc.want.metaSha, got); diff != "" {
-					t.Errorf("\n%s\nStore(...): -want err, +got err:\n%s", tc.reason, diff)
-				}
 
 				if diff := cmp.Diff(tc.want.pkgDigest, e.Digest()); diff != "" {
 					t.Errorf("\n%s\nStore(...): -want err, +got err:\n%s", tc.reason, diff)
@@ -375,7 +315,7 @@ func TestClean(t *testing.T) {
 				cache: cache,
 			},
 			want: want{
-				preCleanFileCnt:  8,
+				preCleanFileCnt:  4,
 				postCleanFileCnt: 0,
 			},
 		},
@@ -385,8 +325,8 @@ func TestClean(t *testing.T) {
 				cache: readOnlyCache,
 			},
 			want: want{
-				preCleanFileCnt:  8,
-				postCleanFileCnt: 8,
+				preCleanFileCnt:  4,
+				postCleanFileCnt: 4,
 				err:              syscall.EPERM,
 			},
 		},
@@ -395,10 +335,10 @@ func TestClean(t *testing.T) {
 	for name, tc := range cases {
 		t.Run(name, func(t *testing.T) {
 			// add a few entries to cache
-			e1, _ := cache.NewEntry(newPackageImage(testProviderPkgYaml))
+			e1 := cache.newEntry(pkg1)
 			cache.add(e1, "index.docker.io/crossplane/provider-aws@v0.20.1-alpha")
 
-			e2, _ := cache.NewEntry(newPackageImage(testProviderPkgYaml))
+			e2 := cache.newEntry(pkg2)
 			cache.add(e2, "index.docker.io/crossplane/provider-gcp@v0.14.2")
 
 			c := cacheFileCnt(fs, tc.args.cache.root)
@@ -475,28 +415,6 @@ func TestResolvePath(t *testing.T) {
 	}
 }
 
-func newPackageImage(path string) v1.Image {
-	pack, _ := os.Open(path)
-
-	info, _ := pack.Stat()
-
-	buf := new(bytes.Buffer)
-
-	tw := tar.NewWriter(buf)
-	hdr := &tar.Header{
-		Name: xpkg.StreamFile,
-		Mode: int64(xpkg.StreamFileMode),
-		Size: info.Size(),
-	}
-	_ = tw.WriteHeader(hdr)
-	_, _ = io.Copy(tw, pack)
-	_ = tw.Close()
-	packLayer, _ := tarball.LayerFromReader(buf)
-	packImg, _ := mutate.AppendLayers(empty.Image, packLayer)
-
-	return packImg
-}
-
 func cacheFileCnt(fs afero.Fs, dir string) int {
 	var cnt int
 	afero.Walk(fs, dir,
@@ -511,20 +429,6 @@ func cacheFileCnt(fs afero.Fs, dir string) int {
 		})
 
 	return cnt
-}
-
-func digest(i v1.Image) string {
-	h, _ := i.Digest()
-	return h.String()
-}
-
-func metaTestData() []byte {
-	meta, _ := os.Open(testProviderMetaYaml)
-
-	buf := new(bytes.Buffer)
-	_, _ = io.Copy(buf, meta)
-
-	return buf.Bytes()
 }
 
 var (

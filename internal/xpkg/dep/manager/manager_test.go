@@ -18,7 +18,6 @@ import (
 	"archive/tar"
 	"bytes"
 	"context"
-	"fmt"
 	"io"
 	"testing"
 
@@ -161,8 +160,8 @@ func TestResolveTransitiveDependencies(t *testing.T) {
 	for n, tc := range cases {
 		t.Run(n, func(t *testing.T) {
 
-			ref, _ := name.ParseReference(image.ImgTag(tc.args.root.dep))
-			lref, _ := name.ParseReference(image.ImgTag(tc.args.leaf.dep))
+			ref, _ := name.ParseReference(image.FullTag(tc.args.root.dep))
+			lref, _ := name.ParseReference(image.FullTag(tc.args.leaf.dep))
 
 			sut, _ := New(
 				WithCache(c),
@@ -244,8 +243,6 @@ func (m *MockFetcher) Tags(ctx context.Context, ref name.Reference, secrets ...s
 
 func newPackageImage(meta runtime.Object) v1.Image {
 	pack, _ := yaml.Marshal(meta)
-
-	fmt.Println(string(pack))
 	r := bytes.NewReader(pack)
 
 	buf := new(bytes.Buffer)

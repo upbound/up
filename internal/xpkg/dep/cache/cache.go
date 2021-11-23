@@ -22,35 +22,22 @@ import (
 	"sync"
 
 	"github.com/google/go-containerregistry/pkg/name"
-	v1 "github.com/google/go-containerregistry/pkg/v1"
 	"github.com/spf13/afero"
 
 	"github.com/crossplane/crossplane-runtime/pkg/errors"
-	"github.com/crossplane/crossplane-runtime/pkg/parser"
 	"github.com/crossplane/crossplane/apis/pkg/v1beta1"
 
 	"github.com/upbound/up/internal/config"
 	"github.com/upbound/up/internal/xpkg/dep/resolver/image"
+	"github.com/upbound/up/internal/xpkg/dep/resolver/xpkg"
 	xpkgparser "github.com/upbound/up/internal/xpkg/parser"
 )
 
 const (
-	errFailedToAddEntry  = "failed to add entry to cache"
-	errFailedToFindEntry = "failed to find entry"
-
-	errOpenPackageStream = "failed to open package stream file"
+	errFailedToAddEntry     = "failed to add entry to cache"
+	errFailedToFindEntry    = "failed to find entry"
+	errInvalidValueSupplied = "invalid value supplied"
 )
-
-// TODO this interface doesn't below here. It should be at the caller.
-
-// A Cache caches OCI images.
-type Cache interface {
-	Get(v1beta1.Dependency) (*Entry, error)
-	GetPkgType(v1beta1.Dependency) (string, error)
-	Store(v1beta1.Dependency, v1.Image) error
-
-	Clean() error
-}
 
 // Local stores and retrieves OCI images in a filesystem-backed cache in a
 // thread-safe manner.
@@ -60,13 +47,14 @@ type Local struct {
 	mu     sync.RWMutex
 	root   string
 	path   string
-	parser *parser.PackageParser
+	pkgres *xpkg.Resolver
 }
 
 // NewLocal creates a new LocalCache.
 func NewLocal(opts ...Option) (*Local, error) {
+	fs := afero.NewOsFs()
 	l := &Local{
-		fs:   afero.NewOsFs(),
+		fs:   fs,
 		home: os.UserHomeDir,
 	}
 
@@ -90,7 +78,11 @@ func NewLocal(opts ...Option) (*Local, error) {
 		return nil, err
 	}
 
-	l.parser = p
+	r := xpkg.NewResolver(
+		xpkg.WithParser(p),
+	)
+
+	l.pkgres = r
 
 	return l, nil
 }
@@ -114,80 +106,67 @@ func WithRoot(root string) Option {
 }
 
 // Get retrieves an image from the LocalCache.
-func (c *Local) Get(k v1beta1.Dependency) (*Entry, error) {
+func (c *Local) Get(k v1beta1.Dependency) (*xpkg.ParsedPackage, error) {
 	c.mu.RLock()
 	defer c.mu.RUnlock()
-	t, err := name.NewTag(image.ImgTag(k))
+	t, err := name.NewTag(image.FullTag(k))
 	if err != nil {
 		return nil, err
 	}
 
-	return c.CurrentEntry(c.resolvePath(&t))
-}
-
-// TODO remove this.
-
-// GetPkgType retrieves the package type for the given dependency's meta file
-func (c *Local) GetPkgType(k v1beta1.Dependency) (string, error) {
-	e, err := c.Get(k)
+	e, err := c.currentEntry(c.resolvePath(&t))
 	if err != nil {
-		return "", err
+		return nil, err
 	}
 
-	return string(e.Type()), nil
+	return e.pkg, nil
 }
 
 // Store saves an image to the LocalCache. If a file currently
 // exists at that location, we overwrite the current file.
-// TODO(@tnthornton) does passing in v1.Image make sense here still?
-// While the API on it's face is nice and clean, it makes tests alittle harder.
-// One could argue that we should push image ingestion and parsing to the
-// edges of the system and only after they've successfully been parsed allow
-// them in to be handled by the rest of the system.
-func (c *Local) Store(k v1beta1.Dependency, v v1.Image) (*Entry, error) {
+func (c *Local) Store(k v1beta1.Dependency, v *xpkg.ParsedPackage) error {
 	c.mu.Lock()
 	defer c.mu.Unlock()
 
-	t, err := name.NewTag(image.ImgTag(k))
+	if v == nil {
+		return errors.New(errInvalidValueSupplied)
+	}
+
+	t, err := name.NewTag(image.FullTag(k))
 	if err != nil {
-		return nil, err
+		return err
 	}
 
 	path := c.resolvePath(&t)
 
-	curr, err := c.CurrentEntry(path)
+	curr, err := c.currentEntry(path)
 	if err != nil && !os.IsNotExist(err) {
-		return nil, errors.Wrap(err, errFailedToFindEntry)
+		return errors.Wrap(err, errFailedToFindEntry)
 	}
 
-	e, err := c.NewEntry(v)
-	if err != nil {
-		return nil, err
-	}
+	e := c.newEntry(v)
 
 	// clean the current entry
 	if err := curr.Clean(); err != nil {
-		return nil, err
+		return err
 	}
 
 	if err := c.add(e, path); err != nil {
-		return nil, err
+		return err
 	}
 
-	// TODO(@tnthornton) this is a little bit of a bummer, maybe we could hydrate
-	// e on add...
-	return c.CurrentEntry(path)
+	return nil
 }
 
 // add the given entry to the supplied path (to)
-func (c *Local) add(e *Entry, to string) error {
+func (c *Local) add(e *entry, to string) error {
 	if err := c.ensureDirExists(filepath.Join(c.root, to)); err != nil {
 		return err
 	}
 
 	e.setPath(to)
 
-	if _, _, _, err := e.flush(); err != nil {
+	if _, err := e.flush(); err != nil {
 		return errors.Wrap(err, errFailedToAddEntry)
 	}
 
