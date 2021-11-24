@@ -49,16 +49,17 @@ func (c *depCmd) AfterApply(kongCtx *kong.Context) error {
 	f := dep.NewLocalFetcher()
 	r := dep.NewResolver(dep.WithFetcher(f))
 
-	c.m = manager.New(
+	m, err := manager.New(
 		manager.WithCache(cache),
 		manager.WithFetcher(f),
 		manager.WithResolver(r),
 	)
 
-	if err := c.m.Init(); err != nil {
+	if err != nil {
 		return err
 	}
 
+	c.m = m
 	c.c = cache
 
 	ws, err := workspace.New(workspace.WithFS(fs))

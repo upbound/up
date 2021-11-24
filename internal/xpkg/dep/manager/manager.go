@@ -45,30 +45,33 @@ type Manager struct {
 }
 
 // New returns a new Manager
-func New(opts ...Option) *Manager {
+func New(opts ...Option) (*Manager, error) {
 	m := &Manager{}
+
+	c, err := cache.NewLocal()
+	if err != nil {
+		return nil, err
+	}
+
+	metaScheme, err := xpkg.BuildMetaScheme()
+	if err != nil {
+		return nil, errors.New(errBuildMetaScheme)
+	}
+	objScheme, err := xpkg.BuildObjectScheme()
+	if err != nil {
+		return nil, errors.New(errBuildObjectScheme)
+	}
+
+	m.c = c
+	m.f = dep.NewLocalFetcher()
+	m.p = parser.New(metaScheme, objScheme)
+	m.r = dep.NewResolver()
 
 	for _, o := range opts {
 		o(m)
 	}
 
-	return m
-}
-
-// Init initializes the Manager.
-func (m *Manager) Init() error {
-	metaScheme, err := xpkg.BuildMetaScheme()
-	if err != nil {
-		return errors.New(errBuildMetaScheme)
-	}
-	objScheme, err := xpkg.BuildObjectScheme()
-	if err != nil {
-		return errors.New(errBuildObjectScheme)
-	}
-
-	m.p = parser.New(metaScheme, objScheme)
-
-	return nil
+	return m, nil
 }
 
 // Option modifies the Manager.

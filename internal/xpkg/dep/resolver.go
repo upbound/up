@@ -46,7 +46,10 @@ type Resolver struct {
 
 // NewResolver returns a new Resolver.
 func NewResolver(opts ...ResolverOption) *Resolver {
-	r := &Resolver{}
+	r := &Resolver{
+		f: NewLocalFetcher(),
+	}
+
 	for _, o := range opts {
 		o(r)
 	}
