@@ -362,7 +362,7 @@ func TestClean(t *testing.T) {
 	}
 }
 
-func TestResolvePath(t *testing.T) {
+func TestCalculatePath(t *testing.T) {
 	tag1, _ := ociname.NewTag("crossplane/provider-aws:v0.20.1-alpha")
 	tag2, _ := ociname.NewTag("gcr.io/crossplane/provider-gcp:v1.0.0")
 	tag3, _ := ociname.NewTag("registry.upbound.io/examples-aws/getting-started:v0.14.0-240.g6a7366f")
@@ -406,10 +406,10 @@ func TestResolvePath(t *testing.T) {
 
 	for name, tc := range cases {
 		t.Run(name, func(t *testing.T) {
-			d := c.resolvePath(tc.args.tag)
+			d := c.calculatePath(tc.args.tag)
 
 			if diff := cmp.Diff(tc.want, d); diff != "" {
-				t.Errorf("\n%s\nResolvePath(...): -want err, +got err:\n%s", tc.reason, diff)
+				t.Errorf("\n%s\nCalculatePath(...): -want err, +got err:\n%s", tc.reason, diff)
 			}
 		})
 	}

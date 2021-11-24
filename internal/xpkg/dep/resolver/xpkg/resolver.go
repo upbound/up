@@ -34,6 +34,7 @@ import (
 	"github.com/crossplane/crossplane/apis/pkg/v1beta1"
 
 	"github.com/upbound/up/internal/xpkg"
+	xpkgparser "github.com/upbound/up/internal/xpkg/parser"
 )
 
 const (
@@ -50,18 +51,24 @@ const (
 
 // Resolver represents a xpkg Resolver
 type Resolver struct {
-	p *parser.PackageParser
+	p PackageParser
 }
 
 // NewResolver returns a new Resolver
-func NewResolver(opts ...ResolverOption) *Resolver {
+func NewResolver(opts ...ResolverOption) (*Resolver, error) {
 	r := &Resolver{}
+	p, err := xpkgparser.New()
+	if err != nil {
+		return nil, err
+	}
+
+	r.p = p
 
 	for _, o := range opts {
 		o(r)
 	}
 
-	return r
+	return r, nil
 }
 
 // ResolverOption modifies the xpkg Resolver
@@ -69,7 +76,7 @@ type ResolverOption func(*Resolver)
 
 // WithParser modifies the Resolver by setting the supplied PackageParser as
 // the Resolver's parser.
-func WithParser(p *parser.PackageParser) ResolverOption {
+func WithParser(p PackageParser) ResolverOption {
 	return func(r *Resolver) {
 		r.p = p
 	}

@@ -21,17 +21,14 @@ import (
 	"github.com/crossplane/crossplane/apis/pkg/v1beta1"
 
 	"github.com/upbound/up/internal/xpkg/dep/cache"
-	"github.com/upbound/up/internal/xpkg/dep/resolver/image"
 	"github.com/upbound/up/internal/xpkg/dep/resolver/xpkg"
-	xpkgparser "github.com/upbound/up/internal/xpkg/parser"
 )
 
 // Manager defines a dependency Manager
 type Manager struct {
-	c  *cache.Local
-	f  image.Fetcher
-	r  *image.Resolver
-	rx *xpkg.Resolver
+	c Cache
+	i ImageResolver
+	x XpkgResolver
 }
 
 // New returns a new Manager
@@ -43,14 +40,13 @@ func New(opts ...Option) (*Manager, error) {
 		return nil, err
 	}
 
-	p, err := xpkgparser.New()
+	x, err := xpkg.NewResolver()
 	if err != nil {
 		return nil, err
 	}
 
 	m.c = c
-	m.f = image.NewLocalFetcher()
-	m.rx = xpkg.NewResolver(xpkg.WithParser(p))
+	m.x = x
 
 	for _, o := range opts {
 		o(m)
@@ -63,23 +59,16 @@ func New(opts ...Option) (*Manager, error) {
 type Option func(*Manager)
 
 // WithCache sets the supplied cache.Local on the Manager.
-func WithCache(c *cache.Local) Option {
+func WithCache(c Cache) Option {
 	return func(m *Manager) {
 		m.c = c
 	}
 }
 
-// WithFetcher sets the supplied dep.LocalFetcher on the Manager.
-func WithFetcher(f image.Fetcher) Option {
-	return func(m *Manager) {
-		m.f = f
-	}
-}
-
 // WithResolver sets the supplied dep.Resolver on the Manager.
-func WithResolver(r *image.Resolver) Option {
+func WithResolver(r ImageResolver) Option {
 	return func(m *Manager) {
-		m.r = r
+		m.i = r
 	}
 }
 
@@ -132,12 +121,12 @@ func (m *Manager) resolveAllDeps(ctx context.Context, p *xpkg.ParsedPackage) err
 
 func (m *Manager) storePkg(ctx context.Context, d v1beta1.Dependency) (*xpkg.ParsedPackage, error) {
 	// this is expensive
-	t, i, err := m.r.ResolveImage(ctx, d)
+	t, i, err := m.i.ResolveImage(ctx, d)
 	if err != nil {
 		return nil, err
 	}
 
-	p, err := m.rx.FromImage(d.Package, t, i)
+	p, err := m.x.FromImage(d.Package, t, i)
 	if err != nil {
 		return nil, err
 	}
@@ -170,7 +159,7 @@ func (m *Manager) retrievePkg(ctx context.Context, d v1beta1.Dependency) (*xpkg.
 		}
 	} else {
 		// check if digest is different from what we have locally
-		digest, err := m.r.ResolveDigest(ctx, d)
+		digest, err := m.i.ResolveDigest(ctx, d)
 		if err != nil {
 			return nil, err
 		}
@@ -190,7 +179,7 @@ func (m *Manager) retrievePkg(ctx context.Context, d v1beta1.Dependency) (*xpkg.
 // finalizeDepVersion sets the resolved tag version on the supplied v1beta1.Dependency.
 func (m *Manager) finalizeDepVersion(ctx context.Context, d *v1beta1.Dependency) error {
 	// determine the version (using resolver) to use based on the supplied constraints
-	v, err := m.r.ResolveTag(ctx, *d)
+	v, err := m.i.ResolveTag(ctx, *d)
 	if err != nil {
 		return err
 	}

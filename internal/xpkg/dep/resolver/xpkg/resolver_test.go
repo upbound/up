@@ -37,7 +37,6 @@ import (
 	"github.com/crossplane/crossplane/apis/pkg/v1beta1"
 
 	"github.com/upbound/up/internal/xpkg"
-	"github.com/upbound/up/internal/xpkg/parser"
 )
 
 const (
@@ -126,10 +125,7 @@ func TestFromImage(t *testing.T) {
 
 	for name, tc := range cases {
 		t.Run(name, func(t *testing.T) {
-
-			parser, _ := parser.New()
-
-			pkgres := NewResolver(WithParser(parser))
+			pkgres, _ := NewResolver()
 
 			pkg, err := pkgres.FromImage(tc.args.reg, tc.args.tag, tc.args.img)
 
@@ -279,11 +275,7 @@ func TestFromDir(t *testing.T) {
 
 	for name, tc := range cases {
 		t.Run(name, func(t *testing.T) {
-			parser, _ := parser.New()
-
-			pkgres := NewResolver(
-				WithParser(parser),
-			)
+			pkgres, _ := NewResolver()
 
 			pkg, err := pkgres.FromDir(inmemfs, tc.args.path)
 

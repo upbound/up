@@ -15,9 +15,19 @@
 package xpkg
 
 import (
-	"github.com/crossplane/crossplane/apis/pkg/v1beta1"
+	"context"
+	"io"
+
 	"k8s.io/apimachinery/pkg/runtime"
+
+	"github.com/crossplane/crossplane-runtime/pkg/parser"
+	"github.com/crossplane/crossplane/apis/pkg/v1beta1"
 )
+
+// PackageParser --
+type PackageParser interface {
+	Parse(context.Context, io.ReadCloser) (*parser.Package, error)
+}
 
 // ParsedPackage represents an xpkg that has been parsed from a v1.Image
 type ParsedPackage struct {

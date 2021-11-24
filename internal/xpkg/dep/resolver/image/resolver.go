@@ -42,13 +42,6 @@ const (
 	errTagDoesNotExist    = "supplied tag does not exist in the registry"
 )
 
-// Fetcher defines how we expect to intract with the Image repository.
-type Fetcher interface {
-	Fetch(ctx context.Context, ref name.Reference, secrets ...string) (v1.Image, error)
-	Head(ctx context.Context, ref name.Reference, secrets ...string) (*v1.Descriptor, error)
-	Tags(ctx context.Context, ref name.Reference, secrets ...string) ([]string, error)
-}
-
 // Resolver --
 type Resolver struct {
 	f Fetcher

@@ -47,12 +47,10 @@ func (c *depCmd) AfterApply(kongCtx *kong.Context) error {
 		return err
 	}
 
-	f := image.NewLocalFetcher()
-	r := image.NewResolver(image.WithFetcher(f))
+	r := image.NewResolver()
 
 	m, err := manager.New(
 		manager.WithCache(cache),
-		manager.WithFetcher(f),
 		manager.WithResolver(r),
 	)
 

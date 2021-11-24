@@ -30,7 +30,6 @@ import (
 	"github.com/upbound/up/internal/config"
 	"github.com/upbound/up/internal/xpkg/dep/resolver/image"
 	"github.com/upbound/up/internal/xpkg/dep/resolver/xpkg"
-	xpkgparser "github.com/upbound/up/internal/xpkg/parser"
 )
 
 const (
@@ -47,7 +46,7 @@ type Local struct {
 	mu     sync.RWMutex
 	root   string
 	path   string
-	pkgres *xpkg.Resolver
+	pkgres XpkgResolver
 }
 
 // NewLocal creates a new LocalCache.
@@ -71,17 +70,12 @@ func NewLocal(opts ...Option) (*Local, error) {
 	if err != nil {
 		return nil, err
 	}
-	l.root = root
-
-	p, err := xpkgparser.New()
+	r, err := xpkg.NewResolver()
 	if err != nil {
 		return nil, err
 	}
 
-	r := xpkg.NewResolver(
-		xpkg.WithParser(p),
-	)
-
+	l.root = root
 	l.pkgres = r
 
 	return l, nil
@@ -114,7 +108,7 @@ func (c *Local) Get(k v1beta1.Dependency) (*xpkg.ParsedPackage, error) {
 		return nil, err
 	}
 
-	e, err := c.currentEntry(c.resolvePath(&t))
+	e, err := c.currentEntry(c.calculatePath(&t))
 	if err != nil {
 		return nil, err
 	}
@@ -137,7 +131,7 @@ func (c *Local) Store(k v1beta1.Dependency, v *xpkg.ParsedPackage) error {
 		return err
 	}
 
-	path := c.resolvePath(&t)
+	path := c.calculatePath(&t)
 
 	curr, err := c.currentEntry(path)
 	if err != nil && !os.IsNotExist(err) {
@@ -190,12 +184,12 @@ func (c *Local) ensureDirExists(path string) error {
 	return c.fs.MkdirAll(path, os.ModePerm)
 }
 
-// resolvePath resolves the given image tag to a directory path following our
-// convention.
+// calculatePath calculates the directory path from the given name.Tag following
+// our convention.
 // example:
 //   tag: crossplane/provider-aws:v0.20.1-alpha
 //   path: index.docker.io/crossplane/provider-aws@v0.20.1-alpha
-func (c *Local) resolvePath(tag *name.Tag) string {
+func (c *Local) calculatePath(tag *name.Tag) string {
 	return filepath.Join(
 		tag.RegistryStr(),
 		fmt.Sprintf("%s@%s", tag.RepositoryStr(), tag.TagStr()),
