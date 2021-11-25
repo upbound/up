@@ -48,6 +48,7 @@ func TestFlush(t *testing.T) {
 		metaCount int
 		crdCount  int
 		xrdCount  int
+		compCount int
 		flushErr  error
 	}
 
@@ -129,6 +130,15 @@ func TestFlush(t *testing.T) {
 								Name: "xrd2",
 							},
 						},
+						&xpapiextv1.Composition{
+							TypeMeta: apimetav1.TypeMeta{
+								APIVersion: "apiextensions.crossplane.io/v1",
+								Kind:       "Composition",
+							},
+							ObjectMeta: apimetav1.ObjectMeta{
+								Name: "comp",
+							},
+						},
 					},
 				},
 			},
@@ -136,6 +146,7 @@ func TestFlush(t *testing.T) {
 				metaCount: 1,
 				crdCount:  0,
 				xrdCount:  2,
+				compCount: 1,
 			},
 		},
 	}
@@ -155,6 +166,10 @@ func TestFlush(t *testing.T) {
 			}
 
 			if diff := cmp.Diff(tc.want.xrdCount, stats.xrds); diff != "" {
+				t.Errorf("\n%s\nFlush(...): -want err, +got err:\n%s", tc.reason, diff)
+			}
+
+			if diff := cmp.Diff(tc.want.compCount, stats.comps); diff != "" {
 				t.Errorf("\n%s\nFlush(...): -want err, +got err:\n%s", tc.reason, diff)
 			}
 

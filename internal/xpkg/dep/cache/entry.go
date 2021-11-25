@@ -36,6 +36,9 @@ import (
 
 const (
 	crdNameFmt = "%s.yaml"
+	crd        = "crd"
+	xrd        = "xrd"
+	comp       = "comp"
 
 	errFailedToCreateMeta     = "failed to create meta file in entry"
 	errFailedToCreateCRD      = "failed to create crd"
@@ -156,24 +159,34 @@ func (e *entry) writeMeta(o runtime.Object) (*flushstats, error) {
 func (e *entry) writeObjects(objs []runtime.Object) (*flushstats, error) { // nolint:gocyclo
 	stats := &flushstats{}
 
+	checks := []typeCheck{
+		isCRD,
+		isXRD,
+		isComposition,
+	}
+
 	for _, o := range objs {
+		var knownType bool
+		var currentType string
+
 		b, err := yaml.Marshal(o)
 		if err != nil {
 			return stats, err
 		}
 
-		isXRD := false
-
-		if err := xpkg.IsCRD(o); err != nil {
-			if err := xpkg.IsXRD(o); err != nil {
-				// not a CRD nor an XRD, skip
+		for _, c := range checks {
+			t, err := c(o)
+			if err == nil {
+				knownType = true
+				currentType = t
 				continue
-			} else {
-				isXRD = true
 			}
 		}
 
-		// TODO(@tnthornton) add support for compositions
+		if !knownType {
+			// not a CRD, XRD, nor a Composition, skip
+			continue
+		}
 
 		name := ""
 		switch crd := o.(type) {
@@ -185,28 +198,36 @@ func (e *entry) writeObjects(objs []runtime.Object) (*flushstats, error) { // no
 			name = crd.GetName()
 		case *xpv1.CompositeResourceDefinition:
 			name = crd.GetName()
+		case *v1beta1.Composition:
+			name = crd.GetName()
+		case *xpv1.Composition:
+			name = crd.GetName()
 		default:
 			return stats, errors.New(errObjectNotCRDNorXRD)
 		}
 
-		crdf, err := e.fs.Create(filepath.Join(e.location(), fmt.Sprintf(crdNameFmt, name)))
+		f, err := e.fs.Create(filepath.Join(e.location(), fmt.Sprintf(crdNameFmt, name)))
 		if err != nil {
 			return stats, err
 		}
-		defer crdf.Close() // nolint:errcheck
+		defer f.Close() // nolint:errcheck
 
-		crdb, err := crdf.Write(b)
+		fb, err := f.Write(b)
 		if err != nil {
 			return stats, err
 		}
 
-		if crdb == 0 {
+		if fb == 0 {
 			return stats, errors.New(errFailedToCreateCRD)
 		}
-		if isXRD {
-			stats.incXRDs()
-		} else {
+
+		switch currentType {
+		case crd:
 			stats.incCRDs()
+		case xrd:
+			stats.incXRDs()
+		case comp:
+			stats.incComps()
 		}
 	}
 
@@ -242,16 +263,42 @@ func (e *entry) location() string {
 	return filepath.Join(e.cacheRoot, e.path)
 }
 
+type typeCheck func(runtime.Object) (string, error)
+
+func isCRD(o runtime.Object) (string, error) {
+	err := xpkg.IsCRD(o)
+	if err == nil {
+		return crd, nil
+	}
+	return "", err
+}
+
+func isXRD(o runtime.Object) (string, error) {
+	err := xpkg.IsXRD(o)
+	if err == nil {
+		return xrd, nil
+	}
+	return "", err
+}
+
+func isComposition(o runtime.Object) (string, error) {
+	err := xpkg.IsComposition(o)
+	if err == nil {
+		return comp, nil
+	}
+	return "", err
+}
+
 type flushstats struct {
-	// comps int
+	comps int
 	crds  int
 	metas int
 	xrds  int
 }
 
-// func (s *flushstats) incComps() {
-// 	s.comps++
-// }
+func (s *flushstats) incComps() {
+	s.comps++
+}
 
 func (s *flushstats) incCRDs() {
 	s.crds++
@@ -266,7 +313,7 @@ func (s *flushstats) incXRDs() {
 }
 
 func (s *flushstats) combine(src *flushstats) {
-	// s.comps += src.comps
+	s.comps += src.comps
 	s.crds += src.crds
 	s.metas += src.metas
 	s.xrds += src.xrds
