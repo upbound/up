@@ -31,7 +31,7 @@ import (
 	"github.com/crossplane/crossplane/apis/apiextensions/v1beta1"
 
 	"github.com/upbound/up/internal/xpkg"
-	rxpkg "github.com/upbound/up/internal/xpkg/dep/resolver/xpkg"
+	rxpkg "github.com/upbound/up/internal/xpkg/dep/marshaler/xpkg"
 )
 
 const (

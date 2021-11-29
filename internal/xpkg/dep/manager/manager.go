@@ -21,14 +21,14 @@ import (
 	"github.com/crossplane/crossplane/apis/pkg/v1beta1"
 
 	"github.com/upbound/up/internal/xpkg/dep/cache"
-	"github.com/upbound/up/internal/xpkg/dep/resolver/xpkg"
+	"github.com/upbound/up/internal/xpkg/dep/marshaler/xpkg"
 )
 
 // Manager defines a dependency Manager
 type Manager struct {
 	c Cache
 	i ImageResolver
-	x XpkgResolver
+	x XpkgMarshaler
 }
 
 // New returns a new Manager
@@ -40,7 +40,7 @@ func New(opts ...Option) (*Manager, error) {
 		return nil, err
 	}
 
-	x, err := xpkg.NewResolver()
+	x, err := xpkg.NewMarshaler()
 	if err != nil {
 		return nil, err
 	}

@@ -49,14 +49,14 @@ const (
 	digestPrefix = "sha256:"
 )
 
-// Resolver represents a xpkg Resolver
-type Resolver struct {
+// Marshaler represents a xpkg Marshaler
+type Marshaler struct {
 	p PackageParser
 }
 
-// NewResolver returns a new Resolver
-func NewResolver(opts ...ResolverOption) (*Resolver, error) {
-	r := &Resolver{}
+// NewMarshaler returns a new Resolver
+func NewMarshaler(opts ...MarshalerOption) (*Marshaler, error) {
+	r := &Marshaler{}
 	p, err := xpkgparser.New()
 	if err != nil {
 		return nil, err
@@ -71,20 +71,20 @@ func NewResolver(opts ...ResolverOption) (*Resolver, error) {
 	return r, nil
 }
 
-// ResolverOption modifies the xpkg Resolver
-type ResolverOption func(*Resolver)
+// MarshalerOption modifies the xpkg Resolver
+type MarshalerOption func(*Marshaler)
 
 // WithParser modifies the Resolver by setting the supplied PackageParser as
 // the Resolver's parser.
-func WithParser(p PackageParser) ResolverOption {
-	return func(r *Resolver) {
+func WithParser(p PackageParser) MarshalerOption {
+	return func(r *Marshaler) {
 		r.p = p
 	}
 }
 
 // FromImage takes a registry and version string and their corresponding v1.Image and
 // returns a ParsedPackage for consumption by upstream callers.
-func (r *Resolver) FromImage(reg, ver string, i v1.Image) (*ParsedPackage, error) {
+func (r *Marshaler) FromImage(reg, ver string, i v1.Image) (*ParsedPackage, error) {
 	digest, err := i.Digest()
 	if err != nil {
 		return nil, errors.Wrap(err, errFaileToAcquireDigest)
@@ -107,7 +107,7 @@ func (r *Resolver) FromImage(reg, ver string, i v1.Image) (*ParsedPackage, error
 
 // FromDir takes an afero.Fs and a path to a directory and returns a ParsedPackage
 // based on the directories contents for consumption by upstream callers.
-func (r *Resolver) FromDir(fs afero.Fs, path string) (*ParsedPackage, error) {
+func (r *Marshaler) FromDir(fs afero.Fs, path string) (*ParsedPackage, error) {
 	parts := strings.Split(path, "@")
 	if len(parts) != 2 {
 		return nil, errors.New(errInvalidPath)
@@ -142,7 +142,7 @@ func (r *Resolver) FromDir(fs afero.Fs, path string) (*ParsedPackage, error) {
 	return finalizePkg(parts[0], parts[1], digest, pkg)
 }
 
-func (r *Resolver) parse(reader io.ReadCloser) (*ParsedPackage, error) {
+func (r *Marshaler) parse(reader io.ReadCloser) (*ParsedPackage, error) {
 	// parse package.yaml
 	pkg, err := r.p.Parse(context.Background(), reader)
 	if err != nil {

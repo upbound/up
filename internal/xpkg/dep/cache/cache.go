@@ -28,8 +28,8 @@ import (
 	"github.com/crossplane/crossplane/apis/pkg/v1beta1"
 
 	"github.com/upbound/up/internal/config"
+	"github.com/upbound/up/internal/xpkg/dep/marshaler/xpkg"
 	"github.com/upbound/up/internal/xpkg/dep/resolver/image"
-	"github.com/upbound/up/internal/xpkg/dep/resolver/xpkg"
 )
 
 const (
@@ -46,7 +46,7 @@ type Local struct {
 	mu     sync.RWMutex
 	root   string
 	path   string
-	pkgres XpkgResolver
+	pkgres XpkgMarshaler
 }
 
 // NewLocal creates a new LocalCache.
@@ -70,7 +70,7 @@ func NewLocal(opts ...Option) (*Local, error) {
 	if err != nil {
 		return nil, err
 	}
-	r, err := xpkg.NewResolver()
+	r, err := xpkg.NewMarshaler()
 	if err != nil {
 		return nil, err
 	}

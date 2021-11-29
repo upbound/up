@@ -125,7 +125,7 @@ func TestFromImage(t *testing.T) {
 
 	for name, tc := range cases {
 		t.Run(name, func(t *testing.T) {
-			pkgres, _ := NewResolver()
+			pkgres, _ := NewMarshaler()
 
 			pkg, err := pkgres.FromImage(tc.args.reg, tc.args.tag, tc.args.img)
 
@@ -275,7 +275,7 @@ func TestFromDir(t *testing.T) {
 
 	for name, tc := range cases {
 		t.Run(name, func(t *testing.T) {
-			pkgres, _ := NewResolver()
+			pkgres, _ := NewMarshaler()
 
 			pkg, err := pkgres.FromDir(inmemfs, tc.args.path)
 

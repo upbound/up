@@ -29,7 +29,7 @@ import (
 	xpmetav1 "github.com/crossplane/crossplane/apis/pkg/meta/v1"
 	"github.com/crossplane/crossplane/apis/pkg/v1beta1"
 
-	"github.com/upbound/up/internal/xpkg/dep/resolver/xpkg"
+	"github.com/upbound/up/internal/xpkg/dep/marshaler/xpkg"
 )
 
 var (

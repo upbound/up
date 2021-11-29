@@ -17,10 +17,10 @@ package cache
 import (
 	"github.com/spf13/afero"
 
-	"github.com/upbound/up/internal/xpkg/dep/resolver/xpkg"
+	"github.com/upbound/up/internal/xpkg/dep/marshaler/xpkg"
 )
 
-// XpkgResolver --
-type XpkgResolver interface {
+// XpkgMarshaler --
+type XpkgMarshaler interface {
 	FromDir(afero.Fs, string) (*xpkg.ParsedPackage, error)
 }

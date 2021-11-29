@@ -28,7 +28,7 @@ import (
 	xpapiextv1 "github.com/crossplane/crossplane/apis/apiextensions/v1"
 	xpmetav1 "github.com/crossplane/crossplane/apis/pkg/meta/v1"
 
-	"github.com/upbound/up/internal/xpkg/dep/resolver/xpkg"
+	"github.com/upbound/up/internal/xpkg/dep/marshaler/xpkg"
 )
 
 func TestFlush(t *testing.T) {

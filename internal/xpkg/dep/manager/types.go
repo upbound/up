@@ -22,7 +22,7 @@ import (
 
 	"github.com/crossplane/crossplane/apis/pkg/v1beta1"
 
-	"github.com/upbound/up/internal/xpkg/dep/resolver/xpkg"
+	"github.com/upbound/up/internal/xpkg/dep/marshaler/xpkg"
 )
 
 // Cache --
@@ -38,8 +38,8 @@ type ImageResolver interface {
 	ResolveTag(context.Context, v1beta1.Dependency) (string, error)
 }
 
-// XpkgResolver --
-type XpkgResolver interface {
+// XpkgMarshaler --
+type XpkgMarshaler interface {
 	FromImage(string, string, v1.Image) (*xpkg.ParsedPackage, error)
 	FromDir(afero.Fs, string) (*xpkg.ParsedPackage, error)
 }
