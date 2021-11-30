@@ -61,16 +61,32 @@ func New(opts ...WSOption) (*Workspace, error) {
 		wd: os.Getwd,
 	}
 
+	p, err := xpkgparser.New()
+	if err != nil {
+		return nil, err
+	}
+
+	ws.parser = p
+
 	for _, o := range opts {
 		o(ws)
 	}
 
+	// wd is function driven, which could be overridden through opts.
+	// Make sure the function is invoked after opts has been evaluated.
 	wd, err := ws.wd()
 	if err != nil {
 		return nil, err
 	}
 
 	ws.root = wd
+
+	exists, err := afero.Exists(ws.fs, filepath.Join(wd, xpkg.MetaFile))
+	if err != nil {
+		return nil, errors.Wrap(err, errMetaFileDoesNotExist)
+	}
+
+	ws.metaFileExists = exists
 
 	return ws, nil
 }
@@ -88,22 +104,14 @@ func WithFS(fs afero.Fs) WSOption {
 	}
 }
 
-// Init initializes the workspace
-func (w *Workspace) Init() error {
-	exists, err := afero.Exists(w.fs, filepath.Join(w.root, xpkg.MetaFile))
-	if err != nil {
-		return errors.Wrap(err, errMetaFileDoesNotExist)
+// WithWorkingDir configures the workspace with the given path as the working
+// directory.
+func WithWorkingDir(path string) WSOption {
+	return func(ws *Workspace) {
+		ws.wd = func() (string, error) {
+			return path, nil
+		}
 	}
-
-	w.metaFileExists = exists
-
-	p, err := xpkgparser.New()
-	if err != nil {
-		return err
-	}
-
-	w.parser = p
-	return nil
 }
 
 // MetaExists returns true if a meta file exists in the workspace

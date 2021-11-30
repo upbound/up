@@ -622,6 +622,5 @@ func newTestWS(fs afero.Fs) *Workspace {
 			}
 		},
 	)
-	ws.Init()
 	return ws
 }

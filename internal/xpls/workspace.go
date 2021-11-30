@@ -16,19 +16,19 @@ package xpls
 
 import (
 	"bufio"
+	"context"
 	"fmt"
 	"io"
 	"io/fs"
 	"strings"
 	"sync"
 
-	"github.com/crossplane/crossplane-runtime/pkg/errors"
-	xpextv1 "github.com/crossplane/crossplane/apis/apiextensions/v1"
 	"github.com/goccy/go-yaml"
 	"github.com/goccy/go-yaml/ast"
 	"github.com/goccy/go-yaml/parser"
 	"github.com/sourcegraph/go-lsp"
 	"github.com/spf13/afero"
+
 	ext "k8s.io/apiextensions-apiserver/pkg/apis/apiextensions"
 	extv1 "k8s.io/apiextensions-apiserver/pkg/apis/apiextensions/v1"
 	"k8s.io/apiextensions-apiserver/pkg/apiserver/validation"
@@ -39,6 +39,12 @@ import (
 	verrors "k8s.io/kube-openapi/pkg/validation/errors"
 	"k8s.io/kube-openapi/pkg/validation/validate"
 	k8syaml "sigs.k8s.io/yaml"
+
+	"github.com/crossplane/crossplane-runtime/pkg/errors"
+	xpextv1 "github.com/crossplane/crossplane/apis/apiextensions/v1"
+
+	"github.com/upbound/up/internal/xpkg/dep/manager"
+	"github.com/upbound/up/internal/xpkg/dep/workspace"
 )
 
 // paths to extract GVK and name from objects that conform to Kubernetes
@@ -168,6 +174,7 @@ func NewWorkspace(root string, opts ...WorkspaceOpt) *Workspace {
 		nodes:      map[NodeIdentifier]Node{},
 		validators: map[schema.GroupVersionKind]Validator{},
 	}
+
 	for _, o := range opts {
 		o(w)
 	}
@@ -371,6 +378,42 @@ func validationDiagnostics(res *validate.Result, n ast.Node, gvk schema.GroupVer
 	return diags
 }
 
+// LoadCacheValidators loads the validators corresponding to the external
+// dependencies defined in the dep cache (if there is a meta file in the
+// project root).
+func (w *Workspace) LoadCacheValidators() error {
+	depWS, err := workspace.New(
+		workspace.WithWorkingDir(w.root),
+	)
+	if err != nil {
+		return err
+	}
+
+	// grab external dependency validators only if a meta file is defined.
+	if depWS.MetaExists() {
+		m, err := manager.New()
+		if err != nil {
+			return err
+		}
+
+		deps, err := depWS.DependsOn()
+		if err != nil {
+			return err
+		}
+
+		snap, err := m.Snapshot(context.Background(), deps)
+		if err != nil {
+			return err
+		}
+
+		// add external deps to the set of validators for the workspace.
+		for k, v := range snap.View() {
+			w.validators[k] = v
+		}
+	}
+	return nil
+}
+
 // LoadValidators loads all validators from the specified location.
 // TODO(hasheddan): we currently assume that the cache holds objects in their
 // CRD form, but it is more likely that we will need to extract them from
@@ -379,6 +422,7 @@ func validationDiagnostics(res *validate.Result, n ast.Node, gvk schema.GroupVer
 // from a generic YAML reader, similar to the package parser.
 func (w *Workspace) LoadValidators(path string) error { // nolint:gocyclo
 	validators := map[schema.GroupVersionKind]*validate.SchemaValidator{}
+
 	if err := afero.Walk(w.fs, path, func(p string, info fs.FileInfo, err error) error {
 		if err != nil {
 			return err

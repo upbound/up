@@ -112,11 +112,18 @@ func (h *Handler) Handle(ctx context.Context, c *jsonrpc2.Conn, r *jsonrpc2.Requ
 		}
 		h.root = params.RootPath
 		h.ws = NewWorkspace(h.root)
-		if err := h.ws.LoadValidators(h.cachePath); err != nil {
+		if err := h.ws.LoadValidators(h.root); err != nil {
 			// If we can't load validators panic because we won't be able to
 			// perform validation.
 			panic(err)
 		}
+		if err := h.ws.LoadCacheValidators(); err != nil {
+			// TODO(@tnthornton) while at first glance, panicing here makes sense
+			// i.e. we simply can't function correctly, it's unclear to me if
+			// that's the correct choice from an end user UX perspective.
+			panic(err)
+		}
+
 		if err := h.ws.Parse(); err != nil {
 			log.Debug(errParseWorkspace, "error", err)
 		}
