@@ -20,7 +20,6 @@ import (
 	"io"
 	"io/fs"
 	"os"
-	"path/filepath"
 	"strings"
 	"sync"
 
@@ -163,6 +162,7 @@ func WithFS(fs afero.Fs) WorkspaceOpt {
 // package cache. A workspace must be parsed before it can be validated.
 func NewWorkspace(root string, opts ...WorkspaceOpt) *Workspace {
 	w := &Workspace{
+		fs:         afero.NewOsFs(),
 		root:       root,
 		nodes:      map[NodeIdentifier]Node{},
 		validators: map[schema.GroupVersionKind]Validator{},
@@ -184,12 +184,11 @@ func (w *Workspace) Parse() error {
 		if info.IsDir() {
 			return nil
 		}
-		fileName := filepath.Join(w.root, p)
 		// We attempt to parse subsequent documents if we encounter an error
 		// in a preceding one.
 		// TODO(hasheddan): errors should be aggregated and returned as
 		// diagnostics.
-		_ = w.parseFile(fileName)
+		_ = w.parseFile(p)
 		return nil
 	})
 }
@@ -204,7 +203,11 @@ func (w *Workspace) ParseFile(path string) error {
 // parseFile parses all YAML objects at the given path and updates the workspace
 // node cache.
 func (w *Workspace) parseFile(path string) error {
-	f, err := parser.ParseFile(path, parser.ParseComments)
+	b, err := afero.ReadFile(w.fs, path)
+	if err != nil {
+		return err
+	}
+	f, err := parser.ParseBytes(b, parser.ParseComments)
 	if err != nil {
 		return err
 	}
@@ -380,9 +383,7 @@ func (w *Workspace) LoadValidators(path string) error { // nolint:gocyclo
 		if info.IsDir() {
 			return nil
 		}
-		// NOTE(hasheddan): filepath.Join cleans result, so we ignore gosec
-		// warning here.
-		f, err := os.Open(filepath.Join(path, p)) // nolint:gosec
+		f, err := os.Open(p)
 		if err != nil {
 			return err
 		}
