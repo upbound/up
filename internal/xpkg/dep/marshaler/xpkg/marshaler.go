@@ -18,6 +18,7 @@ import (
 	"archive/tar"
 	"context"
 	"encoding/json"
+	"fmt"
 	"io"
 	"os"
 	"path/filepath"
@@ -60,6 +61,7 @@ const (
 	errObjectNotKnownType           = "object is not a known type"
 
 	digestPrefix = "sha256:"
+	dockerhub    = "index.docker.io"
 )
 
 // Marshaler represents a xpkg Marshaler
@@ -95,9 +97,9 @@ func WithParser(p PackageParser) MarshalerOption {
 	}
 }
 
-// FromImage takes a registry and version string and their corresponding v1.Image and
-// returns a ParsedPackage for consumption by upstream callers.
-func (r *Marshaler) FromImage(reg, ver string, i v1.Image) (*ParsedPackage, error) {
+// FromImage takes a registry, version, and name strings and their corresponding
+// v1.Image and returns a ParsedPackage for consumption by upstream callers.
+func (r *Marshaler) FromImage(reg, repo, ver string, i v1.Image) (*ParsedPackage, error) {
 	digest, err := i.Digest()
 	if err != nil {
 		return nil, errors.Wrap(err, errFaileToAcquireDigest)
@@ -115,12 +117,13 @@ func (r *Marshaler) FromImage(reg, ver string, i v1.Image) (*ParsedPackage, erro
 		return nil, err
 	}
 
-	return finalizePkg(reg, ver, digest.String(), pkg)
+	return finalizePkg(reg, repo, ver, digest.String(), pkg)
 }
 
-// FromDir takes an afero.Fs and a path to a directory and returns a ParsedPackage
-// based on the directories contents for consumption by upstream callers.
-func (r *Marshaler) FromDir(fs afero.Fs, path string) (*ParsedPackage, error) {
+// FromDir takes an afero.Fs, path to a directory, registry reference, and name
+// returns a ParsedPackage based on the directories contents for consumption by
+// upstream callers.
+func (r *Marshaler) FromDir(fs afero.Fs, path, reg, repo string) (*ParsedPackage, error) {
 	parts := strings.Split(path, "@")
 	if len(parts) != 2 {
 		return nil, errors.New(errInvalidPath)
@@ -137,7 +140,7 @@ func (r *Marshaler) FromDir(fs afero.Fs, path string) (*ParsedPackage, error) {
 		return nil, err
 	}
 
-	return finalizePkg(parts[0], parts[1], digest, pkg)
+	return finalizePkg(reg, repo, parts[1], digest, pkg)
 }
 
 func (r *Marshaler) parse(reader io.ReadCloser) (*ParsedPackage, error) {
@@ -173,7 +176,7 @@ func (r *Marshaler) parse(reader io.ReadCloser) (*ParsedPackage, error) {
 	}, nil
 }
 
-func finalizePkg(reg, ver, digest string, pkg *ParsedPackage) (*ParsedPackage, error) { // nolint:gocyclo
+func finalizePkg(reg, repo, ver, digest string, pkg *ParsedPackage) (*ParsedPackage, error) { // nolint:gocyclo
 	deps, err := determineDeps(pkg.MetaObj)
 	if err != nil {
 		return nil, err
@@ -207,11 +210,20 @@ func finalizePkg(reg, ver, digest string, pkg *ParsedPackage) (*ParsedPackage, e
 
 	pkg.Deps = deps
 	pkg.GVKtoV = v
-	pkg.SHA = digest
+	pkg.PName = derivePkgName(reg, repo)
 	pkg.Reg = reg
+	pkg.SHA = digest
 	pkg.Ver = ver
 
 	return pkg, nil
+}
+
+// derivePkgName returns the package name that we'd expect to see in a meta file
+func derivePkgName(registry, repo string) string {
+	if registry != dockerhub {
+		return fmt.Sprintf("%s/%s", registry, repo)
+	}
+	return repo
 }
 
 func determineDeps(o runtime.Object) ([]v1beta1.Dependency, error) {

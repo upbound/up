@@ -47,7 +47,7 @@ var (
 		},
 		PType: v1beta1.ProviderPackageType,
 		SHA:   "sha256:d507e508234732c6dc95d29c8a8c932fa8fa6a229231e309927641f99933892e",
-		Reg:   "index.docker.io/crossplane/provider-aws",
+		Reg:   "index.docker.io",
 		Ver:   "v0.20.1-alpha",
 	}
 
@@ -63,8 +63,24 @@ var (
 		},
 		PType: v1beta1.ProviderPackageType,
 		SHA:   "sha256:d507e508234732c6dc95d29c8a8c932fa8fa6a229231e309927077099933707",
-		Reg:   "index.docker.io/crossplane/provider-gcp",
+		Reg:   "index.docker.io",
 		Ver:   "v0.18.1",
+	}
+
+	pkg3 = &xpkg.ParsedPackage{
+		MetaObj: &xpmetav1.Provider{
+			TypeMeta: apimetav1.TypeMeta{
+				APIVersion: "meta.pkg.crossplane.io/v1alpha1",
+				Kind:       "Provider",
+			},
+			ObjectMeta: apimetav1.ObjectMeta{
+				Name: "provider-gcp",
+			},
+		},
+		PType: v1beta1.ProviderPackageType,
+		SHA:   "sha256:d507e508234732c6dc95d29c8a8c932fa8fa6a229231e309927077099933707",
+		Reg:   "registry.upbound.io",
+		Ver:   "v0.2.0",
 	}
 )
 
@@ -155,6 +171,12 @@ func TestStore(t *testing.T) {
 		Constraints: "latest",
 	}
 
+	dep3 := v1beta1.Dependency{
+		Package:     "registry.upbound.io/upbound/dep3-xpkg",
+		Type:        v1beta1.ProviderPackageType,
+		Constraints: "latest",
+	}
+
 	type setup struct {
 		dep v1beta1.Dependency
 		pkg *xpkg.ParsedPackage
@@ -186,11 +208,11 @@ func TestStore(t *testing.T) {
 					WithRoot("/tmp/cache"),
 					rootIsHome,
 				),
-				dep: dep1,
-				pkg: pkg1,
+				dep: dep3,
+				pkg: pkg3,
 			},
 			want: want{
-				pkgDigest:      pkg1.SHA,
+				pkgDigest:      pkg3.SHA,
 				cacheFileCount: 2,
 			},
 		},
@@ -439,7 +461,7 @@ func TestCalculatePath(t *testing.T) {
 	tag2, _ := ociname.NewTag("gcr.io/crossplane/provider-gcp:v1.0.0")
 	tag3, _ := ociname.NewTag("registry.upbound.io/examples-aws/getting-started:v0.14.0-240.g6a7366f")
 
-	c, _ := NewLocal(
+	NewLocal(
 		WithFS(afero.NewMemMapFs()),
 		WithRoot("/cache"),
 		rootIsHome,
@@ -478,7 +500,7 @@ func TestCalculatePath(t *testing.T) {
 
 	for name, tc := range cases {
 		t.Run(name, func(t *testing.T) {
-			d := c.calculatePath(tc.args.tag)
+			d := calculatePath(tc.args.tag)
 
 			if diff := cmp.Diff(tc.want, d); diff != "" {
 				t.Errorf("\n%s\nCalculatePath(...): -want err, +got err:\n%s", tc.reason, diff)

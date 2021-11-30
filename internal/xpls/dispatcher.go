@@ -16,11 +16,15 @@ package xpls
 
 import (
 	"context"
+	"fmt"
+	"path/filepath"
 
 	"github.com/golang/tools/lsp/protocol"
 	"github.com/sourcegraph/go-lsp"
 
 	"github.com/crossplane/crossplane-runtime/pkg/logging"
+
+	"github.com/upbound/up/internal/xpkg"
 )
 
 var (
@@ -31,6 +35,7 @@ var (
 const (
 	errParseWorkspace = "failed to parse workspace"
 	errValidateNodes  = "failed to validate nodes in workspace"
+	errLoadValidators = "failed to load validators"
 )
 
 // Dispatcher --
@@ -60,17 +65,17 @@ func (d *Dispatcher) Initialize(ctx context.Context, params lsp.InitializeParams
 
 	d.ws = ws
 
-	if err := d.ws.LoadValidators(d.root); err != nil {
-		// If we can't load validators panic because we won't be able to
-		// perform validation.
-		panic(err)
-	}
-
 	// TODO(@tnthornton) this is a slow operation
 	if err := d.ws.LoadCacheValidators(); err != nil {
 		// TODO(@tnthornton) while at first glance, panicing here makes sense
 		// i.e. we simply can't function correctly, it's unclear to me if
 		// that's the correct choice from an end user UX perspective.
+		panic(err)
+	}
+
+	if err := d.ws.LoadValidators(d.root); err != nil {
+		// If we can't load validators panic because we won't be able to
+		// perform validation.
 		panic(err)
 	}
 
@@ -148,6 +153,10 @@ func (d *Dispatcher) DidSave(ctx context.Context, params lsp.DidSaveTextDocument
 		d.log.Debug(errParseWorkspace, "error", err)
 		return nil
 	}
+
+	// we saved the meta file, load validators if the file isn't invalid
+	d.handleMeta(ctx, string(params.TextDocument.URI))
+
 	// TODO(hasheddan): diagnostics should be cached and validation should
 	// be performed selectively.
 	diags, err := d.ws.Validate(AllNodes)
@@ -158,5 +167,31 @@ func (d *Dispatcher) DidSave(ctx context.Context, params lsp.DidSaveTextDocument
 	return &lsp.PublishDiagnosticsParams{
 		URI:         params.TextDocument.URI,
 		Diagnostics: diags,
+	}
+}
+
+func (d *Dispatcher) handleMeta(_ context.Context, filename string) {
+	if filepath.Base(filename) == xpkg.MetaFile {
+		diags, err := d.ws.Validate(d.ws.MetaNode)
+		if err != nil {
+			d.log.Debug(errValidateNodes, "error", err)
+		}
+		// don't load validators from the cache if the meta file is in an
+		// invalid state.
+		if len(diags) == 0 {
+			// reset validators
+			d.ws.ResetValidators()
+
+			if err := d.ws.LoadValidators(d.root); err != nil {
+				d.log.Debug(errLoadValidators, "error", err)
+			}
+
+			if err := d.ws.LoadCacheValidators(); err != nil {
+				d.log.Debug(errLoadValidators, "error", err)
+			}
+			for k := range d.ws.snapshot.validators {
+				d.log.Info(fmt.Sprintf("%+v", k))
+			}
+		}
 	}
 }

@@ -51,8 +51,10 @@ import (
 	"github.com/upbound/up/internal/xpkg"
 	"github.com/upbound/up/internal/xpkg/dep/cache"
 	"github.com/upbound/up/internal/xpkg/dep/manager"
+	mxpkg "github.com/upbound/up/internal/xpkg/dep/marshaler/xpkg"
 	"github.com/upbound/up/internal/xpkg/dep/workspace"
 	"github.com/upbound/up/internal/xpls/validator"
+	"github.com/upbound/up/internal/xpls/validator/meta"
 )
 
 // paths to extract GVK and name from objects that conform to Kubernetes
@@ -143,11 +145,6 @@ type Node interface {
 	GetObject() metav1.Object
 }
 
-// A Validator validates data and returns a validation result.
-type Validator interface {
-	Validate(data interface{}) *validate.Result
-}
-
 // A Workspace represents a single xpkg workspace. It is safe for multi-threaded
 // use.
 type Workspace struct {
@@ -158,24 +155,25 @@ type Workspace struct {
 
 	mu sync.RWMutex
 
-	m *manager.Manager
+	m          *manager.Manager
+	metaNodeID NodeIdentifier
 
 	// The node cache maintains a set of nodes present in a workspace. A node
 	// identifier is a combination of its GVK and name.
 	nodes map[NodeIdentifier]Node
 
 	snapshot *Snapshot
-
-	// The validator cache maintains a set of validators loaded from the package cache.
-	validators map[schema.GroupVersionKind]Validator
 }
 
 // Snapshot represents the workspace for the given snapshot.
 // TODO(@tnthornton) we probably want to version the shapshots in order
 // to handle multiple inbound changes.
 type Snapshot struct {
+	packages map[string]*mxpkg.ParsedPackage
 	// map of full filename to file contents
 	ws map[string][]byte
+	// The validator cache maintains a set of validators loaded from the package cache.
+	validators map[schema.GroupVersionKind][]validator.Validator
 }
 
 // A WorkspaceOpt modifies the configuration of a workspace.
@@ -192,11 +190,14 @@ func WithFS(fs afero.Fs) WorkspaceOpt {
 // package cache. A workspace must be parsed before it can be validated.
 func NewWorkspace(root, cacheRoot string, opts ...WorkspaceOpt) (*Workspace, error) {
 	w := &Workspace{
-		fs:         afero.NewOsFs(),
-		root:       root,
-		nodes:      map[NodeIdentifier]Node{},
-		snapshot:   &Snapshot{ws: map[string][]byte{}},
-		validators: map[schema.GroupVersionKind]Validator{},
+		fs:    afero.NewOsFs(),
+		root:  root,
+		nodes: map[NodeIdentifier]Node{},
+		snapshot: &Snapshot{
+			packages:   map[string]*mxpkg.ParsedPackage{},
+			ws:         map[string][]byte{},
+			validators: map[schema.GroupVersionKind][]validator.Validator{},
+		},
 	}
 
 	c, err := cache.NewLocal(cache.WithRoot(cacheRoot))
@@ -280,7 +281,7 @@ func (w *Workspace) parseFile(path string) error {
 
 // parseDoc recursively parses a YAML document into PackageNodes. Embedded nodes
 // are added to the parent's list of dependants.
-func (w *Workspace) parseDoc(n ast.Node, path string) (NodeIdentifier, error) {
+func (w *Workspace) parseDoc(n ast.Node, path string) (NodeIdentifier, error) { //nolint:gocyclo
 	b, err := n.MarshalYAML()
 	if err != nil {
 		return NodeIdentifier{}, err
@@ -331,6 +332,12 @@ func (w *Workspace) parseDoc(n ast.Node, path string) (NodeIdentifier, error) {
 	// TODO(hasheddan): if this is an embedded resource we don't have a name so
 	// we should form a deterministic name based on its parent Composition.
 	id := nodeID(obj.GetName(), obj.GroupVersionKind())
+
+	// if this is node for the meta file, note it in the workspace for easy lookups.
+	if filepath.Base(path) == xpkg.MetaFile {
+		w.metaNodeID = id
+	}
+
 	w.nodes[id] = &PackageNode{
 		ast:        n,
 		fileName:   path,
@@ -354,6 +361,13 @@ func AllNodes(nodes map[NodeIdentifier]Node) []Node {
 	return ns
 }
 
+// MetaNode filters the node set for the workspace down to just the meta file node.
+func (w *Workspace) MetaNode(nodes map[NodeIdentifier]Node) []Node {
+	ns := make([]Node, 1)
+	ns[0] = nodes[w.metaNodeID]
+	return ns
+}
+
 // Validate performs validation on all filtered nodes and returns diagnostics
 // for any validation errors encountered.
 // TODO(hasheddan): consider decoupling forming diagnostics from getting
@@ -364,13 +378,16 @@ func (w *Workspace) Validate(fn NodeFilterFn) ([]lsp.Diagnostic, error) { // nol
 	diags := []lsp.Diagnostic{}
 	for _, n := range fn(w.nodes) {
 		gvk := n.GetGVK()
-		v, ok := w.validators[gvk]
+		validators, ok := w.snapshot.validators[gvk]
 		if !ok {
 			continue
 			// TODO(@tnthornton) if we can't find the validator for the given node, we should
 			// surface that error in the editor.
 		}
-		diags = append(diags, validationDiagnostics(v.Validate(n.GetObject()), n.GetAST(), n.GetGVK())...)
+
+		for _, v := range validators {
+			diags = append(diags, validationDiagnostics(v.Validate(n.GetObject()), n.GetAST(), n.GetGVK())...)
+		}
 	}
 	return diags, nil
 }
@@ -479,9 +496,8 @@ func (w *Workspace) LoadCacheValidators() error {
 		}
 
 		// add external deps to the set of validators for the workspace.
-		for k, v := range snap.View() {
-			w.validators[k] = v
-		}
+		w.appendValidators(snap.View().Validators())
+		w.snapshot.packages = snap.View().Packages()
 	}
 	return nil
 }
@@ -493,7 +509,7 @@ func (w *Workspace) LoadCacheValidators() error {
 // TODO(hasheddan): consider refactoring this to allow for sourcing validators
 // from a generic YAML reader, similar to the package parser.
 func (w *Workspace) LoadValidators(path string) error { // nolint:gocyclo
-	validators := map[schema.GroupVersionKind]Validator{}
+	validators := map[schema.GroupVersionKind][]validator.Validator{}
 
 	if err := afero.Walk(w.fs, path, func(p string, info fs.FileInfo, err error) error {
 		if err != nil {
@@ -523,16 +539,19 @@ func (w *Workspace) LoadValidators(path string) error { // nolint:gocyclo
 			}
 			if w.IsMeta(p) {
 				// just need to get gvk from this file
-				meta := &unstructured.Unstructured{}
-				if err := k8syaml.Unmarshal(b, meta); err != nil {
+				mobj := &unstructured.Unstructured{}
+				if err := k8syaml.Unmarshal(b, mobj); err != nil {
 					continue
 				}
-				v, err := validator.NewMeta(w.m)
+				m, err := meta.New(w.m, w.snapshot.packages)
 				if err != nil {
 					continue
 				}
 
-				validators[meta.GetObjectKind().GroupVersionKind()] = v
+				validators[mobj.GetObjectKind().GroupVersionKind()] = []validator.Validator{
+					meta.NewVersionValidator(m),
+					meta.NewTypeValidator(m),
+				}
 				continue
 			}
 			// TODO(hasheddan): handle v1beta1 CRDs, as well as all XRD API versions.
@@ -557,7 +576,7 @@ func (w *Workspace) LoadValidators(path string) error { // nolint:gocyclo
 						Group:   internal.Spec.Group,
 						Version: v.Name,
 						Kind:    internal.Spec.Names.Kind,
-					}] = sv
+					}] = []validator.Validator{sv}
 				}
 				continue
 			}
@@ -570,7 +589,7 @@ func (w *Workspace) LoadValidators(path string) error { // nolint:gocyclo
 					Group:   internal.Spec.Group,
 					Version: v.Name,
 					Kind:    internal.Spec.Names.Kind,
-				}] = sv
+				}] = []validator.Validator{sv}
 			}
 		}
 		return nil
@@ -582,10 +601,26 @@ func (w *Workspace) LoadValidators(path string) error { // nolint:gocyclo
 	// while loading any new validators.
 	w.mu.Lock()
 	defer w.mu.Unlock()
-	for k, v := range validators {
-		w.validators[k] = v
-	}
+
+	w.appendValidators(validators)
 	return nil
+}
+
+// ResetValidators resets the validators map for the workspace.
+func (w *Workspace) ResetValidators() {
+	w.snapshot.validators = make(map[schema.GroupVersionKind][]validator.Validator)
+}
+
+func (w *Workspace) appendValidators(validators map[schema.GroupVersionKind][]validator.Validator) {
+	for k, v := range validators {
+		validators, ok := w.snapshot.validators[k]
+		if !ok {
+			w.snapshot.validators[k] = v
+			continue
+		}
+		validators = append(validators, v...)
+		w.snapshot.validators[k] = validators
+	}
 }
 
 // updateContent updates the current immem content representation for the provided file uri.

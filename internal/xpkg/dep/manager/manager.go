@@ -19,14 +19,15 @@ import (
 	"os"
 
 	"github.com/crossplane/crossplane/apis/pkg/v1beta1"
+	"github.com/google/go-containerregistry/pkg/name"
 	v1 "github.com/google/go-containerregistry/pkg/v1"
 	"github.com/spf13/afero"
 	"k8s.io/apimachinery/pkg/runtime/schema"
-	"k8s.io/kube-openapi/pkg/validation/validate"
 
 	"github.com/upbound/up/internal/xpkg/dep/cache"
 	"github.com/upbound/up/internal/xpkg/dep/marshaler/xpkg"
 	"github.com/upbound/up/internal/xpkg/dep/resolver/image"
+	"github.com/upbound/up/internal/xpls/validator"
 )
 
 // Manager defines a dependency Manager
@@ -56,8 +57,8 @@ type ImageResolver interface {
 // XpkgMarshaler defines the API contract for working with an
 // xpkg.ParsedPackage marshaler.
 type XpkgMarshaler interface {
-	FromImage(string, string, v1.Image) (*xpkg.ParsedPackage, error)
-	FromDir(afero.Fs, string) (*xpkg.ParsedPackage, error)
+	FromImage(string, string, string, v1.Image) (*xpkg.ParsedPackage, error)
+	FromDir(afero.Fs, string, string, string) (*xpkg.ParsedPackage, error)
 }
 
 // New returns a new Manager
@@ -107,7 +108,8 @@ func WithResolver(r ImageResolver) Option {
 // dependencies (both defined and transitive) related to the given slice of
 // v1beta1.Dependency.
 func (m *Manager) Snapshot(ctx context.Context, deps []v1beta1.Dependency) (*Snapshot, error) {
-	view := make(map[schema.GroupVersionKind]*validate.SchemaValidator)
+	validators := make(map[schema.GroupVersionKind][]validator.Validator)
+	packages := make(map[string]*xpkg.ParsedPackage)
 
 	for _, d := range deps {
 		_, acc, err := m.Resolve(ctx, d)
@@ -116,13 +118,17 @@ func (m *Manager) Snapshot(ctx context.Context, deps []v1beta1.Dependency) (*Sna
 		}
 		for _, p := range acc {
 			for k, v := range p.Validators() {
-				view[k] = v
+				validators[k] = []validator.Validator{v}
 			}
+			packages[p.Name()] = p
 		}
 	}
 
 	return &Snapshot{
-		view: view,
+		view: &View{
+			packages:   packages,
+			validators: validators,
+		},
 	}, nil
 }
 
@@ -188,7 +194,12 @@ func (m *Manager) addPkg(ctx context.Context, d v1beta1.Dependency) (*xpkg.Parse
 		return nil, err
 	}
 
-	p, err := m.x.FromImage(d.Package, t, i)
+	tag, err := name.NewTag(d.Package)
+	if err != nil {
+		return nil, err
+	}
+
+	p, err := m.x.FromImage(tag.RegistryStr(), tag.RepositoryStr(), t, i)
 	if err != nil {
 		return nil, err
 	}
@@ -250,12 +261,29 @@ func (m *Manager) finalizeDepVersion(ctx context.Context, d *v1beta1.Dependency)
 	return nil
 }
 
-// Snapshot --
+// Snapshot represents the dependency cache at a snapshot in time.
 type Snapshot struct {
-	view map[schema.GroupVersionKind]*validate.SchemaValidator
+	view *View
+}
+
+// View represents the current view of the dependency cache in an easy to consume
+// manner.
+type View struct {
+	packages   map[string]*xpkg.ParsedPackage
+	validators map[schema.GroupVersionKind][]validator.Validator
 }
 
 // View returns the Snapshot's View.
-func (s *Snapshot) View() map[schema.GroupVersionKind]*validate.SchemaValidator {
+func (s *Snapshot) View() *View {
 	return s.view
+}
+
+// Packages returns the packages map for the view.
+func (v *View) Packages() map[string]*xpkg.ParsedPackage {
+	return v.packages
+}
+
+// Validators returns the validators map for the view.
+func (v *View) Validators() map[schema.GroupVersionKind][]validator.Validator {
+	return v.validators
 }

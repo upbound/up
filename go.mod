@@ -45,5 +45,6 @@ require (
 replace (
 	github.com/docker/distribution => github.com/docker/distribution v0.0.0-20191216044856-a8371794149d
 	github.com/docker/docker => github.com/moby/moby v17.12.0-ce-rc1.0.20200618181300-9dc6525e6118+incompatible
+	github.com/goccy/go-yaml => github.com/tnthornton/go-yaml v1.9.5-0.20211208010618-0bb11a74cc96
 	github.com/golang/tools => ./internal/vendor/golang.org/x/tools
 )

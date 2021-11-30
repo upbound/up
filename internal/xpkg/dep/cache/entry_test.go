@@ -90,6 +90,7 @@ func TestFlush(t *testing.T) {
 							},
 						},
 					},
+					SHA: "adfadfadsfasdfasdfsadf",
 				},
 			},
 			want: want{
@@ -140,6 +141,7 @@ func TestFlush(t *testing.T) {
 							},
 						},
 					},
+					SHA: "adfadfadsfasdfasdfsadf",
 				},
 			},
 			want: want{

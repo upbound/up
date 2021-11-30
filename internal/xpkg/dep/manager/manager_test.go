@@ -319,7 +319,8 @@ func TestSnapshot(t *testing.T) {
 			}
 
 			for _, k := range tc.want.keys {
-				_, ok := got.View()[k]
+				v := got.View()
+				_, ok := v.validators[k]
 
 				if diff := cmp.Diff(true, ok); diff != "" {
 					t.Errorf("\n%s\nSnapshot(...): -want err, +got err:\n%s", tc.reason, diff)

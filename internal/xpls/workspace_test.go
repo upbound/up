@@ -188,10 +188,10 @@ func TestLoadValidators(t *testing.T) {
 			if diff := cmp.Diff(tc.err, ws.LoadValidators(tc.path), test.EquateErrors()); diff != "" {
 				t.Errorf("\n%s\nLoadValidators(...): -want error, +got error:\n%s", tc.reason, diff)
 			}
-			if len(tc.validators) != len(ws.validators) {
-				t.Errorf("\n%s\nLoadValidators(...): -want validators count: %d, +got validators count: %d", tc.reason, len(tc.validators), len(ws.validators))
+			if len(tc.validators) != len(ws.snapshot.validators) {
+				t.Errorf("\n%s\nLoadValidators(...): -want validators count: %d, +got validators count: %d", tc.reason, len(tc.validators), len(ws.snapshot.validators))
 			}
-			for id := range ws.validators {
+			for id := range ws.snapshot.validators {
 				if _, ok := tc.validators[id]; !ok {
 					t.Errorf("\n%s\nLoadValidators(...): missing validator:\n%v", tc.reason, id)
 				}

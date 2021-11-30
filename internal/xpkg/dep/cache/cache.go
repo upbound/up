@@ -36,6 +36,7 @@ const (
 	errFailedToAddEntry     = "failed to add entry to cache"
 	errFailedToFindEntry    = "failed to find entry"
 	errInvalidValueSupplied = "invalid value supplied"
+	errInvalidVersion       = "invalid version found"
 )
 
 // Local stores and retrieves OCI images in a filesystem-backed cache in a
@@ -52,7 +53,7 @@ type Local struct {
 // XpkgMarshaler defines the API contract for working marshaling
 // xpkg.ParsedPackage's from a directory.
 type XpkgMarshaler interface {
-	FromDir(afero.Fs, string) (*xpkg.ParsedPackage, error)
+	FromDir(afero.Fs, string, string, string) (*xpkg.ParsedPackage, error)
 }
 
 // NewLocal creates a new LocalCache.
@@ -116,7 +117,7 @@ func (c *Local) Get(k v1beta1.Dependency) (*xpkg.ParsedPackage, error) {
 		return nil, err
 	}
 
-	e, err := c.currentEntry(c.calculatePath(&t))
+	e, err := c.currentEntry(calculatePath(&t), t.RegistryStr(), t.RepositoryStr())
 	if err != nil {
 		return nil, err
 	}
@@ -139,9 +140,9 @@ func (c *Local) Store(k v1beta1.Dependency, v *xpkg.ParsedPackage) error {
 		return err
 	}
 
-	path := c.calculatePath(&t)
+	path := calculatePath(&t)
 
-	curr, err := c.currentEntry(path)
+	curr, err := c.currentEntry(path, t.RegistryStr(), t.RepositoryStr())
 	if err != nil && !os.IsNotExist(err) {
 		return errors.Wrap(err, errFailedToFindEntry)
 	}
@@ -168,7 +169,7 @@ func (c *Local) Versions(k v1beta1.Dependency) ([]string, error) {
 		return nil, err
 	}
 
-	glob := c.calculateVersionsGlob(&t)
+	glob := calculateVersionsGlob(&t)
 
 	matches, err := afero.Glob(c.fs, filepath.Join(c.root, glob))
 	if err != nil {
@@ -178,7 +179,7 @@ func (c *Local) Versions(k v1beta1.Dependency) ([]string, error) {
 	for _, m := range matches {
 		ver := strings.Split(m, "@")
 		if len(ver) != 2 {
-			return nil, errors.New("invalid version found")
+			return nil, errors.New(errInvalidVersion)
 		}
 		vers = append(vers, ver[1])
 	}
@@ -219,14 +220,14 @@ func (c *Local) ensureDirExists(path string) error {
 // example:
 //   tag: crossplane/provider-aws:v0.20.1-alpha
 //   path: index.docker.io/crossplane/provider-aws@v0.20.1-alpha
-func (c *Local) calculatePath(tag *name.Tag) string {
+func calculatePath(tag *name.Tag) string {
 	return filepath.Join(
 		tag.RegistryStr(),
 		fmt.Sprintf("%s@%s", tag.RepositoryStr(), tag.TagStr()),
 	)
 }
 
-func (c *Local) calculateVersionsGlob(tag *name.Tag) string {
+func calculateVersionsGlob(tag *name.Tag) string {
 	return filepath.Join(
 		tag.RegistryStr(),
 		fmt.Sprintf("%s@*", tag.RepositoryStr()),

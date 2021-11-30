@@ -34,20 +34,22 @@ type PackageParser interface {
 
 // ParsedPackage represents an xpkg that has been parsed from a v1.Image
 type ParsedPackage struct {
-	// The SHA corresponding to the package.
-	SHA string
 	// The package dependencies derived from .Spec.DependsOn.
 	Deps []v1beta1.Dependency
 	// The calculated validators for the resources that make up this package.
 	GVKtoV map[schema.GroupVersionKind]*validate.SchemaValidator
 	// The MetaObj file that corresponds to the package.
 	MetaObj runtime.Object
+	// The name of the package.
+	PName string
 	// The N corresponding Objs (CRDs, XRDs, Compositions) depending on the package type.
 	Objs []runtime.Object
 	// The type of Package.
 	PType v1beta1.PackageType
 	// The container registry.
 	Reg string
+	// The SHA corresponding to the package.
+	SHA string
 	// The resolved version, e.g. v0.20.0
 	Ver string
 }
@@ -65,6 +67,11 @@ func (p *ParsedPackage) Dependencies() []v1beta1.Dependency {
 // Meta returns the runtime.Object corresponding to the meta file.
 func (p *ParsedPackage) Meta() runtime.Object {
 	return p.MetaObj
+}
+
+// Name returns the name of the package. e.g. crossplane/provider-aws
+func (p *ParsedPackage) Name() string {
+	return p.PName
 }
 
 // Objects returns the slice of runtime.Objects corresponding to CRDs, XRDs, and

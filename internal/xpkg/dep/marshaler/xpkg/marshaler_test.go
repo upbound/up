@@ -50,9 +50,10 @@ const (
 
 func TestFromImage(t *testing.T) {
 	type args struct {
-		reg string
-		tag string
-		img v1.Image
+		reg  string
+		repo string
+		tag  string
+		img  v1.Image
 	}
 
 	type want struct {
@@ -70,9 +71,10 @@ func TestFromImage(t *testing.T) {
 		"Success": {
 			reason: "Should return a ParsedPackage and no error.",
 			args: args{
-				reg: "index.docker.io/crossplane/provider-aws",
-				tag: "v0.20.0",
-				img: newPackageImage(testProviderPkgYaml),
+				reg:  "index.docker.io/crossplane/provider-aws",
+				repo: "crossplane/provider-aws",
+				tag:  "v0.20.0",
+				img:  newPackageImage(testProviderPkgYaml),
 			},
 			want: want{
 				pkg: &ParsedPackage{
@@ -129,7 +131,7 @@ func TestFromImage(t *testing.T) {
 		t.Run(name, func(t *testing.T) {
 			pkgres, _ := NewMarshaler()
 
-			pkg, err := pkgres.FromImage(tc.args.reg, tc.args.tag, tc.args.img)
+			pkg, err := pkgres.FromImage(tc.args.reg, tc.args.repo, tc.args.tag, tc.args.img)
 
 			if diff := cmp.Diff(tc.want.err, err, test.EquateErrors()); diff != "" {
 				t.Errorf("\n%s\nFromImage(...): -want err, +got err:\n%s", tc.reason, diff)
@@ -173,9 +175,11 @@ func TestFromDir(t *testing.T) {
 
 	inmemfs := afero.NewMemMapFs()
 	testdatafs := afero.NewOsFs()
-	path := "index.docker.io/crossplane/provider-helm@v0.9.0"
+	path1 := "cache/index.docker.io/crossplane/provider-helm@v0.9.0"
+	path2 := "cache/registry.upbound.io/upbound/platform-ref-aws@v0.9.0"
 
-	_ = inmemfs.MkdirAll(path, os.ModePerm)
+	_ = inmemfs.MkdirAll(path1, os.ModePerm)
+	_ = inmemfs.MkdirAll(path2, os.ModePerm)
 
 	// write files to the above path
 	meta, _ := testdatafs.Open(filepath.Join("testdata", testMetaFile))
@@ -187,18 +191,39 @@ func TestFromDir(t *testing.T) {
 	sha, _ := testdatafs.Open(filepath.Join("testdata", testDigestFile))
 	defer sha.Close()
 
-	targetMeta, _ := inmemfs.Create(filepath.Join(path, xpkg.MetaFile))
-	targetCRD1, _ := inmemfs.Create(filepath.Join(path, testProviderConfigsCRD))
-	targetCRD2, _ := inmemfs.Create(filepath.Join(path, testProviderConfigUsagesCRD))
-	targetSHA, _ := inmemfs.Create(filepath.Join(path, testDigestFile))
+	meta2, _ := testdatafs.Open(filepath.Join("testdata", testMetaFile))
+	defer meta.Close()
+	crd12, _ := testdatafs.Open(filepath.Join("testdata", testProviderConfigsCRD))
+	defer crd1.Close()
+	crd22, _ := testdatafs.Open(filepath.Join("testdata", testProviderConfigUsagesCRD))
+	defer crd2.Close()
+	sha2, _ := testdatafs.Open(filepath.Join("testdata", testDigestFile))
+	defer sha.Close()
+
+	targetMeta, _ := inmemfs.Create(filepath.Join(path1, xpkg.MetaFile))
+	targetCRD1, _ := inmemfs.Create(filepath.Join(path1, testProviderConfigsCRD))
+	targetCRD2, _ := inmemfs.Create(filepath.Join(path1, testProviderConfigUsagesCRD))
+	targetSHA, _ := inmemfs.Create(filepath.Join(path1, testDigestFile))
 
 	io.Copy(targetMeta, meta)
 	io.Copy(targetCRD1, crd1)
 	io.Copy(targetCRD2, crd2)
 	io.Copy(targetSHA, sha)
 
+	targetMeta2, _ := inmemfs.Create(filepath.Join(path2, xpkg.MetaFile))
+	targetCRD12, _ := inmemfs.Create(filepath.Join(path2, testProviderConfigsCRD))
+	targetCRD22, _ := inmemfs.Create(filepath.Join(path2, testProviderConfigUsagesCRD))
+	targetSHA2, _ := inmemfs.Create(filepath.Join(path2, testDigestFile))
+
+	io.Copy(targetMeta2, meta2)
+	io.Copy(targetCRD12, crd12)
+	io.Copy(targetCRD22, crd22)
+	io.Copy(targetSHA2, sha2)
+
 	type args struct {
 		path string
+		reg  string
+		repo string
 	}
 	type want struct {
 		pkg           *ParsedPackage
@@ -212,10 +237,12 @@ func TestFromDir(t *testing.T) {
 		args   args
 		want   want
 	}{
-		"Success": {
+		"SuccessDockerHubPackage": {
 			reason: "Should return a ParsedPackage and no error.",
 			args: args{
-				path: path,
+				path: path1,
+				reg:  "index.docker.io",
+				repo: "crossplane/provider-helm",
 			},
 			want: want{
 				pkg: &ParsedPackage{
@@ -249,8 +276,57 @@ func TestFromDir(t *testing.T) {
 							},
 						},
 					},
+					PName: "crossplane/provider-helm",
 					PType: v1beta1.ProviderPackageType,
-					Reg:   "index.docker.io/crossplane/provider-helm",
+					Reg:   "index.docker.io",
+					Ver:   "v0.9.0",
+				},
+				numObjects:    2,
+				numValidators: 4,
+			},
+		},
+		"SuccessNonDockerHubPackage": {
+			reason: "Should return a ParsedPackage and no error.",
+			args: args{
+				path: path2,
+				reg:  "registry.upbound.io",
+				repo: "upbound/platform-ref-aws",
+			},
+			want: want{
+				pkg: &ParsedPackage{
+					SHA: testDigestFile,
+					Deps: []v1beta1.Dependency{
+						{
+							Package:     "crossplane/provider-aws",
+							Type:        v1beta1.ProviderPackageType,
+							Constraints: "v0.20.0",
+						},
+					},
+					MetaObj: &xpmetav1alpha1.Provider{
+						TypeMeta: apimetav1.TypeMeta{
+							APIVersion: "meta.pkg.crossplane.io/v1alpha1",
+							Kind:       "Provider",
+						},
+						ObjectMeta: apimetav1.ObjectMeta{
+							Name: "provider-helm",
+						},
+						Spec: xpmetav1alpha1.ProviderSpec{
+							Controller: xpmetav1alpha1.ControllerSpec{
+								Image: "crossplane/provider-helm-controller:v0.9.0",
+							},
+							MetaSpec: xpmetav1alpha1.MetaSpec{
+								DependsOn: []xpmetav1alpha1.Dependency{
+									{
+										Provider: pointer.String("crossplane/provider-aws"),
+										Version:  "v0.20.0",
+									},
+								},
+							},
+						},
+					},
+					PName: "registry.upbound.io/upbound/platform-ref-aws",
+					PType: v1beta1.ProviderPackageType,
+					Reg:   "registry.upbound.io",
 					Ver:   "v0.9.0",
 				},
 				numObjects:    2,
@@ -281,7 +357,7 @@ func TestFromDir(t *testing.T) {
 		t.Run(name, func(t *testing.T) {
 			pkgres, _ := NewMarshaler()
 
-			pkg, err := pkgres.FromDir(inmemfs, tc.args.path)
+			pkg, err := pkgres.FromDir(inmemfs, tc.args.path, tc.args.reg, tc.args.repo)
 
 			if diff := cmp.Diff(tc.want.err, err, test.EquateErrors()); diff != "" {
 				t.Errorf("\n%s\nFromDir(...): -want err, +got err:\n%s", tc.reason, diff)
@@ -297,6 +373,10 @@ func TestFromDir(t *testing.T) {
 				}
 
 				if diff := cmp.Diff(tc.want.pkg.Meta(), pkg.Meta()); diff != "" {
+					t.Errorf("\n%s\nFromDir(...): -want err, +got err:\n%s", tc.reason, diff)
+				}
+
+				if diff := cmp.Diff(tc.want.pkg.Name(), pkg.Name()); diff != "" {
 					t.Errorf("\n%s\nFromDir(...): -want err, +got err:\n%s", tc.reason, diff)
 				}
 
