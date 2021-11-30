@@ -12,10 +12,11 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-package dep
+package image
 
 import (
 	"context"
+	"fmt"
 	"net/http"
 	"sort"
 
@@ -24,6 +25,7 @@ import (
 	v1 "github.com/google/go-containerregistry/pkg/v1"
 	"github.com/google/go-containerregistry/pkg/v1/remote/transport"
 	"github.com/pkg/errors"
+	"github.com/upbound/up/internal/xpkg/dep"
 
 	"github.com/crossplane/crossplane/apis/pkg/v1beta1"
 )
@@ -32,12 +34,21 @@ const (
 	// DefaultVer effectively defines latest for the semver constraints
 	DefaultVer = ">=v0.0.0"
 
+	packageTagFmt = "%s:%s"
+
 	errInvalidConstraint  = "invalid dependency constraint"
 	errInvalidProviderRef = "invalid package reference"
 	errFailedToFetchTags  = "failed to fetch tags"
 	errNoMatchingVersion  = "supplied version does not match an existing version"
 	errTagDoesNotExist    = "supplied tag does not exist in the registry"
 )
+
+// Fetcher defines how we expect to intract with the Image repository.
+type Fetcher interface {
+	Fetch(ctx context.Context, ref name.Reference, secrets ...string) (v1.Image, error)
+	Head(ctx context.Context, ref name.Reference, secrets ...string) (*v1.Descriptor, error)
+	Tags(ctx context.Context, ref name.Reference, secrets ...string) ([]string, error)
+}
 
 // Resolver --
 type Resolver struct {
@@ -47,7 +58,7 @@ type Resolver struct {
 // NewResolver returns a new Resolver.
 func NewResolver(opts ...ResolverOption) *Resolver {
 	r := &Resolver{
-		f: NewLocalFetcher(),
+		f: dep.NewLocalFetcher(),
 	}
 
 	for _, o := range opts {
@@ -56,7 +67,7 @@ func NewResolver(opts ...ResolverOption) *Resolver {
 	return r
 }
 
-// ResolverOption modifies the dependency resolver.
+// ResolverOption modifies the image resolver.
 type ResolverOption func(*Resolver)
 
 // WithFetcher modifies the Resolver and adds the given fetcher.
@@ -176,4 +187,12 @@ func (r *Resolver) ResolveDigest(ctx context.Context, d v1beta1.Dependency) (str
 		return "", err
 	}
 	return desc.Digest.String(), nil
+}
+
+// ImgTag returns the full image tag "source:version" of the given dependency
+func ImgTag(d v1beta1.Dependency) string {
+	// NOTE(@tnthornton) this should ONLY be used after the version constraint
+	// has been resolved for the given dependency. Using a semver range is not
+	// a valid tag format and will cause lookups to this string to fail.
+	return fmt.Sprintf(packageTagFmt, d.Package, d.Constraints)
 }

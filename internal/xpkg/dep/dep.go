@@ -15,14 +15,11 @@
 package dep
 
 import (
-	"fmt"
 	"strings"
 
 	"github.com/crossplane/crossplane/apis/pkg/v1beta1"
-)
 
-const (
-	packageTagFmt = "%s:%s"
+	"github.com/upbound/up/internal/xpkg/dep/resolver/image"
 )
 
 // New returns a new v1beta1.Dependency based on the given package name
@@ -32,7 +29,7 @@ func New(pkg string) v1beta1.Dependency {
 
 	// if the passed in ver was blank use the default to pass
 	// constraint checks and grab latest semver
-	version := DefaultVer
+	version := image.DefaultVer
 
 	ps := strings.Split(pkg, "@")
 
@@ -60,12 +57,4 @@ func NewWithType(pkg string, t string) v1beta1.Dependency {
 	}
 
 	return d
-}
-
-// ImgTag returns the full image tag "source:version" of the given dependency
-func ImgTag(d v1beta1.Dependency) string {
-	// NOTE(@tnthornton) this should ONLY be used after the version constraint
-	// has been resolved for the given dependency. Using a semver range is not
-	// a valid tag format and will cause lookups to this string to fail.
-	return fmt.Sprintf(packageTagFmt, d.Package, d.Constraints)
 }

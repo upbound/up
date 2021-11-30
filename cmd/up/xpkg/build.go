@@ -25,12 +25,10 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 
 	"github.com/upbound/up/internal/xpkg"
+	xpkgparser "github.com/upbound/up/internal/xpkg/parser"
 )
 
 const (
-	errBuildMetaScheme   = "failed to build meta scheme for package parser"
-	errBuildObjectScheme = "failed to build object scheme for package parser"
-
 	errGetNameFromMeta = "failed to get name from crossplane.yaml"
 	errBuildPackage    = "failed to build package"
 	errImageDigest     = "failed to get package digest"
@@ -61,18 +59,14 @@ func (c *buildCmd) Run() error {
 		return err
 	}
 
-	metaScheme, err := xpkg.BuildMetaScheme()
+	p, err := xpkgparser.New()
 	if err != nil {
-		return errors.New(errBuildMetaScheme)
-	}
-	objScheme, err := xpkg.BuildObjectScheme()
-	if err != nil {
-		return errors.New(errBuildObjectScheme)
+		return err
 	}
 
 	img, meta, err := xpkg.Build(context.Background(),
 		parser.NewFsBackend(c.fs, parser.FsDir(root), parser.FsFilters(buildFilters(root, c.Ignore)...)),
-		parser.New(metaScheme, objScheme))
+		p)
 	if err != nil {
 		return errors.Wrap(err, errBuildPackage)
 	}

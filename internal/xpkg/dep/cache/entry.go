@@ -47,9 +47,6 @@ const (
 	digestPrefix = "sha256"
 	crdNameFmt   = "%s.yaml"
 
-	errBuildMetaScheme   = "failed to build meta scheme for package parser"
-	errBuildObjectScheme = "failed to build object scheme for package parser"
-
 	errFailedEntryCreate    = "failed to create entry"
 	errFailedToCreateMeta   = "failed to create meta file in entry"
 	errFailedToCreateCRD    = "failed to create crd"

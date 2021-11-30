@@ -83,5 +83,5 @@ submodules:
 
 .PHONY: submodules fallthrough
 
-build.lsp:
+install:
 	@$(MAKE) go.install

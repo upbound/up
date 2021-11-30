@@ -20,6 +20,8 @@ import (
 
 	"github.com/crossplane/crossplane/apis/pkg/v1beta1"
 	"github.com/google/go-cmp/cmp"
+
+	"github.com/upbound/up/internal/xpkg/dep/resolver/image"
 )
 
 func TestNew(t *testing.T) {
@@ -47,7 +49,7 @@ func TestNew(t *testing.T) {
 				dep: v1beta1.Dependency{
 					Package:     providerAws,
 					Type:        v1beta1.ProviderPackageType,
-					Constraints: DefaultVer,
+					Constraints: image.DefaultVer,
 				},
 			},
 		},

@@ -25,6 +25,7 @@ import (
 	"github.com/upbound/up/internal/xpkg/dep"
 	"github.com/upbound/up/internal/xpkg/dep/cache"
 	"github.com/upbound/up/internal/xpkg/dep/manager"
+	"github.com/upbound/up/internal/xpkg/dep/resolver/image"
 	"github.com/upbound/up/internal/xpkg/dep/workspace"
 )
 
@@ -47,7 +48,7 @@ func (c *depCmd) AfterApply(kongCtx *kong.Context) error {
 	}
 
 	f := dep.NewLocalFetcher()
-	r := dep.NewResolver(dep.WithFetcher(f))
+	r := image.NewResolver(image.WithFetcher(f))
 
 	m, err := manager.New(
 		manager.WithCache(cache),

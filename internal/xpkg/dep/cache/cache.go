@@ -30,8 +30,8 @@ import (
 	"github.com/crossplane/crossplane/apis/pkg/v1beta1"
 
 	"github.com/upbound/up/internal/config"
-	"github.com/upbound/up/internal/xpkg"
-	"github.com/upbound/up/internal/xpkg/dep"
+	"github.com/upbound/up/internal/xpkg/dep/resolver/image"
+	xpkgparser "github.com/upbound/up/internal/xpkg/parser"
 )
 
 const (
@@ -40,6 +40,8 @@ const (
 
 	errOpenPackageStream = "failed to open package stream file"
 )
+
+// TODO this interface doesn't below here. It should be at the caller.
 
 // A Cache caches OCI images.
 type Cache interface {
@@ -83,16 +85,12 @@ func NewLocal(opts ...Option) (*Local, error) {
 	}
 	l.root = root
 
-	metaScheme, err := xpkg.BuildMetaScheme()
+	p, err := xpkgparser.New()
 	if err != nil {
-		return nil, errors.New(errBuildMetaScheme)
-	}
-	objScheme, err := xpkg.BuildObjectScheme()
-	if err != nil {
-		return nil, errors.New(errBuildObjectScheme)
+		return nil, err
 	}
 
-	l.parser = parser.New(metaScheme, objScheme)
+	l.parser = p
 
 	return l, nil
 }
@@ -119,13 +117,15 @@ func WithRoot(root string) Option {
 func (c *Local) Get(k v1beta1.Dependency) (*Entry, error) {
 	c.mu.RLock()
 	defer c.mu.RUnlock()
-	t, err := name.NewTag(dep.ImgTag(k))
+	t, err := name.NewTag(image.ImgTag(k))
 	if err != nil {
 		return nil, err
 	}
 
 	return c.CurrentEntry(c.resolvePath(&t))
 }
+
+// TODO remove this.
 
 // GetPkgType retrieves the package type for the given dependency's meta file
 func (c *Local) GetPkgType(k v1beta1.Dependency) (string, error) {
@@ -148,7 +148,7 @@ func (c *Local) Store(k v1beta1.Dependency, v v1.Image) (*Entry, error) {
 	c.mu.Lock()
 	defer c.mu.Unlock()
 
-	t, err := name.NewTag(dep.ImgTag(k))
+	t, err := name.NewTag(image.ImgTag(k))
 	if err != nil {
 		return nil, err
 	}

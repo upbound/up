@@ -40,8 +40,8 @@ import (
 	"github.com/crossplane/crossplane/apis/pkg/v1beta1"
 
 	"github.com/upbound/up/internal/xpkg"
-	"github.com/upbound/up/internal/xpkg/dep"
 	"github.com/upbound/up/internal/xpkg/dep/cache"
+	"github.com/upbound/up/internal/xpkg/dep/resolver/image"
 )
 
 func TestResolveTransitiveDependencies(t *testing.T) {
@@ -161,14 +161,14 @@ func TestResolveTransitiveDependencies(t *testing.T) {
 	for n, tc := range cases {
 		t.Run(n, func(t *testing.T) {
 
-			ref, _ := name.ParseReference(dep.ImgTag(tc.args.root.dep))
-			lref, _ := name.ParseReference(dep.ImgTag(tc.args.leaf.dep))
+			ref, _ := name.ParseReference(image.ImgTag(tc.args.root.dep))
+			lref, _ := name.ParseReference(image.ImgTag(tc.args.leaf.dep))
 
 			sut, _ := New(
 				WithCache(c),
 				WithResolver(
-					dep.NewResolver(
-						dep.WithFetcher(
+					image.NewResolver(
+						image.WithFetcher(
 							NewMockFetcher(
 								WithMeta(ref, tc.args.root.meta),
 								WithMeta(lref, tc.args.leaf.meta),

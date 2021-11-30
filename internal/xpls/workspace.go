@@ -19,7 +19,6 @@ import (
 	"fmt"
 	"io"
 	"io/fs"
-	"os"
 	"strings"
 	"sync"
 
@@ -389,7 +388,7 @@ func (w *Workspace) LoadValidators(path string) error { // nolint:gocyclo
 		}
 		// NOTE(hasheddan): path is cleaned before being passed to our walk
 		// function.
-		f, err := os.Open(p) // nolint:gosec
+		f, err := w.fs.Open(p) // nolint:gosec
 		if err != nil {
 			return err
 		}

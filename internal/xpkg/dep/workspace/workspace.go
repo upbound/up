@@ -34,12 +34,10 @@ import (
 
 	"github.com/upbound/up/internal/xpkg"
 	"github.com/upbound/up/internal/xpkg/dep/manager"
+	xpkgparser "github.com/upbound/up/internal/xpkg/parser"
 )
 
 const (
-	errBuildMetaScheme   = "failed to build meta scheme for workspace"
-	errBuildObjectScheme = "failed to build object scheme for workspace"
-
 	errInvalidMetaFile      = "invalid meta type supplied"
 	errMetaFileDoesNotExist = "meta file does not exist"
 	errMetaContainsDupeDep  = "meta file contains duplicate dependency"
@@ -99,17 +97,12 @@ func (w *Workspace) Init() error {
 
 	w.metaFileExists = exists
 
-	metaScheme, err := xpkg.BuildMetaScheme()
+	p, err := xpkgparser.New()
 	if err != nil {
-		return errors.New(errBuildMetaScheme)
-	}
-	objScheme, err := xpkg.BuildObjectScheme()
-	if err != nil {
-		return errors.New(errBuildObjectScheme)
+		return err
 	}
 
-	w.parser = parser.New(metaScheme, objScheme)
-
+	w.parser = p
 	return nil
 }
 

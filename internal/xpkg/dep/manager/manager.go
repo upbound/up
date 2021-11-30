@@ -27,6 +27,8 @@ import (
 	"github.com/upbound/up/internal/xpkg"
 	"github.com/upbound/up/internal/xpkg/dep"
 	"github.com/upbound/up/internal/xpkg/dep/cache"
+	"github.com/upbound/up/internal/xpkg/dep/resolver/image"
+	xpkgparser "github.com/upbound/up/internal/xpkg/parser"
 )
 
 const (
@@ -41,7 +43,7 @@ type Manager struct {
 	c *cache.Local
 	f dep.Fetcher
 	p *parser.PackageParser
-	r *dep.Resolver
+	r *image.Resolver
 }
 
 // New returns a new Manager
@@ -53,24 +55,14 @@ func New(opts ...Option) (*Manager, error) {
 		return nil, err
 	}
 
-	metaScheme, err := xpkg.BuildMetaScheme()
+	p, err := xpkgparser.New()
 	if err != nil {
-		return nil, errors.New(errBuildMetaScheme)
-	}
-	objScheme, err := xpkg.BuildObjectScheme()
-	if err != nil {
-		return nil, errors.New(errBuildObjectScheme)
+		return nil, err
 	}
 
 	m.c = c
 	m.f = dep.NewLocalFetcher()
-	m.p = parser.New(metaScheme, objScheme)
-	m.r = dep.NewResolver()
-
-	for _, o := range opts {
-		o(m)
-	}
-
+	m.p = p
 	return m, nil
 }
 
@@ -92,7 +84,7 @@ func WithFetcher(f dep.Fetcher) Option {
 }
 
 // WithResolver sets the supplied dep.Resolver on the Manager.
-func WithResolver(r *dep.Resolver) Option {
+func WithResolver(r *image.Resolver) Option {
 	return func(m *Manager) {
 		m.r = r
 	}

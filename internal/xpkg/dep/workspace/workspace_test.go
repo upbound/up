@@ -32,6 +32,7 @@ import (
 	"github.com/crossplane/crossplane/apis/pkg/v1beta1"
 
 	"github.com/upbound/up/internal/xpkg/dep"
+	"github.com/upbound/up/internal/xpkg/dep/resolver/image"
 )
 
 func TestUpsert(t *testing.T) {
@@ -285,7 +286,7 @@ func TestUpsertDeps(t *testing.T) {
 				deps: []metav1.Dependency{
 					{
 						Provider: pointer.String("crossplane/provider-aws"),
-						Version:  dep.DefaultVer,
+						Version:  image.DefaultVer,
 					},
 				},
 			},
