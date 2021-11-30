@@ -19,6 +19,8 @@ import (
 	"io"
 
 	"k8s.io/apimachinery/pkg/runtime"
+	"k8s.io/apimachinery/pkg/runtime/schema"
+	"k8s.io/kube-openapi/pkg/validation/validate"
 
 	"github.com/crossplane/crossplane-runtime/pkg/parser"
 	"github.com/crossplane/crossplane/apis/pkg/v1beta1"
@@ -31,10 +33,12 @@ type PackageParser interface {
 
 // ParsedPackage represents an xpkg that has been parsed from a v1.Image
 type ParsedPackage struct {
-	// The SHA SHA corresponding to the package.
+	// The SHA corresponding to the package.
 	SHA string
 	// The package dependencies derived from .Spec.DependsOn.
 	Deps []v1beta1.Dependency
+	// The calculated validators for the resources that make up this package.
+	GVKtoV map[schema.GroupVersionKind]*validate.SchemaValidator
 	// The MetaObj file that corresponds to the package.
 	MetaObj runtime.Object
 	// The N corresponding Objs (CRDs, XRDs, Compositions) depending on the package type.
@@ -83,4 +87,10 @@ func (p *ParsedPackage) Registry() string {
 // e.g. v0.20.0
 func (p *ParsedPackage) Version() string {
 	return p.Ver
+}
+
+// Validators returns the map of GVK to validators for the underlying resources
+// that make up the ParsedPackage.
+func (p *ParsedPackage) Validators() map[schema.GroupVersionKind]*validate.SchemaValidator {
+	return p.GVKtoV
 }

@@ -51,9 +51,8 @@ type Local struct {
 
 // NewLocal creates a new LocalCache.
 func NewLocal(opts ...Option) (*Local, error) {
-	fs := afero.NewOsFs()
 	l := &Local{
-		fs:   fs,
+		fs:   afero.NewOsFs(),
 		home: os.UserHomeDir,
 	}
 
@@ -161,10 +160,6 @@ func (c *Local) add(e *entry, to string) error {
 	e.setPath(to)
 
 	if _, err := e.flush(); err != nil {
-		return errors.Wrap(err, errFailedToAddEntry)
-	}
-
-	if err := e.setDigest(); err != nil {
 		return errors.Wrap(err, errFailedToAddEntry)
 	}
 

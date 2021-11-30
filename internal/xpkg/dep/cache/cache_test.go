@@ -110,19 +110,19 @@ func TestGet(t *testing.T) {
 				val: e.pkg,
 			},
 		},
-		// "ErrNotExist": {
-		// 	reason: "Should return error if package does not exist at path.",
-		// 	args: args{
-		// 		cache: cache,
-		// 		key: v1beta1.Dependency{
-		// 			Package:     providerAws,
-		// 			Constraints: "v0.20.1-alpha1",
-		// 		},
-		// 	},
-		// 	want: want{
-		// 		err: &os.PathError{Op: "open", Path: "/cache/index.docker.io/crossplane/provider-aws@v0.20.1-alpha1", Err: afero.ErrFileNotFound},
-		// 	},
-		// },
+		"ErrNotExist": {
+			reason: "Should return error if package does not exist at path.",
+			args: args{
+				cache: cache,
+				key: v1beta1.Dependency{
+					Package:     providerAws,
+					Constraints: "v0.20.1-alpha1",
+				},
+			},
+			want: want{
+				err: &os.PathError{Op: "open", Path: "/cache/index.docker.io/crossplane/provider-aws@v0.20.1-alpha1", Err: afero.ErrFileNotFound},
+			},
+		},
 	}
 
 	for name, tc := range cases {

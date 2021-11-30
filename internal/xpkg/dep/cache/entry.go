@@ -36,14 +36,10 @@ import (
 
 const (
 	crdNameFmt = "%s.yaml"
-	crd        = "crd"
-	xrd        = "xrd"
-	comp       = "comp"
 
 	errFailedToCreateMeta     = "failed to create meta file in entry"
 	errFailedToCreateCRD      = "failed to create crd"
 	errNoObjectsToFlushToDisk = "no objects to flush"
-	errObjectNotCRDNorXRD     = "object is not a crd"
 )
 
 // entry is the internal representation of the cache at a given directory
@@ -89,20 +85,6 @@ func (c *Local) currentEntry(path string) (*entry, error) {
 	return e, nil
 }
 
-// // SetDigest sets the digest for the entry.
-func (e *entry) setDigest() error {
-	if e.pkg == nil {
-		return errors.New(errNoObjectsToFlushToDisk)
-	}
-	// writing empty digest file
-	_, err := e.fs.Create(filepath.Join(e.location(), e.pkg.Digest()))
-	if err != nil {
-		return err
-	}
-
-	return nil
-}
-
 // flush writes the package contents to disk.
 // In addition to error, flush returns the number of meta, CRD, and XRD files
 // written to the entry on disk.
@@ -121,6 +103,12 @@ func (e *entry) flush() (*flushstats, error) {
 	stats.combine(metaStats)
 
 	objstats, err := e.writeObjects(e.pkg.Objects())
+	if err != nil {
+		return stats, err
+	}
+
+	// writing empty digest file
+	_, err = e.fs.Create(filepath.Join(e.location(), e.pkg.Digest()))
 	if err != nil {
 		return stats, err
 	}
@@ -159,51 +147,37 @@ func (e *entry) writeMeta(o runtime.Object) (*flushstats, error) {
 func (e *entry) writeObjects(objs []runtime.Object) (*flushstats, error) { // nolint:gocyclo
 	stats := &flushstats{}
 
-	checks := []typeCheck{
-		isCRD,
-		isXRD,
-		isComposition,
-	}
-
 	for _, o := range objs {
-		var knownType bool
-		var currentType string
+		var inc statsIncrementer
 
 		b, err := yaml.Marshal(o)
 		if err != nil {
 			return stats, err
 		}
 
-		for _, c := range checks {
-			t, err := c(o)
-			if err == nil {
-				knownType = true
-				currentType = t
-				continue
-			}
-		}
-
-		if !knownType {
-			// not a CRD, XRD, nor a Composition, skip
-			continue
-		}
-
 		name := ""
 		switch crd := o.(type) {
 		case *v1beta1ext.CustomResourceDefinition:
 			name = crd.GetName()
+			inc = stats.incCRDs
 		case *v1ext.CustomResourceDefinition:
 			name = crd.GetName()
+			inc = stats.incCRDs
 		case *v1beta1.CompositeResourceDefinition:
 			name = crd.GetName()
+			inc = stats.incXRDs
 		case *xpv1.CompositeResourceDefinition:
 			name = crd.GetName()
+			inc = stats.incXRDs
 		case *v1beta1.Composition:
 			name = crd.GetName()
+			inc = stats.incComps
 		case *xpv1.Composition:
 			name = crd.GetName()
+			inc = stats.incComps
 		default:
-			return stats, errors.New(errObjectNotCRDNorXRD)
+			// not a CRD, XRD, nor a Composition, skip
+			continue
 		}
 
 		f, err := e.fs.Create(filepath.Join(e.location(), fmt.Sprintf(crdNameFmt, name)))
@@ -221,14 +195,7 @@ func (e *entry) writeObjects(objs []runtime.Object) (*flushstats, error) { // no
 			return stats, errors.New(errFailedToCreateCRD)
 		}
 
-		switch currentType {
-		case crd:
-			stats.incCRDs()
-		case xrd:
-			stats.incXRDs()
-		case comp:
-			stats.incComps()
-		}
+		inc()
 	}
 
 	return stats, nil
@@ -263,38 +230,14 @@ func (e *entry) location() string {
 	return filepath.Join(e.cacheRoot, e.path)
 }
 
-type typeCheck func(runtime.Object) (string, error)
-
-func isCRD(o runtime.Object) (string, error) {
-	err := xpkg.IsCRD(o)
-	if err == nil {
-		return crd, nil
-	}
-	return "", err
-}
-
-func isXRD(o runtime.Object) (string, error) {
-	err := xpkg.IsXRD(o)
-	if err == nil {
-		return xrd, nil
-	}
-	return "", err
-}
-
-func isComposition(o runtime.Object) (string, error) {
-	err := xpkg.IsComposition(o)
-	if err == nil {
-		return comp, nil
-	}
-	return "", err
-}
-
 type flushstats struct {
 	comps int
 	crds  int
 	metas int
 	xrds  int
 }
+
+type statsIncrementer func()
 
 func (s *flushstats) incComps() {
 	s.comps++

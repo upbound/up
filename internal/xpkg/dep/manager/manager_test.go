@@ -29,8 +29,10 @@ import (
 	"github.com/google/go-containerregistry/pkg/v1/tarball"
 	"github.com/pkg/errors"
 	"github.com/spf13/afero"
+	apiextv1 "k8s.io/apiextensions-apiserver/pkg/apis/apiextensions/v1"
 	apimetav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
+	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/utils/pointer"
 	"sigs.k8s.io/yaml"
 
@@ -163,29 +165,34 @@ func TestResolveTransitiveDependencies(t *testing.T) {
 			ref, _ := name.ParseReference(image.FullTag(tc.args.root.dep))
 			lref, _ := name.ParseReference(image.FullTag(tc.args.leaf.dep))
 
-			sut, _ := New(
+			m, _ := New(
 				WithCache(c),
 				WithResolver(
 					image.NewResolver(
 						image.WithFetcher(
 							NewMockFetcher(
-								WithMeta(ref, tc.args.root.meta),
-								WithMeta(lref, tc.args.leaf.meta),
+								WithPackageObjects(ref, tc.args.root.meta),
+								WithPackageObjects(lref, tc.args.leaf.meta),
 							),
 						),
 					),
 				),
 			)
 
-			_, err := sut.Resolve(context.Background(), tc.args.root.dep)
+			_, acc, err := m.Resolve(context.Background(), tc.args.root.dep)
 
 			if diff := cmp.Diff(tc.want.err, err, test.EquateErrors()); diff != "" {
 				t.Errorf("\n%s\nResolveTransitiveDependencies(...): -want err, +got err:\n%s", tc.reason, diff)
 			}
 
+			// make sure the # of accumulated entries is equal the the expected entries
+			if diff := cmp.Diff(len(tc.want.entries), len(acc)); diff != "" {
+				t.Errorf("\n%s\nResolveTransitiveDependencies(...): -want err, +got err:\n%s", tc.reason, diff)
+			}
+
 			for _, e := range tc.want.entries {
 				// for each expressed entry, we should not get a NotExists
-				_, err := sut.c.Get(e)
+				_, err := m.c.Get(e)
 
 				if diff := cmp.Diff(nil, err, test.EquateErrors()); diff != "" {
 					t.Errorf("\n%s\nResolveTransitiveDependencies(...): -want err, +got err:\n%s", tc.reason, diff)
@@ -195,15 +202,142 @@ func TestResolveTransitiveDependencies(t *testing.T) {
 	}
 }
 
+func TestSnapshot(t *testing.T) {
+	fs := afero.NewMemMapFs()
+	c, _ := cache.NewLocal(cache.WithFS(fs), cache.WithRoot("/tmp/cache"))
+
+	type args struct {
+		dep  v1beta1.Dependency
+		meta runtime.Object
+		objs []runtime.Object
+	}
+	type want struct {
+		keys []schema.GroupVersionKind
+		err  error
+	}
+
+	cases := map[string]struct {
+		reason string
+		args   args
+		want   want
+	}{
+		"SuccessAllRelatedDepsInCache": {
+			args: args{
+				dep: v1beta1.Dependency{
+					Package:     "registry.upbound.io/upbound/platform-ref-aws",
+					Type:        v1beta1.ConfigurationPackageType,
+					Constraints: "v0.2.1",
+				},
+				meta: &metav1.Provider{
+					TypeMeta: apimetav1.TypeMeta{
+						APIVersion: "meta.pkg.crossplane.io/v1alpha1",
+						Kind:       "Provider",
+					},
+					Spec: metav1.ProviderSpec{
+						MetaSpec: metav1.MetaSpec{},
+					},
+				},
+				objs: []runtime.Object{
+					&apiextv1.CustomResourceDefinition{
+						TypeMeta: apimetav1.TypeMeta{
+							APIVersion: "apiextensions.k8s.io/v1",
+							Kind:       "CustomResourceDefinition",
+						},
+						ObjectMeta: apimetav1.ObjectMeta{
+							Name: "crd1",
+						},
+						Spec: apiextv1.CustomResourceDefinitionSpec{
+							Names: apiextv1.CustomResourceDefinitionNames{
+								Plural:   "tests",
+								Singular: "test",
+								Kind:     "testcrd",
+							},
+							Group: "crossplane.io",
+							Versions: []apiextv1.CustomResourceDefinitionVersion{
+								{
+									Name: "v1alpha1",
+									Schema: &apiextv1.CustomResourceValidation{
+										OpenAPIV3Schema: &apiextv1.JSONSchemaProps{
+											ID:          "id-v1alpha1",
+											Description: "desc1",
+										},
+									},
+								},
+								{
+									Name: "v1beta1",
+									Schema: &apiextv1.CustomResourceValidation{
+										OpenAPIV3Schema: &apiextv1.JSONSchemaProps{
+											ID:          "id-v1beta1",
+											Description: "desc2",
+										},
+									},
+								},
+							},
+						},
+					},
+				},
+			},
+			want: want{
+				keys: []schema.GroupVersionKind{
+					{
+						Group:   "crossplane.io",
+						Version: "v1alpha1",
+						Kind:    "testcrd",
+					},
+					{
+						Group:   "crossplane.io",
+						Version: "v1beta1",
+						Kind:    "testcrd",
+					},
+				},
+			},
+		},
+	}
+
+	for n, tc := range cases {
+		t.Run(n, func(t *testing.T) {
+
+			ref, _ := name.ParseReference(image.FullTag(tc.args.dep))
+
+			m, _ := New(
+				WithCache(c),
+				WithResolver(
+					image.NewResolver(
+						image.WithFetcher(
+							NewMockFetcher(
+								WithPackageObjects(ref, tc.args.meta, tc.args.objs...),
+							),
+						),
+					),
+				),
+			)
+
+			got, err := m.Snapshot(context.Background(), []v1beta1.Dependency{tc.args.dep})
+
+			if diff := cmp.Diff(tc.want.err, err, test.EquateErrors()); diff != "" {
+				t.Errorf("\n%s\nSnapshot(...): -want err, +got err:\n%s", tc.reason, diff)
+			}
+
+			for _, k := range tc.want.keys {
+				_, ok := got.View()[k]
+
+				if diff := cmp.Diff(true, ok); diff != "" {
+					t.Errorf("\n%s\nSnapshot(...): -want err, +got err:\n%s", tc.reason, diff)
+				}
+			}
+		})
+	}
+}
+
 type MockFetcher struct {
-	pkgMeta map[name.Reference]runtime.Object
+	pkgMeta map[name.Reference][]runtime.Object
 	tags    []string
 	err     error
 }
 
 func NewMockFetcher(opts ...MockFetcherOption) *MockFetcher {
 	f := &MockFetcher{
-		pkgMeta: make(map[name.Reference]runtime.Object),
+		pkgMeta: make(map[name.Reference][]runtime.Object),
 	}
 	for _, o := range opts {
 		o(f)
@@ -214,18 +348,21 @@ func NewMockFetcher(opts ...MockFetcherOption) *MockFetcher {
 // MockFetcherOption modifies the mock resolver.
 type MockFetcherOption func(*MockFetcher)
 
-func WithMeta(ref name.Reference, meta runtime.Object) MockFetcherOption {
+func WithPackageObjects(ref name.Reference, meta runtime.Object, objs ...runtime.Object) MockFetcherOption {
 	return func(m *MockFetcher) {
-		m.pkgMeta[ref] = meta
+		pkg := make([]runtime.Object, 0)
+		pkg = append(pkg, meta)
+		pkg = append(pkg, objs...)
+		m.pkgMeta[ref] = pkg
 	}
 }
 
 func (m *MockFetcher) Fetch(ctx context.Context, ref name.Reference, secrets ...string) (v1.Image, error) {
-	meta, ok := m.pkgMeta[ref]
+	objs, ok := m.pkgMeta[ref]
 	if !ok {
 		return nil, errors.New("entry does not exist in pkgMeta map")
 	}
-	return newPackageImage(meta), nil
+	return newPackageImage(objs...), nil
 }
 func (m *MockFetcher) Head(ctx context.Context, ref name.Reference, secrets ...string) (*v1.Descriptor, error) {
 	h, _ := v1.NewHash("test")
@@ -241,23 +378,27 @@ func (m *MockFetcher) Tags(ctx context.Context, ref name.Reference, secrets ...s
 	return nil, m.err
 }
 
-func newPackageImage(meta runtime.Object) v1.Image {
-	pack, _ := yaml.Marshal(meta)
-	r := bytes.NewReader(pack)
+func newPackageImage(objs ...runtime.Object) v1.Image {
+	rbuf := new(bytes.Buffer)
+	for _, o := range objs {
+		b, _ := yaml.Marshal(o)
 
-	buf := new(bytes.Buffer)
+		rbuf.Write(b)
+		rbuf.Write([]byte("\n---\n"))
+	}
 
-	tw := tar.NewWriter(buf)
+	wbuf := new(bytes.Buffer)
+	tw := tar.NewWriter(wbuf)
 	hdr := &tar.Header{
 		Name: xpkg.StreamFile,
 		Mode: int64(xpkg.StreamFileMode),
-		Size: int64(len(pack)),
+		Size: int64(len(rbuf.Bytes())),
 	}
 
 	_ = tw.WriteHeader(hdr)
-	_, _ = io.Copy(tw, r)
+	_, _ = io.Copy(tw, rbuf)
 	_ = tw.Close()
-	packLayer, _ := tarball.LayerFromReader(buf)
+	packLayer, _ := tarball.LayerFromReader(wbuf)
 	packImg, _ := mutate.AppendLayers(empty.Image, packLayer)
 
 	return packImg
