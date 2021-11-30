@@ -49,22 +49,22 @@ func init() {
 func TestParse(t *testing.T) {
 	cases := map[string]struct {
 		reason string
-		ws     *Workspace
+		opt    WorkspaceOpt
 		nodes  map[NodeIdentifier]struct{}
 		err    error
 	}{
 		"ErrorRootNotExist": {
 			reason: "Should return an error if the workspace root does not exist.",
-			ws:     NewWorkspace("/ws", WithFS(afero.NewMemMapFs())),
+			opt:    WithFS(afero.NewMemMapFs()),
 			err:    &os.PathError{Op: "open", Path: "/ws", Err: afero.ErrFileNotFound},
 		},
 		"SuccessfulEmpty": {
 			reason: "Should not return an error if the workspace is empty.",
-			ws: NewWorkspace("/ws", WithFS(func() afero.Fs {
+			opt: WithFS(func() afero.Fs {
 				fs := afero.NewMemMapFs()
 				_ = fs.Mkdir("/ws", os.ModePerm)
 				return fs
-			}())),
+			}()),
 		},
 		"SuccessfulNoKubernetesObjects": {
 			// NOTE(hasheddan): this test reflects current behavior, but we
@@ -73,19 +73,19 @@ func TestParse(t *testing.T) {
 			// likely also want skip any non-YAML files by default as we do in
 			// package parsing.
 			reason: "Should have no package nodes if no Kubernetes objects are present.",
-			ws: NewWorkspace("/ws", WithFS(func() afero.Fs {
+			opt: WithFS(func() afero.Fs {
 				fs := afero.NewMemMapFs()
 				_ = afero.WriteFile(fs, "/ws/somerandom.yaml", []byte("some invalid ::: yaml"), os.ModePerm)
 				return fs
-			}())),
+			}()),
 		},
 		"SuccessfulParseComposition": {
 			reason: "Should add a package node for Composition and every embedded resource.",
-			ws: NewWorkspace("/ws", WithFS(func() afero.Fs {
+			opt: WithFS(func() afero.Fs {
 				fs := afero.NewMemMapFs()
 				_ = afero.WriteFile(fs, "/ws/composition.yaml", testComposition, os.ModePerm)
 				return fs
-			}())),
+			}()),
 			nodes: map[NodeIdentifier]struct{}{
 				nodeID("", schema.FromAPIVersionAndKind("ec2.aws.crossplane.io/v1beta1", "VPC")):               {},
 				nodeID("", schema.FromAPIVersionAndKind("ec2.aws.crossplane.io/v1beta1", "Subnet")):            {},
@@ -94,11 +94,11 @@ func TestParse(t *testing.T) {
 		},
 		"SuccessfulParseMultipleSameFile": {
 			reason: "Should add a package node for every resource when multiple objects exist in single file.",
-			ws: NewWorkspace("/ws", WithFS(func() afero.Fs {
+			opt: WithFS(func() afero.Fs {
 				fs := afero.NewMemMapFs()
 				_ = afero.WriteFile(fs, "/ws/multiple.yaml", testMultipleObject, os.ModePerm)
 				return fs
-			}())),
+			}()),
 			nodes: map[NodeIdentifier]struct{}{
 				nodeID("compositepostgresqlinstances.database.example.org", xpextv1.CompositeResourceDefinitionGroupVersionKind): {},
 				nodeID("some.other.xrd", xpextv1.CompositeResourceDefinitionGroupVersionKind):                                    {},
@@ -107,13 +107,15 @@ func TestParse(t *testing.T) {
 	}
 	for name, tc := range cases {
 		t.Run(name, func(t *testing.T) {
-			if diff := cmp.Diff(tc.err, tc.ws.Parse(), test.EquateErrors()); diff != "" {
+			ws, _ := NewWorkspace("/ws", "/cache", tc.opt)
+
+			if diff := cmp.Diff(tc.err, ws.Parse(), test.EquateErrors()); diff != "" {
 				t.Errorf("\n%s\nParse(...): -want error, +got error:\n%s", tc.reason, diff)
 			}
-			if len(tc.nodes) != len(tc.ws.nodes) {
-				t.Errorf("\n%s\nParse(...): -want node count: %d, +got node count: %d", tc.reason, len(tc.nodes), len(tc.ws.nodes))
+			if len(tc.nodes) != len(ws.nodes) {
+				t.Errorf("\n%s\nParse(...): -want node count: %d, +got node count: %d", tc.reason, len(tc.nodes), len(ws.nodes))
 			}
-			for id := range tc.ws.nodes {
+			for id := range ws.nodes {
 				if _, ok := tc.nodes[id]; !ok {
 					t.Errorf("\n%s\nParse(...): missing node:\n%v", tc.reason, id)
 				}
@@ -125,35 +127,39 @@ func TestParse(t *testing.T) {
 func TestLoadValidators(t *testing.T) {
 	cases := map[string]struct {
 		reason     string
-		ws         *Workspace
+		opt        WorkspaceOpt
+		wsroot     string
 		path       string
 		validators map[schema.GroupVersionKind]struct{}
 		err        error
 	}{
 		"ErrorPathNotExist": {
 			reason: "Should return an error if the path does not exist.",
-			ws:     NewWorkspace("/", WithFS(afero.NewMemMapFs())),
+			wsroot: "/",
+			opt:    WithFS(afero.NewMemMapFs()),
 			path:   "/cache",
 			err:    &os.PathError{Op: "open", Path: "/cache", Err: afero.ErrFileNotFound},
 		},
 		"SuccessfulNoKubernetesObjects": {
 			reason: "Should return an error if the path does not exist.",
-			ws: NewWorkspace("/ws", WithFS(func() afero.Fs {
+			wsroot: "/ws",
+			opt: WithFS(func() afero.Fs {
 				fs := afero.NewMemMapFs()
 				_ = fs.Mkdir("/ws", os.ModePerm)
 				_ = afero.WriteFile(fs, "/cache/somerandom.yaml", []byte("some invalid ::: yaml"), os.ModePerm)
 				return fs
-			}())),
+			}()),
 			path: "/cache",
 		},
 		"SuccessfulLoadFromCRD": {
 			reason: "Should add a validator for a CRD if it is valid.",
-			ws: NewWorkspace("/ws", WithFS(func() afero.Fs {
+			wsroot: "/ws",
+			opt: WithFS(func() afero.Fs {
 				fs := afero.NewMemMapFs()
 				_ = fs.Mkdir("/ws", os.ModePerm)
 				_ = afero.WriteFile(fs, "/cache/valid.yaml", testSingleVersionCRD, os.ModePerm)
 				return fs
-			}())),
+			}()),
 			path: "/cache",
 			validators: map[schema.GroupVersionKind]struct{}{
 				schema.FromAPIVersionAndKind("acm.aws.crossplane.io/v1alpha1", "Certificate"): {},
@@ -161,12 +167,13 @@ func TestLoadValidators(t *testing.T) {
 		},
 		"SuccessfulLoadMultiVersionFromCRD": {
 			reason: "Should add a validator for each version in a CRD if multiple are specified.",
-			ws: NewWorkspace("/ws", WithFS(func() afero.Fs {
+			wsroot: "/ws",
+			opt: WithFS(func() afero.Fs {
 				fs := afero.NewMemMapFs()
 				_ = fs.Mkdir("/ws", os.ModePerm)
 				_ = afero.WriteFile(fs, "/cache/multiversion.yaml", testMultiVersionCRD, os.ModePerm)
 				return fs
-			}())),
+			}()),
 			path: "/cache",
 			validators: map[schema.GroupVersionKind]struct{}{
 				xpextv1.CompositeResourceDefinitionGroupVersionKind:      {},
@@ -176,13 +183,15 @@ func TestLoadValidators(t *testing.T) {
 	}
 	for name, tc := range cases {
 		t.Run(name, func(t *testing.T) {
-			if diff := cmp.Diff(tc.err, tc.ws.LoadValidators(tc.path), test.EquateErrors()); diff != "" {
+			ws, _ := NewWorkspace(tc.wsroot, "/cache", tc.opt)
+
+			if diff := cmp.Diff(tc.err, ws.LoadValidators(tc.path), test.EquateErrors()); diff != "" {
 				t.Errorf("\n%s\nLoadValidators(...): -want error, +got error:\n%s", tc.reason, diff)
 			}
-			if len(tc.validators) != len(tc.ws.validators) {
-				t.Errorf("\n%s\nLoadValidators(...): -want validators count: %d, +got validators count: %d", tc.reason, len(tc.validators), len(tc.ws.validators))
+			if len(tc.validators) != len(ws.validators) {
+				t.Errorf("\n%s\nLoadValidators(...): -want validators count: %d, +got validators count: %d", tc.reason, len(tc.validators), len(ws.validators))
 			}
-			for id := range tc.ws.validators {
+			for id := range ws.validators {
 				if _, ok := tc.validators[id]; !ok {
 					t.Errorf("\n%s\nLoadValidators(...): missing validator:\n%v", tc.reason, id)
 				}
@@ -194,56 +203,46 @@ func TestLoadValidators(t *testing.T) {
 func TestValidate(t *testing.T) {
 	cases := map[string]struct {
 		reason string
-		ws     *Workspace
+		opt    WorkspaceOpt
 		filter NodeFilterFn
 		dsCnt  int
 		err    error
 	}{
-		// "ErrorMissingValidator": {
-		// 	reason: "Should return an error if we can't find a validator for the object kind.",
-		// 	ws: NewWorkspace("/ws", WithFS(func() afero.Fs {
-		// 		fs := afero.NewMemMapFs()
-		// 		_ = afero.WriteFile(fs, "/ws/xrd.yaml", testInvalidXRD, os.ModePerm)
-		// 		_ = afero.WriteFile(fs, "/cache/crd.yaml", testSingleVersionCRD, os.ModePerm)
-		// 		return fs
-		// 	}())),
-		// 	filter: AllNodes,
-		// 	err:    errors.Errorf(errMissingValidatorFmt, xpextv1.CompositeResourceDefinitionGroupVersionKind),
-		// },
 		"SuccessfulNoNodes": {
 			reason: "Should not return an error if no nodes match filter.",
-			ws: NewWorkspace("/ws", WithFS(func() afero.Fs {
+			opt: WithFS(func() afero.Fs {
 				fs := afero.NewMemMapFs()
 				_ = afero.WriteFile(fs, "/ws/xrd.yaml", testInvalidXRD, os.ModePerm)
 				_ = afero.WriteFile(fs, "/cache/crd.yaml", testSingleVersionCRD, os.ModePerm)
 				return fs
-			}())),
+			}()),
 			filter: func(map[NodeIdentifier]Node) []Node { return nil },
 		},
 		"SuccessfulInvalidObject": {
 			reason: "Should return a single diagnostic if we successfully validate and find a single error.",
-			ws: NewWorkspace("/ws", WithFS(func() afero.Fs {
+			opt: WithFS(func() afero.Fs {
 				fs := afero.NewMemMapFs()
 				_ = afero.WriteFile(fs, "/ws/xrd.yaml", testInvalidXRD, os.ModePerm)
 				_ = afero.WriteFile(fs, "/cache/crd.yaml", testMultiVersionCRD, os.ModePerm)
 				return fs
-			}())),
+			}()),
 			filter: AllNodes,
 			dsCnt:  1,
 		},
 	}
 	for name, tc := range cases {
 		t.Run(name, func(t *testing.T) {
+			ws, _ := NewWorkspace("/ws", "/cache", tc.opt)
 			// TODO(hasheddan): consider pre-building validators and nodes so
 			// that we aren't exercising Parse and LoadValidators when we just
 			// want to test Validate.
-			if err := tc.ws.Parse(); err != nil {
+			if err := ws.Parse(); err != nil {
 				t.Errorf("\n%s\nParse(...): unexpected error:\n%s", tc.reason, err)
 			}
-			if err := tc.ws.LoadValidators("/cache"); err != nil {
+			if err := ws.LoadValidators("/cache"); err != nil {
 				t.Errorf("\n%s\nLoadValidators(...): unexpected error:\n%s", tc.reason, err)
 			}
-			ds, err := tc.ws.Validate(tc.filter)
+			ds, err := ws.Validate(tc.filter)
 			if diff := cmp.Diff(tc.err, err, test.EquateErrors()); diff != "" {
 				t.Errorf("\n%s\nValidate(...): -want error, +got error:\n%s", tc.reason, diff)
 			}
@@ -357,7 +356,7 @@ metadata:
 
 	for name, tc := range cases {
 		t.Run(name, func(t *testing.T) {
-			ws := NewWorkspace("/ws")
+			ws, _ := NewWorkspace("/ws", "/cache")
 
 			ws.snapshot.ws[tc.args.uri.Filename()] = tc.args.prebody
 

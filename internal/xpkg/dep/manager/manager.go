@@ -42,6 +42,7 @@ type Manager struct {
 type Cache interface {
 	Get(v1beta1.Dependency) (*xpkg.ParsedPackage, error)
 	Store(v1beta1.Dependency, *xpkg.ParsedPackage) error
+	Versions(v1beta1.Dependency) ([]string, error)
 }
 
 // ImageResolver defines the API contract for working with an
@@ -123,6 +124,12 @@ func (m *Manager) Snapshot(ctx context.Context, deps []v1beta1.Dependency) (*Sna
 	return &Snapshot{
 		view: view,
 	}, nil
+}
+
+// Versions returns the dependency versions corresponding to the supplied
+// v1beta1.Dependency that currently exist locally.
+func (m *Manager) Versions(ctx context.Context, d v1beta1.Dependency) ([]string, error) {
+	return m.c.Versions(d)
 }
 
 // Resolve resolves the given package as well as it's transitive dependencies.

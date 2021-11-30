@@ -21,12 +21,14 @@ import (
 	"fmt"
 	"io"
 	"io/fs"
+	"path/filepath"
 	"strings"
 	"sync"
 
 	"github.com/goccy/go-yaml"
 	"github.com/goccy/go-yaml/ast"
 	"github.com/goccy/go-yaml/parser"
+	"github.com/goccy/go-yaml/token"
 	"github.com/golang/tools/lsp/protocol"
 	"github.com/golang/tools/span"
 	"github.com/sourcegraph/go-lsp"
@@ -46,9 +48,11 @@ import (
 	"github.com/crossplane/crossplane-runtime/pkg/errors"
 	xpextv1 "github.com/crossplane/crossplane/apis/apiextensions/v1"
 
+	"github.com/upbound/up/internal/xpkg"
 	"github.com/upbound/up/internal/xpkg/dep/cache"
 	"github.com/upbound/up/internal/xpkg/dep/manager"
 	"github.com/upbound/up/internal/xpkg/dep/workspace"
+	"github.com/upbound/up/internal/xpls/validator"
 )
 
 // paths to extract GVK and name from objects that conform to Kubernetes
@@ -154,6 +158,8 @@ type Workspace struct {
 
 	mu sync.RWMutex
 
+	m *manager.Manager
+
 	// The node cache maintains a set of nodes present in a workspace. A node
 	// identifier is a combination of its GVK and name.
 	nodes map[NodeIdentifier]Node
@@ -184,7 +190,7 @@ func WithFS(fs afero.Fs) WorkspaceOpt {
 
 // NewWorkspace constructs a new Workspace by loading validators from the
 // package cache. A workspace must be parsed before it can be validated.
-func NewWorkspace(root string, opts ...WorkspaceOpt) *Workspace {
+func NewWorkspace(root, cacheRoot string, opts ...WorkspaceOpt) (*Workspace, error) {
 	w := &Workspace{
 		fs:         afero.NewOsFs(),
 		root:       root,
@@ -193,10 +199,27 @@ func NewWorkspace(root string, opts ...WorkspaceOpt) *Workspace {
 		validators: map[schema.GroupVersionKind]Validator{},
 	}
 
+	c, err := cache.NewLocal(cache.WithRoot(cacheRoot))
+	if err != nil {
+		return nil, err
+	}
+
+	m, err := manager.New(manager.WithCache(c))
+	if err != nil {
+		return nil, err
+	}
+
+	w.m = m
+
 	for _, o := range opts {
 		o(w)
 	}
-	return w
+	return w, nil
+}
+
+// IsMeta tests whether the supplied filename matches our expected meta filename.
+func (w *Workspace) IsMeta(filename string) bool {
+	return filepath.Base(filename) == xpkg.MetaFile
 }
 
 // Parse parses all objects in a workspace and stores them in the node cache.
@@ -354,51 +377,78 @@ func (w *Workspace) Validate(fn NodeFilterFn) ([]lsp.Diagnostic, error) { // nol
 
 // validationDiagnostics generates language server diagnostics from validation
 // errors.
-func validationDiagnostics(res *validate.Result, n ast.Node, gvk schema.GroupVersionKind) []lsp.Diagnostic {
+// TODO(@tnthornton) this function is getting pretty complex. We should work
+// towards breaking it up.
+func validationDiagnostics(res *validate.Result, n ast.Node, gvk schema.GroupVersionKind) []lsp.Diagnostic { // nolint:gocyclo
 	diags := []lsp.Diagnostic{}
 	for _, err := range res.Errors {
-		if err, ok := err.(*verrors.Validation); ok {
-			// TODO(hasheddan): handle the case where error occurs and we
-			// don't have a valid path.
-			vErr := err
-			if len(err.Name) > 0 && err.Name != "." {
-				errPath := err.Name
-				if err.Code() == verrors.RequiredFailCode {
-					errPath = err.Name[:strings.LastIndex(err.Name, ".")]
+		var e *verror
+		switch et := err.(type) {
+		case *verrors.Validation:
+			e = &verror{
+				code:    et.Code(),
+				message: fmt.Sprintf("%s (%s)", et.Error(), gvk),
+				name:    et.Name,
+			}
+		case *validator.MetaValidaton:
+			e = &verror{
+				code:    et.Code(),
+				message: et.Error(),
+				name:    et.Name,
+			}
+		default:
+			// found an error type we weren't expecting
+			continue
+		}
+
+		// TODO(hasheddan): handle the case where error occurs and we
+		// don't have a valid path.
+		if len(e.name) > 0 && e.name != "." {
+			errPath := e.name
+			if e.code == verrors.RequiredFailCode {
+				errPath = e.name[:strings.LastIndex(e.name, ".")]
+			}
+			// TODO(hasheddan): a general error should be surfaced if we
+			// cannot determine the location in the document causing the
+			// error.
+			path, err := yaml.PathString("$." + errPath)
+			if err != nil {
+				continue
+			}
+			node, err := path.FilterNode(n)
+			if err != nil {
+				continue
+			}
+			tok := node.GetToken()
+			if tok != nil {
+				startCh, endCh := tok.Position.Column-1, 0
+
+				// end character can be unmatched if we have doublequotes
+				switch tok.Type { // nolint:exhaustive
+				case token.DoubleQuoteType:
+					endCh = tok.Position.Column + len(tok.Value) + 1
+				default:
+					endCh = tok.Position.Column + len(tok.Value) - 1
 				}
-				// TODO(hasheddan): a general error should be surfaced if we
-				// cannot determine the location in the document causing the
-				// error.
-				path, err := yaml.PathString("$." + errPath)
-				if err != nil {
-					continue
-				}
-				node, err := path.FilterNode(n)
-				if err != nil {
-					continue
-				}
-				tok := node.GetToken()
-				if tok != nil {
-					// TODO(hasheddan): token position reflects file line
-					// and column by NOT being zero-indexed, but VSCode
-					// interprets ranges with zero-indexing. We should
-					// develop a more robust solution for this conversion.
-					diags = append(diags, lsp.Diagnostic{
-						Range: lsp.Range{
-							Start: lsp.Position{
-								Line:      tok.Position.Line - 1,
-								Character: tok.Position.Column - 1,
-							},
-							End: lsp.Position{
-								Line:      tok.Position.Line - 1,
-								Character: tok.Position.Column + len(tok.Value) - 1,
-							},
+				// TODO(hasheddan): token position reflects file line
+				// and column by NOT being zero-indexed, but VSCode
+				// interprets ranges with zero-indexing. We should
+				// develop a more robust solution for this conversion.
+				diags = append(diags, lsp.Diagnostic{
+					Range: lsp.Range{
+						Start: lsp.Position{
+							Line:      tok.Position.Line - 1,
+							Character: startCh,
 						},
-						Message:  fmt.Sprintf("%s (%s)", vErr.Error(), gvk),
-						Severity: lsp.Error,
-						Source:   serverName,
-					})
-				}
+						End: lsp.Position{
+							Line:      tok.Position.Line - 1,
+							Character: endCh,
+						},
+					},
+					Message:  e.Error(),
+					Severity: lsp.Error,
+					Source:   serverName,
+				})
 			}
 		}
 	}
@@ -408,7 +458,7 @@ func validationDiagnostics(res *validate.Result, n ast.Node, gvk schema.GroupVer
 // LoadCacheValidators loads the validators corresponding to the external
 // dependencies defined in the dep cache (if there is a meta file in the
 // project root).
-func (w *Workspace) LoadCacheValidators(cacheRoot string) error {
+func (w *Workspace) LoadCacheValidators() error {
 	depWS, err := workspace.New(
 		workspace.WithWorkingDir(w.root),
 	)
@@ -418,22 +468,12 @@ func (w *Workspace) LoadCacheValidators(cacheRoot string) error {
 
 	// grab external dependency validators only if a meta file is defined.
 	if depWS.MetaExists() {
-		c, err := cache.NewLocal(cache.WithRoot(cacheRoot))
-		if err != nil {
-			return err
-		}
-
-		m, err := manager.New(manager.WithCache(c))
-		if err != nil {
-			return err
-		}
-
 		deps, err := depWS.DependsOn()
 		if err != nil {
 			return err
 		}
 
-		snap, err := m.Snapshot(context.Background(), deps)
+		snap, err := w.m.Snapshot(context.Background(), deps)
 		if err != nil {
 			return err
 		}
@@ -453,7 +493,7 @@ func (w *Workspace) LoadCacheValidators(cacheRoot string) error {
 // TODO(hasheddan): consider refactoring this to allow for sourcing validators
 // from a generic YAML reader, similar to the package parser.
 func (w *Workspace) LoadValidators(path string) error { // nolint:gocyclo
-	validators := map[schema.GroupVersionKind]*validate.SchemaValidator{}
+	validators := map[schema.GroupVersionKind]Validator{}
 
 	if err := afero.Walk(w.fs, path, func(p string, info fs.FileInfo, err error) error {
 		if err != nil {
@@ -479,6 +519,20 @@ func (w *Workspace) LoadValidators(path string) error { // nolint:gocyclo
 				break
 			}
 			if len(b) == 0 {
+				continue
+			}
+			if w.IsMeta(p) {
+				// just need to get gvk from this file
+				meta := &unstructured.Unstructured{}
+				if err := k8syaml.Unmarshal(b, meta); err != nil {
+					continue
+				}
+				v, err := validator.NewMeta(w.m)
+				if err != nil {
+					continue
+				}
+
+				validators[meta.GetObjectKind().GroupVersionKind()] = v
 				continue
 			}
 			// TODO(hasheddan): handle v1beta1 CRDs, as well as all XRD API versions.
@@ -601,4 +655,15 @@ func (w *Workspace) updateChanges(_ context.Context, uri span.URI, changes []pro
 	}
 
 	return content, nil
+}
+
+// verror normalizes the different validation error types that we work with.
+type verror struct {
+	code    int32
+	message string
+	name    string
+}
+
+func (e *verror) Error() string {
+	return e.message
 }

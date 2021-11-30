@@ -109,6 +109,20 @@ func (h *Handler) Handle(ctx context.Context, c *jsonrpc2.Conn, r *jsonrpc2.Requ
 	case "initialized":
 		// NOTE(hasheddan): no need to respond when the client reports initialized.
 		return
+	case "textDocument/didOpen":
+		var params lsp.DidOpenTextDocumentParams
+		if err := json.Unmarshal(*r.Params, &params); err != nil {
+			h.log.Debug(errParseSaveParameters)
+			break
+		}
+		diags := h.dispatch.DidOpen(ctx, params)
+		if diags == nil {
+			// an error occurred while processing diagnostics, skip for now.
+			break
+		}
+		if err := c.Notify(ctx, "textDocument/publishDiagnostics", diags); err != nil {
+			h.log.Debug(errPublishDiagnostics, "error", err)
+		}
 	case "textDocument/didSave":
 		var params lsp.DidSaveTextDocumentParams
 		if err := json.Unmarshal(*r.Params, &params); err != nil {

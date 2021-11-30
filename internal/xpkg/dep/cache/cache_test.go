@@ -362,6 +362,78 @@ func TestClean(t *testing.T) {
 	}
 }
 
+func TestVersions(t *testing.T) {
+	fs := afero.NewMemMapFs()
+
+	cache, _ := NewLocal(
+		WithFS(fs),
+		WithRoot("/cache"),
+		// override HomeDirFn
+		rootIsHome,
+	)
+
+	e1 := cache.newEntry(pkg1)
+	cache.add(e1, "index.docker.io/crossplane/provider-aws@v0.20.1-alpha")
+
+	e2 := cache.newEntry(pkg2)
+	cache.add(e2, "index.docker.io/crossplane/provider-aws@v0.20.2")
+
+	type args struct {
+		cache *Local
+		key   v1beta1.Dependency
+	}
+
+	type want struct {
+		versions []string
+	}
+
+	cases := map[string]struct {
+		reason string
+		args   args
+		want   want
+	}{
+		"Success": {
+			reason: "Should not return an error if package exists at path.",
+			args: args{
+				cache: cache,
+				key: v1beta1.Dependency{
+					Package:     providerAws,
+					Constraints: "v0.20.1-alpha",
+				},
+			},
+			want: want{
+				versions: []string{
+					"v0.20.1-alpha",
+					"v0.20.2",
+				},
+			},
+		},
+		"NoVersionsExist": {
+			reason: "Should return an empty versions slice.",
+			args: args{
+				cache: cache,
+				key: v1beta1.Dependency{
+					Package:     "crossplane/provider-",
+					Constraints: "v0.20.1-alpha1",
+				},
+			},
+			want: want{
+				versions: []string{},
+			},
+		},
+	}
+
+	for name, tc := range cases {
+		t.Run(name, func(t *testing.T) {
+			vers, _ := tc.args.cache.Versions(tc.args.key)
+
+			if diff := cmp.Diff(tc.want.versions, vers); diff != "" {
+				t.Errorf("\n%s\nVersions(...): -want err, +got err:\n%s", tc.reason, diff)
+			}
+		})
+	}
+}
+
 func TestCalculatePath(t *testing.T) {
 	tag1, _ := ociname.NewTag("crossplane/provider-aws:v0.20.1-alpha")
 	tag2, _ := ociname.NewTag("gcr.io/crossplane/provider-gcp:v1.0.0")

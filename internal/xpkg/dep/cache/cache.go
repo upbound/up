@@ -160,6 +160,32 @@ func (c *Local) Store(k v1beta1.Dependency, v *xpkg.ParsedPackage) error {
 	return nil
 }
 
+// Versions returns a slice of versions that exist in the cache for the given
+// package.
+func (c *Local) Versions(k v1beta1.Dependency) ([]string, error) {
+	t, err := name.NewTag(k.Package)
+	if err != nil {
+		return nil, err
+	}
+
+	glob := c.calculateVersionsGlob(&t)
+
+	matches, err := afero.Glob(c.fs, filepath.Join(c.root, glob))
+	if err != nil {
+		return nil, err
+	}
+	vers := make([]string, 0)
+	for _, m := range matches {
+		ver := strings.Split(m, "@")
+		if len(ver) != 2 {
+			return nil, errors.New("invalid version found")
+		}
+		vers = append(vers, ver[1])
+	}
+
+	return vers, nil
+}
+
 // add the given entry to the supplied path (to)
 func (c *Local) add(e *entry, to string) error {
 	if err := c.ensureDirExists(filepath.Join(c.root, to)); err != nil {
@@ -197,5 +223,12 @@ func (c *Local) calculatePath(tag *name.Tag) string {
 	return filepath.Join(
 		tag.RegistryStr(),
 		fmt.Sprintf("%s@%s", tag.RepositoryStr(), tag.TagStr()),
+	)
+}
+
+func (c *Local) calculateVersionsGlob(tag *name.Tag) string {
+	return filepath.Join(
+		tag.RegistryStr(),
+		fmt.Sprintf("%s@*", tag.RepositoryStr()),
 	)
 }
