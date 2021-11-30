@@ -138,21 +138,18 @@ func (m *Manager) Versions(ctx context.Context, d v1beta1.Dependency) ([]string,
 	return m.c.Versions(d)
 }
 
-// Resolve resolves the given package as well as it's transitive dependencies.
-// If storage is successful, the resolved dependency is returned, errors
-// otherwise.
+// Resolve resolves the given package as well as it's transitive dependencies. If dependencies
+// are not included in the current cache, an error is returned.
 func (m *Manager) Resolve(ctx context.Context, d v1beta1.Dependency) (v1beta1.Dependency, []*xpkg.ParsedPackage, error) {
 	ud := v1beta1.Dependency{}
 
 	e, err := m.retrievePkg(ctx, d)
 	if err != nil {
-		return ud, m.acc, nil
+		return ud, m.acc, err
 	}
-	m.acc = append(m.acc, e)
 
-	// recursively resolve all transitive dependencies
-	// currently assumes we have something from
-	if err := m.resolveAllDeps(ctx, e); err != nil {
+	m.acc = append(m.acc, e)
+	if err := m.retrieveAllDeps(ctx, e); err != nil {
 		return ud, m.acc, err
 	}
 
@@ -163,10 +160,32 @@ func (m *Manager) Resolve(ctx context.Context, d v1beta1.Dependency) (v1beta1.De
 	return ud, m.acc, nil
 }
 
-// resolveAllDeps recursively resolves the transitive dependencies for a
-// given xpkg.ParsedPackage.
-func (m *Manager) resolveAllDeps(ctx context.Context, p *xpkg.ParsedPackage) error {
+// AddAll resolves the given package as well as it's transitive dependencies.
+// If storage is successful, the resolved dependency is returned, errors
+// otherwise.
+func (m *Manager) AddAll(ctx context.Context, d v1beta1.Dependency) (v1beta1.Dependency, []*xpkg.ParsedPackage, error) {
+	ud := v1beta1.Dependency{}
 
+	e, err := m.retrieveAndStorePkg(ctx, d)
+	if err != nil {
+		return ud, m.acc, err
+	}
+	m.acc = append(m.acc, e)
+
+	// recursively resolve all transitive dependencies
+	// currently assumes we have something from
+	if err := m.addAllDeps(ctx, e); err != nil {
+		return ud, m.acc, err
+	}
+
+	ud.Type = e.Type()
+	ud.Package = d.Package
+	ud.Constraints = e.Version()
+
+	return ud, m.acc, nil
+}
+
+func (m *Manager) retrieveAllDeps(ctx context.Context, p *xpkg.ParsedPackage) error {
 	if len(p.Dependencies()) == 0 {
 		// no remaining dependencies to resolve
 		return nil
@@ -179,7 +198,31 @@ func (m *Manager) resolveAllDeps(ctx context.Context, p *xpkg.ParsedPackage) err
 		}
 		m.acc = append(m.acc, e)
 
-		if err := m.resolveAllDeps(ctx, e); err != nil {
+		if err := m.retrieveAllDeps(ctx, e); err != nil {
+			return err
+		}
+	}
+
+	return nil
+}
+
+// addAllDeps recursively resolves the transitive dependencies for a
+// given xpkg.ParsedPackage.
+func (m *Manager) addAllDeps(ctx context.Context, p *xpkg.ParsedPackage) error {
+
+	if len(p.Dependencies()) == 0 {
+		// no remaining dependencies to resolve
+		return nil
+	}
+
+	for _, d := range p.Dependencies() {
+		e, err := m.retrieveAndStorePkg(ctx, d)
+		if err != nil {
+			return err
+		}
+		m.acc = append(m.acc, e)
+
+		if err := m.addAllDeps(ctx, e); err != nil {
 			return err
 		}
 	}
@@ -214,6 +257,15 @@ func (m *Manager) addPkg(ctx context.Context, d v1beta1.Dependency) (*xpkg.Parse
 }
 
 func (m *Manager) retrievePkg(ctx context.Context, d v1beta1.Dependency) (*xpkg.ParsedPackage, error) {
+	// resolve version prior to Get
+	if err := m.finalizeDepVersion(ctx, &d); err != nil {
+		return nil, err
+	}
+
+	return m.c.Get(d)
+}
+
+func (m *Manager) retrieveAndStorePkg(ctx context.Context, d v1beta1.Dependency) (*xpkg.ParsedPackage, error) {
 	// resolve version prior to Get
 	if err := m.finalizeDepVersion(ctx, &d); err != nil {
 		return nil, err

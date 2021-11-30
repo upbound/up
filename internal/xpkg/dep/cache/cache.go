@@ -108,6 +108,11 @@ func WithRoot(root string) Option {
 	}
 }
 
+// Root returns the calculated root of the cache.
+func (c *Local) Root() string {
+	return c.root
+}
+
 // Get retrieves an image from the LocalCache.
 func (c *Local) Get(k v1beta1.Dependency) (*xpkg.ParsedPackage, error) {
 	c.mu.RLock()
@@ -207,7 +212,16 @@ func (c *Local) Clean() error {
 	c.mu.Lock()
 	defer c.mu.Unlock()
 
-	return c.fs.RemoveAll(c.root)
+	files, err := afero.ReadDir(c.fs, c.root)
+	if err != nil && !os.IsNotExist(err) {
+		return err
+	}
+	for _, f := range files {
+		if err := c.fs.RemoveAll(filepath.Join(c.root, f.Name())); err != nil {
+			return err
+		}
+	}
+	return nil
 }
 
 // ensureDirExists ensures the target directory corresponding to the given path exists.

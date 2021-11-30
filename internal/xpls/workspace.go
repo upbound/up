@@ -46,6 +46,7 @@ import (
 	k8syaml "sigs.k8s.io/yaml"
 
 	"github.com/crossplane/crossplane-runtime/pkg/errors"
+	"github.com/crossplane/crossplane-runtime/pkg/logging"
 	xpextv1 "github.com/crossplane/crossplane/apis/apiextensions/v1"
 
 	"github.com/upbound/up/internal/xpkg"
@@ -150,12 +151,16 @@ type Node interface {
 // A Workspace represents a single xpkg workspace. It is safe for multi-threaded
 // use.
 type Workspace struct {
+	// dep cache root
+	cacheRoot string
+
 	fs afero.Fs
 
 	// The absolute path of the workspace.
 	root string
 
-	mu sync.RWMutex
+	log logging.Logger
+	mu  sync.RWMutex
 
 	m          *manager.Manager
 	metaNodeID NodeIdentifier
@@ -195,6 +200,7 @@ func NewWorkspace(root, cacheRoot string, opts ...WorkspaceOpt) (*Workspace, err
 	w := &Workspace{
 		fs:    afero.NewOsFs(),
 		root:  root,
+		log:   logging.NewNopLogger(),
 		nodes: map[NodeIdentifier]Node{},
 		snapshot: &Snapshot{
 			packages:   map[string]*mxpkg.ParsedPackage{},
@@ -215,11 +221,19 @@ func NewWorkspace(root, cacheRoot string, opts ...WorkspaceOpt) (*Workspace, err
 	}
 
 	w.m = m
+	w.cacheRoot = c.Root()
 
 	for _, o := range opts {
 		o(w)
 	}
 	return w, nil
+}
+
+// CacheRoot returns the compiled cache root associated with the workspace.
+// TODO(@tnthornton) remove this. This shouldn't be here. The compiled cacheRoot
+// is really not a concern of the workspace.
+func (w *Workspace) CacheRoot() string {
+	return w.cacheRoot
 }
 
 // IsMeta tests whether the supplied filename matches our expected meta filename.
@@ -532,8 +546,10 @@ func (w *Workspace) LoadCacheValidators() error {
 		}
 
 		// add external deps to the set of validators for the workspace.
+		w.mu.Lock()
 		w.appendValidators(snap.View().Validators())
 		w.snapshot.packages = snap.View().Packages()
+		w.mu.Unlock()
 	}
 	return nil
 }
@@ -640,8 +656,27 @@ func (w *Workspace) LoadValidators(path string) error { // nolint:gocyclo
 }
 
 // ResetValidators resets the validators map for the workspace.
-func (w *Workspace) ResetValidators() {
+func (w *Workspace) resetValidators() {
+	w.mu.Lock()
 	w.snapshot.validators = make(map[schema.GroupVersionKind]validator.Validator)
+	w.mu.Unlock()
+}
+
+// ReloadValidators reloads all applicable validators for the workspace.
+func (w *Workspace) ReloadValidators() {
+	// reset validators
+	w.resetValidators()
+
+	if err := w.LoadValidators(w.root); err != nil {
+		w.log.Debug(errLoadValidators, "error", err)
+	}
+
+	if err := w.LoadCacheValidators(); err != nil {
+		w.log.Debug(errLoadValidators, "error", err)
+	}
+	for k := range w.snapshot.validators {
+		w.log.Debug(fmt.Sprintf("%+v", k))
+	}
 }
 
 func (w *Workspace) appendValidators(validators map[schema.GroupVersionKind]validator.Validator) {

@@ -110,7 +110,7 @@ func (c *depCmd) userSuppliedDep(ctx context.Context) error {
 
 	d := dep.New(c.Package)
 
-	ud, _, err := c.m.Resolve(ctx, d)
+	ud, _, err := c.m.AddAll(ctx, d)
 	if err != nil {
 		return err
 	}
@@ -136,7 +136,7 @@ func (c *depCmd) metaSuppliedDeps(ctx context.Context) error {
 	}
 
 	for _, d := range deps {
-		if _, _, err := c.m.Resolve(ctx, d); err != nil {
+		if _, _, err := c.m.AddAll(ctx, d); err != nil {
 			return err
 		}
 	}

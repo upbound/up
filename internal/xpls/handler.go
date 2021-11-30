@@ -34,7 +34,6 @@ const (
 
 	errParseSaveParameters   = "failed to parse document save parameters"
 	errParseChangeParameters = "failed to parse document change parameters"
-	errPublishDiagnostics    = "failed to publish diagnostics"
 )
 
 // HomeDirFn indicates the location of a user's home directory.
@@ -43,6 +42,9 @@ type HomeDirFn func() (string, error)
 // A Handler handles LSP requests.
 type Handler struct {
 	cacheDir string
+
+	conn *jsonrpc2.Conn
+
 	dispatch *Dispatcher
 	fs       afero.Fs
 	home     HomeDirFn
@@ -98,13 +100,21 @@ func (h *Handler) Handle(ctx context.Context, c *jsonrpc2.Conn, r *jsonrpc2.Requ
 			// future operations will not work.
 			panic(err)
 		}
-		reply := h.dispatch.Initialize(ctx, params)
+		h.conn = c
+
+		reply := h.dispatch.Initialize(ctx, params, c)
 
 		if err := c.Reply(ctx, r.ID, reply); err != nil {
 			// If we fail to initialize the workspace we won't receive future
 			// messages so we panic and try again on restart.
 			panic(err)
 		}
+
+		h.dispatch.registerWatchFilesCapability()
+		// TODO(@tnthornton) invocation of this should be moved to be within
+		// the cache itself.
+		h.dispatch.watchCache()
+
 		return
 	case "initialized":
 		// NOTE(hasheddan): no need to respond when the client reports initialized.
@@ -120,9 +130,7 @@ func (h *Handler) Handle(ctx context.Context, c *jsonrpc2.Conn, r *jsonrpc2.Requ
 			// an error occurred while processing diagnostics, skip for now.
 			break
 		}
-		if err := c.Notify(ctx, "textDocument/publishDiagnostics", diags); err != nil {
-			h.log.Debug(errPublishDiagnostics, "error", err)
-		}
+		h.dispatch.publishDiagnostics(ctx, diags)
 	case "textDocument/didSave":
 		var params lsp.DidSaveTextDocumentParams
 		if err := json.Unmarshal(*r.Params, &params); err != nil {
@@ -145,9 +153,7 @@ func (h *Handler) Handle(ctx context.Context, c *jsonrpc2.Conn, r *jsonrpc2.Requ
 		// sending an individual set of diagnostics for each file with
 		// errors, then move to maintaining a cache of diagnostics so that
 		// we don't have to re-validate the entire workspace each time.
-		if err := c.Notify(ctx, "textDocument/publishDiagnostics", diags); err != nil {
-			h.log.Debug(errPublishDiagnostics, "error", err)
-		}
+		h.dispatch.publishDiagnostics(ctx, diags)
 	case "textDocument/didChange":
 		// need to keep track of a snapshot of the workspace inmem, with filename -> doc string
 		// on change, grab doc string from snapshot, stitch in change (in order)
@@ -165,6 +171,18 @@ func (h *Handler) Handle(ctx context.Context, c *jsonrpc2.Conn, r *jsonrpc2.Requ
 
 		if err := c.Notify(ctx, "textDocument/publishDiagnostics", diags); err != nil {
 			h.log.Debug(errPublishDiagnostics, "error", err)
+		}
+	case "workspace/didChangeWatchedFiles":
+		var params protocol.DidChangeWatchedFilesParams
+		if err := json.Unmarshal(*r.Params, &params); err != nil {
+			h.log.Debug(errParseChangeParameters)
+			break
+		}
+
+		accDiags := h.dispatch.WsWatchedFilesChanged(ctx, params)
+		// iterate over the list of diagnostics and return individual reports
+		for _, d := range accDiags {
+			h.dispatch.publishDiagnostics(ctx, d)
 		}
 	}
 }

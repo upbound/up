@@ -179,7 +179,7 @@ func TestResolveTransitiveDependencies(t *testing.T) {
 				),
 			)
 
-			_, acc, err := m.Resolve(context.Background(), tc.args.root.dep)
+			_, acc, err := m.AddAll(context.Background(), tc.args.root.dep)
 
 			if diff := cmp.Diff(tc.want.err, err, test.EquateErrors()); diff != "" {
 				t.Errorf("\n%s\nResolveTransitiveDependencies(...): -want err, +got err:\n%s", tc.reason, diff)
@@ -203,6 +203,7 @@ func TestResolveTransitiveDependencies(t *testing.T) {
 }
 
 func TestSnapshot(t *testing.T) {
+	ctx := context.Background()
 	fs := afero.NewMemMapFs()
 	c, _ := cache.NewLocal(cache.WithFS(fs), cache.WithRoot("/tmp/cache"))
 
@@ -312,7 +313,10 @@ func TestSnapshot(t *testing.T) {
 				),
 			)
 
-			got, err := m.Snapshot(context.Background(), []v1beta1.Dependency{tc.args.dep})
+			// add the pkg to the cache
+			m.addPkg(ctx, tc.args.dep)
+
+			got, err := m.Snapshot(ctx, []v1beta1.Dependency{tc.args.dep})
 
 			if diff := cmp.Diff(tc.want.err, err, test.EquateErrors()); diff != "" {
 				t.Errorf("\n%s\nSnapshot(...): -want err, +got err:\n%s", tc.reason, diff)
