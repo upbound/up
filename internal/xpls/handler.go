@@ -111,13 +111,12 @@ func (h *Handler) Handle(ctx context.Context, c *jsonrpc2.Conn, r *jsonrpc2.Requ
 			panic(err)
 		}
 		h.root = params.RootPath
-		ws, err := NewWorkspace(h.root, h.cachePath)
-		if err != nil {
-			// If we can't construct the workspace panic because future
-			// operations will not work.
+		h.ws = NewWorkspace(h.root)
+		if err := h.ws.LoadValidators(h.cachePath); err != nil {
+			// If we can't load validators panic because we won't be able to
+			// perform validation.
 			panic(err)
 		}
-		h.ws = ws
 		if err := h.ws.Parse(); err != nil {
 			log.Debug(errParseWorkspace, "error", err)
 		}

@@ -30,6 +30,7 @@ import (
 	"github.com/goccy/go-yaml/ast"
 	"github.com/goccy/go-yaml/parser"
 	"github.com/sourcegraph/go-lsp"
+	"github.com/spf13/afero"
 	ext "k8s.io/apiextensions-apiserver/pkg/apis/apiextensions"
 	extv1 "k8s.io/apiextensions-apiserver/pkg/apis/apiextensions/v1"
 	"k8s.io/apiextensions-apiserver/pkg/apiserver/validation"
@@ -127,9 +128,16 @@ type Node interface {
 	GetObject() metav1.Object
 }
 
+// A validator validates data and returns a validation result.
+type Validator interface {
+	Validate(data interface{}) *validate.Result
+}
+
 // A Workspace represents a single xpkg workspace. It is safe for multi-threaded
 // use.
 type Workspace struct {
+	fs afero.Fs
+
 	// The absolute path of the workspace.
 	root string
 
@@ -140,35 +148,40 @@ type Workspace struct {
 	nodes map[NodeIdentifier]Node
 
 	// The validator cache maintains a set of validators loaded from the package cache.
-	validators map[schema.GroupVersionKind]*validate.SchemaValidator
+	validators map[schema.GroupVersionKind]Validator
+}
+
+type WorkspaceOpt func(*Workspace)
+
+func WithFS(fs afero.Fs) WorkspaceOpt {
+	return func(w *Workspace) {
+		w.fs = fs
+	}
 }
 
 // NewWorkspace constructs a new Workspace by loading validators from the
 // package cache. A workspace must be parsed before it can be validated.
-func NewWorkspace(root, cache string) (*Workspace, error) {
-	// TODO(hasheddan): currently we load all validators from the schema cache.
-	// In the future we will need to selectively and dynamically load validators
-	// based on changing dependencies in the crossplane.yaml.
-	vlds, err := validatorsFromDir(cache)
-	if err != nil {
-		return nil, err
-	}
-	return &Workspace{
+func NewWorkspace(root string, opts ...WorkspaceOpt) *Workspace {
+	w := &Workspace{
 		root:       root,
 		nodes:      map[NodeIdentifier]Node{},
-		validators: vlds,
-	}, nil
+		validators: map[schema.GroupVersionKind]Validator{},
+	}
+	for _, o := range opts {
+		o(w)
+	}
+	return w
 }
 
 // Parse parses all objects in a workspace and stores them in the node cache.
 func (w *Workspace) Parse() error {
 	w.mu.Lock()
 	defer w.mu.Unlock()
-	return fs.WalkDir(os.DirFS(w.root), ".", func(p string, d fs.DirEntry, err error) error {
+	return afero.Walk(w.fs, w.root, func(p string, info fs.FileInfo, err error) error {
 		if err != nil {
 			return err
 		}
-		if d.IsDir() {
+		if info.IsDir() {
 			return nil
 		}
 		fileName := filepath.Join(w.root, p)
@@ -352,17 +365,19 @@ func validationDiagnostics(res *validate.Result, n ast.Node, gvk schema.GroupVer
 	return diags
 }
 
-// validatorsFromDir loads all validators from the specified directory.
+// LoadValidators loads all validators from the specified location.
 // TODO(hasheddan): we currently assume that the cache holds objects in their
 // CRD form, but it is more likely that we will need to extract them from
 // packages.
-func validatorsFromDir(path string) (map[schema.GroupVersionKind]*validate.SchemaValidator, error) { // nolint:gocyclo
+// TODO(hasheddan): consider refactoring this to allow for sourcing validators
+// from a generic YAML reader, similar to the package parser.
+func (w *Workspace) LoadValidators(path string) error { // nolint:gocyclo
 	validators := map[schema.GroupVersionKind]*validate.SchemaValidator{}
-	if err := fs.WalkDir(os.DirFS(path), ".", func(p string, d fs.DirEntry, err error) error {
+	if err := afero.Walk(w.fs, path, func(p string, info fs.FileInfo, err error) error {
 		if err != nil {
 			return err
 		}
-		if d.IsDir() {
+		if info.IsDir() {
 			return nil
 		}
 		// NOTE(hasheddan): filepath.Join cleans result, so we ignore gosec
@@ -424,7 +439,15 @@ func validatorsFromDir(path string) (map[schema.GroupVersionKind]*validate.Schem
 		}
 		return nil
 	}); err != nil {
-		return nil, err
+		return err
 	}
-	return validators, nil
+	// NOTE(hasheddan): we wait to acquire the lock until we have finished
+	// constructing all validators so that we can continue performing validation
+	// while loading any new validators.
+	w.mu.Lock()
+	defer w.mu.Unlock()
+	for k, v := range validators {
+		w.validators[k] = v
+	}
+	return nil
 }
