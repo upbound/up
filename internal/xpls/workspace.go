@@ -127,7 +127,7 @@ type Node interface {
 	GetObject() metav1.Object
 }
 
-// A validator validates data and returns a validation result.
+// A Validator validates data and returns a validation result.
 type Validator interface {
 	Validate(data interface{}) *validate.Result
 }
@@ -150,8 +150,10 @@ type Workspace struct {
 	validators map[schema.GroupVersionKind]Validator
 }
 
+// A WorkspaceOpt modifies the configuration of a workspace.
 type WorkspaceOpt func(*Workspace)
 
+// WithFS sets the filesystem for the workspace.
 func WithFS(fs afero.Fs) WorkspaceOpt {
 	return func(w *Workspace) {
 		w.fs = fs
@@ -273,6 +275,8 @@ func (w *Workspace) parseDoc(n ast.Node, path string) (NodeIdentifier, error) {
 			dependants[id] = struct{}{}
 		}
 	}
+	// TODO(hasheddan): if this is an embedded resource we don't have a name so
+	// we should form a deterministic name based on its parent Composition.
 	id := nodeID(obj.GetName(), obj.GroupVersionKind())
 	w.nodes[id] = &PackageNode{
 		ast:        n,
@@ -383,7 +387,9 @@ func (w *Workspace) LoadValidators(path string) error { // nolint:gocyclo
 		if info.IsDir() {
 			return nil
 		}
-		f, err := os.Open(p)
+		// NOTE(hasheddan): path is cleaned before being passed to our walk
+		// function.
+		f, err := os.Open(p) // nolint:gosec
 		if err != nil {
 			return err
 		}
