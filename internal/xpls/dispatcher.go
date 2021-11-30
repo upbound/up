@@ -112,7 +112,7 @@ func (d *Dispatcher) DidChange(ctx context.Context, params protocol.DidChangeTex
 
 	// TODO(hasheddan): diagnostics should be cached and validation should
 	// be performed selectively.
-	diags, err := d.ws.Validate(AllNodes)
+	diags, err := d.ws.Validate(string(params.TextDocument.URI), d.ws.CorrespondingNodes)
 	if err != nil {
 		d.log.Debug(errValidateNodes, "error", err)
 		return nil
@@ -134,7 +134,7 @@ func (d *Dispatcher) DidOpen(ctx context.Context, params lsp.DidOpenTextDocument
 	}
 	// TODO(hasheddan): diagnostics should be cached and validation should
 	// be performed selectively.
-	diags, err := d.ws.Validate(AllNodes)
+	diags, err := d.ws.Validate(string(params.TextDocument.URI), d.ws.CorrespondingNodes)
 	if err != nil {
 		d.log.Debug(errValidateNodes, "error", err)
 		return nil
@@ -159,7 +159,7 @@ func (d *Dispatcher) DidSave(ctx context.Context, params lsp.DidSaveTextDocument
 
 	// TODO(hasheddan): diagnostics should be cached and validation should
 	// be performed selectively.
-	diags, err := d.ws.Validate(AllNodes)
+	diags, err := d.ws.Validate(string(params.TextDocument.URI), d.ws.CorrespondingNodes)
 	if err != nil {
 		d.log.Debug(errValidateNodes, "error", err)
 		return nil
@@ -172,7 +172,7 @@ func (d *Dispatcher) DidSave(ctx context.Context, params lsp.DidSaveTextDocument
 
 func (d *Dispatcher) handleMeta(_ context.Context, filename string) {
 	if filepath.Base(filename) == xpkg.MetaFile {
-		diags, err := d.ws.Validate(d.ws.MetaNode)
+		diags, err := d.ws.Validate(filename, d.ws.MetaNode)
 		if err != nil {
 			d.log.Debug(errValidateNodes, "error", err)
 		}

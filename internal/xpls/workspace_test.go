@@ -26,6 +26,8 @@ import (
 	"github.com/golang/tools/lsp/protocol"
 	"github.com/golang/tools/span"
 	"github.com/google/go-cmp/cmp"
+	"github.com/google/go-cmp/cmp/cmpopts"
+	"github.com/sourcegraph/go-lsp"
 	"github.com/spf13/afero"
 	"k8s.io/apimachinery/pkg/runtime/schema"
 )
@@ -216,7 +218,7 @@ func TestValidate(t *testing.T) {
 				_ = afero.WriteFile(fs, "/cache/crd.yaml", testSingleVersionCRD, os.ModePerm)
 				return fs
 			}()),
-			filter: func(map[NodeIdentifier]Node) []Node { return nil },
+			filter: func(string, map[NodeIdentifier]Node) []Node { return nil },
 		},
 		"SuccessfulInvalidObject": {
 			reason: "Should return a single diagnostic if we successfully validate and find a single error.",
@@ -242,7 +244,7 @@ func TestValidate(t *testing.T) {
 			if err := ws.LoadValidators("/cache"); err != nil {
 				t.Errorf("\n%s\nLoadValidators(...): unexpected error:\n%s", tc.reason, err)
 			}
-			ds, err := ws.Validate(tc.filter)
+			ds, err := ws.Validate("", tc.filter)
 			if diff := cmp.Diff(tc.err, err, test.EquateErrors()); diff != "" {
 				t.Errorf("\n%s\nValidate(...): -want error, +got error:\n%s", tc.reason, diff)
 			}
@@ -371,4 +373,123 @@ metadata:
 			}
 		})
 	}
+}
+
+func TestFilterCorrespondingNode(t *testing.T) {
+	ws := initws("/ws", "cache", WithFS(afero.NewMemMapFs()))
+
+	compPath := "/ws/composition.yaml"
+	defPath := "/ws/definition.yaml"
+	testPath := "/ws/test.yaml"
+
+	compGVK := schema.GroupVersionKind{
+		Group:   "composition",
+		Version: "composition",
+		Kind:    "composition",
+	}
+
+	defGVK := schema.GroupVersionKind{
+		Group:   "definition",
+		Version: "definition",
+		Kind:    "definition",
+	}
+
+	test1GVK := schema.GroupVersionKind{
+		Group:   "test1",
+		Version: "test1",
+		Kind:    "test1",
+	}
+
+	test2GVK := schema.GroupVersionKind{
+		Group:   "test2",
+		Version: "test2",
+		Kind:    "test2",
+	}
+
+	ws.uriToNodes = map[lsp.DocumentURI][]NodeIdentifier{
+		lsp.DocumentURI(compPath): {{gvk: compGVK}},
+		lsp.DocumentURI(defPath):  {{gvk: defGVK}},
+		lsp.DocumentURI(testPath): {{gvk: test1GVK}, {gvk: test2GVK}},
+	}
+
+	ws.nodes = map[NodeIdentifier]Node{
+		{gvk: compGVK}:  &PackageNode{},
+		{gvk: test1GVK}: &PackageNode{},
+		{gvk: test2GVK}: &PackageNode{},
+	}
+
+	type args struct {
+		path string
+		id   NodeIdentifier
+	}
+	type want struct {
+		ids   []NodeIdentifier
+		nodes []Node
+	}
+
+	cases := map[string]struct {
+		reason string
+		args   args
+		want   want
+	}{
+		"ShouldFindOneNode": {
+			reason: "Given duplicate node ids for a path, we should only find one node.",
+			args: args{
+				path: compPath,
+				id: NodeIdentifier{
+					gvk: compGVK,
+				},
+			},
+			want: want{
+				ids: []NodeIdentifier{
+					{
+						gvk: compGVK,
+					},
+				},
+				nodes: []Node{&PackageNode{}},
+			},
+		},
+		"ShouldFindTwoNodes": {
+			reason: "Given node id for a path, we should find two nodes.",
+			args: args{
+				path: testPath,
+				id: NodeIdentifier{
+					gvk: test1GVK,
+				},
+			},
+			want: want{
+				ids: []NodeIdentifier{
+					{
+						gvk: test1GVK,
+					},
+					{
+						gvk: test2GVK,
+					},
+				},
+				nodes: []Node{&PackageNode{}, &PackageNode{}},
+			},
+		},
+	}
+
+	for name, tc := range cases {
+		t.Run(name, func(t *testing.T) {
+
+			ws.appendID(tc.args.path, tc.args.id)
+
+			if diff := cmp.Diff(tc.want.ids, ws.uriToNodes[lsp.DocumentURI(tc.args.path)], cmpopts.IgnoreUnexported(NodeIdentifier{})); diff != "" {
+				t.Errorf("\n%s\nFilterCorrespondingNode(...): -want error, +got error:\n%s", tc.reason, diff)
+			}
+
+			got := ws.CorrespondingNodes(tc.args.path, ws.nodes)
+
+			if diff := cmp.Diff(tc.want.nodes, got, cmpopts.IgnoreUnexported(PackageNode{})); diff != "" {
+				t.Errorf("\n%s\nFilterCorrespondingNode(...): -want error, +got error:\n%s", tc.reason, diff)
+			}
+		})
+	}
+}
+
+func initws(root, cacheRoot string, opts ...WorkspaceOpt) *Workspace {
+	ws, _ := NewWorkspace(root, cacheRoot, opts...)
+	return ws
 }
