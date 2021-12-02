@@ -16,6 +16,7 @@ package xpls
 
 import (
 	"bufio"
+	"bytes"
 	"context"
 	"fmt"
 	"io"
@@ -26,6 +27,8 @@ import (
 	"github.com/goccy/go-yaml"
 	"github.com/goccy/go-yaml/ast"
 	"github.com/goccy/go-yaml/parser"
+	"github.com/golang/tools/lsp/protocol"
+	"github.com/golang/tools/span"
 	"github.com/sourcegraph/go-lsp"
 	"github.com/spf13/afero"
 
@@ -43,6 +46,7 @@ import (
 	"github.com/crossplane/crossplane-runtime/pkg/errors"
 	xpextv1 "github.com/crossplane/crossplane/apis/apiextensions/v1"
 
+	"github.com/upbound/up/internal/xpkg/dep/cache"
 	"github.com/upbound/up/internal/xpkg/dep/manager"
 	"github.com/upbound/up/internal/xpkg/dep/workspace"
 )
@@ -52,6 +56,14 @@ import (
 var (
 	compResources *yaml.Path
 	compBase      *yaml.Path
+)
+
+const (
+	errCompositionResources = "resources in Composition are malformed"
+	errFileBodyNotFound     = "could not find corresponding file body for %s"
+	errNoChangesSupplied    = "no content changes provided"
+	errInvalidFileURI       = "invalid path supplied"
+	errInvalidRange         = "invalid range supplied"
 )
 
 // builds static YAML path strings ahead of usage.
@@ -66,11 +78,6 @@ func init() {
 		panic(err)
 	}
 }
-
-const (
-	errMissingValidatorFmt  = "could not find validator for node: %s"
-	errCompositionResources = "resources in Composition are malformed"
-)
 
 // A PackageNode represents a concrete node in an xpkg.
 // TODO(hasheddan): PackageNode should be refactored into separate
@@ -151,8 +158,18 @@ type Workspace struct {
 	// identifier is a combination of its GVK and name.
 	nodes map[NodeIdentifier]Node
 
+	snapshot *Snapshot
+
 	// The validator cache maintains a set of validators loaded from the package cache.
 	validators map[schema.GroupVersionKind]Validator
+}
+
+// Snapshot represents the workspace for the given snapshot.
+// TODO(@tnthornton) we probably want to version the shapshots in order
+// to handle multiple inbound changes.
+type Snapshot struct {
+	// map of full filename to file contents
+	ws map[string][]byte
 }
 
 // A WorkspaceOpt modifies the configuration of a workspace.
@@ -172,6 +189,7 @@ func NewWorkspace(root string, opts ...WorkspaceOpt) *Workspace {
 		fs:         afero.NewOsFs(),
 		root:       root,
 		nodes:      map[NodeIdentifier]Node{},
+		snapshot:   &Snapshot{ws: map[string][]byte{}},
 		validators: map[schema.GroupVersionKind]Validator{},
 	}
 
@@ -196,6 +214,15 @@ func (w *Workspace) Parse() error {
 		// in a preceding one.
 		// TODO(hasheddan): errors should be aggregated and returned as
 		// diagnostics.
+
+		b, err := afero.ReadFile(w.fs, p)
+		if err != nil {
+			return err
+		}
+
+		// add file contents to our inmem workspace
+		w.snapshot.ws[p] = b
+
 		_ = w.parseFile(p)
 		return nil
 	})
@@ -211,11 +238,8 @@ func (w *Workspace) ParseFile(path string) error {
 // parseFile parses all YAML objects at the given path and updates the workspace
 // node cache.
 func (w *Workspace) parseFile(path string) error {
-	b, err := afero.ReadFile(w.fs, path)
-	if err != nil {
-		return err
-	}
-	f, err := parser.ParseBytes(b, parser.ParseComments)
+
+	f, err := parser.ParseBytes(w.snapshot.ws[path], parser.ParseComments)
 	if err != nil {
 		return err
 	}
@@ -316,9 +340,12 @@ func (w *Workspace) Validate(fn NodeFilterFn) ([]lsp.Diagnostic, error) { // nol
 	defer w.mu.RUnlock()
 	diags := []lsp.Diagnostic{}
 	for _, n := range fn(w.nodes) {
-		v, ok := w.validators[n.GetGVK()]
+		gvk := n.GetGVK()
+		v, ok := w.validators[gvk]
 		if !ok {
-			return nil, errors.Errorf(errMissingValidatorFmt, n.GetGVK())
+			continue
+			// TODO(@tnthornton) if we can't find the validator for the given node, we should
+			// surface that error in the editor.
 		}
 		diags = append(diags, validationDiagnostics(v.Validate(n.GetObject()), n.GetAST(), n.GetGVK())...)
 	}
@@ -381,7 +408,7 @@ func validationDiagnostics(res *validate.Result, n ast.Node, gvk schema.GroupVer
 // LoadCacheValidators loads the validators corresponding to the external
 // dependencies defined in the dep cache (if there is a meta file in the
 // project root).
-func (w *Workspace) LoadCacheValidators() error {
+func (w *Workspace) LoadCacheValidators(cacheRoot string) error {
 	depWS, err := workspace.New(
 		workspace.WithWorkingDir(w.root),
 	)
@@ -391,7 +418,12 @@ func (w *Workspace) LoadCacheValidators() error {
 
 	// grab external dependency validators only if a meta file is defined.
 	if depWS.MetaExists() {
-		m, err := manager.New()
+		c, err := cache.NewLocal(cache.WithRoot(cacheRoot))
+		if err != nil {
+			return err
+		}
+
+		m, err := manager.New(manager.WithCache(c))
 		if err != nil {
 			return err
 		}
@@ -500,4 +532,73 @@ func (w *Workspace) LoadValidators(path string) error { // nolint:gocyclo
 		w.validators[k] = v
 	}
 	return nil
+}
+
+// updateContent updates the current immem content representation for the provided file uri.
+func (w *Workspace) updateContent(ctx context.Context, uri span.URI, changes []protocol.TextDocumentContentChangeEvent) error {
+	if len(changes) == 0 {
+		return errors.New(errNoChangesSupplied)
+	}
+
+	body, err := w.updateChanges(ctx, uri, changes)
+	if err != nil {
+		return err
+	}
+
+	w.mu.Lock()
+	defer w.mu.Unlock()
+	w.snapshot.ws[uri.Filename()] = body
+
+	return nil
+}
+
+// updateChanges updates the body mapped to the given filename uri based on the
+// provided changes. This is strongly inspired by how gopls injects spans into
+// content bodies.
+func (w *Workspace) updateChanges(_ context.Context, uri span.URI, changes []protocol.TextDocumentContentChangeEvent) ([]byte, error) {
+	if uri == "" {
+		return nil, errors.New(errInvalidFileURI)
+	}
+
+	content, ok := w.snapshot.ws[uri.Filename()]
+	if !ok {
+		return nil, fmt.Errorf(errFileBodyNotFound, uri.Filename())
+	}
+
+	for _, c := range changes {
+		converter := span.NewContentConverter(uri.Filename(), content)
+		m := &protocol.ColumnMapper{
+			URI:       uri,
+			Converter: converter,
+			Content:   content,
+		}
+
+		if c.Range == nil {
+			return nil, errors.New(errInvalidRange)
+		}
+
+		spn, err := m.RangeSpan(*c.Range)
+		if err != nil {
+			return nil, err
+		}
+
+		if !spn.HasOffset() {
+			return nil, errors.New(errInvalidRange)
+		}
+
+		start, end := spn.Start().Offset(), spn.End().Offset()
+		if end < start {
+			return nil, errors.New(errInvalidRange)
+		}
+
+		// inject changes into surrounding content body
+		var buf bytes.Buffer
+		buf.Write(content[:start])
+		buf.WriteString(c.Text)
+		buf.Write(content[end:])
+		content = buf.Bytes()
+
+	}
+
+	return content, nil
 }

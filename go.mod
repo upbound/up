@@ -12,6 +12,7 @@ require (
 	github.com/docker/docker v20.10.7+incompatible
 	github.com/goccy/go-yaml v1.9.4
 	github.com/golang-jwt/jwt v3.2.1+incompatible
+	github.com/golang/tools v0.1.7
 	github.com/google/addlicense v1.0.0
 	github.com/google/go-cmp v0.5.6
 	github.com/google/go-containerregistry v0.6.0
@@ -44,4 +45,5 @@ require (
 replace (
 	github.com/docker/distribution => github.com/docker/distribution v0.0.0-20191216044856-a8371794149d
 	github.com/docker/docker => github.com/moby/moby v17.12.0-ce-rc1.0.20200618181300-9dc6525e6118+incompatible
+	github.com/golang/tools => ./internal/vendor/golang.org/x/tools
 )

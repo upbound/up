@@ -18,25 +18,23 @@ import (
 	"context"
 	"encoding/json"
 	"os"
-	"path/filepath"
 
-	"github.com/crossplane/crossplane-runtime/pkg/logging"
 	"github.com/sourcegraph/go-lsp"
 	"github.com/sourcegraph/jsonrpc2"
 	"github.com/spf13/afero"
+
+	"github.com/crossplane/crossplane-runtime/pkg/logging"
+
+	"github.com/golang/tools/lsp/protocol"
 )
 
 const (
-	serverName = "xpls"
-
+	serverName      = "xpls"
 	defaultCacheDir = ".up/cache"
-)
 
-const (
-	errParseWorkspace      = "failed to parse workspace"
-	errParseSaveParameters = "failed to parse document save parameters"
-	errValidateNodes       = "failed to validate nodes in workspace"
-	errPublishDiagnostics  = "failed to publish diagnostics"
+	errParseSaveParameters   = "failed to parse document save parameters"
+	errParseChangeParameters = "failed to parse document change parameters"
+	errPublishDiagnostics    = "failed to publish diagnostics"
 )
 
 // HomeDirFn indicates the location of a user's home directory.
@@ -44,13 +42,11 @@ type HomeDirFn func() (string, error)
 
 // A Handler handles LSP requests.
 type Handler struct {
-	root      string
-	cacheDir  string
-	cachePath string
-	fs        afero.Fs
-	ws        *Workspace
-	home      HomeDirFn
-	log       logging.Logger
+	cacheDir string
+	dispatch *Dispatcher
+	fs       afero.Fs
+	home     HomeDirFn
+	log      logging.Logger
 }
 
 // HandlerOpt modifies a handler.
@@ -88,54 +84,23 @@ func NewHandler(opts ...HandlerOpt) (*Handler, error) {
 	for _, o := range opts {
 		o(h)
 	}
-	// NOTE(hasheddan): using a HomeDirFn allows us to override home directory
-	// location in testing, while still getting user directory from OS in normal
-	// execution.
-	home, err := h.home()
-	if err != nil {
-		return nil, err
-	}
-	h.cachePath = filepath.Join(home, h.cacheDir)
+	h.dispatch = NewDispatcher(h.log, h.cacheDir)
 	return h, nil
 }
 
 // Handle handles LSP requests. It panics if we cannot initialize the workspace.
 func (h *Handler) Handle(ctx context.Context, c *jsonrpc2.Conn, r *jsonrpc2.Request) { // nolint:gocyclo
-	log := h.log.WithValues("request", r)
 	switch r.Method {
 	case "initialize":
-		params := &lsp.InitializeParams{}
-		if err := json.Unmarshal(*r.Params, params); err != nil {
+		var params lsp.InitializeParams
+		if err := json.Unmarshal(*r.Params, &params); err != nil {
 			// If we can't understand the initialization parmaters panic because
 			// future operations will not work.
 			panic(err)
 		}
-		h.root = params.RootPath
-		h.ws = NewWorkspace(h.root)
-		if err := h.ws.LoadValidators(h.root); err != nil {
-			// If we can't load validators panic because we won't be able to
-			// perform validation.
-			panic(err)
-		}
-		if err := h.ws.LoadCacheValidators(); err != nil {
-			// TODO(@tnthornton) while at first glance, panicing here makes sense
-			// i.e. we simply can't function correctly, it's unclear to me if
-			// that's the correct choice from an end user UX perspective.
-			panic(err)
-		}
+		reply := h.dispatch.Initialize(ctx, params)
 
-		if err := h.ws.Parse(); err != nil {
-			log.Debug(errParseWorkspace, "error", err)
-		}
-		// TODO(hasheddan): perform initial validation on initialization.
-		kind := lsp.TDSKIncremental
-		if err := c.Reply(ctx, r.ID, lsp.InitializeResult{
-			Capabilities: lsp.ServerCapabilities{
-				TextDocumentSync: &lsp.TextDocumentSyncOptionsOrKind{
-					Kind: &kind,
-				},
-			},
-		}); err != nil {
+		if err := c.Reply(ctx, r.ID, reply); err != nil {
 			// If we fail to initialize the workspace we won't receive future
 			// messages so we panic and try again on restart.
 			panic(err)
@@ -153,29 +118,38 @@ func (h *Handler) Handle(ctx context.Context, c *jsonrpc2.Conn, r *jsonrpc2.Requ
 			h.log.Debug(errParseSaveParameters)
 			break
 		}
-		if err := h.ws.Parse(); err != nil {
-			// If we can't parse the workspace, log the error and skip validation.
-			// TODO(hasheddan): surface this in diagnostics.
-			h.log.Debug(errParseWorkspace, "error", err)
+
+		diags := h.dispatch.DidSave(ctx, params)
+		if diags == nil {
+			// an error occurred while processing diagnostics, skip for now.
 			break
 		}
-		// TODO(hasheddan): diagnostics should be cached and validation should
-		// be performed selectively.
-		diags, err := h.ws.Validate(AllNodes)
-		if err != nil {
-			h.log.Debug(errValidateNodes, "error", err)
-			break
-		}
+
 		// TODO(hasheddan): we currently send all workspace diagnostics with
 		// the text document URI from this save operation, meaning that
 		// errors in other files are shown in it. We should first switch to
 		// sending an individual set of diagnostics for each file with
 		// errors, then move to maintaining a cache of diagnostics so that
 		// we don't have to re-validate the entire workspace each time.
-		if err := c.Notify(ctx, "textDocument/publishDiagnostics", &lsp.PublishDiagnosticsParams{
-			URI:         params.TextDocument.URI,
-			Diagnostics: diags,
-		}); err != nil {
+		if err := c.Notify(ctx, "textDocument/publishDiagnostics", diags); err != nil {
+			h.log.Debug(errPublishDiagnostics, "error", err)
+		}
+	case "textDocument/didChange":
+		// need to keep track of a snapshot of the workspace inmem, with filename -> doc string
+		// on change, grab doc string from snapshot, stitch in change (in order)
+		var params protocol.DidChangeTextDocumentParams
+		if err := json.Unmarshal(*r.Params, &params); err != nil {
+			h.log.Debug(errParseChangeParameters)
+			break
+		}
+
+		diags := h.dispatch.DidChange(ctx, params)
+		if diags == nil {
+			// an error occurred while processing diagnostics, skip for now.
+			break
+		}
+
+		if err := c.Notify(ctx, "textDocument/publishDiagnostics", diags); err != nil {
 			h.log.Debug(errPublishDiagnostics, "error", err)
 		}
 	}

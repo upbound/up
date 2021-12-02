@@ -71,6 +71,9 @@ func NewLocal(opts ...Option) (*Local, error) {
 		return nil, err
 	}
 
+	// TODO(@tnthornton) this is probably not what we want. Otherwise if
+	// a cachedir is specified outside of the home path, we'll install
+	// in the home path anyways
 	root, err := filepath.Abs(filepath.Join(home, l.path))
 	if err != nil {
 		return nil, err
