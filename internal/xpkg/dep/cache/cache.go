@@ -49,6 +49,12 @@ type Local struct {
 	pkgres XpkgMarshaler
 }
 
+// XpkgMarshaler defines the API contract for working marshaling
+// xpkg.ParsedPackage's from a directory.
+type XpkgMarshaler interface {
+	FromDir(afero.Fs, string) (*xpkg.ParsedPackage, error)
+}
+
 // NewLocal creates a new LocalCache.
 func NewLocal(opts ...Option) (*Local, error) {
 	l := &Local{

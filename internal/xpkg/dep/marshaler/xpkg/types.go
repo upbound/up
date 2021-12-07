@@ -26,7 +26,8 @@ import (
 	"github.com/crossplane/crossplane/apis/pkg/v1beta1"
 )
 
-// PackageParser --
+// PackageParser defines the API contract for working with a
+// PackageParser.
 type PackageParser interface {
 	Parse(context.Context, io.ReadCloser) (*parser.Package, error)
 }

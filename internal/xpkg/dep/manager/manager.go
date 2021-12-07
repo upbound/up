@@ -19,6 +19,8 @@ import (
 	"os"
 
 	"github.com/crossplane/crossplane/apis/pkg/v1beta1"
+	v1 "github.com/google/go-containerregistry/pkg/v1"
+	"github.com/spf13/afero"
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/kube-openapi/pkg/validation/validate"
 
@@ -34,6 +36,27 @@ type Manager struct {
 	x XpkgMarshaler
 
 	acc []*xpkg.ParsedPackage
+}
+
+// Cache defines the API contract for working with a Cache.
+type Cache interface {
+	Get(v1beta1.Dependency) (*xpkg.ParsedPackage, error)
+	Store(v1beta1.Dependency, *xpkg.ParsedPackage) error
+}
+
+// ImageResolver defines the API contract for working with an
+// ImageResolver.
+type ImageResolver interface {
+	ResolveDigest(context.Context, v1beta1.Dependency) (string, error)
+	ResolveImage(context.Context, v1beta1.Dependency) (string, v1.Image, error)
+	ResolveTag(context.Context, v1beta1.Dependency) (string, error)
+}
+
+// XpkgMarshaler defines the API contract for working with an
+// xpkg.ParsedPackage marshaler.
+type XpkgMarshaler interface {
+	FromImage(string, string, v1.Image) (*xpkg.ParsedPackage, error)
+	FromDir(afero.Fs, string) (*xpkg.ParsedPackage, error)
 }
 
 // New returns a new Manager
@@ -128,8 +151,7 @@ func (m *Manager) Resolve(ctx context.Context, d v1beta1.Dependency) (v1beta1.De
 }
 
 // resolveAllDeps recursively resolves the transitive dependencies for a
-// given Entry. In addition, resolveAllDeps takes an accumulator for gathering
-// the related xpkg.ParsedPackages for the dependency tree.
+// given xpkg.ParsedPackage.
 func (m *Manager) resolveAllDeps(ctx context.Context, p *xpkg.ParsedPackage) error {
 
 	if len(p.Dependencies()) == 0 {
