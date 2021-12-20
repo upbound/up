@@ -40,8 +40,10 @@ type ParsedPackage struct {
 	GVKtoV map[schema.GroupVersionKind]*validate.SchemaValidator
 	// The MetaObj file that corresponds to the package.
 	MetaObj runtime.Object
-	// The name of the package.
-	PName string
+	// The name of the package. This name maps to the package name defined
+	// in the crossplane.yaml and is represented in the directory name for
+	// the package on the filesystem.
+	DepName string
 	// The N corresponding Objs (CRDs, XRDs, Compositions) depending on the package type.
 	Objs []runtime.Object
 	// The type of Package.
@@ -69,9 +71,9 @@ func (p *ParsedPackage) Meta() runtime.Object {
 	return p.MetaObj
 }
 
-// Name returns the name of the package. e.g. crossplane/provider-aws
+// Name returns the name of the package. e.g. crossplane/provider-aws.
 func (p *ParsedPackage) Name() string {
-	return p.PName
+	return p.DepName
 }
 
 // Objects returns the slice of runtime.Objects corresponding to CRDs, XRDs, and

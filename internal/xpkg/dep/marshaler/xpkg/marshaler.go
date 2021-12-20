@@ -210,7 +210,7 @@ func finalizePkg(reg, repo, ver, digest string, pkg *ParsedPackage) (*ParsedPack
 
 	pkg.Deps = deps
 	pkg.GVKtoV = v
-	pkg.PName = derivePkgName(reg, repo)
+	pkg.DepName = derivePkgName(reg, repo)
 	pkg.Reg = reg
 	pkg.SHA = digest
 	pkg.Ver = ver
