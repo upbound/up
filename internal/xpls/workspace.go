@@ -165,7 +165,7 @@ type Workspace struct {
 	nodes map[NodeIdentifier]Node
 
 	snapshot   *Snapshot
-	uriToNodes map[lsp.DocumentURI][]NodeIdentifier
+	uriToNodes map[lsp.DocumentURI]map[NodeIdentifier]struct{}
 }
 
 // Snapshot represents the workspace for the given snapshot.
@@ -201,7 +201,7 @@ func NewWorkspace(root, cacheRoot string, opts ...WorkspaceOpt) (*Workspace, err
 			ws:         map[string][]byte{},
 			validators: map[schema.GroupVersionKind]validator.Validator{},
 		},
-		uriToNodes: map[lsp.DocumentURI][]NodeIdentifier{},
+		uriToNodes: make(map[lsp.DocumentURI]map[NodeIdentifier]struct{}),
 	}
 
 	c, err := cache.NewLocal(cache.WithRoot(cacheRoot))
@@ -358,32 +358,24 @@ func (w *Workspace) appendID(path string, id NodeIdentifier) {
 	uri := lsp.DocumentURI(fmt.Sprintf(fileProtocolFmt, path))
 	curr, ok := w.uriToNodes[uri]
 	if !ok {
-		w.uriToNodes[uri] = []NodeIdentifier{id}
+		w.uriToNodes[uri] = map[NodeIdentifier]struct{}{
+			id: {},
+		}
 		return
 	}
-	// find the match
-	found := false
-	for i, n := range curr {
-		if n.gvk == id.gvk {
-			curr[i] = id
-			found = true
-			break
-		}
-	}
-	if !found {
-		curr = append(curr, id)
-	}
+	curr[id] = struct{}{}
+
 	w.uriToNodes[uri] = curr
 }
 
 // A NodeFilterFn filters the node on which we perform validation.
-type NodeFilterFn func(path string, nodes map[NodeIdentifier]Node) []Node
+type NodeFilterFn func(uri lsp.DocumentURI) []Node
 
 // AllNodes does not filter out any nodes in the workspace.
-func AllNodes(path string, nodes map[NodeIdentifier]Node) []Node {
-	ns := make([]Node, len(nodes))
+func (w *Workspace) AllNodes(uri lsp.DocumentURI) []Node {
+	ns := make([]Node, len(w.nodes))
 	i := 0
-	for _, n := range nodes {
+	for _, n := range w.nodes {
 		ns[i] = n
 		i++
 	}
@@ -392,14 +384,14 @@ func AllNodes(path string, nodes map[NodeIdentifier]Node) []Node {
 
 // CorrespondingNodes filters out the returned nodes to just the ones
 // corresponding to the supplied path.
-func (w *Workspace) CorrespondingNodes(path string, nodes map[NodeIdentifier]Node) []Node {
+func (w *Workspace) CorrespondingNodes(uri lsp.DocumentURI) []Node {
 	ns := make([]Node, 0)
-	ids, ok := w.uriToNodes[lsp.DocumentURI(path)]
+	ids, ok := w.uriToNodes[uri]
 	if !ok {
 		return ns
 	}
-	for _, id := range ids {
-		node, ok := nodes[id]
+	for id := range ids {
+		node, ok := w.nodes[id]
 		if !ok {
 			continue
 		}
@@ -410,19 +402,19 @@ func (w *Workspace) CorrespondingNodes(path string, nodes map[NodeIdentifier]Nod
 }
 
 // MetaNode filters the node set for the workspace down to just the meta file node.
-func (w *Workspace) MetaNode(path string, nodes map[NodeIdentifier]Node) []Node {
-	return []Node{nodes[w.metaNodeID]}
+func (w *Workspace) MetaNode(uri lsp.DocumentURI) []Node {
+	return []Node{w.nodes[w.metaNodeID]}
 }
 
 // Validate performs validation on all filtered nodes and returns diagnostics
 // for any validation errors encountered.
 // TODO(hasheddan): consider decoupling forming diagnostics from getting
 // validation errors.
-func (w *Workspace) Validate(path string, fn NodeFilterFn) ([]lsp.Diagnostic, error) { // nolint:gocyclo
+func (w *Workspace) Validate(uri lsp.DocumentURI, fn NodeFilterFn) ([]lsp.Diagnostic, error) { // nolint:gocyclo
 	w.mu.RLock()
 	defer w.mu.RUnlock()
 	diags := []lsp.Diagnostic{}
-	for _, n := range fn(path, w.nodes) {
+	for _, n := range fn(uri) {
 		gvk := n.GetGVK()
 		v, ok := w.snapshot.validators[gvk]
 		if !ok {

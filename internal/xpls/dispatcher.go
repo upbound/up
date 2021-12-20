@@ -112,7 +112,7 @@ func (d *Dispatcher) DidChange(ctx context.Context, params protocol.DidChangeTex
 
 	// TODO(hasheddan): diagnostics should be cached and validation should
 	// be performed selectively.
-	diags, err := d.ws.Validate(string(params.TextDocument.URI), d.ws.CorrespondingNodes)
+	diags, err := d.ws.Validate(lsp.DocumentURI(params.TextDocument.URI), d.ws.CorrespondingNodes)
 	if err != nil {
 		d.log.Debug(errValidateNodes, "error", err)
 		return nil
@@ -134,7 +134,7 @@ func (d *Dispatcher) DidOpen(ctx context.Context, params lsp.DidOpenTextDocument
 	}
 	// TODO(hasheddan): diagnostics should be cached and validation should
 	// be performed selectively.
-	diags, err := d.ws.Validate(string(params.TextDocument.URI), d.ws.CorrespondingNodes)
+	diags, err := d.ws.Validate(params.TextDocument.URI, d.ws.CorrespondingNodes)
 	if err != nil {
 		d.log.Debug(errValidateNodes, "error", err)
 		return nil
@@ -155,11 +155,11 @@ func (d *Dispatcher) DidSave(ctx context.Context, params lsp.DidSaveTextDocument
 	}
 
 	// we saved the meta file, load validators if the file isn't invalid
-	d.handleMeta(ctx, string(params.TextDocument.URI))
+	d.handleMeta(ctx, params.TextDocument.URI)
 
 	// TODO(hasheddan): diagnostics should be cached and validation should
 	// be performed selectively.
-	diags, err := d.ws.Validate(string(params.TextDocument.URI), d.ws.CorrespondingNodes)
+	diags, err := d.ws.Validate(params.TextDocument.URI, d.ws.CorrespondingNodes)
 	if err != nil {
 		d.log.Debug(errValidateNodes, "error", err)
 		return nil
@@ -170,9 +170,9 @@ func (d *Dispatcher) DidSave(ctx context.Context, params lsp.DidSaveTextDocument
 	}
 }
 
-func (d *Dispatcher) handleMeta(_ context.Context, filename string) {
-	if filepath.Base(filename) == xpkg.MetaFile {
-		diags, err := d.ws.Validate(filename, d.ws.MetaNode)
+func (d *Dispatcher) handleMeta(_ context.Context, uri lsp.DocumentURI) {
+	if filepath.Base(string(uri)) == xpkg.MetaFile {
+		diags, err := d.ws.Validate(uri, d.ws.MetaNode)
 		if err != nil {
 			d.log.Debug(errValidateNodes, "error", err)
 		}

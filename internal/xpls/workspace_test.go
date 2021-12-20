@@ -206,7 +206,7 @@ func TestValidate(t *testing.T) {
 	cases := map[string]struct {
 		reason string
 		opt    WorkspaceOpt
-		filter NodeFilterFn
+		filter func(*Workspace) NodeFilterFn
 		dsCnt  int
 		err    error
 	}{
@@ -218,7 +218,9 @@ func TestValidate(t *testing.T) {
 				_ = afero.WriteFile(fs, "/cache/crd.yaml", testSingleVersionCRD, os.ModePerm)
 				return fs
 			}()),
-			filter: func(string, map[NodeIdentifier]Node) []Node { return nil },
+			filter: func(w *Workspace) NodeFilterFn {
+				return func(lsp.DocumentURI) []Node { return nil }
+			},
 		},
 		"SuccessfulInvalidObject": {
 			reason: "Should return a single diagnostic if we successfully validate and find a single error.",
@@ -228,8 +230,10 @@ func TestValidate(t *testing.T) {
 				_ = afero.WriteFile(fs, "/cache/crd.yaml", testMultiVersionCRD, os.ModePerm)
 				return fs
 			}()),
-			filter: AllNodes,
-			dsCnt:  1,
+			filter: func(ws *Workspace) NodeFilterFn {
+				return ws.AllNodes
+			},
+			dsCnt: 1,
 		},
 	}
 	for name, tc := range cases {
@@ -244,7 +248,7 @@ func TestValidate(t *testing.T) {
 			if err := ws.LoadValidators("/cache"); err != nil {
 				t.Errorf("\n%s\nLoadValidators(...): unexpected error:\n%s", tc.reason, err)
 			}
-			ds, err := ws.Validate("", tc.filter)
+			ds, err := ws.Validate("", tc.filter(ws))
 			if diff := cmp.Diff(tc.err, err, test.EquateErrors()); diff != "" {
 				t.Errorf("\n%s\nValidate(...): -want error, +got error:\n%s", tc.reason, diff)
 			}
@@ -378,9 +382,9 @@ metadata:
 func TestFilterCorrespondingNode(t *testing.T) {
 	ws := initws("/ws", "cache", WithFS(afero.NewMemMapFs()))
 
-	compPath := "/ws/composition.yaml"
-	defPath := "/ws/definition.yaml"
-	testPath := "/ws/test.yaml"
+	compPath := lsp.DocumentURI("/ws/composition.yaml")
+	defPath := lsp.DocumentURI("/ws/definition.yaml")
+	testPath := lsp.DocumentURI("/ws/test.yaml")
 
 	compGVK := schema.GroupVersionKind{
 		Group:   "composition",
@@ -406,10 +410,17 @@ func TestFilterCorrespondingNode(t *testing.T) {
 		Kind:    "test2",
 	}
 
-	ws.uriToNodes = map[lsp.DocumentURI][]NodeIdentifier{
-		lsp.DocumentURI(compPath): {{gvk: compGVK}},
-		lsp.DocumentURI(defPath):  {{gvk: defGVK}},
-		lsp.DocumentURI(testPath): {{gvk: test1GVK}, {gvk: test2GVK}},
+	ws.uriToNodes = map[lsp.DocumentURI]map[NodeIdentifier]struct{}{
+		compPath: {
+			{gvk: compGVK}: {},
+		},
+		defPath: {
+			{gvk: defGVK}: {},
+		},
+		testPath: {
+			{gvk: test1GVK}: {},
+			{gvk: test2GVK}: {},
+		},
 	}
 
 	ws.nodes = map[NodeIdentifier]Node{
@@ -419,11 +430,11 @@ func TestFilterCorrespondingNode(t *testing.T) {
 	}
 
 	type args struct {
-		path string
+		path lsp.DocumentURI
 		id   NodeIdentifier
 	}
 	type want struct {
-		ids   []NodeIdentifier
+		ids   map[NodeIdentifier]struct{}
 		nodes []Node
 	}
 
@@ -441,10 +452,8 @@ func TestFilterCorrespondingNode(t *testing.T) {
 				},
 			},
 			want: want{
-				ids: []NodeIdentifier{
-					{
-						gvk: compGVK,
-					},
+				ids: map[NodeIdentifier]struct{}{
+					{gvk: compGVK}: {},
 				},
 				nodes: []Node{&PackageNode{}},
 			},
@@ -458,13 +467,9 @@ func TestFilterCorrespondingNode(t *testing.T) {
 				},
 			},
 			want: want{
-				ids: []NodeIdentifier{
-					{
-						gvk: test1GVK,
-					},
-					{
-						gvk: test2GVK,
-					},
+				ids: map[NodeIdentifier]struct{}{
+					{gvk: test1GVK}: {},
+					{gvk: test2GVK}: {},
 				},
 				nodes: []Node{&PackageNode{}, &PackageNode{}},
 			},
@@ -474,13 +479,13 @@ func TestFilterCorrespondingNode(t *testing.T) {
 	for name, tc := range cases {
 		t.Run(name, func(t *testing.T) {
 
-			ws.appendID(tc.args.path, tc.args.id)
+			ws.appendID(string(tc.args.path), tc.args.id)
 
-			if diff := cmp.Diff(tc.want.ids, ws.uriToNodes[lsp.DocumentURI(tc.args.path)], cmpopts.IgnoreUnexported(NodeIdentifier{})); diff != "" {
+			if diff := cmp.Diff(tc.want.ids, ws.uriToNodes[tc.args.path], cmpopts.IgnoreUnexported(NodeIdentifier{})); diff != "" {
 				t.Errorf("\n%s\nFilterCorrespondingNode(...): -want error, +got error:\n%s", tc.reason, diff)
 			}
 
-			got := ws.CorrespondingNodes(tc.args.path, ws.nodes)
+			got := ws.CorrespondingNodes(tc.args.path)
 
 			if diff := cmp.Diff(tc.want.nodes, got, cmpopts.IgnoreUnexported(PackageNode{})); diff != "" {
 				t.Errorf("\n%s\nFilterCorrespondingNode(...): -want error, +got error:\n%s", tc.reason, diff)
