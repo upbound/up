@@ -363,9 +363,7 @@ func AllNodes(nodes map[NodeIdentifier]Node) []Node {
 
 // MetaNode filters the node set for the workspace down to just the meta file node.
 func (w *Workspace) MetaNode(nodes map[NodeIdentifier]Node) []Node {
-	ns := make([]Node, 1)
-	ns[0] = nodes[w.metaNodeID]
-	return ns
+	return []Node{nodes[w.metaNodeID]}
 }
 
 // Validate performs validation on all filtered nodes and returns diagnostics
