@@ -24,18 +24,18 @@ type Validator interface {
 	Validate(data interface{}) *validate.Result
 }
 
-// MetaValidaton represents a failure of a meta file condition.
-type MetaValidaton struct {
+// MetaValidation represents a failure of a meta file condition.
+type MetaValidation struct {
 	code    int32
 	Message string
 	Name    string
 }
 
 // Code returns the code corresponding to the MetaValidation.
-func (e *MetaValidaton) Code() int32 {
+func (e *MetaValidation) Code() int32 {
 	return e.code
 }
 
-func (e *MetaValidaton) Error() string {
+func (e *MetaValidation) Error() string {
 	return e.Message
 }

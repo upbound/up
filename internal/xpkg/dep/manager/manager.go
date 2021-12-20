@@ -108,7 +108,7 @@ func WithResolver(r ImageResolver) Option {
 // dependencies (both defined and transitive) related to the given slice of
 // v1beta1.Dependency.
 func (m *Manager) Snapshot(ctx context.Context, deps []v1beta1.Dependency) (*Snapshot, error) {
-	validators := make(map[schema.GroupVersionKind][]validator.Validator)
+	validators := make(map[schema.GroupVersionKind]validator.Validator)
 	packages := make(map[string]*xpkg.ParsedPackage)
 
 	for _, d := range deps {
@@ -118,7 +118,7 @@ func (m *Manager) Snapshot(ctx context.Context, deps []v1beta1.Dependency) (*Sna
 		}
 		for _, p := range acc {
 			for k, v := range p.Validators() {
-				validators[k] = []validator.Validator{v}
+				validators[k] = v
 			}
 			packages[p.Name()] = p
 		}
@@ -270,7 +270,7 @@ type Snapshot struct {
 // manner.
 type View struct {
 	packages   map[string]*xpkg.ParsedPackage
-	validators map[schema.GroupVersionKind][]validator.Validator
+	validators map[schema.GroupVersionKind]validator.Validator
 }
 
 // View returns the Snapshot's View.
@@ -284,6 +284,6 @@ func (v *View) Packages() map[string]*xpkg.ParsedPackage {
 }
 
 // Validators returns the validators map for the view.
-func (v *View) Validators() map[schema.GroupVersionKind][]validator.Validator {
+func (v *View) Validators() map[schema.GroupVersionKind]validator.Validator {
 	return v.validators
 }

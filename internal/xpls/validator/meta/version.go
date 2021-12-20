@@ -20,7 +20,6 @@ import (
 	"strings"
 
 	"github.com/Masterminds/semver"
-	"k8s.io/kube-openapi/pkg/validation/validate"
 
 	"github.com/crossplane/crossplane/apis/pkg/v1beta1"
 
@@ -38,53 +37,34 @@ const (
 
 // VersionValidator is used to validate the dependency versions in a meta file.
 type VersionValidator struct {
-	m *Meta
+	manager *manager.Manager
 }
 
 // NewVersionValidator returns a new VersionValidator.
-func NewVersionValidator(m *Meta) *VersionValidator {
+func NewVersionValidator(manager *manager.Manager) *VersionValidator {
 	return &VersionValidator{
-		m: m,
+		manager: manager,
 	}
 }
 
-// Validate validates the dependency versions in a meta file.
-func (v *VersionValidator) Validate(data interface{}) *validate.Result {
-	pkg, err := v.m.Marshal(data)
-	if err != nil {
-		// TODO(@tnthornton) add debug logging
-		return validator.Nop
-	}
-
-	errs := make([]error, 0)
-
-	for i, d := range pkg.GetDependencies() {
-		cd := manager.ConvertToV1beta1(d)
-		errs = append(errs, v.validateVersion(i, cd))
-	}
-
-	return &validate.Result{
-		Errors: errs,
-	}
-}
-
-func (v *VersionValidator) validateVersion(i int, d v1beta1.Dependency) error {
+// validate validates the dependency versions in a meta file.
+func (v *VersionValidator) validate(i int, d v1beta1.Dependency) error {
 	// check explicit version
 	// TODO(@tnthornton) move this into the Snapshot. Versions shouldn't change
 	// within the lifespan of a snapshot.
-	vers, err := v.m.manager.Versions(context.Background(), d)
+	vers, err := v.manager.Versions(context.Background(), d)
 	if err != nil {
 		// TODO(@tnthornton) add debug logging here
 		return nil
 	}
 	if len(vers) == 0 {
-		return &validator.MetaValidaton{
+		return &validator.MetaValidation{
 			Name:    fmt.Sprintf(dependsOnPathFmt, i, strings.ToLower(string(d.Type))),
 			Message: fmt.Sprintf(errPackageDNEFmt, d.Package),
 		}
 	}
 	if !versionMatch(d.Constraints, vers) {
-		return &validator.MetaValidaton{
+		return &validator.MetaValidation{
 			Name:    fmt.Sprintf(dependsOnPathFmt, i, versionField),
 			Message: fmt.Sprintf(errVersionDENFmt, d.Constraints),
 		}

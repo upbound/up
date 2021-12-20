@@ -173,7 +173,7 @@ type Snapshot struct {
 	// map of full filename to file contents
 	ws map[string][]byte
 	// The validator cache maintains a set of validators loaded from the package cache.
-	validators map[schema.GroupVersionKind][]validator.Validator
+	validators map[schema.GroupVersionKind]validator.Validator
 }
 
 // A WorkspaceOpt modifies the configuration of a workspace.
@@ -196,7 +196,7 @@ func NewWorkspace(root, cacheRoot string, opts ...WorkspaceOpt) (*Workspace, err
 		snapshot: &Snapshot{
 			packages:   map[string]*mxpkg.ParsedPackage{},
 			ws:         map[string][]byte{},
-			validators: map[schema.GroupVersionKind][]validator.Validator{},
+			validators: map[schema.GroupVersionKind]validator.Validator{},
 		},
 	}
 
@@ -376,16 +376,14 @@ func (w *Workspace) Validate(fn NodeFilterFn) ([]lsp.Diagnostic, error) { // nol
 	diags := []lsp.Diagnostic{}
 	for _, n := range fn(w.nodes) {
 		gvk := n.GetGVK()
-		validators, ok := w.snapshot.validators[gvk]
+		v, ok := w.snapshot.validators[gvk]
 		if !ok {
 			continue
 			// TODO(@tnthornton) if we can't find the validator for the given node, we should
 			// surface that error in the editor.
 		}
 
-		for _, v := range validators {
-			diags = append(diags, validationDiagnostics(v.Validate(n.GetObject()), n.GetAST(), n.GetGVK())...)
-		}
+		diags = append(diags, validationDiagnostics(v.Validate(n.GetObject()), n.GetAST(), n.GetGVK())...)
 	}
 	return diags, nil
 }
@@ -405,7 +403,7 @@ func validationDiagnostics(res *validate.Result, n ast.Node, gvk schema.GroupVer
 				message: fmt.Sprintf("%s (%s)", et.Error(), gvk),
 				name:    et.Name,
 			}
-		case *validator.MetaValidaton:
+		case *validator.MetaValidation:
 			e = &verror{
 				code:    et.Code(),
 				message: et.Error(),
@@ -507,7 +505,7 @@ func (w *Workspace) LoadCacheValidators() error {
 // TODO(hasheddan): consider refactoring this to allow for sourcing validators
 // from a generic YAML reader, similar to the package parser.
 func (w *Workspace) LoadValidators(path string) error { // nolint:gocyclo
-	validators := map[schema.GroupVersionKind][]validator.Validator{}
+	validators := map[schema.GroupVersionKind]validator.Validator{}
 
 	if err := afero.Walk(w.fs, path, func(p string, info fs.FileInfo, err error) error {
 		if err != nil {
@@ -546,10 +544,7 @@ func (w *Workspace) LoadValidators(path string) error { // nolint:gocyclo
 					continue
 				}
 
-				validators[mobj.GetObjectKind().GroupVersionKind()] = []validator.Validator{
-					meta.NewVersionValidator(m),
-					meta.NewTypeValidator(m),
-				}
+				validators[mobj.GetObjectKind().GroupVersionKind()] = m
 				continue
 			}
 			// TODO(hasheddan): handle v1beta1 CRDs, as well as all XRD API versions.
@@ -574,7 +569,7 @@ func (w *Workspace) LoadValidators(path string) error { // nolint:gocyclo
 						Group:   internal.Spec.Group,
 						Version: v.Name,
 						Kind:    internal.Spec.Names.Kind,
-					}] = []validator.Validator{sv}
+					}] = sv
 				}
 				continue
 			}
@@ -587,7 +582,7 @@ func (w *Workspace) LoadValidators(path string) error { // nolint:gocyclo
 					Group:   internal.Spec.Group,
 					Version: v.Name,
 					Kind:    internal.Spec.Names.Kind,
-				}] = []validator.Validator{sv}
+				}] = sv
 			}
 		}
 		return nil
@@ -606,18 +601,12 @@ func (w *Workspace) LoadValidators(path string) error { // nolint:gocyclo
 
 // ResetValidators resets the validators map for the workspace.
 func (w *Workspace) ResetValidators() {
-	w.snapshot.validators = make(map[schema.GroupVersionKind][]validator.Validator)
+	w.snapshot.validators = make(map[schema.GroupVersionKind]validator.Validator)
 }
 
-func (w *Workspace) appendValidators(validators map[schema.GroupVersionKind][]validator.Validator) {
+func (w *Workspace) appendValidators(validators map[schema.GroupVersionKind]validator.Validator) {
 	for k, v := range validators {
-		validators, ok := w.snapshot.validators[k]
-		if !ok {
-			w.snapshot.validators[k] = v
-			continue
-		}
-		validators = append(validators, v...)
-		w.snapshot.validators[k] = validators
+		w.snapshot.validators[k] = v
 	}
 }
 

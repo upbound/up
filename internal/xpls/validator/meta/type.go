@@ -18,54 +18,33 @@ import (
 	"fmt"
 	"strings"
 
-	"k8s.io/kube-openapi/pkg/validation/validate"
-
 	"github.com/crossplane/crossplane/apis/pkg/v1beta1"
 
-	"github.com/upbound/up/internal/xpkg/dep/manager"
+	mxpkg "github.com/upbound/up/internal/xpkg/dep/marshaler/xpkg"
 	"github.com/upbound/up/internal/xpls/validator"
 )
 
 // TypeValidator validates the dependency type matches the supplied dependency
 // in a meta file.
 type TypeValidator struct {
-	m *Meta
+	pkgs map[string]*mxpkg.ParsedPackage
 }
 
 // NewTypeValidator returns a new TypeValidator.
-func NewTypeValidator(m *Meta) *TypeValidator {
+func NewTypeValidator(packages map[string]*mxpkg.ParsedPackage) *TypeValidator {
 	return &TypeValidator{
-		m: m,
+		pkgs: packages,
 	}
 }
 
-// Validate validates the dependency versions in a meta file.
-func (v *TypeValidator) Validate(data interface{}) *validate.Result {
-	pkg, err := v.m.Marshal(data)
-	if err != nil {
-		// TODO(@tnthornton) add debug logging
-		return validator.Nop
-	}
-
-	errs := make([]error, 0)
-
-	for i, d := range pkg.GetDependencies() {
-		cd := manager.ConvertToV1beta1(d)
-		errs = append(errs, v.validateType(i, cd))
-	}
-
-	return &validate.Result{
-		Errors: errs,
-	}
-}
-
-func (v *TypeValidator) validateType(i int, d v1beta1.Dependency) error {
-	got, ok := v.m.packages[d.Package]
+// validate validates the dependency versions in a meta file.
+func (v *TypeValidator) validate(i int, d v1beta1.Dependency) error {
+	got, ok := v.pkgs[d.Package]
 	if !ok {
 		return nil
 	}
 	if got.Type() != d.Type {
-		return &validator.MetaValidaton{
+		return &validator.MetaValidation{
 			Name: fmt.Sprintf(dependsOnPathFmt, i, strings.ToLower(string(d.Type))),
 			Message: fmt.Sprintf(errWrongPkgTypeFmt,
 				strings.ToLower(string(d.Type)),

@@ -20,15 +20,18 @@ import (
 	"errors"
 	"io/ioutil"
 
+	"k8s.io/kube-openapi/pkg/validation/validate"
 	"sigs.k8s.io/yaml"
 
 	"github.com/crossplane/crossplane-runtime/pkg/parser"
 	pkgmetav1 "github.com/crossplane/crossplane/apis/pkg/meta/v1"
+	"github.com/crossplane/crossplane/apis/pkg/v1beta1"
 
 	"github.com/upbound/up/internal/xpkg"
 	"github.com/upbound/up/internal/xpkg/dep/manager"
 	mxpkg "github.com/upbound/up/internal/xpkg/dep/marshaler/xpkg"
 	xpkgparser "github.com/upbound/up/internal/xpkg/parser"
+	"github.com/upbound/up/internal/xpls/validator"
 )
 
 var (
@@ -37,31 +40,61 @@ var (
 	errFailedConvertToPkg = "unable to convert to package"
 )
 
-// Meta defines a validator for meta files.
-type Meta struct {
+// Validator defines a validator for meta files.
+type Validator struct {
 	manager *manager.Manager
 	p       *parser.PackageParser
 	// TODO(@tnthornton) move to accepting a snapshot rather than the map
 	// once Snapshots are first class citizens.
-	packages map[string]*mxpkg.ParsedPackage
+	packages   map[string]*mxpkg.ParsedPackage
+	validators []metaValidator
 }
 
 // New returns a new Meta validator.
-func New(m *manager.Manager, pkgs map[string]*mxpkg.ParsedPackage) (*Meta, error) {
+func New(m *manager.Manager, pkgs map[string]*mxpkg.ParsedPackage) (*Validator, error) {
 	p, err := xpkgparser.New()
 	if err != nil {
 		return nil, err
 	}
 
-	return &Meta{
-		manager:  m,
-		p:        p,
-		packages: pkgs,
+	validators := []metaValidator{
+		NewTypeValidator(pkgs),
+		NewVersionValidator(m),
+	}
+
+	return &Validator{
+		manager:    m,
+		p:          p,
+		packages:   pkgs,
+		validators: validators,
 	}, nil
 }
 
+// Validate performs validation rules on the given data input per the rules
+// defined for the Validator.
+func (m *Validator) Validate(data interface{}) *validate.Result {
+	pkg, err := m.Marshal(data)
+	if err != nil {
+		// TODO(@tnthornton) add debug logging
+		return validator.Nop
+	}
+
+	errs := make([]error, 0)
+
+	for i, d := range pkg.GetDependencies() {
+		cd := manager.ConvertToV1beta1(d)
+		for _, v := range m.validators {
+			errs = append(errs, v.validate(i, cd))
+		}
+	}
+
+	return &validate.Result{
+		Errors: errs,
+	}
+}
+
 // Marshal marshals the given data object into a Pkg, errors otherwise.
-func (m *Meta) Marshal(data interface{}) (pkgmetav1.Pkg, error) {
+func (m *Validator) Marshal(data interface{}) (pkgmetav1.Pkg, error) {
 	b, err := yaml.Marshal(data)
 	if err != nil {
 		return nil, err
@@ -82,4 +115,8 @@ func (m *Meta) Marshal(data interface{}) (pkgmetav1.Pkg, error) {
 		return nil, errors.New(errFailedConvertToPkg)
 	}
 	return pkg, nil
+}
+
+type metaValidator interface {
+	validate(int, v1beta1.Dependency) error
 }
