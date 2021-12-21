@@ -18,6 +18,7 @@ import (
 	"context"
 	"encoding/json"
 	"os"
+	"time"
 
 	"github.com/sourcegraph/go-lsp"
 	"github.com/sourcegraph/jsonrpc2"
@@ -29,8 +30,9 @@ import (
 )
 
 const (
-	serverName      = "xpls"
-	defaultCacheDir = ".up/cache"
+	serverName           = "xpls"
+	defaultCacheDir      = ".up/cache"
+	defaultWatchInterval = "100ms"
 
 	errParseSaveParameters   = "failed to parse document save parameters"
 	errParseChangeParameters = "failed to parse document change parameters"
@@ -49,6 +51,8 @@ type Handler struct {
 	fs       afero.Fs
 	home     HomeDirFn
 	log      logging.Logger
+
+	watchInterval time.Duration
 }
 
 // HandlerOpt modifies a handler.
@@ -75,18 +79,31 @@ func WithLogger(l logging.Logger) HandlerOpt {
 	}
 }
 
+// WithWatchInterval sets the cache watch interval.
+func WithWatchInterval(interval time.Duration) HandlerOpt {
+	return func(h *Handler) {
+		h.watchInterval = interval
+	}
+}
+
 // NewHandler constructs a new LSP handler,
 func NewHandler(opts ...HandlerOpt) (*Handler, error) {
+	interval, err := time.ParseDuration(defaultWatchInterval)
+	if err != nil {
+		return nil, err
+	}
+
 	h := &Handler{
-		fs:       afero.NewOsFs(),
-		home:     os.UserHomeDir,
-		cacheDir: defaultCacheDir,
-		log:      logging.NewNopLogger(),
+		fs:            afero.NewOsFs(),
+		home:          os.UserHomeDir,
+		cacheDir:      defaultCacheDir,
+		log:           logging.NewNopLogger(),
+		watchInterval: interval,
 	}
 	for _, o := range opts {
 		o(h)
 	}
-	h.dispatch = NewDispatcher(h.log, h.cacheDir)
+	h.dispatch = NewDispatcher(h.log, h.cacheDir, interval)
 	return h, nil
 }
 

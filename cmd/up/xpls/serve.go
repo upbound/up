@@ -16,6 +16,7 @@ package xpls
 
 import (
 	"context"
+	"time"
 
 	"github.com/crossplane/crossplane-runtime/pkg/logging"
 	"github.com/sourcegraph/jsonrpc2"
@@ -26,15 +27,20 @@ import (
 
 // serveCmd starts the language server.
 type serveCmd struct {
-	Cache   string `default:".up/cache" help:"Directory path for dependency schema cache."`
-	Verbose bool   `help:"Run server with verbose logging."`
+	Cache         string        `default:".up/cache" help:"Directory path for dependency schema cache."`
+	Verbose       bool          `help:"Run server with verbose logging."`
+	WatchInterval time.Duration `default:"100ms" help:"How frequently the server should check the cache for changes. Specified as a duration."`
 }
 
 // Run runs the language server.
 func (c *serveCmd) Run() error {
 	// TODO(hasheddan): move to AfterApply.
 	zl := zap.New(zap.UseDevMode(c.Verbose))
-	h, err := xpls.NewHandler(xpls.WithCacheDir(c.Cache), xpls.WithLogger(logging.NewLogrLogger(zl.WithName("xpls"))))
+	h, err := xpls.NewHandler(
+		xpls.WithCacheDir(c.Cache),
+		xpls.WithLogger(logging.NewLogrLogger(zl.WithName("xpls"))),
+		xpls.WithWatchInterval(c.WatchInterval),
+	)
 	if err != nil {
 		return err
 	}

@@ -58,13 +58,17 @@ type Dispatcher struct {
 
 	ws  *Workspace
 	log logging.Logger
+
+	watchInterval time.Duration
 }
 
 // NewDispatcher returns a new Dispatcher instance.
-func NewDispatcher(log logging.Logger, cacheRoot string) *Dispatcher {
+func NewDispatcher(log logging.Logger, cacheRoot string, watchInterval time.Duration) *Dispatcher {
 	return &Dispatcher{
 		cacheRoot: cacheRoot,
 		log:       log,
+		// TODO(@tnthornton) this shouldn't live here long term.
+		watchInterval: watchInterval,
 	}
 }
 
@@ -246,7 +250,7 @@ func (d *Dispatcher) watchCache() { // nolint:gocyclo
 			select {
 			case event := <-watch.Event:
 				go func() {
-					d.log.Info(fmt.Sprintf("event: %s", event))
+					d.log.Debug(fmt.Sprintf("event: %s", event))
 					if err := watch.AddRecursive(d.ws.CacheRoot()); err != nil {
 						d.log.Debug(errFailedToWatchCache, "error", err)
 					}
@@ -256,17 +260,24 @@ func (d *Dispatcher) watchCache() { // nolint:gocyclo
 
 					d.ws.ReloadValidators()
 
-					diags, err := d.ws.Validate(lsp.DocumentURI(filepath.Join(d.root, xpkg.MetaFile)), d.ws.MetaNode)
-					if err != nil {
-						d.log.Debug(errValidateNodes, "error", err)
+					params := make([]*lsp.PublishDiagnosticsParams, 0)
+					for _, n := range d.ws.AllNodes("") {
+						gvk := n.GetGVK()
+						v, ok := d.ws.snapshot.validators[gvk]
+						if !ok {
+							continue
+						}
+						params = append(params, &lsp.PublishDiagnosticsParams{
+							URI:         lsp.DocumentURI(fmt.Sprintf(fileProtocolFmt, n.GetFileName())),
+							Diagnostics: validationDiagnostics(v.Validate(n.GetObject()), n.GetAST(), n.GetGVK()),
+						})
 					}
 
-					params := &lsp.PublishDiagnosticsParams{
-						URI:         lsp.DocumentURI(fmt.Sprintf(fileProtocolFmt, filepath.Join(d.root, xpkg.MetaFile))),
-						Diagnostics: diags,
+					// TODO(@tnthornton) do we really need to iterate through
+					// this seperately from the above loop?
+					for _, p := range params {
+						d.publishDiagnostics(context.Background(), p)
 					}
-
-					d.publishDiagnostics(context.Background(), params)
 				}()
 
 			case err := <-watch.Error:
@@ -277,7 +288,7 @@ func (d *Dispatcher) watchCache() { // nolint:gocyclo
 		}
 	}()
 
-	// Watch test_folder recursively for changes.
+	// Watch cache root directory recursively for changes.
 	if err := watch.AddRecursive(d.ws.CacheRoot()); err != nil {
 		d.log.Debug(errFailedToWatchCache, "error", err)
 	}
@@ -290,7 +301,7 @@ func (d *Dispatcher) watchCache() { // nolint:gocyclo
 
 	// Start the watching process - it'll check for changes every 100ms.
 	go func() {
-		if err := watch.Start(time.Millisecond * 100); err != nil {
+		if err := watch.Start(d.watchInterval); err != nil {
 			d.log.Debug(errFailedToWatchCache, "error", err)
 		}
 	}()
