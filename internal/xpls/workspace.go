@@ -66,6 +66,7 @@ var (
 )
 
 const (
+	fileProtocol    = "file://"
 	fileProtocolFmt = "file://%s"
 
 	errCompositionResources = "resources in Composition are malformed"
@@ -194,12 +195,19 @@ func WithFS(fs afero.Fs) WorkspaceOpt {
 	}
 }
 
+// WithWSLogger sets the logger for the workspace.
+func WithWSLogger(l logging.Logger) WorkspaceOpt {
+	return func(w *Workspace) {
+		w.log = l
+	}
+}
+
 // NewWorkspace constructs a new Workspace by loading validators from the
 // package cache. A workspace must be parsed before it can be validated.
-func NewWorkspace(root, cacheRoot string, opts ...WorkspaceOpt) (*Workspace, error) {
+func NewWorkspace(root span.URI, cacheRoot string, opts ...WorkspaceOpt) (*Workspace, error) {
 	w := &Workspace{
 		fs:    afero.NewOsFs(),
-		root:  root,
+		root:  root.Filename(),
 		log:   logging.NewNopLogger(),
 		nodes: map[NodeIdentifier]Node{},
 		snapshot: &Snapshot{
@@ -226,6 +234,8 @@ func NewWorkspace(root, cacheRoot string, opts ...WorkspaceOpt) (*Workspace, err
 	for _, o := range opts {
 		o(w)
 	}
+	w.log.Debug(fmt.Sprintf("cacheRoot: %s", cacheRoot))
+
 	return w, nil
 }
 

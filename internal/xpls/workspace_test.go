@@ -109,7 +109,7 @@ func TestParse(t *testing.T) {
 	}
 	for name, tc := range cases {
 		t.Run(name, func(t *testing.T) {
-			ws, _ := NewWorkspace("/ws", "/cache", tc.opt)
+			ws, _ := NewWorkspace(span.URIFromPath("/ws"), "/cache", tc.opt)
 
 			if diff := cmp.Diff(tc.err, ws.Parse(), test.EquateErrors()); diff != "" {
 				t.Errorf("\n%s\nParse(...): -want error, +got error:\n%s", tc.reason, diff)
@@ -185,7 +185,7 @@ func TestLoadValidators(t *testing.T) {
 	}
 	for name, tc := range cases {
 		t.Run(name, func(t *testing.T) {
-			ws, _ := NewWorkspace(tc.wsroot, "/cache", tc.opt)
+			ws, _ := NewWorkspace(span.URIFromPath(tc.wsroot), "/cache", tc.opt)
 
 			if diff := cmp.Diff(tc.err, ws.LoadValidators(tc.path), test.EquateErrors()); diff != "" {
 				t.Errorf("\n%s\nLoadValidators(...): -want error, +got error:\n%s", tc.reason, diff)
@@ -238,7 +238,7 @@ func TestValidate(t *testing.T) {
 	}
 	for name, tc := range cases {
 		t.Run(name, func(t *testing.T) {
-			ws, _ := NewWorkspace("/ws", "/cache", tc.opt)
+			ws, _ := NewWorkspace(span.URIFromPath("/ws"), "/cache", tc.opt)
 			// TODO(hasheddan): consider pre-building validators and nodes so
 			// that we aren't exercising Parse and LoadValidators when we just
 			// want to test Validate.
@@ -362,7 +362,7 @@ metadata:
 
 	for name, tc := range cases {
 		t.Run(name, func(t *testing.T) {
-			ws, _ := NewWorkspace("/ws", "/cache")
+			ws, _ := NewWorkspace(span.URIFromPath("/ws"), "/cache", WithFS(afero.NewMemMapFs()))
 
 			ws.snapshot.ws[tc.args.uri.Filename()] = tc.args.prebody
 
@@ -380,7 +380,7 @@ metadata:
 }
 
 func TestFilterCorrespondingNode(t *testing.T) {
-	ws := initws("/ws", "cache", WithFS(afero.NewMemMapFs()))
+	ws, _ := NewWorkspace(span.URIFromPath("/ws"), "/cache", WithFS(afero.NewMemMapFs()))
 
 	compPath := lsp.DocumentURI("/ws/composition.yaml")
 	defPath := lsp.DocumentURI("/ws/definition.yaml")
@@ -492,9 +492,4 @@ func TestFilterCorrespondingNode(t *testing.T) {
 			}
 		})
 	}
-}
-
-func initws(root, cacheRoot string, opts ...WorkspaceOpt) *Workspace {
-	ws, _ := NewWorkspace(root, cacheRoot, opts...)
-	return ws
 }

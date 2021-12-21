@@ -16,8 +16,12 @@ package manager
 
 import (
 	"context"
+	"errors"
+	"fmt"
 	"os"
+	"sort"
 
+	"github.com/Masterminds/semver"
 	"github.com/crossplane/crossplane/apis/pkg/v1beta1"
 	"github.com/google/go-containerregistry/pkg/name"
 	v1 "github.com/google/go-containerregistry/pkg/v1"
@@ -28,6 +32,10 @@ import (
 	"github.com/upbound/up/internal/xpkg/dep/marshaler/xpkg"
 	"github.com/upbound/up/internal/xpkg/dep/resolver/image"
 	"github.com/upbound/up/internal/xpls/validator"
+)
+
+const (
+	errInvalidSemVerConstraintFmt = "invalid semver constraint %v: %w"
 )
 
 // Manager defines a dependency Manager
@@ -113,6 +121,9 @@ func (m *Manager) Snapshot(ctx context.Context, deps []v1beta1.Dependency) (*Sna
 
 	for _, d := range deps {
 		_, acc, err := m.Resolve(ctx, d)
+		if err != nil && errors.Is(err, os.ErrNotExist) {
+			continue
+		}
 		if err != nil {
 			return nil, err
 		}
@@ -258,7 +269,7 @@ func (m *Manager) addPkg(ctx context.Context, d v1beta1.Dependency) (*xpkg.Parse
 
 func (m *Manager) retrievePkg(ctx context.Context, d v1beta1.Dependency) (*xpkg.ParsedPackage, error) {
 	// resolve version prior to Get
-	if err := m.finalizeDepVersion(ctx, &d); err != nil {
+	if err := m.finalizeLocalDepVersion(ctx, &d); err != nil {
 		return nil, err
 	}
 
@@ -267,7 +278,7 @@ func (m *Manager) retrievePkg(ctx context.Context, d v1beta1.Dependency) (*xpkg.
 
 func (m *Manager) retrieveAndStorePkg(ctx context.Context, d v1beta1.Dependency) (*xpkg.ParsedPackage, error) {
 	// resolve version prior to Get
-	if err := m.finalizeDepVersion(ctx, &d); err != nil {
+	if err := m.finalizeExtDepVersion(ctx, &d); err != nil {
 		return nil, err
 	}
 
@@ -301,8 +312,8 @@ func (m *Manager) retrieveAndStorePkg(ctx context.Context, d v1beta1.Dependency)
 	return p, nil
 }
 
-// finalizeDepVersion sets the resolved tag version on the supplied v1beta1.Dependency.
-func (m *Manager) finalizeDepVersion(ctx context.Context, d *v1beta1.Dependency) error {
+// finalizeExtDepVersion sets the resolved tag version on the supplied v1beta1.Dependency.
+func (m *Manager) finalizeExtDepVersion(ctx context.Context, d *v1beta1.Dependency) error {
 	// determine the version (using resolver) to use based on the supplied constraints
 	v, err := m.i.ResolveTag(ctx, *d)
 	if err != nil {
@@ -310,6 +321,50 @@ func (m *Manager) finalizeDepVersion(ctx context.Context, d *v1beta1.Dependency)
 	}
 
 	d.Constraints = v
+	return nil
+}
+
+// finalizeLocalDepVersion sets the resolve tag version on the supplied v1beta1.Dependency
+// based on versions currently located in the cache.
+func (m *Manager) finalizeLocalDepVersion(_ context.Context, d *v1beta1.Dependency) error {
+	// check up front if we already have a semver constraint
+	c, err := semver.NewConstraint(d.Constraints)
+	if err != nil {
+		// Constraints is not a semver constraint, we're not going to
+		// find it locally.
+		return fmt.Errorf(errInvalidSemVerConstraintFmt, err, os.ErrNotExist)
+	}
+
+	// we're working with a semver constraint, let's try to resolve
+	// it based on the versions we have locally
+	vers, err := m.c.Versions(*d)
+	if err != nil {
+		return err
+	}
+
+	vs := []*semver.Version{}
+	for _, r := range vers {
+		v, err := semver.NewVersion(r)
+		if err != nil {
+			continue
+		}
+		vs = append(vs, v)
+	}
+
+	sort.Sort(semver.Collection(vs))
+	var ver string
+	for _, v := range vs {
+		if c.Check(v) {
+			ver = v.Original()
+		}
+	}
+
+	if ver == "" {
+		return os.ErrNotExist
+	}
+
+	d.Constraints = ver
+
 	return nil
 }
 

@@ -22,6 +22,7 @@ import (
 	"time"
 
 	"github.com/golang/tools/lsp/protocol"
+	"github.com/golang/tools/span"
 	"github.com/radovskyb/watcher"
 	"github.com/sourcegraph/go-lsp"
 	"github.com/sourcegraph/jsonrpc2"
@@ -37,7 +38,6 @@ var (
 )
 
 const (
-	fileProtocol  = "file://"
 	fileWatchGlob = "**/*.yaml"
 
 	errParseWorkspace     = "failed to parse workspace"
@@ -53,7 +53,7 @@ const (
 type Dispatcher struct {
 	clientConn *jsonrpc2.Conn
 
-	root      string
+	root      span.URI
 	cacheRoot string
 
 	ws  *Workspace
@@ -73,10 +73,10 @@ func NewDispatcher(log logging.Logger, cacheRoot string, watchInterval time.Dura
 }
 
 // Initialize handles initialize events.
-func (d *Dispatcher) Initialize(ctx context.Context, params lsp.InitializeParams, c *jsonrpc2.Conn) *lsp.InitializeResult {
+func (d *Dispatcher) Initialize(ctx context.Context, params protocol.InitializeParams, c *jsonrpc2.Conn) *lsp.InitializeResult {
 	d.clientConn = c
-	d.root = params.RootPath
-	ws, err := NewWorkspace(d.root, d.cacheRoot)
+	d.root = params.RootURI.SpanURI()
+	ws, err := NewWorkspace(d.root, d.cacheRoot, WithWSLogger(d.log))
 	if err != nil {
 		panic(err)
 	}
@@ -90,7 +90,7 @@ func (d *Dispatcher) Initialize(ctx context.Context, params lsp.InitializeParams
 		d.log.Debug(errLoadValidators, "error", err)
 	}
 
-	if err := d.ws.LoadValidators(d.root); err != nil {
+	if err := d.ws.LoadValidators(d.root.Filename()); err != nil {
 		// If we can't load validators panic because we won't be able to
 		// perform validation.
 		panic(err)
@@ -274,7 +274,7 @@ func (d *Dispatcher) watchCache() { // nolint:gocyclo
 					}
 
 					// TODO(@tnthornton) do we really need to iterate through
-					// this seperately from the above loop?
+					// this separately from the above loop?
 					for _, p := range params {
 						d.publishDiagnostics(context.Background(), p)
 					}

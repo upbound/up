@@ -103,6 +103,9 @@ func NewHandler(opts ...HandlerOpt) (*Handler, error) {
 	for _, o := range opts {
 		o(h)
 	}
+
+	// TODO(@tnthornton) cacheDir here is a relative directory at this point.
+	// We should fully resolve the path before passing it down.
 	h.dispatch = NewDispatcher(h.log, h.cacheDir, interval)
 	return h, nil
 }
@@ -111,7 +114,7 @@ func NewHandler(opts ...HandlerOpt) (*Handler, error) {
 func (h *Handler) Handle(ctx context.Context, c *jsonrpc2.Conn, r *jsonrpc2.Request) { // nolint:gocyclo
 	switch r.Method {
 	case "initialize":
-		var params lsp.InitializeParams
+		var params protocol.InitializeParams
 		if err := json.Unmarshal(*r.Params, &params); err != nil {
 			// If we can't understand the initialization parmaters panic because
 			// future operations will not work.

@@ -293,6 +293,66 @@ func TestSnapshot(t *testing.T) {
 				},
 			},
 		},
+		"ErrorInvalidDepVersion": {
+			args: args{
+				dep: v1beta1.Dependency{
+					Package:     "registry.upbound.io/upbound/platform-ref-aws",
+					Type:        v1beta1.ConfigurationPackageType,
+					Constraints: "no",
+				},
+				meta: &metav1.Provider{
+					TypeMeta: apimetav1.TypeMeta{
+						APIVersion: "meta.pkg.crossplane.io/v1alpha1",
+						Kind:       "Provider",
+					},
+					Spec: metav1.ProviderSpec{
+						MetaSpec: metav1.MetaSpec{},
+					},
+				},
+				objs: []runtime.Object{
+					&apiextv1.CustomResourceDefinition{
+						TypeMeta: apimetav1.TypeMeta{
+							APIVersion: "apiextensions.k8s.io/v1",
+							Kind:       "CustomResourceDefinition",
+						},
+						ObjectMeta: apimetav1.ObjectMeta{
+							Name: "crd1",
+						},
+						Spec: apiextv1.CustomResourceDefinitionSpec{
+							Names: apiextv1.CustomResourceDefinitionNames{
+								Plural:   "tests",
+								Singular: "test",
+								Kind:     "testcrd",
+							},
+							Group: "crossplane.io",
+							Versions: []apiextv1.CustomResourceDefinitionVersion{
+								{
+									Name: "v1alpha1",
+									Schema: &apiextv1.CustomResourceValidation{
+										OpenAPIV3Schema: &apiextv1.JSONSchemaProps{
+											ID:          "id-v1alpha1",
+											Description: "desc1",
+										},
+									},
+								},
+								{
+									Name: "v1beta1",
+									Schema: &apiextv1.CustomResourceValidation{
+										OpenAPIV3Schema: &apiextv1.JSONSchemaProps{
+											ID:          "id-v1beta1",
+											Description: "desc2",
+										},
+									},
+								},
+							},
+						},
+					},
+				},
+			},
+			want: want{
+				keys: []schema.GroupVersionKind{},
+			},
+		},
 	}
 
 	for n, tc := range cases {
