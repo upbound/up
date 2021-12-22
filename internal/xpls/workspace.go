@@ -68,6 +68,7 @@ var (
 const (
 	fileProtocol    = "file://"
 	fileProtocolFmt = "file://%s"
+	yamlExt         = ".yaml"
 
 	errCompositionResources = "resources in Composition are malformed"
 	errFileBodyNotFound     = "could not find corresponding file body for %s"
@@ -217,7 +218,6 @@ func NewWorkspace(root span.URI, cacheRoot string, opts ...WorkspaceOpt) (*Works
 		},
 		uriToNodes: make(map[lsp.DocumentURI]map[NodeIdentifier]struct{}),
 	}
-
 	c, err := cache.NewLocal(cache.WithRoot(cacheRoot))
 	if err != nil {
 		return nil, err
@@ -260,6 +260,9 @@ func (w *Workspace) Parse() error {
 			return err
 		}
 		if info.IsDir() {
+			return nil
+		}
+		if filepath.Ext(p) != yamlExt {
 			return nil
 		}
 		// We attempt to parse subsequent documents if we encounter an error
@@ -578,6 +581,9 @@ func (w *Workspace) LoadValidators(path string) error { // nolint:gocyclo
 			return err
 		}
 		if info.IsDir() {
+			return nil
+		}
+		if filepath.Ext(p) != yamlExt {
 			return nil
 		}
 		// NOTE(hasheddan): path is cleaned before being passed to our walk
