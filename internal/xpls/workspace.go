@@ -499,6 +499,9 @@ func validationDiagnostics(res *validate.Result, n ast.Node, gvk schema.GroupVer
 			if err != nil {
 				continue
 			}
+			if node == nil {
+				continue
+			}
 			tok := node.GetToken()
 			if tok != nil {
 				startCh, endCh := tok.Position.Column-1, 0

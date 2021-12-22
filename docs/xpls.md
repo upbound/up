@@ -1,6 +1,6 @@
 # `xpls`, the Crossplane language server
 
-`xpls` (pronounced "Ex please") is the Crossplane [language server] developed
+`xpls` (pronounced "cross please") is the Crossplane [language server] developed
 by the Upbound team. It provides IDE features to any [LSP]-compatible editor.
 
 # Supported IDEs
@@ -17,7 +17,8 @@ These steps will walk you through setting up `up` with the new features locally.
 1. Clone `http:s//github.com/upbound/up-ls` locally.
 2. cd into up-ls and run `make install`
 
-At this point you should have the up-ls version of `up`.
+At this point you should have the up-ls version of `up`. (If you have a homebrew-installed up version, you must uninstall it using `brew uninstall up` or configure your path to find the one in GOPATH first.)
+
 Running `up --version` should give you something similar to `v0.6.0-rc.0.102.****`.
 
 ## Getting started with VSCode
@@ -52,6 +53,7 @@ interacting with `xpls` locally.
     
 
 <!-- Named Links -->
+[language server]: https://langserver.org/
 [LSP]: https://microsoft.github.io/language-server-protocol/
 [LSP support]: https://plugins.jetbrains.com/plugin/10209-lsp-support
 [vscode-up]: https://github.com/upbound/vscode-up
