@@ -84,6 +84,72 @@ var (
 	}
 )
 
+func TestNew(t *testing.T) {
+	fs := afero.NewMemMapFs()
+
+	type args struct {
+		fs   afero.Fs
+		opts []Option
+		root string
+	}
+
+	type want struct {
+		err        error
+		rootExists bool
+	}
+
+	cases := map[string]struct {
+		reason string
+		args   args
+		want   want
+	}{
+		"SuccessfullyCreatedCache": {
+			reason: "Given a filesystem we have appropriate perms on, we should be able to init the cache.",
+			args: args{
+				opts: []Option{
+					WithFS(fs),
+					WithRoot("/tmp/cache"),
+					rootIsHome,
+				},
+				root: "/tmp/cache",
+			},
+			want: want{
+				rootExists: true,
+			},
+		},
+		"ErrFailedCreate": {
+			reason: "Should return an error if file creation fails.",
+			args: args{
+				opts: []Option{
+					WithFS(afero.NewReadOnlyFs(fs)),
+					WithRoot("/different/cache"),
+					rootIsHome,
+				},
+				root: "/different/cache",
+			},
+			want: want{
+				err: syscall.EPERM,
+			},
+		},
+	}
+
+	for name, tc := range cases {
+		t.Run(name, func(t *testing.T) {
+			_, err := NewLocal(tc.args.opts...)
+
+			if diff := cmp.Diff(tc.want.err, err, test.EquateErrors()); diff != "" {
+				t.Errorf("\n%s\nNew(...): -want err, +got err:\n%s", tc.reason, diff)
+			}
+
+			exists, _ := afero.Exists(fs, tc.args.root)
+
+			if diff := cmp.Diff(tc.want.rootExists, exists); diff != "" {
+				t.Errorf("\n%s\nNew(...): -want err, +got err:\n%s", tc.reason, diff)
+			}
+		})
+	}
+}
+
 func TestGet(t *testing.T) {
 	fs := afero.NewMemMapFs()
 
@@ -254,22 +320,6 @@ func TestStore(t *testing.T) {
 			want: want{
 				pkgDigest:      pkg2.SHA,
 				cacheFileCount: 2,
-			},
-		},
-		"ErrFailedCreate": {
-			reason: "Should return an error if file creation fails.",
-			args: args{
-				cache: newLocalCache(
-					WithFS(afero.NewReadOnlyFs(afero.NewMemMapFs())),
-					WithRoot("/tmp/cache"),
-					rootIsHome,
-				),
-				dep: dep1,
-				pkg: pkg1,
-			},
-			want: want{
-				err:            syscall.EPERM,
-				cacheFileCount: 0,
 			},
 		},
 	}

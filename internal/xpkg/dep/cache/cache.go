@@ -87,6 +87,10 @@ func NewLocal(opts ...Option) (*Local, error) {
 	l.root = root
 	l.pkgres = r
 
+	if err := l.ensureDirExists(root); err != nil {
+		return nil, err
+	}
+
 	return l, nil
 }
 
