@@ -20,11 +20,14 @@ import (
 	"path/filepath"
 	"strings"
 	"sync"
+	"time"
 
 	"github.com/google/go-containerregistry/pkg/name"
+	"github.com/radovskyb/watcher"
 	"github.com/spf13/afero"
 
 	"github.com/crossplane/crossplane-runtime/pkg/errors"
+	"github.com/crossplane/crossplane-runtime/pkg/logging"
 	"github.com/crossplane/crossplane/apis/pkg/v1beta1"
 
 	"github.com/upbound/up/internal/xpkg/dep/marshaler/xpkg"
@@ -36,15 +39,22 @@ const (
 	errFailedToFindEntry    = "failed to find entry"
 	errInvalidValueSupplied = "invalid value supplied"
 	errInvalidVersion       = "invalid version found"
+
+	errFailedToWatchCache = "failed to setup cache watch"
 )
 
-// Local stores and retrieves OCI images in a filesystem-backed cache in a
-// thread-safe manner.
+// Local stores and retrieves xpkg.ParsedPackages in a filesystem-backed cache
+// in a thread-safe manner.
 type Local struct {
 	fs     afero.Fs
+	log    logging.Logger
 	mu     sync.RWMutex
-	root   string
 	pkgres XpkgMarshaler
+	root   string
+
+	closed        bool
+	subs          []chan Event
+	watchInterval time.Duration
 }
 
 // XpkgMarshaler defines the API contract for working marshaling
@@ -56,7 +66,8 @@ type XpkgMarshaler interface {
 // NewLocal creates a new LocalCache.
 func NewLocal(root string, opts ...Option) (*Local, error) {
 	l := &Local{
-		fs: afero.NewOsFs(),
+		fs:  afero.NewOsFs(),
+		log: logging.NewNopLogger(),
 	}
 
 	for _, o := range opts {
@@ -79,21 +90,21 @@ func NewLocal(root string, opts ...Option) (*Local, error) {
 	return l, nil
 }
 
-// Option represents an option that can be applied to Local
+// Option represents an option that can be applied to Local.
 type Option func(*Local)
 
-// WithFS defines the filesystem that is configured for Local
+// WithFS defines the filesystem that is configured for Local.
 func WithFS(fs afero.Fs) Option {
 	return func(l *Local) {
 		l.fs = fs
 	}
 }
 
-// TODO(@tnthornton): remove this
-
-// Root returns the calculated root of the cache.
-func (c *Local) Root() string {
-	return c.root
+// WithLogger defines the logger that is configured for Local.
+func WithLogger(logger logging.Logger) Option {
+	return func(l *Local) {
+		l.log = logger
+	}
 }
 
 // Get retrieves an image from the LocalCache.
@@ -175,19 +186,16 @@ func (c *Local) Versions(k v1beta1.Dependency) ([]string, error) {
 	return vers, nil
 }
 
-// add the given entry to the supplied path (to)
-func (c *Local) add(e *entry, to string) error {
-	if err := c.ensureDirExists(filepath.Join(c.root, to)); err != nil {
-		return err
-	}
+// Watch returns a channel that can be used to subscribe to events
+// from the cache.
+func (c *Local) Watch() <-chan Event {
+	c.mu.Lock()
+	defer c.mu.Unlock()
 
-	e.setPath(to)
-
-	if _, err := e.flush(); err != nil {
-		return errors.Wrap(err, errFailedToAddEntry)
-	}
-
-	return nil
+	// use an buffered channel so that we don't block incoming watch events.
+	ch := make(chan Event, 1)
+	c.subs = append(c.subs, ch)
+	return ch
 }
 
 // Clean removes all entries from the cache. Returns nil if the directory DNE.
@@ -204,6 +212,53 @@ func (c *Local) Clean() error {
 			return err
 		}
 	}
+	return nil
+}
+
+// Publish publishes the given Event to the subscription channels defined
+// for the cache.
+func (c *Local) publish(e Event) {
+	c.mu.Lock()
+	defer c.mu.Unlock()
+
+	// subscriptions are closed, skip publish.
+	if c.closed {
+		return
+	}
+
+	for _, ch := range c.subs {
+		ch <- e
+	}
+}
+
+// Close closes the subscription channels for the cache.
+func (c *Local) Close() {
+	c.mu.Lock()
+	defer c.mu.Unlock()
+
+	if !c.closed {
+		c.closed = true
+		for _, ch := range c.subs {
+			close(ch)
+		}
+	}
+}
+
+// Event contains change information about the cache.
+type Event interface{}
+
+// add the given entry to the supplied path (to)
+func (c *Local) add(e *entry, to string) error {
+	if err := c.ensureDirExists(filepath.Join(c.root, to)); err != nil {
+		return err
+	}
+
+	e.setPath(to)
+
+	if _, err := e.flush(); err != nil {
+		return errors.Wrap(err, errFailedToAddEntry)
+	}
+
 	return nil
 }
 
@@ -229,4 +284,44 @@ func calculateVersionsGlob(tag *name.Tag) string {
 		tag.RegistryStr(),
 		fmt.Sprintf("%s@*", tag.RepositoryStr()),
 	)
+}
+
+// watchCache watches the cache for changes. As changes are detected by the
+// underlying watcher package, events are published to upstream cache watchers.
+func (c *Local) watchCache() {
+	watch := watcher.New()
+	watch.SetMaxEvents(1)
+
+	go func() {
+		for {
+			select {
+			case event := <-watch.Event:
+				// send the event to the subscribers
+				c.publish(event)
+			case err := <-watch.Error:
+				c.log.Debug(err.Error())
+			case <-watch.Closed:
+				return
+			}
+		}
+	}()
+
+	c.log.Debug(fmt.Sprintf("setting up watch at cache root: %s", c.root))
+	// Watch cache root directory recursively for changes.
+	if err := watch.AddRecursive(c.root); err != nil {
+		c.log.Debug(errFailedToWatchCache, "error", err)
+	}
+
+	// Print a list of all of the files and folders currently
+	// being watched and their paths.
+	for path, f := range watch.WatchedFiles() {
+		c.log.Debug(fmt.Sprintf("%s: %s\n", path, f.Name()))
+	}
+
+	// Start the watching process - it'll check for changes at the given watchInterval.
+	go func() {
+		if err := watch.Start(c.watchInterval); err != nil {
+			c.log.Debug(errFailedToWatchCache, "error", err)
+		}
+	}()
 }

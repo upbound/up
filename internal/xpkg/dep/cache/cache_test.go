@@ -558,6 +558,52 @@ func TestCalculatePath(t *testing.T) {
 	}
 }
 
+func TestWatch(t *testing.T) {
+	type args struct {
+		event Event
+	}
+	type want struct {
+		event Event
+	}
+
+	cases := map[string]struct {
+		reason string
+		args   args
+		want   want
+	}{
+		"ReceivedEvent": {
+			reason: "Should successfully receive event after watching cache.",
+			args: args{
+				struct {
+					Op string
+				}{
+					Op: "test",
+				},
+			},
+			want: want{
+				event: struct {
+					Op string
+				}{
+					Op: "test",
+				},
+			},
+		},
+	}
+
+	for name, tc := range cases {
+		t.Run(name, func(t *testing.T) {
+			cache, _ := NewLocal("/tmp/cache")
+
+			ch := cache.Watch()
+			cache.publish(tc.args.event)
+
+			if diff := cmp.Diff(tc.want.event, <-ch); diff != "" {
+				t.Errorf("\n%s\nWatch(...): -want err, +got err:\n%s", tc.reason, diff)
+			}
+		})
+	}
+}
+
 func cacheFileCnt(fs afero.Fs, dir string) int {
 	var cnt int
 	afero.Walk(fs, dir,

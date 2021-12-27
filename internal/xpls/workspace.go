@@ -207,10 +207,11 @@ func WithWSLogger(l logging.Logger) WorkspaceOpt {
 // package cache. A workspace must be parsed before it can be validated.
 func NewWorkspace(root span.URI, cacheRoot string, opts ...WorkspaceOpt) (*Workspace, error) {
 	w := &Workspace{
-		fs:    afero.NewOsFs(),
-		root:  root.Filename(),
-		log:   logging.NewNopLogger(),
-		nodes: map[NodeIdentifier]Node{},
+		cacheRoot: cacheRoot,
+		fs:        afero.NewOsFs(),
+		root:      root.Filename(),
+		log:       logging.NewNopLogger(),
+		nodes:     map[NodeIdentifier]Node{},
 		snapshot: &Snapshot{
 			packages:   map[string]*mxpkg.ParsedPackage{},
 			ws:         map[string][]byte{},
@@ -230,7 +231,6 @@ func NewWorkspace(root span.URI, cacheRoot string, opts ...WorkspaceOpt) (*Works
 	}
 
 	w.m = m
-	w.cacheRoot = c.Root()
 
 	for _, o := range opts {
 		o(w)
