@@ -35,9 +35,8 @@ func TestFlush(t *testing.T) {
 	fs := afero.NewMemMapFs()
 
 	cache, _ := NewLocal(
+		"/cache",
 		WithFS(fs),
-		WithRoot("/cache"),
-		rootIsHome,
 	)
 
 	type args struct {

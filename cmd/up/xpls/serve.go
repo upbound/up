@@ -16,28 +16,51 @@ package xpls
 
 import (
 	"context"
+	"os"
 	"time"
 
+	"github.com/alecthomas/kong"
 	"github.com/crossplane/crossplane-runtime/pkg/logging"
 	"github.com/sourcegraph/jsonrpc2"
 	"sigs.k8s.io/controller-runtime/pkg/log/zap"
 
+	"github.com/upbound/up/internal/config"
 	"github.com/upbound/up/internal/xpls"
 )
 
+func (c *serveCmd) AfterApply(kongCtx *kong.Context) error {
+	cacheRoot, err := config.CleanDirWithTilde(c.Cache, os.UserHomeDir)
+	if err != nil {
+		return err
+	}
+
+	c.cacheRoot = cacheRoot
+
+	return nil
+}
+
 // serveCmd starts the language server.
 type serveCmd struct {
-	Cache         string        `default:".up/cache" help:"Directory path for dependency schema cache."`
+	cacheRoot string
+
+	// TODO(@tnthornton) cache dir doesn't seem to be the responsibility of the
+	// serve command. It seems like we can easily get into an inconsistent state
+	// if someone specifies config element from the command line. We should move
+	// this to the config.
+	Cache         string        `default:"~/.up/cache" help:"Directory path for dependency schema cache."`
 	Verbose       bool          `help:"Run server with verbose logging."`
 	WatchInterval time.Duration `default:"100ms" help:"How frequently the server should check the cache for changes. Specified as a duration."`
 }
 
 // Run runs the language server.
 func (c *serveCmd) Run() error {
+
+	// cache directory resolution should occur at this level.
+
 	// TODO(hasheddan): move to AfterApply.
 	zl := zap.New(zap.UseDevMode(c.Verbose))
 	h, err := xpls.NewHandler(
-		xpls.WithCacheDir(c.Cache),
+		xpls.WithCacheDir(c.cacheRoot),
 		xpls.WithLogger(logging.NewLogrLogger(zl.WithName("xpls"))),
 		xpls.WithWatchInterval(c.WatchInterval),
 	)

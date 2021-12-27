@@ -20,26 +20,24 @@ import (
 	"os"
 	"time"
 
+	"github.com/golang/tools/lsp/protocol"
 	"github.com/sourcegraph/go-lsp"
 	"github.com/sourcegraph/jsonrpc2"
 	"github.com/spf13/afero"
 
 	"github.com/crossplane/crossplane-runtime/pkg/logging"
 
-	"github.com/golang/tools/lsp/protocol"
+	"github.com/upbound/up/internal/config"
 )
 
 const (
 	serverName           = "xpls"
-	defaultCacheDir      = ".up/cache"
+	defaultCacheDir      = "~/.up/cache"
 	defaultWatchInterval = "100ms"
 
 	errParseSaveParameters   = "failed to parse document save parameters"
 	errParseChangeParameters = "failed to parse document change parameters"
 )
-
-// HomeDirFn indicates the location of a user's home directory.
-type HomeDirFn func() (string, error)
 
 // A Handler handles LSP requests.
 type Handler struct {
@@ -49,7 +47,6 @@ type Handler struct {
 
 	dispatch *Dispatcher
 	fs       afero.Fs
-	home     HomeDirFn
 	log      logging.Logger
 
 	watchInterval time.Duration
@@ -93,10 +90,14 @@ func NewHandler(opts ...HandlerOpt) (*Handler, error) {
 		return nil, err
 	}
 
+	cacheRoot, err := config.CleanDirWithTilde(defaultCacheDir, os.UserHomeDir)
+	if err != nil {
+		return nil, err
+	}
+
 	h := &Handler{
 		fs:            afero.NewOsFs(),
-		home:          os.UserHomeDir,
-		cacheDir:      defaultCacheDir,
+		cacheDir:      cacheRoot,
 		log:           logging.NewNopLogger(),
 		watchInterval: interval,
 	}
@@ -104,8 +105,6 @@ func NewHandler(opts ...HandlerOpt) (*Handler, error) {
 		o(h)
 	}
 
-	// TODO(@tnthornton) cacheDir here is a relative directory at this point.
-	// We should fully resolve the path before passing it down.
 	h.dispatch = NewDispatcher(h.log, h.cacheDir, interval)
 	return h, nil
 }

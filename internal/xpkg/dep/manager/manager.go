@@ -19,6 +19,7 @@ import (
 	"errors"
 	"fmt"
 	"os"
+	"path/filepath"
 	"sort"
 
 	"github.com/Masterminds/semver"
@@ -35,6 +36,8 @@ import (
 )
 
 const (
+	defaultCacheRoot = ".up/cache"
+
 	errInvalidSemVerConstraintFmt = "invalid semver constraint %v: %w"
 )
 
@@ -73,7 +76,17 @@ type XpkgMarshaler interface {
 func New(opts ...Option) (*Manager, error) {
 	m := &Manager{}
 
-	c, err := cache.NewLocal()
+	home, err := os.UserHomeDir()
+	if err != nil {
+		return nil, err
+	}
+
+	c, err := cache.NewLocal(
+		filepath.Join(
+			filepath.Clean(home),
+			defaultCacheRoot,
+		),
+	)
 	if err != nil {
 		return nil, err
 	}

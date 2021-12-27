@@ -27,7 +27,6 @@ import (
 	"github.com/crossplane/crossplane-runtime/pkg/errors"
 	"github.com/crossplane/crossplane/apis/pkg/v1beta1"
 
-	"github.com/upbound/up/internal/config"
 	"github.com/upbound/up/internal/xpkg/dep/marshaler/xpkg"
 	"github.com/upbound/up/internal/xpkg/dep/resolver/image"
 )
@@ -43,10 +42,8 @@ const (
 // thread-safe manner.
 type Local struct {
 	fs     afero.Fs
-	home   config.HomeDirFn
 	mu     sync.RWMutex
 	root   string
-	path   string
 	pkgres XpkgMarshaler
 }
 
@@ -57,34 +54,22 @@ type XpkgMarshaler interface {
 }
 
 // NewLocal creates a new LocalCache.
-func NewLocal(opts ...Option) (*Local, error) {
+func NewLocal(root string, opts ...Option) (*Local, error) {
 	l := &Local{
-		fs:   afero.NewOsFs(),
-		home: os.UserHomeDir,
+		fs: afero.NewOsFs(),
 	}
 
 	for _, o := range opts {
 		o(l)
 	}
 
-	home, err := l.home()
-	if err != nil {
-		return nil, err
-	}
+	l.root = filepath.Clean(root)
 
-	// TODO(@tnthornton) this is probably not what we want. Otherwise if
-	// a cachedir is specified outside of the home path, we'll install
-	// in the home path anyways
-	root, err := filepath.Abs(filepath.Join(home, l.path))
-	if err != nil {
-		return nil, err
-	}
 	r, err := xpkg.NewMarshaler()
 	if err != nil {
 		return nil, err
 	}
 
-	l.root = root
 	l.pkgres = r
 
 	if err := l.ensureDirExists(root); err != nil {
@@ -104,13 +89,7 @@ func WithFS(fs afero.Fs) Option {
 	}
 }
 
-// WithRoot defines the root of the cache
-func WithRoot(root string) Option {
-	return func(l *Local) {
-		// in the event ~/cache/dir is passed in trim ~/ to avoid $HOME/~/cache/dir
-		l.path = strings.TrimPrefix(root, "~/")
-	}
-}
+// TODO(@tnthornton): remove this
 
 // Root returns the calculated root of the cache.
 func (c *Local) Root() string {

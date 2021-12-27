@@ -49,7 +49,7 @@ func TestResolveTransitiveDependencies(t *testing.T) {
 	// SUT - recursively reading in meta and pulling deps using the manager
 
 	fs := afero.NewMemMapFs()
-	c, _ := cache.NewLocal(cache.WithFS(fs), cache.WithRoot("/tmp/cache"))
+	c, _ := cache.NewLocal("/tmp/cache", cache.WithFS(fs))
 
 	type depMeta struct {
 		dep  v1beta1.Dependency
@@ -205,7 +205,7 @@ func TestResolveTransitiveDependencies(t *testing.T) {
 func TestSnapshot(t *testing.T) {
 	ctx := context.Background()
 	fs := afero.NewMemMapFs()
-	c, _ := cache.NewLocal(cache.WithFS(fs), cache.WithRoot("/tmp/cache"))
+	c, _ := cache.NewLocal("/tmp/cache", cache.WithFS(fs))
 
 	type args struct {
 		dep  v1beta1.Dependency

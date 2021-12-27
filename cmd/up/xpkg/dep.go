@@ -16,11 +16,13 @@ package xpkg
 
 import (
 	"context"
+	"os"
 
 	"github.com/alecthomas/kong"
 	"github.com/pkg/errors"
 	"github.com/spf13/afero"
 
+	"github.com/upbound/up/internal/config"
 	"github.com/upbound/up/internal/xpkg"
 	"github.com/upbound/up/internal/xpkg/dep"
 	"github.com/upbound/up/internal/xpkg/dep/cache"
@@ -39,10 +41,12 @@ func (c *depCmd) AfterApply(kongCtx *kong.Context) error {
 	ctx := context.Background()
 	fs := afero.NewOsFs()
 
-	cache, err := cache.NewLocal(
-		cache.WithFS(fs),
-		cache.WithRoot(c.CacheDir),
-	)
+	cacheRoot, err := config.CleanDirWithTilde(c.CacheDir, os.UserHomeDir)
+	if err != nil {
+		return err
+	}
+
+	cache, err := cache.NewLocal(cacheRoot)
 	if err != nil {
 		return err
 	}

@@ -15,6 +15,9 @@
 package config
 
 import (
+	"path/filepath"
+	"strings"
+
 	"github.com/pkg/errors"
 )
 
@@ -139,4 +142,21 @@ func (c *Config) SetDefaultUpboundProfile(name string) error {
 	}
 	c.Upbound.Default = name
 	return nil
+}
+
+// CleanDirWithTilde cleans up a linux shortcut for the users home
+// directory, if it exists.
+func CleanDirWithTilde(dir string, home HomeDirFn) (string, error) {
+	tildeHome := "~/"
+	root := dir
+	if strings.HasPrefix(dir, tildeHome) {
+		home, err := home()
+		if err != nil {
+			return "", err
+		}
+		cleanedRoot := strings.TrimPrefix(dir, tildeHome)
+		root = filepath.Join(home, cleanedRoot)
+	}
+
+	return root, nil
 }

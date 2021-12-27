@@ -218,7 +218,8 @@ func NewWorkspace(root span.URI, cacheRoot string, opts ...WorkspaceOpt) (*Works
 		},
 		uriToNodes: make(map[lsp.DocumentURI]map[NodeIdentifier]struct{}),
 	}
-	c, err := cache.NewLocal(cache.WithRoot(cacheRoot))
+
+	c, err := cache.NewLocal(cacheRoot)
 	if err != nil {
 		return nil, err
 	}

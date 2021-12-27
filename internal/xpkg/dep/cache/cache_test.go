@@ -154,10 +154,8 @@ func TestGet(t *testing.T) {
 	fs := afero.NewMemMapFs()
 
 	cache, _ := NewLocal(
+		"/cache",
 		WithFS(fs),
-		WithRoot("/cache"),
-		// override HomeDirFn
-		rootIsHome,
 	)
 
 	e := cache.newEntry(pkg1)
@@ -225,6 +223,8 @@ func TestGet(t *testing.T) {
 }
 
 func TestStore(t *testing.T) {
+	cacheRoot := "/tmp/cache"
+
 	dep1 := v1beta1.Dependency{
 		Package:     "crossplane/exist-xpkg",
 		Type:        v1beta1.ProviderPackageType,
@@ -249,7 +249,7 @@ func TestStore(t *testing.T) {
 	}
 
 	type args struct {
-		cache *Local
+		opts  []Option
 		dep   v1beta1.Dependency
 		pkg   *xpkg.ParsedPackage
 		setup *setup
@@ -269,13 +269,9 @@ func TestStore(t *testing.T) {
 		"Success": {
 			reason: "Should have crossplane.yaml and the expected number of files if successful.",
 			args: args{
-				cache: newLocalCache(
-					WithFS(afero.NewMemMapFs()),
-					WithRoot("/tmp/cache"),
-					rootIsHome,
-				),
-				dep: dep3,
-				pkg: pkg3,
+				opts: []Option{WithFS(afero.NewMemMapFs())},
+				dep:  dep3,
+				pkg:  pkg3,
 			},
 			want: want{
 				pkgDigest:      pkg3.SHA,
@@ -285,13 +281,9 @@ func TestStore(t *testing.T) {
 		"AddSecondDependency": {
 			reason: "Should not return an error if we have multiple packages in cache.",
 			args: args{
-				cache: newLocalCache(
-					WithFS(afero.NewMemMapFs()),
-					WithRoot("/tmp/cache"),
-					rootIsHome,
-				),
-				dep: dep2,
-				pkg: pkg2,
+				opts: []Option{WithFS(afero.NewMemMapFs())},
+				dep:  dep2,
+				pkg:  pkg2,
 				setup: &setup{
 					dep: dep1,
 					pkg: pkg1,
@@ -305,13 +297,9 @@ func TestStore(t *testing.T) {
 		"Replace": {
 			reason: "Should not return an error if we're replacing the pre-existing image.",
 			args: args{
-				cache: newLocalCache(
-					WithFS(afero.NewMemMapFs()),
-					WithRoot("/tmp/cache"),
-					rootIsHome,
-				),
-				dep: dep1,
-				pkg: pkg2,
+				opts: []Option{WithFS(afero.NewMemMapFs())},
+				dep:  dep1,
+				pkg:  pkg2,
 				setup: &setup{
 					dep: dep1,
 					pkg: pkg1,
@@ -322,32 +310,46 @@ func TestStore(t *testing.T) {
 				cacheFileCount: 2,
 			},
 		},
+		"ErrFailedCreate": {
+			reason: "Should return an error if file creation fails.",
+			args: args{
+				opts: []Option{WithFS(afero.NewReadOnlyFs(afero.NewMemMapFs()))},
+				dep:  dep1,
+				pkg:  pkg1,
+			},
+			want: want{
+				err:            syscall.EPERM,
+				cacheFileCount: 0,
+			},
+		},
 	}
 
 	for name, tc := range cases {
 		t.Run(name, func(t *testing.T) {
+			cache, _ := NewLocal(cacheRoot, tc.args.opts...)
+
 			if tc.args.setup != nil {
 				// establish a pre-existing entry
-				err := tc.args.cache.Store(tc.args.setup.dep, tc.args.setup.pkg)
+				err := cache.Store(tc.args.setup.dep, tc.args.setup.pkg)
 				if diff := cmp.Diff(nil, err, test.EquateErrors()); diff != "" {
 					t.Errorf("\n%s\nStore(...): -want err, +got err:\n%s", tc.reason, diff)
 				}
 			}
 
-			err := tc.args.cache.Store(tc.args.dep, tc.args.pkg)
+			err := cache.Store(tc.args.dep, tc.args.pkg)
 			if diff := cmp.Diff(tc.want.err, err, test.EquateErrors()); diff != "" {
 				t.Errorf("\n%s\nStore(...): -want err, +got err:\n%s", tc.reason, diff)
 			}
 
 			if tc.want.err == nil {
 
-				e, _ := tc.args.cache.Get(tc.args.dep)
+				e, _ := cache.Get(tc.args.dep)
 
 				if diff := cmp.Diff(tc.want.pkgDigest, e.Digest()); diff != "" {
 					t.Errorf("\n%s\nStore(...): -want err, +got err:\n%s", tc.reason, diff)
 				}
 
-				if diff := cmp.Diff(tc.want.cacheFileCount, cacheFileCnt(tc.args.cache.fs, tc.args.cache.root)); diff != "" {
+				if diff := cmp.Diff(tc.want.cacheFileCount, cacheFileCnt(cache.fs, cache.root)); diff != "" {
 					t.Errorf("\n%s\nStore(...): -want err, +got err:\n%s", tc.reason, diff)
 				}
 			}
@@ -358,12 +360,12 @@ func TestStore(t *testing.T) {
 func TestClean(t *testing.T) {
 	fs := afero.NewMemMapFs()
 	cache, _ := NewLocal(
+		"~/.up/cache",
 		WithFS(fs),
-		WithRoot("~/.up/cache"),
 	)
 	readOnlyCache, _ := NewLocal(
+		"~/.up/cache",
 		WithFS(afero.NewReadOnlyFs(fs)),
-		WithRoot("~/.up/cache"),
 	)
 
 	type args struct {
@@ -438,10 +440,8 @@ func TestVersions(t *testing.T) {
 	fs := afero.NewMemMapFs()
 
 	cache, _ := NewLocal(
+		"/cache",
 		WithFS(fs),
-		WithRoot("/cache"),
-		// override HomeDirFn
-		rootIsHome,
 	)
 
 	e1 := cache.newEntry(pkg1)
@@ -512,9 +512,8 @@ func TestCalculatePath(t *testing.T) {
 	tag3, _ := ociname.NewTag("registry.upbound.io/examples-aws/getting-started:v0.14.0-240.g6a7366f")
 
 	NewLocal(
+		"/cache",
 		WithFS(afero.NewMemMapFs()),
-		WithRoot("/cache"),
-		rootIsHome,
 	)
 
 	type args struct {
@@ -574,16 +573,3 @@ func cacheFileCnt(fs afero.Fs, dir string) int {
 
 	return cnt
 }
-
-var (
-	rootIsHome = func(l *Local) {
-		l.home = func() (string, error) {
-			return "/", nil
-		}
-	}
-
-	newLocalCache = func(opts ...Option) *Local {
-		c, _ := NewLocal(opts...)
-		return c
-	}
-)
