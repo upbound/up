@@ -25,7 +25,7 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 
 	"github.com/upbound/up/internal/xpkg"
-	xpkgparser "github.com/upbound/up/internal/xpkg/parser"
+	"github.com/upbound/up/internal/xpkg/parser/yaml"
 )
 
 const (
@@ -59,7 +59,7 @@ func (c *buildCmd) Run() error {
 		return err
 	}
 
-	p, err := xpkgparser.New()
+	p, err := yaml.New()
 	if err != nil {
 		return err
 	}

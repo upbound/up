@@ -12,7 +12,7 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-package parser
+package yaml
 
 import (
 	"errors"
@@ -27,7 +27,7 @@ const (
 	errBuildObjectScheme = "failed to build object scheme for package parser"
 )
 
-// New returns a new PackageParser
+// New returns a new PackageParser that targets yaml files.
 func New() (*parser.PackageParser, error) {
 	metaScheme, err := xpkg.BuildMetaScheme()
 	if err != nil {

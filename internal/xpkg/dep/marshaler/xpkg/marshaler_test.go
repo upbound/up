@@ -45,15 +45,12 @@ const (
 	testProviderConfigsCRD      = "providerconfigs.helm.crossplane.io.yaml"
 	testProviderConfigUsagesCRD = "providerconfigusages.helm.crossplane.io.yaml"
 	testDigestFile              = "sha256:295bcd0e6dc396cf0f5ef638c8a7610a571ff2dcef3aa0447398f25b5a0eafc7"
-	testMetaFile                = "crossplane.yaml"
+	testPackageJSONFile2        = "package.ndjson2"
 )
 
 func TestFromImage(t *testing.T) {
 	type args struct {
-		reg  string
-		repo string
-		tag  string
-		img  v1.Image
+		img xpkg.Image
 	}
 
 	type want struct {
@@ -71,10 +68,15 @@ func TestFromImage(t *testing.T) {
 		"Success": {
 			reason: "Should return a ParsedPackage and no error.",
 			args: args{
-				reg:  "index.docker.io/crossplane/provider-aws",
-				repo: "crossplane/provider-aws",
-				tag:  "v0.20.0",
-				img:  newPackageImage(testProviderPkgYaml),
+				img: xpkg.Image{
+					Meta: xpkg.ImageMeta{
+						Registry: "index.docker.io",
+						Repo:     "crossplane/provider-aws",
+						Version:  "v0.20.0",
+						Digest:   "sha256:e705d37caf84ca874800fa0d838804b83759e1acff9dec1c61e20178695f3206",
+					},
+					Image: newPackageImage(testProviderPkgYaml),
+				},
 			},
 			want: want{
 				pkg: &ParsedPackage{
@@ -109,7 +111,7 @@ func TestFromImage(t *testing.T) {
 						},
 					},
 					PType: v1beta1.ProviderPackageType,
-					Reg:   "index.docker.io/crossplane/provider-aws",
+					Reg:   "index.docker.io",
 					Ver:   "v0.20.0",
 				},
 				numObjects:    2,
@@ -119,7 +121,9 @@ func TestFromImage(t *testing.T) {
 		"ErrInvalidPackageImage": {
 			reason: "Should return an error if package image is invalid.",
 			args: args{
-				img: empty.Image,
+				img: xpkg.Image{
+					Image: empty.Image,
+				},
 			},
 			want: want{
 				err: errors.Wrap(errors.New("open package.yaml: no such file or directory"), errOpenPackageStream),
@@ -131,7 +135,7 @@ func TestFromImage(t *testing.T) {
 		t.Run(name, func(t *testing.T) {
 			pkgres, _ := NewMarshaler()
 
-			pkg, err := pkgres.FromImage(tc.args.reg, tc.args.repo, tc.args.tag, tc.args.img)
+			pkg, err := pkgres.FromImage(tc.args.img)
 
 			if diff := cmp.Diff(tc.want.err, err, test.EquateErrors()); diff != "" {
 				t.Errorf("\n%s\nFromImage(...): -want err, +got err:\n%s", tc.reason, diff)
@@ -182,7 +186,9 @@ func TestFromDir(t *testing.T) {
 	_ = inmemfs.MkdirAll(path2, os.ModePerm)
 
 	// write files to the above path
-	meta, _ := testdatafs.Open(filepath.Join("testdata", testMetaFile))
+	json, _ := testdatafs.Open(filepath.Join("testdata", xpkg.JSONStreamFile))
+	defer json.Close()
+	meta, _ := testdatafs.Open(filepath.Join("testdata", xpkg.MetaFile))
 	defer meta.Close()
 	crd1, _ := testdatafs.Open(filepath.Join("testdata", testProviderConfigsCRD))
 	defer crd1.Close()
@@ -191,7 +197,9 @@ func TestFromDir(t *testing.T) {
 	sha, _ := testdatafs.Open(filepath.Join("testdata", testDigestFile))
 	defer sha.Close()
 
-	meta2, _ := testdatafs.Open(filepath.Join("testdata", testMetaFile))
+	json2, _ := testdatafs.Open(filepath.Join("testdata", testPackageJSONFile2))
+	defer json.Close()
+	meta2, _ := testdatafs.Open(filepath.Join("testdata", xpkg.MetaFile))
 	defer meta.Close()
 	crd12, _ := testdatafs.Open(filepath.Join("testdata", testProviderConfigsCRD))
 	defer crd1.Close()
@@ -200,21 +208,25 @@ func TestFromDir(t *testing.T) {
 	sha2, _ := testdatafs.Open(filepath.Join("testdata", testDigestFile))
 	defer sha.Close()
 
+	targetPkgJSON, _ := inmemfs.Create(filepath.Join(path1, xpkg.JSONStreamFile))
 	targetMeta, _ := inmemfs.Create(filepath.Join(path1, xpkg.MetaFile))
 	targetCRD1, _ := inmemfs.Create(filepath.Join(path1, testProviderConfigsCRD))
 	targetCRD2, _ := inmemfs.Create(filepath.Join(path1, testProviderConfigUsagesCRD))
 	targetSHA, _ := inmemfs.Create(filepath.Join(path1, testDigestFile))
 
+	io.Copy(targetPkgJSON, json)
 	io.Copy(targetMeta, meta)
 	io.Copy(targetCRD1, crd1)
 	io.Copy(targetCRD2, crd2)
 	io.Copy(targetSHA, sha)
 
+	targetPkgJSON2, _ := inmemfs.Create(filepath.Join(path2, xpkg.JSONStreamFile))
 	targetMeta2, _ := inmemfs.Create(filepath.Join(path2, xpkg.MetaFile))
 	targetCRD12, _ := inmemfs.Create(filepath.Join(path2, testProviderConfigsCRD))
 	targetCRD22, _ := inmemfs.Create(filepath.Join(path2, testProviderConfigUsagesCRD))
 	targetSHA2, _ := inmemfs.Create(filepath.Join(path2, testDigestFile))
 
+	io.Copy(targetPkgJSON2, json2)
 	io.Copy(targetMeta2, meta2)
 	io.Copy(targetCRD12, crd12)
 	io.Copy(targetCRD22, crd22)
@@ -290,7 +302,7 @@ func TestFromDir(t *testing.T) {
 			args: args{
 				path: path2,
 				reg:  "registry.upbound.io",
-				repo: "upbound/platform-ref-aws",
+				repo: "crossplane/provider-helm",
 			},
 			want: want{
 				pkg: &ParsedPackage{
@@ -324,7 +336,7 @@ func TestFromDir(t *testing.T) {
 							},
 						},
 					},
-					DepName: "registry.upbound.io/upbound/platform-ref-aws",
+					DepName: "registry.upbound.io/crossplane/provider-helm",
 					PType:   v1beta1.ProviderPackageType,
 					Reg:     "registry.upbound.io",
 					Ver:     "v0.9.0",
@@ -348,7 +360,7 @@ func TestFromDir(t *testing.T) {
 				path: "/notapackage@v0.0.0",
 			},
 			want: want{
-				err: &os.PathError{Op: "open", Path: "/notapackage@v0.0.0", Err: os.ErrNotExist},
+				err: &os.PathError{Op: "open", Path: "/notapackage@v0.0.0/package.ndjson", Err: os.ErrNotExist},
 			},
 		},
 	}

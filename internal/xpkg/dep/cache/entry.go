@@ -15,6 +15,7 @@
 package cache
 
 import (
+	"encoding/json"
 	"fmt"
 	"os"
 	"path/filepath"
@@ -36,10 +37,12 @@ import (
 
 const (
 	crdNameFmt = "%s.yaml"
+	delim      = "\n"
 
-	errFailedToCreateMeta     = "failed to create meta file in entry"
-	errFailedToCreateCRD      = "failed to create crd"
-	errNoObjectsToFlushToDisk = "no objects to flush"
+	errFailedToCreateMeta      = "failed to create meta file in entry"
+	errFailedToCreateImageMeta = "faile to create image meta entry"
+	errFailedToCreateCRD       = "failed to create crd"
+	errNoObjectsToFlushToDisk  = "no objects to flush"
 )
 
 // entry is the internal representation of the cache at a given directory
@@ -97,17 +100,23 @@ func (e *entry) flush() (*flushstats, error) {
 		return stats, errors.New(errNoObjectsToFlushToDisk)
 	}
 
+	imetaStats, err := e.writeImageMeta(e.pkg.Reg, e.pkg.DepName, e.pkg.Ver, e.pkg.Digest())
+	if err != nil {
+		return stats, err
+	}
+	stats.combine(imetaStats)
+
 	metaStats, err := e.writeMeta(e.pkg.Meta())
 	if err != nil {
 		return stats, err
 	}
-
 	stats.combine(metaStats)
 
 	objstats, err := e.writeObjects(e.pkg.Objects())
 	if err != nil {
 		return stats, err
 	}
+	stats.combine(objstats)
 
 	// writing empty digest file
 	_, err = e.fs.Create(filepath.Join(e.location(), e.pkg.Digest()))
@@ -115,9 +124,28 @@ func (e *entry) flush() (*flushstats, error) {
 		return stats, err
 	}
 
-	stats.combine(objstats)
-
 	return stats, err
+}
+
+func (e *entry) writeImageMeta(registry, repo, version, digest string) (*flushstats, error) {
+	stats := &flushstats{}
+
+	b, err := json.Marshal(xpkg.ImageMeta{
+		Digest:   digest,
+		Repo:     repo,
+		Registry: registry,
+		Version:  version,
+	})
+	if err != nil {
+		return stats, errors.Wrap(err, errFailedToCreateImageMeta)
+	}
+
+	if err := e.createPackageJSON(b); err != nil {
+		return stats, errors.Wrap(err, errFailedToCreateImageMeta)
+	}
+
+	stats.incImageMeta()
+	return stats, nil
 }
 
 // writeMeta writes the meta file to disk.
@@ -137,12 +165,52 @@ func (e *entry) writeMeta(o runtime.Object) (*flushstats, error) {
 	}
 
 	mb, err := cf.Write(b)
+	if err != nil {
+		return stats, errors.Wrap(err, errFailedToCreateMeta)
+	}
+
+	jb, err := json.Marshal(o)
+	if err != nil {
+		return stats, errors.Wrap(err, errFailedToCreateMeta)
+	}
+
+	if err := e.appendToPackageJSON(jb); err != nil {
+		return stats, errors.Wrap(err, errFailedToCreateMeta)
+	}
 
 	if mb > 0 {
 		stats.incMetas()
 		return stats, err
 	}
+
 	return stats, err
+}
+
+func (e *entry) createPackageJSON(data []byte) error {
+	pf, err := e.fs.Create(filepath.Join(e.location(), xpkg.JSONStreamFile))
+	if err != nil {
+		return err
+	}
+	defer pf.Close() // nolint:errcheck
+
+	return writeToFile(data, pf)
+}
+
+func (e *entry) appendToPackageJSON(data []byte) error {
+	pf, err := e.fs.OpenFile(filepath.Join(e.location(), xpkg.JSONStreamFile), os.O_APPEND|os.O_CREATE|os.O_WRONLY, 0644)
+	if err != nil {
+		return err
+	}
+	defer pf.Close() // nolint:errcheck
+
+	return writeToFile(data, pf)
+}
+
+func writeToFile(data []byte, f afero.File) error {
+	// add delimiter
+	data = append(data, []byte(delim)...)
+	_, err := f.Write(data)
+	return err
 }
 
 // writeObjects writes out the CRDs and XRDs that came from the package.yaml
@@ -152,7 +220,12 @@ func (e *entry) writeObjects(objs []runtime.Object) (*flushstats, error) { // no
 	for _, o := range objs {
 		var inc statsIncrementer
 
-		b, err := yaml.Marshal(o)
+		yb, err := yaml.Marshal(o)
+		if err != nil {
+			return stats, err
+		}
+
+		jb, err := json.Marshal(o)
 		if err != nil {
 			return stats, err
 		}
@@ -188,12 +261,16 @@ func (e *entry) writeObjects(objs []runtime.Object) (*flushstats, error) { // no
 		}
 		defer f.Close() // nolint:errcheck
 
-		fb, err := f.Write(b)
+		fb, err := f.Write(yb)
 		if err != nil {
 			return stats, err
 		}
 
 		if fb == 0 {
+			return stats, errors.New(errFailedToCreateCRD)
+		}
+
+		if err := e.appendToPackageJSON(jb); err != nil {
 			return stats, errors.New(errFailedToCreateCRD)
 		}
 
@@ -233,13 +310,18 @@ func (e *entry) location() string {
 }
 
 type flushstats struct {
-	comps int
-	crds  int
-	metas int
-	xrds  int
+	imageMeta int
+	comps     int
+	crds      int
+	metas     int
+	xrds      int
 }
 
 type statsIncrementer func()
+
+func (s *flushstats) incImageMeta() {
+	s.imageMeta++
+}
 
 func (s *flushstats) incComps() {
 	s.comps++
@@ -258,6 +340,7 @@ func (s *flushstats) incXRDs() {
 }
 
 func (s *flushstats) combine(src *flushstats) {
+	s.imageMeta += src.imageMeta
 	s.comps += src.comps
 	s.crds += src.crds
 	s.metas += src.metas

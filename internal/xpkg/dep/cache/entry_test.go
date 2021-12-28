@@ -35,7 +35,7 @@ func TestFlush(t *testing.T) {
 	fs := afero.NewMemMapFs()
 
 	cache, _ := NewLocal(
-		"/cache",
+		"/tmp/cache",
 		WithFS(fs),
 	)
 
@@ -44,11 +44,12 @@ func TestFlush(t *testing.T) {
 	}
 
 	type want struct {
-		metaCount int
-		crdCount  int
-		xrdCount  int
-		compCount int
-		flushErr  error
+		imetaCount int
+		metaCount  int
+		crdCount   int
+		xrdCount   int
+		compCount  int
+		flushErr   error
 	}
 
 	cases := map[string]struct {
@@ -60,6 +61,9 @@ func TestFlush(t *testing.T) {
 			reason: "Should produce the expected number of definitions from test provider package.",
 			args: args{
 				pkg: &xpkg.ParsedPackage{
+					Reg:     "index.docker.io",
+					DepName: "crossplane/provider-aws",
+					Ver:     "v0.20.0",
 					MetaObj: &xpmetav1.Provider{
 						TypeMeta: apimetav1.TypeMeta{
 							APIVersion: "meta.pkg.crossplane.io/v1alpha1",
@@ -93,15 +97,19 @@ func TestFlush(t *testing.T) {
 				},
 			},
 			want: want{
-				metaCount: 1,
-				crdCount:  2,
-				xrdCount:  0,
+				imetaCount: 1,
+				metaCount:  1,
+				crdCount:   2,
+				xrdCount:   0,
 			},
 		},
 		"ConfigurationSuccess": {
 			reason: "Should produce the expected number of definitions from test configuration package.",
 			args: args{
 				pkg: &xpkg.ParsedPackage{
+					Reg:     "index.docker.io",
+					DepName: "crossplane/configuration-aws",
+					Ver:     "v0.20.0",
 					MetaObj: &xpmetav1.Provider{
 						TypeMeta: apimetav1.TypeMeta{
 							APIVersion: "meta.pkg.crossplane.io/v1alpha1",
@@ -144,10 +152,11 @@ func TestFlush(t *testing.T) {
 				},
 			},
 			want: want{
-				metaCount: 1,
-				crdCount:  0,
-				xrdCount:  2,
-				compCount: 1,
+				imetaCount: 1,
+				metaCount:  1,
+				crdCount:   0,
+				xrdCount:   2,
+				compCount:  1,
 			},
 		},
 	}
@@ -157,6 +166,10 @@ func TestFlush(t *testing.T) {
 			e := cache.newEntry(tc.args.pkg)
 
 			stats, err := e.flush()
+
+			if diff := cmp.Diff(tc.want.imetaCount, stats.imageMeta); diff != "" {
+				t.Errorf("\n%s\nFlush(...): -want err, +got err:\n%s", tc.reason, diff)
+			}
 
 			if diff := cmp.Diff(tc.want.metaCount, stats.metas); diff != "" {
 				t.Errorf("\n%s\nFlush(...): -want err, +got err:\n%s", tc.reason, diff)

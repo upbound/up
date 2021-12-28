@@ -200,7 +200,7 @@ func TestGet(t *testing.T) {
 				},
 			},
 			want: want{
-				err: &os.PathError{Op: "open", Path: "/cache/index.docker.io/crossplane/provider-aws@v0.20.1-alpha1", Err: afero.ErrFileNotFound},
+				err: &os.PathError{Op: "open", Path: "/cache/index.docker.io/crossplane/provider-aws@v0.20.1-alpha1/package.ndjson", Err: afero.ErrFileNotFound},
 			},
 		},
 	}
@@ -275,7 +275,7 @@ func TestStore(t *testing.T) {
 			},
 			want: want{
 				pkgDigest:      pkg3.SHA,
-				cacheFileCount: 2,
+				cacheFileCount: 3,
 			},
 		},
 		"AddSecondDependency": {
@@ -291,7 +291,7 @@ func TestStore(t *testing.T) {
 			},
 			want: want{
 				pkgDigest:      pkg2.SHA,
-				cacheFileCount: 4,
+				cacheFileCount: 6,
 			},
 		},
 		"Replace": {
@@ -307,7 +307,7 @@ func TestStore(t *testing.T) {
 			},
 			want: want{
 				pkgDigest:      pkg2.SHA,
-				cacheFileCount: 2,
+				cacheFileCount: 3,
 			},
 		},
 		"ErrFailedCreate": {
@@ -389,7 +389,7 @@ func TestClean(t *testing.T) {
 				cache: cache,
 			},
 			want: want{
-				preCleanFileCnt:  4,
+				preCleanFileCnt:  6,
 				postCleanFileCnt: 0,
 			},
 		},
@@ -399,8 +399,8 @@ func TestClean(t *testing.T) {
 				cache: readOnlyCache,
 			},
 			want: want{
-				preCleanFileCnt:  4,
-				postCleanFileCnt: 4,
+				preCleanFileCnt:  6,
+				postCleanFileCnt: 6,
 				err:              syscall.EPERM,
 			},
 		},

@@ -29,8 +29,9 @@ import (
 	"github.com/spf13/afero"
 	"k8s.io/apimachinery/pkg/runtime/schema"
 
+	ixpkg "github.com/upbound/up/internal/xpkg"
 	"github.com/upbound/up/internal/xpkg/dep/cache"
-	"github.com/upbound/up/internal/xpkg/dep/marshaler/xpkg"
+	xpkg "github.com/upbound/up/internal/xpkg/dep/marshaler/xpkg"
 	"github.com/upbound/up/internal/xpkg/dep/resolver/image"
 	"github.com/upbound/up/internal/xpls/validator"
 )
@@ -68,7 +69,7 @@ type ImageResolver interface {
 // XpkgMarshaler defines the API contract for working with an
 // xpkg.ParsedPackage marshaler.
 type XpkgMarshaler interface {
-	FromImage(string, string, string, v1.Image) (*xpkg.ParsedPackage, error)
+	FromImage(ixpkg.Image) (*xpkg.ParsedPackage, error)
 	FromDir(afero.Fs, string, string, string) (*xpkg.ParsedPackage, error)
 }
 
@@ -266,7 +267,20 @@ func (m *Manager) addPkg(ctx context.Context, d v1beta1.Dependency) (*xpkg.Parse
 		return nil, err
 	}
 
-	p, err := m.x.FromImage(tag.RegistryStr(), tag.RepositoryStr(), t, i)
+	digest, err := i.Digest()
+	if err != nil {
+		return nil, err
+	}
+
+	p, err := m.x.FromImage(ixpkg.Image{
+		Meta: ixpkg.ImageMeta{
+			Repo:     tag.RepositoryStr(),
+			Registry: tag.RegistryStr(),
+			Version:  t,
+			Digest:   digest.String(),
+		},
+		Image: i,
+	})
 	if err != nil {
 		return nil, err
 	}

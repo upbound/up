@@ -135,13 +135,6 @@ func TestLoadValidators(t *testing.T) {
 		validators map[schema.GroupVersionKind]struct{}
 		err        error
 	}{
-		"ErrorPathNotExist": {
-			reason: "Should return an error if the path does not exist.",
-			wsroot: "/",
-			opt:    WithFS(afero.NewMemMapFs()),
-			path:   "/cache",
-			err:    &os.PathError{Op: "open", Path: "/cache", Err: afero.ErrFileNotFound},
-		},
 		"SuccessfulNoKubernetesObjects": {
 			reason: "Should return an error if the path does not exist.",
 			wsroot: "/ws",

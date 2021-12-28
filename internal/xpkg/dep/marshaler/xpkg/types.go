@@ -24,12 +24,20 @@ import (
 
 	"github.com/crossplane/crossplane-runtime/pkg/parser"
 	"github.com/crossplane/crossplane/apis/pkg/v1beta1"
+
+	"github.com/upbound/up/internal/xpkg/parser/ndjson"
 )
 
 // PackageParser defines the API contract for working with a
 // PackageParser.
 type PackageParser interface {
 	Parse(context.Context, io.ReadCloser) (*parser.Package, error)
+}
+
+// JSONPackageParser defines the API contract for working with a
+// PackageParser.
+type JSONPackageParser interface {
+	Parse(context.Context, io.ReadCloser) (*ndjson.Package, error)
 }
 
 // ParsedPackage represents an xpkg that has been parsed from a v1.Image

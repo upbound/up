@@ -30,7 +30,7 @@ import (
 	"github.com/upbound/up/internal/xpkg"
 	"github.com/upbound/up/internal/xpkg/dep/manager"
 	mxpkg "github.com/upbound/up/internal/xpkg/dep/marshaler/xpkg"
-	xpkgparser "github.com/upbound/up/internal/xpkg/parser"
+	pyaml "github.com/upbound/up/internal/xpkg/parser/yaml"
 	"github.com/upbound/up/internal/xpls/validator"
 )
 
@@ -52,7 +52,7 @@ type Validator struct {
 
 // New returns a new Meta validator.
 func New(m *manager.Manager, pkgs map[string]*mxpkg.ParsedPackage) (*Validator, error) {
-	p, err := xpkgparser.New()
+	p, err := pyaml.New()
 	if err != nil {
 		return nil, err
 	}

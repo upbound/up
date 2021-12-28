@@ -21,6 +21,10 @@ import (
 )
 
 const (
+	// JSONStreamFile is the name of the file in local Crossplane package
+	// that contains the JSON stream representation of the Crossplane package.
+	JSONStreamFile string = "package.ndjson"
+
 	// MetaFile is the name of a Crossplane package metadata file.
 	MetaFile string = "crossplane.yaml"
 

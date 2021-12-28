@@ -220,7 +220,16 @@ func NewWorkspace(root span.URI, cacheRoot string, opts ...WorkspaceOpt) (*Works
 		uriToNodes: make(map[lsp.DocumentURI]map[NodeIdentifier]struct{}),
 	}
 
-	c, err := cache.NewLocal(cacheRoot)
+	for _, o := range opts {
+		o(w)
+	}
+
+	// TODO(@tnthornton) by placing cache instantiation here, we're not able
+	// to mock anything more than the filesystem with the cache. We should
+	// rethink how we're performing this operation for the workspace.
+	// We're also instantiating twice, which isn't what we want given we have a
+	// a watcher.
+	c, err := cache.NewLocal(cacheRoot, cache.WithFS(w.fs))
 	if err != nil {
 		return nil, err
 	}
@@ -231,10 +240,6 @@ func NewWorkspace(root span.URI, cacheRoot string, opts ...WorkspaceOpt) (*Works
 	}
 
 	w.m = m
-
-	for _, o := range opts {
-		o(w)
-	}
 
 	return w, nil
 }

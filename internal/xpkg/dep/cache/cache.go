@@ -55,6 +55,7 @@ type Local struct {
 	closed        bool
 	subs          []chan Event
 	watchInterval time.Duration
+	watching      bool
 }
 
 // XpkgMarshaler defines the API contract for working marshaling
@@ -82,10 +83,6 @@ func NewLocal(root string, opts ...Option) (*Local, error) {
 	}
 
 	l.pkgres = r
-
-	if err := l.ensureDirExists(root); err != nil {
-		return nil, err
-	}
 
 	return l, nil
 }
@@ -191,6 +188,17 @@ func (c *Local) Versions(k v1beta1.Dependency) ([]string, error) {
 func (c *Local) Watch() <-chan Event {
 	c.mu.Lock()
 	defer c.mu.Unlock()
+
+	// Start watching if we haven't already.
+	if !c.watching {
+		if err := c.ensureDirExists(c.root); err != nil {
+			c.log.Debug(errFailedToWatchCache, "error", err)
+		}
+
+		// Kick off cache watching in a separate routine so we don't
+		// block upstream operations on an infrequently used operation.
+		go c.watchCache()
+	}
 
 	// use an buffered channel so that we don't block incoming watch events.
 	ch := make(chan Event, 1)

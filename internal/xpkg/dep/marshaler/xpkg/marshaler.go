@@ -18,13 +18,10 @@ import (
 	"archive/tar"
 	"context"
 	"encoding/json"
-	"fmt"
 	"io"
-	"os"
 	"path/filepath"
 	"strings"
 
-	v1 "github.com/google/go-containerregistry/pkg/v1"
 	"github.com/google/go-containerregistry/pkg/v1/mutate"
 	"github.com/pkg/errors"
 	"github.com/spf13/afero"
@@ -39,7 +36,6 @@ import (
 	"k8s.io/kube-openapi/pkg/validation/strfmt"
 	"k8s.io/kube-openapi/pkg/validation/validate"
 
-	"github.com/crossplane/crossplane-runtime/pkg/parser"
 	xpmetav1 "github.com/crossplane/crossplane/apis/pkg/meta/v1"
 
 	xpv1ext "github.com/crossplane/crossplane/apis/apiextensions/v1"
@@ -47,37 +43,41 @@ import (
 	"github.com/crossplane/crossplane/apis/pkg/v1beta1"
 
 	"github.com/upbound/up/internal/xpkg"
-	xpkgparser "github.com/upbound/up/internal/xpkg/parser"
+	"github.com/upbound/up/internal/xpkg/parser/ndjson"
+	"github.com/upbound/up/internal/xpkg/parser/yaml"
 )
 
 const (
-	errFailedToParsePkgYaml         = "failed to parse package yaml"
-	errLintPackage                  = "failed to lint package"
+	errFailedToParsePkgYaml = "failed to parse package yaml"
+	// errLintPackage                  = "failed to lint package"
 	errOpenPackageStream            = "failed to open package stream file"
-	errFaileToAcquireDigest         = "failed to pull digest from image"
 	errFailedToConvertMetaToPackage = "failed to convert meta to package"
 	errInvalidPath                  = "invalid path provided for package lookup"
 	errNotExactlyOneMeta            = "not exactly one package meta type"
 	errObjectNotKnownType           = "object is not a known type"
-
-	digestPrefix = "sha256:"
-	dockerhub    = "index.docker.io"
 )
 
 // Marshaler represents a xpkg Marshaler
 type Marshaler struct {
-	p PackageParser
+	yp PackageParser
+	jp JSONPackageParser
 }
 
 // NewMarshaler returns a new Marshaler
 func NewMarshaler(opts ...MarshalerOption) (*Marshaler, error) {
 	r := &Marshaler{}
-	p, err := xpkgparser.New()
+	yp, err := yaml.New()
 	if err != nil {
 		return nil, err
 	}
 
-	r.p = p
+	jp, err := ndjson.New()
+	if err != nil {
+		return nil, err
+	}
+
+	r.yp = yp
+	r.jp = jp
 
 	for _, o := range opts {
 		o(r)
@@ -89,35 +89,40 @@ func NewMarshaler(opts ...MarshalerOption) (*Marshaler, error) {
 // MarshalerOption modifies the xpkg Marshaler
 type MarshalerOption func(*Marshaler)
 
-// WithParser modifies the Marshaler by setting the supplied PackageParser as
+// WithYamlParser modifies the Marshaler by setting the supplied PackageParser as
 // the Resolver's parser.
-func WithParser(p PackageParser) MarshalerOption {
+func WithYamlParser(p PackageParser) MarshalerOption {
 	return func(r *Marshaler) {
-		r.p = p
+		r.yp = p
 	}
 }
 
-// FromImage takes a registry, version, and name strings and their corresponding
-// v1.Image and returns a ParsedPackage for consumption by upstream callers.
-func (r *Marshaler) FromImage(reg, repo, ver string, i v1.Image) (*ParsedPackage, error) {
-	digest, err := i.Digest()
-	if err != nil {
-		return nil, errors.Wrap(err, errFaileToAcquireDigest)
+// WithJSONParser modifies the Marshaler by setting the supplied PackageParser as
+// the Resolver's parser.
+func WithJSONParser(p JSONPackageParser) MarshalerOption {
+	return func(r *Marshaler) {
+		r.jp = p
 	}
+}
 
-	reader := mutate.Extract(i)
+// FromImage takes a xpkg.Image and returns a ParsedPackage for consumption by
+// upstream callers.
+func (r *Marshaler) FromImage(i xpkg.Image) (*ParsedPackage, error) {
+	reader := mutate.Extract(i.Image)
 	fs := tarfs.New(tar.NewReader(reader))
 	pkgYaml, err := fs.Open(xpkg.StreamFile)
 	if err != nil {
 		return nil, errors.Wrap(err, errOpenPackageStream)
 	}
 
-	pkg, err := r.parse(pkgYaml)
+	pkg, err := r.parseYaml(pkgYaml)
 	if err != nil {
 		return nil, err
 	}
 
-	return finalizePkg(reg, repo, ver, digest.String(), pkg)
+	pkg = applyImageMeta(i.Meta, pkg)
+
+	return finalizePkg(pkg)
 }
 
 // FromDir takes an afero.Fs, path to a directory, registry reference, and name
@@ -129,45 +134,47 @@ func (r *Marshaler) FromDir(fs afero.Fs, path, reg, repo string) (*ParsedPackage
 		return nil, errors.New(errInvalidPath)
 	}
 
-	var digest string
-	reader, err := parser.NewFsReadCloser(fs, path, parser.SkipDirs(), skipDigest(&digest))
+	pkgJSON, err := fs.Open(filepath.Join(path, xpkg.JSONStreamFile))
 	if err != nil {
 		return nil, err
 	}
 
-	pkg, err := r.parse(reader)
+	pkg, err := r.parseNDJSON(pkgJSON)
 	if err != nil {
 		return nil, err
 	}
 
-	return finalizePkg(reg, repo, parts[1], digest, pkg)
+	return finalizePkg(pkg)
 }
 
-func (r *Marshaler) parse(reader io.ReadCloser) (*ParsedPackage, error) {
-	// parse package.yaml
-	pkg, err := r.p.Parse(context.Background(), reader)
+// parseYaml parses the
+func (r *Marshaler) parseYaml(reader io.ReadCloser) (*ParsedPackage, error) {
+	pkg, err := r.yp.Parse(context.Background(), reader)
 	if err != nil {
 		return nil, errors.Wrap(err, errFailedToParsePkgYaml)
 	}
+	return processPackage(pkg)
+}
 
+func processPackage(pkg intermediatePackage) (*ParsedPackage, error) {
 	metas := pkg.GetMeta()
 	if len(metas) != 1 {
 		return nil, errors.New(errNotExactlyOneMeta)
 	}
 
 	meta := metas[0]
-	var linter parser.Linter
+	// var linter parser.Linter
 	var pkgType v1beta1.PackageType
 	if meta.GetObjectKind().GroupVersionKind().Kind == xpmetav1.ConfigurationKind {
-		linter = xpkg.NewConfigurationLinter()
+		// linter = xpkg.NewConfigurationLinter()
 		pkgType = v1beta1.ConfigurationPackageType
 	} else {
-		linter = xpkg.NewProviderLinter()
+		// linter = xpkg.NewProviderLinter()
 		pkgType = v1beta1.ProviderPackageType
 	}
-	if err := linter.Lint(pkg); err != nil {
-		return nil, errors.Wrap(err, errLintPackage)
-	}
+	// if err := linter.Lint(pkg); err != nil {
+	// 	return nil, errors.Wrap(err, errLintPackage)
+	// }
 
 	return &ParsedPackage{
 		MetaObj: meta,
@@ -176,7 +183,34 @@ func (r *Marshaler) parse(reader io.ReadCloser) (*ParsedPackage, error) {
 	}, nil
 }
 
-func finalizePkg(reg, repo, ver, digest string, pkg *ParsedPackage) (*ParsedPackage, error) { // nolint:gocyclo
+func (r *Marshaler) parseNDJSON(reader io.ReadCloser) (*ParsedPackage, error) {
+	pkg, err := r.jp.Parse(context.Background(), reader)
+	if err != nil {
+		return nil, errors.Wrap(err, errFailedToParsePkgYaml)
+	}
+	p, err := processPackage(pkg)
+	if err != nil {
+		return nil, err
+	}
+
+	return applyImageMeta(pkg.GetImageMeta(), p), nil
+}
+
+type intermediatePackage interface {
+	GetMeta() []runtime.Object
+	GetObjects() []runtime.Object
+}
+
+func applyImageMeta(m xpkg.ImageMeta, pkg *ParsedPackage) *ParsedPackage {
+	pkg.DepName = m.Repo
+	pkg.Reg = m.Registry
+	pkg.SHA = m.Digest
+	pkg.Ver = m.Version
+
+	return pkg
+}
+
+func finalizePkg(pkg *ParsedPackage) (*ParsedPackage, error) { // nolint:gocyclo
 	deps, err := determineDeps(pkg.MetaObj)
 	if err != nil {
 		return nil, err
@@ -210,20 +244,8 @@ func finalizePkg(reg, repo, ver, digest string, pkg *ParsedPackage) (*ParsedPack
 
 	pkg.Deps = deps
 	pkg.GVKtoV = v
-	pkg.DepName = derivePkgName(reg, repo)
-	pkg.Reg = reg
-	pkg.SHA = digest
-	pkg.Ver = ver
 
 	return pkg, nil
-}
-
-// derivePkgName returns the package name that we'd expect to see in a meta file
-func derivePkgName(registry, repo string) string {
-	if registry != dockerhub {
-		return fmt.Sprintf("%s/%s", registry, repo)
-	}
-	return repo
 }
 
 func determineDeps(o runtime.Object) ([]v1beta1.Dependency, error) {
@@ -351,17 +373,5 @@ func gvk(group, version, kind string) schema.GroupVersionKind {
 		Group:   group,
 		Version: version,
 		Kind:    kind,
-	}
-}
-
-func skipDigest(digest *string) parser.FilterFn {
-	return func(path string, info os.FileInfo) (bool, error) {
-		match := false
-		base := filepath.Base(path)
-		if strings.HasPrefix(base, digestPrefix) {
-			*digest = base
-			match = true
-		}
-		return match, nil
 	}
 }

@@ -34,7 +34,7 @@ import (
 
 	"github.com/upbound/up/internal/xpkg"
 	"github.com/upbound/up/internal/xpkg/dep/manager"
-	xpkgparser "github.com/upbound/up/internal/xpkg/parser"
+	"github.com/upbound/up/internal/xpkg/parser/yaml"
 )
 
 const (
@@ -61,7 +61,7 @@ func New(opts ...WSOption) (*Workspace, error) {
 		wd: os.Getwd,
 	}
 
-	p, err := xpkgparser.New()
+	p, err := yaml.New()
 	if err != nil {
 		return nil, err
 	}
