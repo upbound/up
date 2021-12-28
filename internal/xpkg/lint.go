@@ -17,14 +17,16 @@ package xpkg
 import (
 	"github.com/Masterminds/semver"
 	"github.com/pkg/errors"
+
 	extv1 "k8s.io/apiextensions-apiserver/pkg/apis/apiextensions/v1"
 	extv1beta1 "k8s.io/apiextensions-apiserver/pkg/apis/apiextensions/v1beta1"
 	"k8s.io/apimachinery/pkg/runtime"
 
-	"github.com/crossplane/crossplane-runtime/pkg/parser"
 	v1 "github.com/crossplane/crossplane/apis/apiextensions/v1"
 	v1beta1 "github.com/crossplane/crossplane/apis/apiextensions/v1beta1"
 	pkgmetav1 "github.com/crossplane/crossplane/apis/pkg/meta/v1"
+
+	"github.com/upbound/up/internal/xpkg/parser/linter"
 )
 
 const (
@@ -40,18 +42,18 @@ const (
 
 // NewProviderLinter is a convenience function for creating a package linter for
 // providers.
-func NewProviderLinter() parser.Linter {
-	return parser.NewPackageLinter(parser.PackageLinterFns(OneMeta), parser.ObjectLinterFns(IsProvider, PackageValidSemver), parser.ObjectLinterFns(IsCRD))
+func NewProviderLinter() linter.Linter {
+	return linter.NewPackageLinter(linter.PackageLinterFns(OneMeta), linter.ObjectLinterFns(IsProvider, PackageValidSemver), linter.ObjectLinterFns(IsCRD))
 }
 
 // NewConfigurationLinter is a convenience function for creating a package linter for
 // configurations.
-func NewConfigurationLinter() parser.Linter {
-	return parser.NewPackageLinter(parser.PackageLinterFns(OneMeta), parser.ObjectLinterFns(IsConfiguration, PackageValidSemver), parser.ObjectLinterFns(parser.Or(IsXRD, IsComposition)))
+func NewConfigurationLinter() linter.Linter {
+	return linter.NewPackageLinter(linter.PackageLinterFns(OneMeta), linter.ObjectLinterFns(IsConfiguration, PackageValidSemver), linter.ObjectLinterFns(linter.Or(IsXRD, IsComposition)))
 }
 
 // OneMeta checks that there is only one meta object in the package.
-func OneMeta(pkg *parser.Package) error {
+func OneMeta(pkg linter.Package) error {
 	if len(pkg.GetMeta()) != 1 {
 		return errors.New(errNotExactlyOneMeta)
 	}

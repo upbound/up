@@ -43,13 +43,14 @@ import (
 	"github.com/crossplane/crossplane/apis/pkg/v1beta1"
 
 	"github.com/upbound/up/internal/xpkg"
+	"github.com/upbound/up/internal/xpkg/parser/linter"
 	"github.com/upbound/up/internal/xpkg/parser/ndjson"
 	"github.com/upbound/up/internal/xpkg/parser/yaml"
 )
 
 const (
-	errFailedToParsePkgYaml = "failed to parse package yaml"
-	// errLintPackage                  = "failed to lint package"
+	errFailedToParsePkgYaml         = "failed to parse package yaml"
+	errLintPackage                  = "failed to lint package"
 	errOpenPackageStream            = "failed to open package stream file"
 	errFailedToConvertMetaToPackage = "failed to convert meta to package"
 	errInvalidPath                  = "invalid path provided for package lookup"
@@ -156,25 +157,25 @@ func (r *Marshaler) parseYaml(reader io.ReadCloser) (*ParsedPackage, error) {
 	return processPackage(pkg)
 }
 
-func processPackage(pkg intermediatePackage) (*ParsedPackage, error) {
+func processPackage(pkg linter.Package) (*ParsedPackage, error) {
 	metas := pkg.GetMeta()
 	if len(metas) != 1 {
 		return nil, errors.New(errNotExactlyOneMeta)
 	}
 
 	meta := metas[0]
-	// var linter parser.Linter
+	var linter linter.Linter
 	var pkgType v1beta1.PackageType
 	if meta.GetObjectKind().GroupVersionKind().Kind == xpmetav1.ConfigurationKind {
-		// linter = xpkg.NewConfigurationLinter()
+		linter = xpkg.NewConfigurationLinter()
 		pkgType = v1beta1.ConfigurationPackageType
 	} else {
-		// linter = xpkg.NewProviderLinter()
+		linter = xpkg.NewProviderLinter()
 		pkgType = v1beta1.ProviderPackageType
 	}
-	// if err := linter.Lint(pkg); err != nil {
-	// 	return nil, errors.Wrap(err, errLintPackage)
-	// }
+	if err := linter.Lint(pkg); err != nil {
+		return nil, errors.Wrap(err, errLintPackage)
+	}
 
 	return &ParsedPackage{
 		MetaObj: meta,
@@ -194,11 +195,6 @@ func (r *Marshaler) parseNDJSON(reader io.ReadCloser) (*ParsedPackage, error) {
 	}
 
 	return applyImageMeta(pkg.GetImageMeta(), p), nil
-}
-
-type intermediatePackage interface {
-	GetMeta() []runtime.Object
-	GetObjects() []runtime.Object
 }
 
 func applyImageMeta(m xpkg.ImageMeta, pkg *ParsedPackage) *ParsedPackage {
