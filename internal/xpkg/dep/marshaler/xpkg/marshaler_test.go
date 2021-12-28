@@ -234,8 +234,6 @@ func TestFromDir(t *testing.T) {
 
 	type args struct {
 		path string
-		reg  string
-		repo string
 	}
 	type want struct {
 		pkg           *ParsedPackage
@@ -253,8 +251,6 @@ func TestFromDir(t *testing.T) {
 			reason: "Should return a ParsedPackage and no error.",
 			args: args{
 				path: path1,
-				reg:  "index.docker.io",
-				repo: "crossplane/provider-helm",
 			},
 			want: want{
 				pkg: &ParsedPackage{
@@ -301,8 +297,6 @@ func TestFromDir(t *testing.T) {
 			reason: "Should return a ParsedPackage and no error.",
 			args: args{
 				path: path2,
-				reg:  "registry.upbound.io",
-				repo: "crossplane/provider-helm",
 			},
 			want: want{
 				pkg: &ParsedPackage{
@@ -369,7 +363,7 @@ func TestFromDir(t *testing.T) {
 		t.Run(name, func(t *testing.T) {
 			pkgres, _ := NewMarshaler()
 
-			pkg, err := pkgres.FromDir(inmemfs, tc.args.path, tc.args.reg, tc.args.repo)
+			pkg, err := pkgres.FromDir(inmemfs, tc.args.path)
 
 			if diff := cmp.Diff(tc.want.err, err, test.EquateErrors()); diff != "" {
 				t.Errorf("\n%s\nFromDir(...): -want err, +got err:\n%s", tc.reason, diff)

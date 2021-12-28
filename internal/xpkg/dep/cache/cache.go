@@ -61,7 +61,7 @@ type Local struct {
 // XpkgMarshaler defines the API contract for working marshaling
 // xpkg.ParsedPackage's from a directory.
 type XpkgMarshaler interface {
-	FromDir(afero.Fs, string, string, string) (*xpkg.ParsedPackage, error)
+	FromDir(afero.Fs, string) (*xpkg.ParsedPackage, error)
 }
 
 // NewLocal creates a new LocalCache.
@@ -113,7 +113,7 @@ func (c *Local) Get(k v1beta1.Dependency) (*xpkg.ParsedPackage, error) {
 		return nil, err
 	}
 
-	e, err := c.currentEntry(calculatePath(&t), t.RegistryStr(), t.RepositoryStr())
+	e, err := c.currentEntry(calculatePath(&t))
 	if err != nil {
 		return nil, err
 	}
@@ -138,7 +138,7 @@ func (c *Local) Store(k v1beta1.Dependency, v *xpkg.ParsedPackage) error {
 
 	path := calculatePath(&t)
 
-	curr, err := c.currentEntry(path, t.RegistryStr(), t.RepositoryStr())
+	curr, err := c.currentEntry(path)
 	if err != nil && !os.IsNotExist(err) {
 		return errors.Wrap(err, errFailedToFindEntry)
 	}

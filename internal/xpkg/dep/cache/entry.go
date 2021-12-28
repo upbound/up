@@ -68,7 +68,7 @@ func (c *Local) newEntry(p *rxpkg.ParsedPackage) *entry {
 // In addition registry and repo are provided in order to fully
 // hydrate the ParsedPackage.
 // TODO(@tnthornton) maybe pull this into cache.go
-func (c *Local) currentEntry(path, reg, repo string) (*entry, error) {
+func (c *Local) currentEntry(path string) (*entry, error) {
 
 	e := &entry{
 		cacheRoot: c.root,
@@ -77,7 +77,7 @@ func (c *Local) currentEntry(path, reg, repo string) (*entry, error) {
 	}
 
 	// grab the current entry if it exists
-	pkg, err := c.pkgres.FromDir(c.fs, e.location(), reg, repo)
+	pkg, err := c.pkgres.FromDir(c.fs, e.location())
 	if os.IsNotExist(err) {
 		return e, err
 	}

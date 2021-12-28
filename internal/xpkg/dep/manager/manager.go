@@ -70,7 +70,7 @@ type ImageResolver interface {
 // xpkg.ParsedPackage marshaler.
 type XpkgMarshaler interface {
 	FromImage(ixpkg.Image) (*xpkg.ParsedPackage, error)
-	FromDir(afero.Fs, string, string, string) (*xpkg.ParsedPackage, error)
+	FromDir(afero.Fs, string) (*xpkg.ParsedPackage, error)
 }
 
 // New returns a new Manager
