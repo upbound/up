@@ -435,7 +435,7 @@ func TestRWMetaFile(t *testing.T) {
 			},
 			want: want{
 				writerErr: syscall.EPERM,
-				readErr:   errors.Wrap(errors.New("open /crossplane.yaml: file does not exist"), errMetaFileDoesNotExist),
+				readErr:   errors.Wrap(errors.New("open crossplane.yaml: file does not exist"), errMetaFileDoesNotExist),
 			},
 		},
 	}

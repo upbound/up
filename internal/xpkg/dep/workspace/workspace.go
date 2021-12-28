@@ -47,11 +47,11 @@ const (
 
 // Workspace defines our view of the current directory
 type Workspace struct {
-	fs             afero.Fs
-	metaFileExists bool
-	parser         *parser.PackageParser
-	root           string
-	wd             WorkingDirFn
+	fs          afero.Fs
+	metaFileLoc string
+	parser      *parser.PackageParser
+	root        string
+	wd          WorkingDirFn
 }
 
 // New establishees a workspace for acting on current ws entries
@@ -81,12 +81,27 @@ func New(opts ...WSOption) (*Workspace, error) {
 
 	ws.root = wd
 
-	exists, err := afero.Exists(ws.fs, filepath.Join(wd, xpkg.MetaFile))
-	if err != nil {
-		return nil, errors.Wrap(err, errMetaFileDoesNotExist)
-	}
+	// TODO(@tnthornton) consider moving this into a package that is highly
+	// specific to dealing with meta files.
+	if err := afero.Walk(ws.fs, wd, func(path string, info os.FileInfo, err error) error {
 
-	ws.metaFileExists = exists
+		if info.IsDir() {
+			return nil
+		}
+
+		if filepath.Ext(path) != ".yaml" {
+			return nil
+		}
+
+		if info.Name() == xpkg.MetaFile {
+			ws.metaFileLoc = filepath.Dir(path)
+			return nil
+		}
+
+		return nil
+	}); err != nil {
+		return nil, err
+	}
 
 	return ws, nil
 }
@@ -116,7 +131,7 @@ func WithWorkingDir(path string) WSOption {
 
 // MetaExists returns true if a meta file exists in the workspace
 func (w *Workspace) MetaExists() bool {
-	return w.metaFileExists
+	return w.metaFileLoc != ""
 }
 
 // Upsert will add an entry to the meta file, if the meta file exists and
@@ -206,7 +221,7 @@ func upsertDeps(d v1beta1.Dependency, o runtime.Object) error { // nolint:gocycl
 
 func (w *Workspace) readPkgMeta() (runtime.Object, error) {
 
-	mf, err := w.fs.Open(filepath.Join(w.root, xpkg.MetaFile))
+	mf, err := w.fs.Open(filepath.Join(w.metaFileLoc, xpkg.MetaFile))
 	if err != nil && os.IsNotExist(err) {
 		return nil, errors.Wrap(err, errMetaFileDoesNotExist)
 	}
@@ -256,7 +271,7 @@ func (w *Workspace) writeMetaPkg(p runtime.Object) error {
 		}
 	}
 
-	return afero.WriteFile(w.fs, filepath.Join(w.root, xpkg.MetaFile), data, os.ModePerm)
+	return afero.WriteFile(w.fs, filepath.Join(w.metaFileLoc, xpkg.MetaFile), data, os.ModePerm)
 }
 
 // cleanNullTs is a helper function for cleaning the erroneous

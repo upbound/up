@@ -234,7 +234,6 @@ func NewWorkspace(root span.URI, cacheRoot string, opts ...WorkspaceOpt) (*Works
 	for _, o := range opts {
 		o(w)
 	}
-	w.log.Debug(fmt.Sprintf("cacheRoot: %s", cacheRoot))
 
 	return w, nil
 }
