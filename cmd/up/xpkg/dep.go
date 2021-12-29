@@ -28,7 +28,7 @@ import (
 	"github.com/upbound/up/internal/xpkg/dep/cache"
 	"github.com/upbound/up/internal/xpkg/dep/manager"
 	"github.com/upbound/up/internal/xpkg/dep/resolver/image"
-	"github.com/upbound/up/internal/xpkg/dep/workspace"
+	"github.com/upbound/up/internal/xpkg/workspace"
 )
 
 const (
@@ -65,11 +65,20 @@ func (c *depCmd) AfterApply(kongCtx *kong.Context) error {
 	c.m = m
 	c.c = cache
 
-	ws, err := workspace.New(workspace.WithFS(fs))
+	wd, err := os.Getwd()
+	if err != nil {
+		return err
+	}
+
+	ws, err := workspace.New(wd, workspace.WithFS(fs))
 	if err != nil {
 		return err
 	}
 	c.ws = ws
+
+	if err := ws.Parse(); err != nil {
+		return err
+	}
 
 	// workaround interfaces not being bindable ref: https://github.com/alecthomas/kong/issues/48
 	kongCtx.BindTo(ctx, (*context.Context)(nil))
@@ -82,6 +91,9 @@ type depCmd struct {
 	m  *manager.Manager
 	ws *workspace.Workspace
 
+	// TODO(@tnthornton) remove cacheDir flag. Having a user supplied flag
+	// can result in broken behavior between xpls and dep. CacheDir should
+	// only be supplied by the Config.
 	CacheDir   string `short:"d" help:"Directory used for caching package images." default:"~/.up/cache/" env:"CACHE_DIR"`
 	CleanCache bool   `short:"c" help:"Clean dep cache."`
 
@@ -119,9 +131,15 @@ func (c *depCmd) userSuppliedDep(ctx context.Context) error {
 		return err
 	}
 
-	if c.ws.MetaExists() {
+	meta := c.ws.Meta()
+
+	if meta != nil {
 		// crossplane.yaml file exists in the workspace, upsert the new dependency
-		if err := c.ws.Upsert(ud); err != nil {
+		if err := meta.Upsert(ud); err != nil {
+			return err
+		}
+
+		if err := c.ws.Write(meta); err != nil {
 			return err
 		}
 	}
@@ -130,11 +148,13 @@ func (c *depCmd) userSuppliedDep(ctx context.Context) error {
 }
 
 func (c *depCmd) metaSuppliedDeps(ctx context.Context) error {
-	if !c.ws.MetaExists() {
+	meta := c.ws.Meta()
+
+	if meta == nil {
 		return errors.New(errMetaFileNotFound)
 	}
 
-	deps, err := c.ws.DependsOn()
+	deps, err := meta.DependsOn()
 	if err != nil {
 		return err
 	}

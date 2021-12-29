@@ -2,6 +2,8 @@ package workspace
 
 import (
 	"bufio"
+	"bytes"
+	"context"
 	"io"
 	"io/fs"
 	"os"
@@ -49,6 +51,7 @@ const (
 	errFileBodyNotFound     = "could not find corresponding file body for %s"
 	errInvalidFileURI       = "invalid path supplied"
 	errInvalidRange         = "invalid range supplied"
+	errInvalidPackage       = "invalid package; more than one meta file supplied"
 	errMetaFileDoesNotExist = "meta file does not exist"
 	errNoChangesSupplied    = "no content changes provided"
 )
@@ -91,7 +94,6 @@ func New(root string, opts ...Option) (*Workspace, error) {
 		// metaLocation will be updating accordingly during workspace parse.
 		metaLocation: root,
 		view: &View{
-			meta:         &meta.Meta{},
 			nodes:        make(map[NodeIdentifier]Node),
 			uriToDetails: make(map[protocol.DocumentURI]*Details),
 			validators:   make(map[schema.GroupVersionKind]validator.Validator),
@@ -261,8 +263,17 @@ func (w *Workspace) parseDoc(n ast.Node, path string) (NodeIdentifier, error) { 
 
 	// if this is node for the meta file, note it in the workspace for easy lookups.
 	if isMeta(path) {
-		w.metaLocation = path
-		w.view.meta = meta.New(obj)
+		w.metaLocation = filepath.Dir(path)
+		p, err := w.parser.Parse(context.Background(), io.NopCloser(bytes.NewReader(b)))
+		if err != nil {
+			return NodeIdentifier{}, err
+		}
+
+		if len(p.GetMeta()) != 1 {
+			return NodeIdentifier{}, errors.New(errInvalidPackage)
+		}
+
+		w.view.meta = meta.New(p.GetMeta()[0])
 	}
 
 	w.view.nodes[id] = &PackageNode{
