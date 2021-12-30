@@ -23,6 +23,7 @@ import (
 	"sort"
 
 	"github.com/Masterminds/semver"
+	"github.com/crossplane/crossplane-runtime/pkg/logging"
 	"github.com/crossplane/crossplane/apis/pkg/v1beta1"
 	"github.com/google/go-containerregistry/pkg/name"
 	v1 "github.com/google/go-containerregistry/pkg/v1"
@@ -44,9 +45,10 @@ const (
 
 // Manager defines a dependency Manager
 type Manager struct {
-	c Cache
-	i ImageResolver
-	x XpkgMarshaler
+	c   Cache
+	i   ImageResolver
+	x   XpkgMarshaler
+	log logging.Logger
 
 	acc []*xpkg.ParsedPackage
 }
@@ -75,8 +77,11 @@ type XpkgMarshaler interface {
 
 // New returns a new Manager
 func New(opts ...Option) (*Manager, error) {
-	m := &Manager{}
+	m := &Manager{
+		log: logging.NewNopLogger(),
+	}
 
+	// TODO(@tnthornton) move this resolution to the config.
 	home, err := os.UserHomeDir()
 	if err != nil {
 		return nil, err
@@ -119,6 +124,13 @@ func WithCache(c Cache) Option {
 	}
 }
 
+// WithLogger overrides the default logger with the supplied logger.
+func WithLogger(l logging.Logger) Option {
+	return func(m *Manager) {
+		m.log = l
+	}
+}
+
 // WithResolver sets the supplied dep.Resolver on the Manager.
 func WithResolver(r ImageResolver) Option {
 	return func(m *Manager) {
@@ -126,10 +138,9 @@ func WithResolver(r ImageResolver) Option {
 	}
 }
 
-// Snapshot returns a Snapshot containing a view of all of the validators for
-// dependencies (both defined and transitive) related to the given slice of
-// v1beta1.Dependency.
-func (m *Manager) Snapshot(ctx context.Context, deps []v1beta1.Dependency) (*Snapshot, error) {
+// View returns a View corresponding to the supplied dependency slice
+// (both defined and transitive).
+func (m *Manager) View(ctx context.Context, deps []v1beta1.Dependency) (*View, error) {
 	validators := make(map[schema.GroupVersionKind]validator.Validator)
 	packages := make(map[string]*xpkg.ParsedPackage)
 
@@ -149,11 +160,9 @@ func (m *Manager) Snapshot(ctx context.Context, deps []v1beta1.Dependency) (*Sna
 		}
 	}
 
-	return &Snapshot{
-		view: &View{
-			packages:   packages,
-			validators: validators,
-		},
+	return &View{
+		packages:   packages,
+		validators: validators,
 	}, nil
 }
 
@@ -395,21 +404,10 @@ func (m *Manager) finalizeLocalDepVersion(_ context.Context, d *v1beta1.Dependen
 	return nil
 }
 
-// Snapshot represents the dependency cache at a snapshot in time.
-type Snapshot struct {
-	view *View
-}
-
-// View represents the current view of the dependency cache in an easy to consume
-// manner.
+// View represents the processed View corresponding to some dependencies.
 type View struct {
 	packages   map[string]*xpkg.ParsedPackage
 	validators map[schema.GroupVersionKind]validator.Validator
-}
-
-// View returns the Snapshot's View.
-func (s *Snapshot) View() *View {
-	return s.view
 }
 
 // Packages returns the packages map for the view.

@@ -561,15 +561,15 @@ func (w *Workspace) LoadCacheValidators() error {
 			return err
 		}
 
-		snap, err := w.m.Snapshot(context.Background(), deps)
+		view, err := w.m.View(context.Background(), deps)
 		if err != nil {
 			return err
 		}
 
 		// add external deps to the set of validators for the workspace.
 		w.mu.Lock()
-		w.appendValidators(snap.View().Validators())
-		w.snapshot.packages = snap.View().Packages()
+		w.appendValidators(view.Validators())
+		w.snapshot.packages = view.Packages()
 		w.mu.Unlock()
 	}
 	return nil

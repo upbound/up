@@ -26,6 +26,7 @@ import (
 	k8syaml "sigs.k8s.io/yaml"
 
 	"github.com/crossplane/crossplane-runtime/pkg/errors"
+	"github.com/crossplane/crossplane-runtime/pkg/logging"
 	xparser "github.com/crossplane/crossplane-runtime/pkg/parser"
 	xpextv1 "github.com/crossplane/crossplane/apis/apiextensions/v1"
 
@@ -69,10 +70,12 @@ func init() {
 	}
 }
 
-// Workspace --
+// Workspace provides APIs for interacting with the current project workspace.
 type Workspace struct {
 	// fs represents the filesystem the workspace resides in.
 	fs afero.Fs
+
+	log logging.Logger
 	// metaLocation denotes the place the meta file exists at the time the
 	// workspace was created.
 	metaLocation string
@@ -89,6 +92,7 @@ type Workspace struct {
 func New(root string, opts ...Option) (*Workspace, error) {
 	w := &Workspace{
 		fs:   afero.NewOsFs(),
+		log:  logging.NewNopLogger(),
 		root: root,
 		// Default metaLocation to the root. If a pre-existing meta file exists,
 		// metaLocation will be updating accordingly during workspace parse.
@@ -125,9 +129,12 @@ func WithFS(fs afero.Fs) Option {
 	}
 }
 
-// Meta returns the metafile located within the workspace.
-func (w *Workspace) Meta() *meta.Meta {
-	return w.view.meta
+// WithLogger overrides the default logger for the Workspace with the supplied
+// logger.
+func WithLogger(l logging.Logger) Option {
+	return func(w *Workspace) {
+		w.log = l
+	}
 }
 
 // Write writes the supplied Meta details to the fs.
@@ -181,6 +188,12 @@ func (w *Workspace) Parse() error {
 	// TODO(@tnthornton) loading the validators this way means we end up
 	// iterating over the workspace twice. Fix that.
 	return w.loadValidators(w.root)
+}
+
+// View returns the Workspace's View. Note: this will only exist _after_
+// the Workspace has been parsed.
+func (w *Workspace) View() *View {
+	return w.view
 }
 
 // parseFile parses all YAML objects at the given path and updates the workspace
@@ -418,6 +431,16 @@ type View struct {
 	uriToDetails map[protocol.DocumentURI]*Details
 	nodes        map[NodeIdentifier]Node
 	validators   map[schema.GroupVersionKind]validator.Validator
+}
+
+// Meta returns the View's Meta.
+func (v *View) Meta() *meta.Meta {
+	return v.meta
+}
+
+// Validators returns the View's validators.
+func (v *View) Validators() map[schema.GroupVersionKind]validator.Validator {
+	return v.validators
 }
 
 // Details represent file specific details.

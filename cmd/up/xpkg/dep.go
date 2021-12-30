@@ -131,7 +131,7 @@ func (c *depCmd) userSuppliedDep(ctx context.Context) error {
 		return err
 	}
 
-	meta := c.ws.Meta()
+	meta := c.ws.View().Meta()
 
 	if meta != nil {
 		// crossplane.yaml file exists in the workspace, upsert the new dependency
@@ -148,7 +148,7 @@ func (c *depCmd) userSuppliedDep(ctx context.Context) error {
 }
 
 func (c *depCmd) metaSuppliedDeps(ctx context.Context) error {
-	meta := c.ws.Meta()
+	meta := c.ws.View().Meta()
 
 	if meta == nil {
 		return errors.New(errMetaFileNotFound)

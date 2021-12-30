@@ -376,15 +376,14 @@ func TestSnapshot(t *testing.T) {
 			// add the pkg to the cache
 			m.addPkg(ctx, tc.args.dep)
 
-			got, err := m.Snapshot(ctx, []v1beta1.Dependency{tc.args.dep})
+			got, err := m.View(ctx, []v1beta1.Dependency{tc.args.dep})
 
 			if diff := cmp.Diff(tc.want.err, err, test.EquateErrors()); diff != "" {
 				t.Errorf("\n%s\nSnapshot(...): -want err, +got err:\n%s", tc.reason, diff)
 			}
 
 			for _, k := range tc.want.keys {
-				v := got.View()
-				_, ok := v.validators[k]
+				_, ok := got.validators[k]
 
 				if diff := cmp.Diff(true, ok); diff != "" {
 					t.Errorf("\n%s\nSnapshot(...): -want err, +got err:\n%s", tc.reason, diff)
