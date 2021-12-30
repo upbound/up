@@ -23,8 +23,7 @@ import (
 
 	"github.com/crossplane/crossplane/apis/pkg/v1beta1"
 
-	"github.com/upbound/up/internal/xpkg/dep/manager"
-	"github.com/upbound/up/internal/xpls/validator"
+	"github.com/upbound/up/internal/xpkg/snapshot/validator"
 )
 
 const (
@@ -37,11 +36,14 @@ const (
 
 // VersionValidator is used to validate the dependency versions in a meta file.
 type VersionValidator struct {
-	manager *manager.Manager
+	manager DepManager
 }
 
 // NewVersionValidator returns a new VersionValidator.
-func NewVersionValidator(manager *manager.Manager) *VersionValidator {
+// NOTE(@tnthornton) NewVersionValidator needs snapshot's manager due to the
+// use case where someone adds a dependency to the crossplane.yaml and we need
+// to validate its existence.
+func NewVersionValidator(manager DepManager) *VersionValidator {
 	return &VersionValidator{
 		manager: manager,
 	}
@@ -50,8 +52,6 @@ func NewVersionValidator(manager *manager.Manager) *VersionValidator {
 // validate validates the dependency versions in a meta file.
 func (v *VersionValidator) validate(i int, d v1beta1.Dependency) error {
 	// check explicit version
-	// TODO(@tnthornton) move this into the Snapshot. Versions shouldn't change
-	// within the lifespan of a snapshot.
 	vers, err := v.manager.Versions(context.Background(), d)
 	if err != nil {
 		// TODO(@tnthornton) add debug logging here

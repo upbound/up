@@ -31,7 +31,7 @@ import (
 	"github.com/upbound/up/internal/xpkg/dep/manager"
 	mxpkg "github.com/upbound/up/internal/xpkg/dep/marshaler/xpkg"
 	pyaml "github.com/upbound/up/internal/xpkg/parser/yaml"
-	"github.com/upbound/up/internal/xpls/validator"
+	"github.com/upbound/up/internal/xpkg/snapshot/validator"
 )
 
 var (
@@ -40,10 +40,13 @@ var (
 	errFailedConvertToPkg = "unable to convert to package"
 )
 
+type DepManager interface {
+	Versions(context.Context, v1beta1.Dependency) ([]string, error)
+}
+
 // Validator defines a validator for meta files.
 type Validator struct {
-	manager *manager.Manager
-	p       *parser.PackageParser
+	p *parser.PackageParser
 	// TODO(@tnthornton) move to accepting a snapshot rather than the map
 	// once Snapshots are first class citizens.
 	packages   map[string]*mxpkg.ParsedPackage
@@ -51,7 +54,7 @@ type Validator struct {
 }
 
 // New returns a new Meta validator.
-func New(m *manager.Manager, pkgs map[string]*mxpkg.ParsedPackage) (*Validator, error) {
+func New(m DepManager, pkgs map[string]*mxpkg.ParsedPackage) (*Validator, error) {
 	p, err := pyaml.New()
 	if err != nil {
 		return nil, err
@@ -63,7 +66,6 @@ func New(m *manager.Manager, pkgs map[string]*mxpkg.ParsedPackage) (*Validator, 
 	}
 
 	return &Validator{
-		manager:    m,
 		p:          p,
 		packages:   pkgs,
 		validators: validators,

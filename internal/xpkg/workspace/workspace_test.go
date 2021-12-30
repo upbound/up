@@ -19,7 +19,6 @@ import (
 
 	"github.com/crossplane/crossplane-runtime/pkg/test"
 	xpextv1 "github.com/crossplane/crossplane/apis/apiextensions/v1"
-	xpextv1beta1 "github.com/crossplane/crossplane/apis/apiextensions/v1beta1"
 	metav1 "github.com/crossplane/crossplane/apis/pkg/meta/v1"
 
 	"github.com/upbound/up/internal/xpkg"
@@ -115,71 +114,6 @@ func TestParse(t *testing.T) {
 			for id := range ws.view.nodes {
 				if _, ok := tc.nodes[id]; !ok {
 					t.Errorf("\n%s\nParse(...): missing node:\n%v", tc.reason, id)
-				}
-			}
-		})
-	}
-}
-
-func TestLoadValidators(t *testing.T) {
-	cases := map[string]struct {
-		reason     string
-		opt        Option
-		wsroot     string
-		validators map[schema.GroupVersionKind]struct{}
-		err        error
-	}{
-		"SuccessfulNoKubernetesObjects": {
-			reason: "Should return an error if the path does not exist.",
-			wsroot: "/ws",
-			opt: WithFS(func() afero.Fs {
-				fs := afero.NewMemMapFs()
-				_ = fs.Mkdir("/ws", os.ModePerm)
-				_ = afero.WriteFile(fs, "/ws/somerandom.yaml", []byte("some invalid ::: yaml"), os.ModePerm)
-				return fs
-			}()),
-		},
-		"SuccessfulLoadFromCRD": {
-			reason: "Should add a validator for a CRD if it is valid.",
-			wsroot: "/ws",
-			opt: WithFS(func() afero.Fs {
-				fs := afero.NewMemMapFs()
-				_ = fs.Mkdir("/ws", os.ModePerm)
-				_ = afero.WriteFile(fs, "/ws/valid.yaml", testSingleVersionCRD, os.ModePerm)
-				return fs
-			}()),
-			validators: map[schema.GroupVersionKind]struct{}{
-				schema.FromAPIVersionAndKind("acm.aws.crossplane.io/v1alpha1", "Certificate"): {},
-			},
-		},
-		"SuccessfulLoadMultiVersionFromCRD": {
-			reason: "Should add a validator for each version in a CRD if multiple are specified.",
-			wsroot: "/ws",
-			opt: WithFS(func() afero.Fs {
-				fs := afero.NewMemMapFs()
-				_ = fs.Mkdir("/ws", os.ModePerm)
-				_ = afero.WriteFile(fs, "/ws/multiversion.yaml", testMultiVersionCRD, os.ModePerm)
-				return fs
-			}()),
-			validators: map[schema.GroupVersionKind]struct{}{
-				xpextv1.CompositeResourceDefinitionGroupVersionKind:      {},
-				xpextv1beta1.CompositeResourceDefinitionGroupVersionKind: {},
-			},
-		},
-	}
-	for name, tc := range cases {
-		t.Run(name, func(t *testing.T) {
-			ws, _ := New(tc.wsroot, tc.opt)
-
-			if diff := cmp.Diff(tc.err, ws.Parse(), test.EquateErrors()); diff != "" {
-				t.Errorf("\n%s\nLoadValidators(...): -want error, +got error:\n%s", tc.reason, diff)
-			}
-			if len(tc.validators) != len(ws.view.validators) {
-				t.Errorf("\n%s\nLoadValidators(...): -want validators count: %d, +got validators count: %d", tc.reason, len(tc.validators), len(ws.view.validators))
-			}
-			for id := range ws.view.validators {
-				if _, ok := tc.validators[id]; !ok {
-					t.Errorf("\n%s\nLoadValidators(...): missing validator:\n%v", tc.reason, id)
 				}
 			}
 		})

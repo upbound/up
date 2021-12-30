@@ -1,7 +1,6 @@
 package workspace
 
 import (
-	"bufio"
 	"bytes"
 	"context"
 	"io"
@@ -16,13 +15,9 @@ import (
 	"github.com/golang/tools/lsp/protocol"
 	"github.com/spf13/afero"
 
-	ext "k8s.io/apiextensions-apiserver/pkg/apis/apiextensions"
-	extv1 "k8s.io/apiextensions-apiserver/pkg/apis/apiextensions/v1"
-	"k8s.io/apiextensions-apiserver/pkg/apiserver/validation"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 	"k8s.io/apimachinery/pkg/runtime/schema"
-	apimachyaml "k8s.io/apimachinery/pkg/util/yaml"
 	k8syaml "sigs.k8s.io/yaml"
 
 	"github.com/crossplane/crossplane-runtime/pkg/errors"
@@ -33,7 +28,6 @@ import (
 	"github.com/upbound/up/internal/xpkg"
 	pyaml "github.com/upbound/up/internal/xpkg/parser/yaml"
 	"github.com/upbound/up/internal/xpkg/workspace/meta"
-	"github.com/upbound/up/internal/xpls/validator"
 )
 
 // paths to extract GVK and name from objects that conform to Kubernetes
@@ -100,7 +94,6 @@ func New(root string, opts ...Option) (*Workspace, error) {
 		view: &View{
 			nodes:        make(map[NodeIdentifier]Node),
 			uriToDetails: make(map[protocol.DocumentURI]*Details),
-			validators:   make(map[schema.GroupVersionKind]validator.Validator),
 		},
 	}
 
@@ -152,7 +145,7 @@ func (w *Workspace) Parse() error {
 	w.mu.Lock()
 	defer w.mu.Unlock()
 
-	if err := afero.Walk(w.fs, w.root, func(p string, info fs.FileInfo, err error) error {
+	return afero.Walk(w.fs, w.root, func(p string, info fs.FileInfo, err error) error {
 		if err != nil {
 			return err
 		}
@@ -181,13 +174,7 @@ func (w *Workspace) Parse() error {
 
 		_ = w.parseFile(p)
 		return nil
-	}); err != nil {
-		return err
-	}
-
-	// TODO(@tnthornton) loading the validators this way means we end up
-	// iterating over the workspace twice. Fix that.
-	return w.loadValidators(w.root)
+	})
 }
 
 // View returns the Workspace's View. Note: this will only exist _after_
@@ -301,101 +288,6 @@ func (w *Workspace) parseDoc(n ast.Node, path string) (NodeIdentifier, error) { 
 	return id, nil
 }
 
-func (w *Workspace) loadValidators(path string) error { // nolint:gocyclo
-	validators := map[schema.GroupVersionKind]validator.Validator{}
-
-	if err := afero.Walk(w.fs, path, func(p string, info fs.FileInfo, err error) error {
-		if err != nil {
-			return err
-		}
-		if info.IsDir() {
-			return nil
-		}
-		if filepath.Ext(p) != yamlExt {
-			return nil
-		}
-		// NOTE(hasheddan): path is cleaned before being passed to our walk
-		// function.
-		f, err := w.fs.Open(p) // nolint:gosec
-		if err != nil {
-			return err
-		}
-		defer f.Close() // nolint:errcheck,gosec
-		yr := apimachyaml.NewYAMLReader(bufio.NewReader(f))
-		for {
-			b, err := yr.Read()
-			if err != nil && err != io.EOF {
-				return err
-			}
-			if err == io.EOF {
-				break
-			}
-			if len(b) == 0 {
-				continue
-			}
-			if isMeta(p) {
-				// just need to get gvk from this file
-				mobj := &unstructured.Unstructured{}
-				if err := k8syaml.Unmarshal(b, mobj); err != nil {
-					continue
-				}
-				// TODO(@tnthornton) make these validators not rely on
-				// dep manager directly.
-				// m, err := meta.New(w.m, w.snapshot.packages)
-				// if err != nil {
-				// 	continue
-				// }
-
-				// validators[mobj.GetObjectKind().GroupVersionKind()] = m
-				continue
-			}
-			// TODO(hasheddan): handle v1beta1 CRDs, as well as all XRD API versions.
-			crd := &extv1.CustomResourceDefinition{}
-			if err := k8syaml.Unmarshal(b, crd); err != nil {
-				// Skip YAML document if we cannot unmarshal to v1 CRD.
-				continue
-			}
-			internal := &ext.CustomResourceDefinition{}
-			if err := extv1.Convert_v1_CustomResourceDefinition_To_apiextensions_CustomResourceDefinition(crd, internal, nil); err != nil {
-				return err
-			}
-			// NOTE(hasheddan): If top-level validation is set, we use it for
-			// all versions and continue.
-			if internal.Spec.Validation != nil {
-				sv, _, err := validation.NewSchemaValidator(internal.Spec.Validation)
-				if err != nil {
-					return err
-				}
-				for _, v := range internal.Spec.Versions {
-					validators[schema.GroupVersionKind{
-						Group:   internal.Spec.Group,
-						Version: v.Name,
-						Kind:    internal.Spec.Names.Kind,
-					}] = sv
-				}
-				continue
-			}
-			for _, v := range internal.Spec.Versions {
-				sv, _, err := validation.NewSchemaValidator(v.Schema)
-				if err != nil {
-					return err
-				}
-				validators[schema.GroupVersionKind{
-					Group:   internal.Spec.Group,
-					Version: v.Name,
-					Kind:    internal.Spec.Names.Kind,
-				}] = sv
-			}
-		}
-		return nil
-	}); err != nil {
-		return err
-	}
-
-	w.view.validators = validators
-	return nil
-}
-
 func (w *Workspace) appendID(path string, id NodeIdentifier) {
 	uri := protocol.URIFromPath(path)
 	curr, ok := w.view.uriToDetails[uri]
@@ -430,17 +322,16 @@ type View struct {
 	meta         *meta.Meta
 	uriToDetails map[protocol.DocumentURI]*Details
 	nodes        map[NodeIdentifier]Node
-	validators   map[schema.GroupVersionKind]validator.Validator
+}
+
+// FileDetails returns the map of file details found within the parsed workspace.
+func (v *View) FileDetails() map[protocol.DocumentURI]*Details {
+	return v.uriToDetails
 }
 
 // Meta returns the View's Meta.
 func (v *View) Meta() *meta.Meta {
 	return v.meta
-}
-
-// Validators returns the View's validators.
-func (v *View) Validators() map[schema.GroupVersionKind]validator.Validator {
-	return v.validators
 }
 
 // Details represent file specific details.
