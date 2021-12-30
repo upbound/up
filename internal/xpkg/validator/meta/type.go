@@ -21,7 +21,7 @@ import (
 	"github.com/crossplane/crossplane/apis/pkg/v1beta1"
 
 	mxpkg "github.com/upbound/up/internal/xpkg/dep/marshaler/xpkg"
-	"github.com/upbound/up/internal/xpkg/snapshot/validator"
+	"github.com/upbound/up/internal/xpkg/validator"
 )
 
 // TypeValidator validates the dependency type matches the supplied dependency

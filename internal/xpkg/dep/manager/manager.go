@@ -34,7 +34,7 @@ import (
 	"github.com/upbound/up/internal/xpkg/dep/cache"
 	xpkg "github.com/upbound/up/internal/xpkg/dep/marshaler/xpkg"
 	"github.com/upbound/up/internal/xpkg/dep/resolver/image"
-	"github.com/upbound/up/internal/xpkg/snapshot/validator"
+	"github.com/upbound/up/internal/xpkg/validator"
 )
 
 const (

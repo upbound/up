@@ -23,7 +23,7 @@ import (
 
 	"github.com/crossplane/crossplane/apis/pkg/v1beta1"
 
-	"github.com/upbound/up/internal/xpkg/snapshot/validator"
+	"github.com/upbound/up/internal/xpkg/validator"
 )
 
 const (

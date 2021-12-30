@@ -31,7 +31,7 @@ import (
 	"github.com/upbound/up/internal/xpkg/dep/manager"
 	mxpkg "github.com/upbound/up/internal/xpkg/dep/marshaler/xpkg"
 	pyaml "github.com/upbound/up/internal/xpkg/parser/yaml"
-	"github.com/upbound/up/internal/xpkg/snapshot/validator"
+	"github.com/upbound/up/internal/xpkg/validator"
 )
 
 var (
@@ -40,6 +40,7 @@ var (
 	errFailedConvertToPkg = "unable to convert to package"
 )
 
+// DepManager defines the API necessary for working with the dependency manager.
 type DepManager interface {
 	Versions(context.Context, v1beta1.Dependency) ([]string, error)
 }

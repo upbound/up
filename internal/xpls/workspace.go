@@ -54,8 +54,8 @@ import (
 	"github.com/upbound/up/internal/xpkg/dep/manager"
 	mxpkg "github.com/upbound/up/internal/xpkg/dep/marshaler/xpkg"
 	"github.com/upbound/up/internal/xpkg/dep/workspace"
-	"github.com/upbound/up/internal/xpkg/snapshot/validator"
-	"github.com/upbound/up/internal/xpkg/snapshot/validator/meta"
+	"github.com/upbound/up/internal/xpkg/validator"
+	"github.com/upbound/up/internal/xpkg/validator/meta"
 )
 
 // paths to extract GVK and name from objects that conform to Kubernetes

@@ -22,11 +22,12 @@ import (
 	"github.com/upbound/up/internal/xpkg"
 	"github.com/upbound/up/internal/xpkg/dep/manager"
 	mxpkg "github.com/upbound/up/internal/xpkg/dep/marshaler/xpkg"
-	"github.com/upbound/up/internal/xpkg/snapshot/validator"
-	"github.com/upbound/up/internal/xpkg/snapshot/validator/meta"
+	"github.com/upbound/up/internal/xpkg/validator"
+	"github.com/upbound/up/internal/xpkg/validator/meta"
 	"github.com/upbound/up/internal/xpkg/workspace"
 )
 
+// DepManager defines the API necessary for working with the dependency manager.
 type DepManager interface {
 	View(context.Context, []v1beta1.Dependency) (*manager.View, error)
 	Versions(context.Context, v1beta1.Dependency) ([]string, error)
