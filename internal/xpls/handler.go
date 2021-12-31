@@ -21,7 +21,6 @@ import (
 	"time"
 
 	"github.com/golang/tools/lsp/protocol"
-	"github.com/sourcegraph/go-lsp"
 	"github.com/sourcegraph/jsonrpc2"
 	"github.com/spf13/afero"
 
@@ -49,7 +48,7 @@ type Handler struct {
 	fs       afero.Fs
 	log      logging.Logger
 
-	watchInterval time.Duration
+	watchInterval *time.Duration
 }
 
 // HandlerOpt modifies a handler.
@@ -77,7 +76,7 @@ func WithLogger(l logging.Logger) HandlerOpt {
 }
 
 // WithWatchInterval sets the cache watch interval.
-func WithWatchInterval(interval time.Duration) HandlerOpt {
+func WithWatchInterval(interval *time.Duration) HandlerOpt {
 	return func(h *Handler) {
 		h.watchInterval = interval
 	}
@@ -99,13 +98,13 @@ func NewHandler(opts ...HandlerOpt) (*Handler, error) {
 		fs:            afero.NewOsFs(),
 		cacheDir:      cacheRoot,
 		log:           logging.NewNopLogger(),
-		watchInterval: interval,
+		watchInterval: &interval,
 	}
 	for _, o := range opts {
 		o(h)
 	}
 
-	h.dispatch = NewDispatcher(h.log, h.cacheDir, interval)
+	h.dispatch = NewDispatcher(h.log, h.cacheDir, h.watchInterval)
 	return h, nil
 }
 
@@ -130,16 +129,13 @@ func (h *Handler) Handle(ctx context.Context, c *jsonrpc2.Conn, r *jsonrpc2.Requ
 		}
 
 		h.dispatch.registerWatchFilesCapability()
-		// TODO(@tnthornton) invocation of this should be moved to be within
-		// the cache itself.
-		h.dispatch.watchCache()
 
 		return
 	case "initialized":
 		// NOTE(hasheddan): no need to respond when the client reports initialized.
 		return
 	case "textDocument/didOpen":
-		var params lsp.DidOpenTextDocumentParams
+		var params protocol.DidOpenTextDocumentParams
 		if err := json.Unmarshal(*r.Params, &params); err != nil {
 			h.log.Debug(errParseSaveParameters)
 			break
@@ -151,7 +147,7 @@ func (h *Handler) Handle(ctx context.Context, c *jsonrpc2.Conn, r *jsonrpc2.Requ
 		}
 		h.dispatch.publishDiagnostics(ctx, diags)
 	case "textDocument/didSave":
-		var params lsp.DidSaveTextDocumentParams
+		var params protocol.DidSaveTextDocumentParams
 		if err := json.Unmarshal(*r.Params, &params); err != nil {
 			// If we can't parse the save parameters, log the error and skip
 			// parsing.
@@ -188,9 +184,7 @@ func (h *Handler) Handle(ctx context.Context, c *jsonrpc2.Conn, r *jsonrpc2.Requ
 			break
 		}
 
-		if err := c.Notify(ctx, "textDocument/publishDiagnostics", diags); err != nil {
-			h.log.Debug(errPublishDiagnostics, "error", err)
-		}
+		h.dispatch.publishDiagnostics(ctx, diags)
 	case "workspace/didChangeWatchedFiles":
 		var params protocol.DidChangeWatchedFilesParams
 		if err := json.Unmarshal(*r.Params, &params); err != nil {

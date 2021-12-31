@@ -16,20 +16,19 @@ package xpls
 
 import (
 	"context"
-	"fmt"
-	"path/filepath"
 	"strings"
+	"sync"
 	"time"
 
 	"github.com/golang/tools/lsp/protocol"
 	"github.com/golang/tools/span"
-	"github.com/radovskyb/watcher"
 	"github.com/sourcegraph/go-lsp"
 	"github.com/sourcegraph/jsonrpc2"
 
 	"github.com/crossplane/crossplane-runtime/pkg/logging"
 
-	"github.com/upbound/up/internal/xpkg"
+	"github.com/upbound/up/internal/xpkg/dep/manager"
+	"github.com/upbound/up/internal/xpkg/snapshot"
 )
 
 var (
@@ -38,6 +37,7 @@ var (
 )
 
 const (
+	fileProtocol  = "file://"
 	fileWatchGlob = "**/*.yaml"
 
 	errParseWorkspace     = "failed to parse workspace"
@@ -51,19 +51,22 @@ const (
 
 // Dispatcher --
 type Dispatcher struct {
+	mu sync.RWMutex
+
 	clientConn *jsonrpc2.Conn
 
 	root      span.URI
 	cacheRoot string
 
-	ws  *Workspace
-	log logging.Logger
+	snapFactory *snapshot.Factory
+	snap        *snapshot.Snapshot
+	log         logging.Logger
 
-	watchInterval time.Duration
+	watchInterval *time.Duration
 }
 
 // NewDispatcher returns a new Dispatcher instance.
-func NewDispatcher(log logging.Logger, cacheRoot string, watchInterval time.Duration) *Dispatcher {
+func NewDispatcher(log logging.Logger, cacheRoot string, watchInterval *time.Duration) *Dispatcher {
 	return &Dispatcher{
 		cacheRoot: cacheRoot,
 		log:       log,
@@ -76,30 +79,52 @@ func NewDispatcher(log logging.Logger, cacheRoot string, watchInterval time.Dura
 func (d *Dispatcher) Initialize(ctx context.Context, params protocol.InitializeParams, c *jsonrpc2.Conn) *lsp.InitializeResult {
 	d.clientConn = c
 	d.root = params.RootURI.SpanURI()
-	ws, err := NewWorkspace(d.root, d.cacheRoot, WithWSLogger(d.log))
+
+	m, err := manager.New(
+		manager.WithLogger(d.log),
+		manager.WithWatchInterval(d.watchInterval),
+	)
 	if err != nil {
 		panic(err)
 	}
 
-	d.ws = ws
+	factory, err := snapshot.NewFactory(
+		d.root.Filename(),
+		snapshot.WithLogger(d.log),
+		snapshot.WithDepManager(m),
+	)
+	if err != nil {
+		panic(err)
+	}
+
+	d.snapFactory = factory
+
+	snap, err := d.snapFactory.New()
+	if err != nil {
+		panic(err)
+	}
+
+	d.snap = snap
 
 	// TODO(@tnthornton) this is a slow operation
-	if err := d.ws.LoadCacheValidators(); err != nil {
-		// NOTE(@tnthornton) this error can happen if no dependencies for the
-		// workspace currently exist in the cache.
-		d.log.Debug(errLoadValidators, "error", err)
-	}
+	// if err := d.ws.LoadCacheValidators(); err != nil {
+	// 	// NOTE(@tnthornton) this error can happen if no dependencies for the
+	// 	// workspace currently exist in the cache.
+	// 	d.log.Debug(errLoadValidators, "error", err)
+	// }
 
-	if err := d.ws.LoadValidators(d.root.Filename()); err != nil {
-		// If we can't load validators panic because we won't be able to
-		// perform validation.
-		panic(err)
-	}
+	// if err := d.ws.LoadValidators(d.root.Filename()); err != nil {
+	// 	// If we can't load validators panic because we won't be able to
+	// 	// perform validation.
+	// 	panic(err)
+	// }
 
-	if err := d.ws.Parse(); err != nil {
-		d.log.Debug(errParseWorkspace, "error", err)
-		panic(err)
-	}
+	// if err := d.ws.Parse(); err != nil {
+	// 	d.log.Debug(errParseWorkspace, "error", err)
+	// 	panic(err)
+	// }
+
+	d.watchSnapshot()
 
 	return &lsp.InitializeResult{
 		Capabilities: lsp.ServerCapabilities{
@@ -111,106 +136,126 @@ func (d *Dispatcher) Initialize(ctx context.Context, params protocol.InitializeP
 }
 
 // DidChange handles didChange events.
-func (d *Dispatcher) DidChange(ctx context.Context, params protocol.DidChangeTextDocumentParams) *lsp.PublishDiagnosticsParams {
+func (d *Dispatcher) DidChange(ctx context.Context, params protocol.DidChangeTextDocumentParams) *protocol.PublishDiagnosticsParams {
 	uri := params.TextDocument.URI.SpanURI()
 	filename := uri.Filename()
 
 	// update snapshot for changes seen
-	err := d.ws.updateContent(ctx, uri, params.ContentChanges)
+	err := d.snap.UpdateContent(ctx, uri, params.ContentChanges)
 	if err != nil {
 		d.log.Debug(err.Error())
 		return nil
 	}
 
-	if err := d.ws.parseFile(filename); err != nil {
+	if err := d.snap.ReParseFile(filename); err != nil {
 		d.log.Debug(err.Error())
 		return nil
 	}
 
 	// TODO(hasheddan): diagnostics should be cached and validation should
 	// be performed selectively.
-	diags, err := d.ws.Validate(lsp.DocumentURI(params.TextDocument.URI), d.ws.CorrespondingNodes)
+	diags, err := d.snap.Validate(params.TextDocument.URI.SpanURI())
 	if err != nil {
 		d.log.Debug(errValidateNodes, "error", err)
 		return nil
 	}
 
-	return &lsp.PublishDiagnosticsParams{
-		URI:         lsp.DocumentURI(params.TextDocument.URI),
+	return &protocol.PublishDiagnosticsParams{
+		URI:         params.TextDocument.URI,
 		Diagnostics: diags,
 	}
 }
 
 // DidOpen handles didOpen events.
-func (d *Dispatcher) DidOpen(ctx context.Context, params lsp.DidOpenTextDocumentParams) *lsp.PublishDiagnosticsParams {
-	if err := d.ws.Parse(); err != nil {
-		// If we can't parse the workspace, log the error and skip validation.
-		// TODO(hasheddan): surface this in diagnostics.
-		d.log.Debug(errParseWorkspace, "error", err)
-		return nil
-	}
+func (d *Dispatcher) DidOpen(ctx context.Context, params protocol.DidOpenTextDocumentParams) *protocol.PublishDiagnosticsParams {
+	// if err := d.ws.Parse(); err != nil {
+	// 	// If we can't parse the workspace, log the error and skip validation.
+	// 	// TODO(hasheddan): surface this in diagnostics.
+	// 	d.log.Debug(errParseWorkspace, "error", err)
+	// 	return nil
+	// }
 	// TODO(hasheddan): diagnostics should be cached and validation should
 	// be performed selectively.
-	diags, err := d.ws.Validate(params.TextDocument.URI, d.ws.CorrespondingNodes)
+	diags, err := d.snap.Validate(params.TextDocument.URI.SpanURI())
 	if err != nil {
 		d.log.Debug(errValidateNodes, "error", err)
 		return nil
 	}
-	return &lsp.PublishDiagnosticsParams{
+	return &protocol.PublishDiagnosticsParams{
 		URI:         params.TextDocument.URI,
 		Diagnostics: diags,
 	}
 }
 
 // DidSave handles didSave events.
-func (d *Dispatcher) DidSave(ctx context.Context, params lsp.DidSaveTextDocumentParams) *lsp.PublishDiagnosticsParams {
-	if err := d.ws.Parse(); err != nil {
-		// If we can't parse the workspace, log the error and skip validation.
-		// TODO(hasheddan): surface this in diagnostics.
+func (d *Dispatcher) DidSave(ctx context.Context, params protocol.DidSaveTextDocumentParams) *protocol.PublishDiagnosticsParams {
+	d.mu.Lock()
+	defer d.mu.Unlock()
+	// create new snapshot here
+	snap, err := d.snapFactory.New()
+	if err != nil {
 		d.log.Debug(errParseWorkspace, "error", err)
 		return nil
 	}
+	// TODO(@tnthornton) this isn't thread safe until we serialize incoming requests.
+	d.snap = snap
+
+	// if err := d.ws.Parse(); err != nil {
+	// 	// If we can't parse the workspace, log the error and skip validation.
+	// 	// TODO(hasheddan): surface this in diagnostics.
+	// 	d.log.Debug(errParseWorkspace, "error", err)
+	// 	return nil
+	// }
 
 	// we saved the meta file, load validators if the file isn't invalid
-	d.handleMeta(ctx, params.TextDocument.URI)
+	// d.handleMeta(ctx, params.TextDocument.URI)
 
 	// TODO(hasheddan): diagnostics should be cached and validation should
 	// be performed selectively.
-	diags, err := d.ws.Validate(params.TextDocument.URI, d.ws.CorrespondingNodes)
+	diags, err := d.snap.Validate(params.TextDocument.URI.SpanURI())
 	if err != nil {
 		d.log.Debug(errValidateNodes, "error", err)
 		return nil
 	}
-	return &lsp.PublishDiagnosticsParams{
+	return &protocol.PublishDiagnosticsParams{
 		URI:         params.TextDocument.URI,
 		Diagnostics: diags,
 	}
 }
 
 // WsWatchedFilesChanged handles didChangeWatchedFiles events.
-func (d *Dispatcher) WsWatchedFilesChanged(ctx context.Context, params protocol.DidChangeWatchedFilesParams) []*lsp.PublishDiagnosticsParams {
+func (d *Dispatcher) WsWatchedFilesChanged(ctx context.Context, params protocol.DidChangeWatchedFilesParams) []*protocol.PublishDiagnosticsParams {
+	d.mu.Lock()
+	defer d.mu.Unlock()
 
-	if err := d.ws.Parse(); err != nil {
-		// If we can't parse the workspace, log the error and skip validation.
-		// TODO(hasheddan): surface this in diagnostics.
+	snap, err := d.snapFactory.New()
+	if err != nil {
 		d.log.Debug(errParseWorkspace, "error", err)
 		return nil
 	}
+	// TODO(@tnthornton) this isn't thread safe until we serialize incoming requests.
+	d.snap = snap
+	// if err := d.ws.Parse(); err != nil {
+	// 	// If we can't parse the workspace, log the error and skip validation.
+	// 	// TODO(hasheddan): surface this in diagnostics.
+	// 	d.log.Debug(errParseWorkspace, "error", err)
+	// 	return nil
+	// }
 
-	accDiags := make([]*lsp.PublishDiagnosticsParams, len(params.Changes))
+	accDiags := make([]*protocol.PublishDiagnosticsParams, len(params.Changes))
 	for _, c := range params.Changes {
 		// only attempt to handle changes for files
 		if strings.HasPrefix(c.URI.SpanURI().Filename(), fileProtocol) {
 			// handle changes to meta file, if its a part of that slice
-			d.handleMeta(ctx, lsp.DocumentURI(c.URI.SpanURI().Filename()))
+			// d.handleMeta(ctx, lsp.DocumentURI(c.URI.SpanURI().Filename()))
 
-			diags, err := d.ws.Validate(lsp.DocumentURI(c.URI), d.ws.CorrespondingNodes)
+			diags, err := d.snap.Validate(c.URI.SpanURI())
 			if err != nil {
 				d.log.Debug(errValidateNodes, "error", err)
 				return nil
 			}
-			accDiags = append(accDiags, &lsp.PublishDiagnosticsParams{
-				URI:         lsp.DocumentURI(c.URI),
+			accDiags = append(accDiags, &protocol.PublishDiagnosticsParams{
+				URI:         c.URI,
 				Diagnostics: diags,
 			})
 		}
@@ -219,95 +264,64 @@ func (d *Dispatcher) WsWatchedFilesChanged(ctx context.Context, params protocol.
 	return accDiags
 }
 
-func (d *Dispatcher) handleMeta(_ context.Context, filename lsp.DocumentURI) {
-	if filepath.Base(string(filename)) == xpkg.MetaFile {
-		diags, err := d.ws.Validate(filename, d.ws.MetaNode)
-		if err != nil {
-			d.log.Debug(errValidateNodes, "error", err)
-		}
-		// don't load validators from the cache if the meta file is in an
-		// invalid state.
-		if len(diags) == 0 {
-			d.ws.ReloadValidators()
-		}
-	}
-}
+// func (d *Dispatcher) handleMeta(_ context.Context, filename lsp.DocumentURI) {
+// 	if filepath.Base(string(filename)) == xpkg.MetaFile {
+// 		diags, err := d.ws.Validate(filename, d.ws.MetaNode)
+// 		if err != nil {
+// 			d.log.Debug(errValidateNodes, "error", err)
+// 		}
+// 		// don't load validators from the cache if the meta file is in an
+// 		// invalid state.
+// 		if len(diags) == 0 {
+// 			d.ws.ReloadValidators()
+// 		}
+// 	}
+// }
 
-// watchCache watches the cache for changes.
-// TODO(@tnthornton) this really doesn't feel like the correct place for this.
-// I think we should eventually move this to the dep manager and subsequently notify
-// the dispatcher that validations need to occur for the workspace.
-// Unfortunately at this time, that will require a larger refactor.
-func (d *Dispatcher) watchCache() { // nolint:gocyclo
-	watch := watcher.New()
-
-	watch.SetMaxEvents(1)
-
-	d.log.Debug(fmt.Sprintf("cacheRoot: %s", d.ws.CacheRoot()))
+// // watchSnapshot watches the cache for changes.
+func (d *Dispatcher) watchSnapshot() { // nolint:gocyclo
+	watch := d.snapFactory.WatchExt()
 
 	go func() {
 		for {
-			select {
-			case event := <-watch.Event:
-				go func() {
-					d.log.Debug(fmt.Sprintf("event: %s", event))
-					if err := watch.AddRecursive(d.ws.CacheRoot()); err != nil {
-						d.log.Debug(errFailedToWatchCache, "error", err)
-					}
-					for path, f := range watch.WatchedFiles() {
-						d.log.Debug(fmt.Sprintf("%s: %s\n", path, f.Name()))
-					}
+			// TODO(@tnthornton) handle error/close case from cache
+			<-watch
+			d.log.Debug("change seen at cache, processing...")
+			go func() {
+				d.mu.Lock()
+				defer d.mu.Unlock()
+				snap, err := d.snapFactory.New()
+				if err != nil {
+					d.log.Debug(err.Error())
+				}
+				d.snap = snap
 
-					d.ws.ReloadValidators()
+				params := make([]*protocol.PublishDiagnosticsParams, 0)
 
-					params := make([]*lsp.PublishDiagnosticsParams, 0)
-					for _, n := range d.ws.AllNodes("") {
-						gvk := n.GetGVK()
-						v, ok := d.ws.snapshot.validators[gvk]
-						if !ok {
-							continue
-						}
-						params = append(params, &lsp.PublishDiagnosticsParams{
-							URI:         lsp.DocumentURI(fmt.Sprintf(fileProtocolFmt, n.GetFileName())),
-							Diagnostics: validationDiagnostics(v.Validate(n.GetObject()), n.GetAST(), n.GetGVK()),
-						})
-					}
+				validations, err := snap.ValidateAllFiles()
+				if err != nil {
+					d.log.Debug(err.Error())
+					return
+				}
 
-					// TODO(@tnthornton) do we really need to iterate through
-					// this separately from the above loop?
-					for _, p := range params {
-						d.publishDiagnostics(context.Background(), p)
-					}
-				}()
+				for uri, diags := range validations {
+					params = append(params, &protocol.PublishDiagnosticsParams{
+						URI:         protocol.URIFromSpanURI(uri),
+						Diagnostics: diags,
+					})
+				}
 
-			case err := <-watch.Error:
-				d.log.Debug(err.Error())
-			case <-watch.Closed:
-				return
-			}
-		}
-	}()
-
-	// Watch cache root directory recursively for changes.
-	if err := watch.AddRecursive(d.ws.CacheRoot()); err != nil {
-		d.log.Debug(errFailedToWatchCache, "error", err)
-	}
-
-	// Print a list of all of the files and folders currently
-	// being watched and their paths.
-	for path, f := range watch.WatchedFiles() {
-		d.log.Debug(fmt.Sprintf("%s: %s\n", path, f.Name()))
-	}
-
-	// Start the watching process - it'll check for changes every 100ms.
-	go func() {
-		if err := watch.Start(d.watchInterval); err != nil {
-			d.log.Debug(errFailedToWatchCache, "error", err)
+				// TODO(@tnthornton) do we really need to iterate through
+				// this separately from the above loop?
+				for _, p := range params {
+					d.publishDiagnostics(context.Background(), p)
+				}
+			}()
 		}
 	}()
 }
 
-func (d *Dispatcher) publishDiagnostics(ctx context.Context, params *lsp.PublishDiagnosticsParams) {
+func (d *Dispatcher) publishDiagnostics(ctx context.Context, params *protocol.PublishDiagnosticsParams) {
 	if err := d.clientConn.Notify(ctx, "textDocument/publishDiagnostics", params); err != nil {
 		d.log.Debug(errPublishDiagnostics, "error", err)
 	}

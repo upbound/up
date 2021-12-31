@@ -12,7 +12,7 @@ import (
 	"github.com/goccy/go-yaml"
 	"github.com/goccy/go-yaml/ast"
 	"github.com/goccy/go-yaml/parser"
-	"github.com/golang/tools/lsp/protocol"
+	"github.com/golang/tools/span"
 	"github.com/spf13/afero"
 
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -38,7 +38,6 @@ var (
 )
 
 const (
-	fileProtocol    = "file://"
 	fileProtocolFmt = "file://%s"
 	yamlExt         = ".yaml"
 
@@ -70,13 +69,8 @@ type Workspace struct {
 	fs afero.Fs
 
 	log logging.Logger
-	// metaLocation denotes the place the meta file exists at the time the
-	// workspace was created.
-	metaLocation string
 
 	mu sync.RWMutex
-	// parser is the parser used for parsing packages.
-	parser *xparser.PackageParser
 	// root represents the "root" of the workspace filesystem.
 	root string
 	view *View
@@ -88,12 +82,12 @@ func New(root string, opts ...Option) (*Workspace, error) {
 		fs:   afero.NewOsFs(),
 		log:  logging.NewNopLogger(),
 		root: root,
-		// Default metaLocation to the root. If a pre-existing meta file exists,
-		// metaLocation will be updating accordingly during workspace parse.
-		metaLocation: root,
 		view: &View{
+			// Default metaLocation to the root. If a pre-existing meta file exists,
+			// metaLocation will be updating accordingly during workspace parse.
+			metaLocation: root,
 			nodes:        make(map[NodeIdentifier]Node),
-			uriToDetails: make(map[protocol.DocumentURI]*Details),
+			uriToDetails: make(map[span.URI]*Details),
 		},
 	}
 
@@ -102,7 +96,7 @@ func New(root string, opts ...Option) (*Workspace, error) {
 		return nil, err
 	}
 
-	w.parser = p
+	w.view.parser = p
 
 	// apply overrides if they exist
 	for _, o := range opts {
@@ -137,7 +131,7 @@ func (w *Workspace) Write(m *meta.Meta) error {
 		return err
 	}
 
-	return afero.WriteFile(w.fs, filepath.Join(w.metaLocation, xpkg.MetaFile), b, os.ModePerm)
+	return afero.WriteFile(w.fs, filepath.Join(w.view.metaLocation, xpkg.MetaFile), b, os.ModePerm)
 }
 
 // Parse parses the full workspace in order to hydrate the workspace's View.
@@ -167,12 +161,12 @@ func (w *Workspace) Parse() error {
 		}
 
 		// add file contents to our inmem workspace
-		w.view.uriToDetails[protocol.URIFromPath(p)] = &Details{
+		w.view.uriToDetails[span.URIFromPath(p)] = &Details{
 			Body:    b,
 			NodeIDs: make(map[NodeIdentifier]struct{}),
 		}
 
-		_ = w.parseFile(p)
+		_ = w.view.ParseFile(p)
 		return nil
 	})
 }
@@ -183,10 +177,10 @@ func (w *Workspace) View() *View {
 	return w.view
 }
 
-// parseFile parses all YAML objects at the given path and updates the workspace
+// ParseFile parses all YAML objects at the given path and updates the workspace
 // node cache.
-func (w *Workspace) parseFile(path string) error {
-	details, ok := w.view.uriToDetails[protocol.URIFromPath(path)]
+func (v *View) ParseFile(path string) error {
+	details, ok := v.uriToDetails[span.URIFromPath(path)]
 	if !ok {
 		return errors.New(errInvalidFileURI)
 	}
@@ -196,7 +190,7 @@ func (w *Workspace) parseFile(path string) error {
 		return err
 	}
 	for _, doc := range f.Docs {
-		if _, err := w.parseDoc(doc, path); err != nil {
+		if _, err := v.parseDoc(doc, path); err != nil {
 			// We attempt to parse subsequent documents if we encounter an error
 			// in a preceding one.
 			// TODO(hasheddan): errors should be aggregated and returned as
@@ -209,7 +203,7 @@ func (w *Workspace) parseFile(path string) error {
 
 // parseDoc recursively parses a YAML document into PackageNodes. Embedded nodes
 // are added to the parent's list of dependants.
-func (w *Workspace) parseDoc(n ast.Node, path string) (NodeIdentifier, error) { //nolint:gocyclo
+func (v *View) parseDoc(n ast.Node, path string) (NodeIdentifier, error) { //nolint:gocyclo
 	b, err := n.MarshalYAML()
 	if err != nil {
 		return NodeIdentifier{}, err
@@ -249,7 +243,7 @@ func (w *Workspace) parseDoc(n ast.Node, path string) (NodeIdentifier, error) { 
 				// TODO(hasheddan): surface this error as a diagnostic.
 				continue
 			}
-			id, err := w.parseDoc(sNode, path)
+			id, err := v.parseDoc(sNode, path)
 			if err != nil {
 				// TODO(hasheddan): surface this error as a diagnostic.
 				continue
@@ -263,8 +257,8 @@ func (w *Workspace) parseDoc(n ast.Node, path string) (NodeIdentifier, error) { 
 
 	// if this is node for the meta file, note it in the workspace for easy lookups.
 	if isMeta(path) {
-		w.metaLocation = filepath.Dir(path)
-		p, err := w.parser.Parse(context.Background(), io.NopCloser(bytes.NewReader(b)))
+		v.metaLocation = filepath.Dir(path)
+		p, err := v.parser.Parse(context.Background(), io.NopCloser(bytes.NewReader(b)))
 		if err != nil {
 			return NodeIdentifier{}, err
 		}
@@ -273,26 +267,26 @@ func (w *Workspace) parseDoc(n ast.Node, path string) (NodeIdentifier, error) { 
 			return NodeIdentifier{}, errors.New(errInvalidPackage)
 		}
 
-		w.view.meta = meta.New(p.GetMeta()[0])
+		v.meta = meta.New(p.GetMeta()[0])
 	}
 
-	w.view.nodes[id] = &PackageNode{
+	v.nodes[id] = &PackageNode{
 		ast:        n,
 		fileName:   path,
 		obj:        obj,
 		dependants: dependants,
 	}
 
-	w.appendID(path, id)
+	v.appendID(path, id)
 
 	return id, nil
 }
 
-func (w *Workspace) appendID(path string, id NodeIdentifier) {
-	uri := protocol.URIFromPath(path)
-	curr, ok := w.view.uriToDetails[uri]
+func (v *View) appendID(path string, id NodeIdentifier) {
+	uri := span.URIFromPath(path)
+	curr, ok := v.uriToDetails[uri]
 	if !ok {
-		w.view.uriToDetails[uri] = &Details{
+		v.uriToDetails[uri] = &Details{
 			NodeIDs: map[NodeIdentifier]struct{}{
 				id: {},
 			},
@@ -301,7 +295,7 @@ func (w *Workspace) appendID(path string, id NodeIdentifier) {
 	}
 	curr.NodeIDs[id] = struct{}{}
 
-	w.view.uriToDetails[uri] = curr
+	v.uriToDetails[uri] = curr
 }
 
 // isMeta tests whether the supplied filename matches our expected meta filename.
@@ -319,19 +313,30 @@ func nodeID(name string, gvk schema.GroupVersionKind) NodeIdentifier {
 
 // View represents the current processed view of the workspace.
 type View struct {
+	mu sync.RWMutex
+	// parser is the parser used for parsing packages.
+	parser *xparser.PackageParser
+	// metaLocation denotes the place the meta file exists at the time the
+	// workspace was created.
+	metaLocation string
 	meta         *meta.Meta
-	uriToDetails map[protocol.DocumentURI]*Details
+	uriToDetails map[span.URI]*Details
 	nodes        map[NodeIdentifier]Node
 }
 
 // FileDetails returns the map of file details found within the parsed workspace.
-func (v *View) FileDetails() map[protocol.DocumentURI]*Details {
+func (v *View) FileDetails() map[span.URI]*Details {
 	return v.uriToDetails
 }
 
 // Meta returns the View's Meta.
 func (v *View) Meta() *meta.Meta {
 	return v.meta
+}
+
+// Nodes returns the View's Nodes.
+func (v *View) Nodes() map[NodeIdentifier]Node {
+	return v.nodes
 }
 
 // Details represent file specific details.

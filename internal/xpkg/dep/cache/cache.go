@@ -35,6 +35,8 @@ import (
 )
 
 const (
+	defaultWatchInterval = "100ms"
+
 	errFailedToAddEntry     = "failed to add entry to cache"
 	errFailedToFindEntry    = "failed to find entry"
 	errInvalidValueSupplied = "invalid value supplied"
@@ -54,7 +56,7 @@ type Local struct {
 
 	closed        bool
 	subs          []chan Event
-	watchInterval time.Duration
+	watchInterval *time.Duration
 	watching      bool
 }
 
@@ -66,9 +68,15 @@ type XpkgMarshaler interface {
 
 // NewLocal creates a new LocalCache.
 func NewLocal(root string, opts ...Option) (*Local, error) {
+	interval, err := time.ParseDuration(defaultWatchInterval)
+	if err != nil {
+		return nil, err
+	}
+
 	l := &Local{
-		fs:  afero.NewOsFs(),
-		log: logging.NewNopLogger(),
+		fs:            afero.NewOsFs(),
+		log:           logging.NewNopLogger(),
+		watchInterval: &interval,
 	}
 
 	for _, o := range opts {
@@ -101,6 +109,13 @@ func WithFS(fs afero.Fs) Option {
 func WithLogger(logger logging.Logger) Option {
 	return func(l *Local) {
 		l.log = logger
+	}
+}
+
+// WithWatchInterval overrides the default watchInterval for Local.
+func WithWatchInterval(i *time.Duration) Option {
+	return func(l *Local) {
+		l.watchInterval = i
 	}
 }
 
@@ -328,7 +343,7 @@ func (c *Local) watchCache() {
 
 	// Start the watching process - it'll check for changes at the given watchInterval.
 	go func() {
-		if err := watch.Start(c.watchInterval); err != nil {
+		if err := watch.Start(*c.watchInterval); err != nil {
 			c.log.Debug(errFailedToWatchCache, "error", err)
 		}
 	}()

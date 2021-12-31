@@ -21,6 +21,7 @@ import (
 	"os"
 	"path/filepath"
 	"sort"
+	"time"
 
 	"github.com/Masterminds/semver"
 	"github.com/crossplane/crossplane-runtime/pkg/logging"
@@ -38,17 +39,19 @@ import (
 )
 
 const (
-	defaultCacheRoot = ".up/cache"
+	defaultCacheRoot     = ".up/cache"
+	defaultWatchInterval = "100ms"
 
 	errInvalidSemVerConstraintFmt = "invalid semver constraint %v: %w"
 )
 
 // Manager defines a dependency Manager
 type Manager struct {
-	c   Cache
-	i   ImageResolver
-	x   XpkgMarshaler
-	log logging.Logger
+	c             Cache
+	i             ImageResolver
+	x             XpkgMarshaler
+	log           logging.Logger
+	watchInterval *time.Duration
 
 	acc []*xpkg.ParsedPackage
 }
@@ -58,6 +61,7 @@ type Cache interface {
 	Get(v1beta1.Dependency) (*xpkg.ParsedPackage, error)
 	Store(v1beta1.Dependency, *xpkg.ParsedPackage) error
 	Versions(v1beta1.Dependency) ([]string, error)
+	Watch() <-chan cache.Event
 }
 
 // ImageResolver defines the API contract for working with an
@@ -77,8 +81,14 @@ type XpkgMarshaler interface {
 
 // New returns a new Manager
 func New(opts ...Option) (*Manager, error) {
+	interval, err := time.ParseDuration(defaultWatchInterval)
+	if err != nil {
+		return nil, err
+	}
+
 	m := &Manager{
-		log: logging.NewNopLogger(),
+		log:           logging.NewNopLogger(),
+		watchInterval: &interval,
 	}
 
 	// TODO(@tnthornton) move this resolution to the config.
@@ -92,6 +102,8 @@ func New(opts ...Option) (*Manager, error) {
 			filepath.Clean(home),
 			defaultCacheRoot,
 		),
+		cache.WithLogger(m.log),
+		cache.WithWatchInterval(m.watchInterval),
 	)
 	if err != nil {
 		return nil, err
@@ -138,6 +150,13 @@ func WithResolver(r ImageResolver) Option {
 	}
 }
 
+// WithWatchInterval overrides the default watch interval for the Manager.
+func WithWatchInterval(i *time.Duration) Option {
+	return func(m *Manager) {
+		m.watchInterval = i
+	}
+}
+
 // View returns a View corresponding to the supplied dependency slice
 // (both defined and transitive).
 func (m *Manager) View(ctx context.Context, deps []v1beta1.Dependency) (*View, error) {
@@ -170,6 +189,11 @@ func (m *Manager) View(ctx context.Context, deps []v1beta1.Dependency) (*View, e
 // v1beta1.Dependency that currently exist locally.
 func (m *Manager) Versions(ctx context.Context, d v1beta1.Dependency) ([]string, error) {
 	return m.c.Versions(d)
+}
+
+// Watch provides a hook for watching changes coming from the cache.
+func (m *Manager) Watch() <-chan cache.Event {
+	return m.c.Watch()
 }
 
 // Resolve resolves the given package as well as it's transitive dependencies. If dependencies

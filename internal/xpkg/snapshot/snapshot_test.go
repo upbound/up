@@ -7,11 +7,11 @@ import (
 
 	"github.com/google/go-cmp/cmp"
 	"github.com/spf13/afero"
+	"github.com/upbound/up/internal/xpkg/dep/cache"
 	"github.com/upbound/up/internal/xpkg/dep/manager"
 	"github.com/upbound/up/internal/xpkg/workspace"
 	"k8s.io/apimachinery/pkg/runtime/schema"
 
-	"github.com/crossplane/crossplane-runtime/pkg/logging"
 	"github.com/crossplane/crossplane-runtime/pkg/test"
 	xpextv1 "github.com/crossplane/crossplane/apis/apiextensions/v1"
 	xpextv1beta1 "github.com/crossplane/crossplane/apis/apiextensions/v1beta1"
@@ -77,12 +77,12 @@ func TestWSLoadValidators(t *testing.T) {
 	for name, tc := range cases {
 		t.Run(name, func(t *testing.T) {
 			ws, _ := workspace.New(tc.wsroot, tc.opt)
-			snap, err := New(
-				tc.wsroot,
-				logging.NewNopLogger(),
-				WithWorkspace(ws),
+
+			factory, _ := NewFactory(tc.wsroot,
 				WithDepManager(NewMockDepManager()),
 			)
+
+			snap, err := factory.New(WithWorkspace(ws))
 
 			if diff := cmp.Diff(tc.err, err, test.EquateErrors()); diff != "" {
 				t.Errorf("\n%s\nLoadWSValidators(...): -want error, +got error:\n%s", tc.reason, diff)
@@ -108,4 +108,8 @@ func (m *MockDepManager) View(context.Context, []v1beta1.Dependency) (*manager.V
 }
 func (m *MockDepManager) Versions(context.Context, v1beta1.Dependency) ([]string, error) {
 	return nil, nil
+}
+
+func (m *MockDepManager) Watch() <-chan cache.Event {
+	return make(<-chan cache.Event)
 }

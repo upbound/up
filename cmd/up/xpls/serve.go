@@ -62,7 +62,7 @@ func (c *serveCmd) Run() error {
 	h, err := xpls.NewHandler(
 		xpls.WithCacheDir(c.cacheRoot),
 		xpls.WithLogger(logging.NewLogrLogger(zl.WithName("xpls"))),
-		xpls.WithWatchInterval(c.WatchInterval),
+		xpls.WithWatchInterval(&c.WatchInterval),
 	)
 	if err != nil {
 		return err
