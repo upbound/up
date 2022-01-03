@@ -38,8 +38,11 @@ import (
 	"github.com/upbound/up/internal/xpkg/validator"
 )
 
+var (
+	defaultCacheRoot = ".up/cache"
+)
+
 const (
-	defaultCacheRoot     = ".up/cache"
 	defaultWatchInterval = "100ms"
 
 	errInvalidSemVerConstraintFmt = "invalid semver constraint %v: %w"
@@ -51,6 +54,7 @@ type Manager struct {
 	i             ImageResolver
 	x             XpkgMarshaler
 	log           logging.Logger
+	cacheRoot     string
 	watchInterval *time.Duration
 
 	acc []*xpkg.ParsedPackage
@@ -88,6 +92,7 @@ func New(opts ...Option) (*Manager, error) {
 
 	m := &Manager{
 		log:           logging.NewNopLogger(),
+		cacheRoot:     defaultCacheRoot,
 		watchInterval: &interval,
 	}
 
@@ -100,7 +105,7 @@ func New(opts ...Option) (*Manager, error) {
 	c, err := cache.NewLocal(
 		filepath.Join(
 			filepath.Clean(home),
-			defaultCacheRoot,
+			m.cacheRoot,
 		),
 		cache.WithLogger(m.log),
 		cache.WithWatchInterval(m.watchInterval),

@@ -41,6 +41,8 @@ import (
 )
 
 const (
+	serverName = "xpls"
+
 	errFileBodyNotFound  = "could not find corresponding file body for %s"
 	errInvalidFileURI    = "invalid path supplied"
 	errInvalidNodeID     = "invalid node id supplied"
@@ -500,7 +502,7 @@ func validationDiagnostics(res *validate.Result, n ast.Node, gvk schema.GroupVer
 					},
 					Message:  e.Error(),
 					Severity: protocol.SeverityError,
-					Source:   "xpls",
+					Source:   serverName,
 				})
 			}
 		}
