@@ -14,7 +14,9 @@
 
 package validator
 
-import "k8s.io/kube-openapi/pkg/validation/validate"
+import (
+	"k8s.io/kube-openapi/pkg/validation/validate"
+)
 
 // Nop is used for no-op validator results.
 var Nop = &validate.Result{}

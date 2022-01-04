@@ -13,13 +13,12 @@ import (
 
 	"github.com/goccy/go-yaml/ast"
 
-	"k8s.io/apiextensions-apiserver/pkg/apiserver/validation"
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
+	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/runtime/schema"
+	"k8s.io/apimachinery/pkg/runtime/serializer/json"
 	"k8s.io/kube-openapi/pkg/validation/validate"
 
-	ext "k8s.io/apiextensions-apiserver/pkg/apis/apiextensions"
-	extv1 "k8s.io/apiextensions-apiserver/pkg/apis/apiextensions/v1"
 	apimachyaml "k8s.io/apimachinery/pkg/util/yaml"
 	verrors "k8s.io/kube-openapi/pkg/validation/errors"
 	k8syaml "sigs.k8s.io/yaml"
@@ -37,6 +36,7 @@ import (
 	mxpkg "github.com/upbound/up/internal/xpkg/dep/marshaler/xpkg"
 	"github.com/upbound/up/internal/xpkg/validator"
 	"github.com/upbound/up/internal/xpkg/validator/meta"
+	"github.com/upbound/up/internal/xpkg/validator/object"
 	"github.com/upbound/up/internal/xpkg/workspace"
 )
 
@@ -70,13 +70,14 @@ type Snapshot struct {
 	w   *workspace.Workspace
 	log logging.Logger
 
-	wsview *workspace.View
+	objScheme *runtime.Scheme
 	// packages includes the parsed packages from the defined package
 	// dependencies.
 	packages map[string]*mxpkg.ParsedPackage
 	// validators includes validators for both the workspace as well as
 	// the external dependencies defined in the crossplane.yaml.
 	validators map[schema.GroupVersionKind]validator.Validator
+	wsview     *workspace.View
 }
 
 // Factory is used to "stamp out" Snapshots while allowing
@@ -86,6 +87,9 @@ type Factory struct {
 	m   DepManager
 
 	workdir string
+	// initialize the object scheme once for the factory as this won't change
+	// during its lifecycle.
+	objScheme *runtime.Scheme
 }
 
 // NewFactory returns a new Snapshot Factory instance.
@@ -102,6 +106,13 @@ func NewFactory(workdir string, opts ...FactoryOption) (*Factory, error) {
 
 	f.m = m
 
+	objScheme, err := xpkg.BuildObjectScheme()
+	if err != nil {
+		return nil, err
+	}
+
+	f.objScheme = objScheme
+
 	for _, o := range opts {
 		o(f)
 	}
@@ -115,6 +126,7 @@ func (f *Factory) New(opts ...Option) (*Snapshot, error) {
 		// log is not set to a default so that we can supply the consistently
 		// share it with the supporting subsystems.
 		log:        f.log,
+		objScheme:  f.objScheme,
 		validators: make(map[schema.GroupVersionKind]validator.Validator),
 	}
 
@@ -305,10 +317,11 @@ func (s *Snapshot) updateChanges(_ context.Context, uri span.URI, changes []prot
 // loadWSValidators processes the details from the parsed workspace, extracting
 // the corresponding validators and applying them to the workspace.
 func (s *Snapshot) loadWSValidators() error { // nolint:gocyclo
-	validators := map[schema.GroupVersionKind]validator.Validator{}
+	wsValidators := map[schema.GroupVersionKind]validator.Validator{}
 
 	for f, d := range s.wsview.FileDetails() {
 		yr := apimachyaml.NewYAMLReader(bufio.NewReader(bytes.NewReader(d.Body)))
+		do := json.NewSerializerWithOptions(json.DefaultMetaFactory, s.objScheme, s.objScheme, json.SerializerOptions{Yaml: true})
 		for {
 			b, err := yr.Read()
 			if err != nil && err != io.EOF {
@@ -331,50 +344,67 @@ func (s *Snapshot) loadWSValidators() error { // nolint:gocyclo
 					continue
 				}
 
-				validators[mobj.GetObjectKind().GroupVersionKind()] = m
+				wsValidators[mobj.GetObjectKind().GroupVersionKind()] = m
 				continue
 			}
+
+			o, _, err := do.Decode(b, nil, nil)
+			if err != nil {
+				// skip YAML document if we cannot unmarshal to runtime.Object
+				continue
+			}
+
+			validators, err := object.ValidatorsForObj(o)
+			if err != nil {
+				// skip YAML document if we cannot acquire validators for object
+				continue
+			}
+
+			for gvk, v := range validators {
+				wsValidators[gvk] = v
+			}
+
 			// TODO(hasheddan): handle v1beta1 CRDs, as well as all XRD API versions.
-			crd := &extv1.CustomResourceDefinition{}
-			if err := k8syaml.Unmarshal(b, crd); err != nil {
-				// Skip YAML document if we cannot unmarshal to v1 CRD.
-				continue
-			}
-			internal := &ext.CustomResourceDefinition{}
-			if err := extv1.Convert_v1_CustomResourceDefinition_To_apiextensions_CustomResourceDefinition(crd, internal, nil); err != nil {
-				return err
-			}
-			// NOTE(hasheddan): If top-level validation is set, we use it for
-			// all versions and continue.
-			if internal.Spec.Validation != nil {
-				sv, _, err := validation.NewSchemaValidator(internal.Spec.Validation)
-				if err != nil {
-					return err
-				}
-				for _, v := range internal.Spec.Versions {
-					validators[schema.GroupVersionKind{
-						Group:   internal.Spec.Group,
-						Version: v.Name,
-						Kind:    internal.Spec.Names.Kind,
-					}] = sv
-				}
-				continue
-			}
-			for _, v := range internal.Spec.Versions {
-				sv, _, err := validation.NewSchemaValidator(v.Schema)
-				if err != nil {
-					return err
-				}
-				validators[schema.GroupVersionKind{
-					Group:   internal.Spec.Group,
-					Version: v.Name,
-					Kind:    internal.Spec.Names.Kind,
-				}] = sv
-			}
+			// crd := &extv1.CustomResourceDefinition{}
+			// if err := k8syaml.Unmarshal(b, crd); err != nil {
+			// 	// Skip YAML document if we cannot unmarshal to v1 CRD.
+			// 	continue
+			// }
+			// internal := &ext.CustomResourceDefinition{}
+			// if err := extv1.Convert_v1_CustomResourceDefinition_To_apiextensions_CustomResourceDefinition(crd, internal, nil); err != nil {
+			// 	return err
+			// }
+			// // NOTE(hasheddan): If top-level validation is set, we use it for
+			// // all versions and continue.
+			// if internal.Spec.Validation != nil {
+			// 	sv, _, err := validation.NewSchemaValidator(internal.Spec.Validation)
+			// 	if err != nil {
+			// 		return err
+			// 	}
+			// 	for _, v := range internal.Spec.Versions {
+			// 		validators[schema.GroupVersionKind{
+			// 			Group:   internal.Spec.Group,
+			// 			Version: v.Name,
+			// 			Kind:    internal.Spec.Names.Kind,
+			// 		}] = vcrd.NewV1(sv)
+			// 	}
+			// 	continue
+			// }
+			// for _, v := range internal.Spec.Versions {
+			// 	sv, _, err := validation.NewSchemaValidator(v.Schema)
+			// 	if err != nil {
+			// 		return err
+			// 	}
+			// 	validators[schema.GroupVersionKind{
+			// 		Group:   internal.Spec.Group,
+			// 		Version: v.Name,
+			// 		Kind:    internal.Spec.Names.Kind,
+			// 	}] = vcrd.NewV1(sv)
+			// }
 		}
 	}
 
-	for gvk, v := range validators {
+	for gvk, v := range wsValidators {
 		s.validators[gvk] = v
 	}
 

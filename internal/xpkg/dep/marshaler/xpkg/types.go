@@ -20,12 +20,12 @@ import (
 
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/runtime/schema"
-	"k8s.io/kube-openapi/pkg/validation/validate"
 
 	"github.com/crossplane/crossplane-runtime/pkg/parser"
 	"github.com/crossplane/crossplane/apis/pkg/v1beta1"
 
 	"github.com/upbound/up/internal/xpkg/parser/ndjson"
+	"github.com/upbound/up/internal/xpkg/validator"
 )
 
 // PackageParser defines the API contract for working with a
@@ -45,7 +45,7 @@ type ParsedPackage struct {
 	// The package dependencies derived from .Spec.DependsOn.
 	Deps []v1beta1.Dependency
 	// The calculated validators for the resources that make up this package.
-	GVKtoV map[schema.GroupVersionKind]*validate.SchemaValidator
+	GVKtoV map[schema.GroupVersionKind]validator.Validator
 	// The MetaObj file that corresponds to the package.
 	MetaObj runtime.Object
 	// The name of the package. This name maps to the package name defined
@@ -109,6 +109,6 @@ func (p *ParsedPackage) Version() string {
 
 // Validators returns the map of GVK to validators for the underlying resources
 // that make up the ParsedPackage.
-func (p *ParsedPackage) Validators() map[schema.GroupVersionKind]*validate.SchemaValidator {
+func (p *ParsedPackage) Validators() map[schema.GroupVersionKind]validator.Validator {
 	return p.GVKtoV
 }
