@@ -1,3 +1,17 @@
+// Copyright 2022 Upbound Inc
+//
+// Licensed under the Apache License, Version 2.0 (the "License");
+// you may not use this file except in compliance with the License.
+// You may obtain a copy of the License at
+//
+//      http://www.apache.org/licenses/LICENSE-2.0
+//
+// Unless required by applicable law or agreed to in writing, software
+// distributed under the License is distributed on an "AS IS" BASIS,
+// WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+// See the License for the specific language governing permissions and
+// limitations under the License.
+
 package dispatcher
 
 import (
@@ -54,7 +68,7 @@ func WithLogger(l logging.Logger) Option {
 }
 
 // Dispatch dispatches the given JSONRPC request to the appropriate server function.
-func (d *Dispatcher) Dispatch(ctx context.Context, server Server, conn *jsonrpc2.Conn, r *jsonrpc2.Request) {
+func (d *Dispatcher) Dispatch(ctx context.Context, server Server, conn *jsonrpc2.Conn, r *jsonrpc2.Request) { // nolint:gocyclo
 	switch r.Method {
 	case "initialize":
 		var params protocol.InitializeParams

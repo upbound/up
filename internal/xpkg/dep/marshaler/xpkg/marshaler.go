@@ -47,7 +47,6 @@ const (
 	errFailedToConvertMetaToPackage = "failed to convert meta to package"
 	errInvalidPath                  = "invalid path provided for package lookup"
 	errNotExactlyOneMeta            = "not exactly one package meta type"
-	errObjectNotKnownType           = "object is not a known type"
 )
 
 // Marshaler represents a xpkg Marshaler

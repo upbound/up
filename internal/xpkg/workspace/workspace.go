@@ -1,3 +1,17 @@
+// Copyright 2022 Upbound Inc
+//
+// Licensed under the Apache License, Version 2.0 (the "License");
+// you may not use this file except in compliance with the License.
+// You may obtain a copy of the License at
+//
+//      http://www.apache.org/licenses/LICENSE-2.0
+//
+// Unless required by applicable law or agreed to in writing, software
+// distributed under the License is distributed on an "AS IS" BASIS,
+// WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+// See the License for the specific language governing permissions and
+// limitations under the License.
+
 package workspace
 
 import (
@@ -38,16 +52,11 @@ var (
 )
 
 const (
-	fileProtocolFmt = "file://%s"
-	yamlExt         = ".yaml"
+	yamlExt = ".yaml"
 
 	errCompositionResources = "resources in Composition are malformed"
-	errFileBodyNotFound     = "could not find corresponding file body for %s"
 	errInvalidFileURI       = "invalid path supplied"
-	errInvalidRange         = "invalid range supplied"
 	errInvalidPackage       = "invalid package; more than one meta file supplied"
-	errMetaFileDoesNotExist = "meta file does not exist"
-	errNoChangesSupplied    = "no content changes provided"
 )
 
 // builds static YAML path strings ahead of usage.
@@ -313,7 +322,6 @@ func nodeID(name string, gvk schema.GroupVersionKind) NodeIdentifier {
 
 // View represents the current processed view of the workspace.
 type View struct {
-	mu sync.RWMutex
 	// parser is the parser used for parsing packages.
 	parser *xparser.PackageParser
 	// metaLocation denotes the place the meta file exists at the time the

@@ -12,7 +12,7 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-package crd
+package xrc
 
 import (
 	"k8s.io/kube-openapi/pkg/validation/validate"
@@ -20,51 +20,24 @@ import (
 	"github.com/upbound/up/internal/xpkg/validator"
 )
 
-// V1 defines the v1.CRD validator type.
-type V1 struct {
+// XRC defines the XRC validator type.
+type XRC struct {
 	validators []validator.Validator
 }
 
-// V1Beta defines the v1beta.CRD validator type.
-type V1Beta struct {
-	validators []validator.Validator
-}
-
-// NewV1 returns a new V1 validator.
-func NewV1(schemaValidator validator.Validator) *V1 {
-	return &V1{
-		validators: []validator.Validator{schemaValidator},
-	}
-}
-
-// NewV1Beta returns a new V1Beta validator.
-func NewV1Beta(schemaValidator validator.Validator) *V1Beta {
-	return &V1Beta{
+// New returns a new XRC validator.
+func New(schemaValidator validator.Validator) *XRC {
+	return &XRC{
 		validators: []validator.Validator{schemaValidator},
 	}
 }
 
 // Validate implements the validator.Validator interface, providing a way to
-// validate more than just the strict schema from the CRD.
-func (v *V1) Validate(data interface{}) *validate.Result {
+// validate more than just the strict schema for an XRC.
+func (x *XRC) Validate(data interface{}) *validate.Result {
 	errs := make([]error, 0)
 
-	for _, v := range v.validators {
-		result := v.Validate(data)
-		errs = append(errs, result.Errors...)
-	}
-
-	return &validate.Result{
-		Errors: errs,
-	}
-}
-
-// Validate implements the validator.Validator interface, providing a way to
-// validate more than just the strict schema from the CRD.
-func (v *V1Beta) Validate(data interface{}) *validate.Result {
-	errs := make([]error, 0)
-
-	for _, v := range v.validators {
+	for _, v := range x.validators {
 		result := v.Validate(data)
 		errs = append(errs, result.Errors...)
 	}

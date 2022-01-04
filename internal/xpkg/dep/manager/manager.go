@@ -24,12 +24,13 @@ import (
 	"time"
 
 	"github.com/Masterminds/semver"
-	"github.com/crossplane/crossplane-runtime/pkg/logging"
-	"github.com/crossplane/crossplane/apis/pkg/v1beta1"
 	"github.com/google/go-containerregistry/pkg/name"
 	v1 "github.com/google/go-containerregistry/pkg/v1"
 	"github.com/spf13/afero"
 	"k8s.io/apimachinery/pkg/runtime/schema"
+
+	"github.com/crossplane/crossplane-runtime/pkg/logging"
+	"github.com/crossplane/crossplane/apis/pkg/v1beta1"
 
 	ixpkg "github.com/upbound/up/internal/xpkg"
 	"github.com/upbound/up/internal/xpkg/dep/cache"

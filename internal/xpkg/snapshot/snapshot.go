@@ -1,3 +1,17 @@
+// Copyright 2022 Upbound Inc
+//
+// Licensed under the Apache License, Version 2.0 (the "License");
+// you may not use this file except in compliance with the License.
+// You may obtain a copy of the License at
+//
+//      http://www.apache.org/licenses/LICENSE-2.0
+//
+// Unless required by applicable law or agreed to in writing, software
+// distributed under the License is distributed on an "AS IS" BASIS,
+// WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+// See the License for the specific language governing permissions and
+// limitations under the License.
+
 package snapshot
 
 import (
@@ -488,7 +502,10 @@ func validationDiagnostics(res *validate.Result, n ast.Node, gvk schema.GroupVer
 		if len(e.name) > 0 && e.name != "." {
 			errPath := e.name
 			if e.code == verrors.RequiredFailCode {
-				errPath = e.name[:strings.LastIndex(e.name, ".")]
+				idx := strings.LastIndex(e.name, ".")
+				if idx != 0 {
+					errPath = e.name[:idx]
+				}
 			}
 			// TODO(hasheddan): a general error should be surfaced if we
 			// cannot determine the location in the document causing the
