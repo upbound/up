@@ -227,7 +227,7 @@ func (s *Server) DidChangeWatchedFiles(ctx context.Context, params *protocol.Did
 	}
 	s.snap = snap
 
-	accDiags := make([]*protocol.PublishDiagnosticsParams, len(params.Changes))
+	accDiags := make([]*protocol.PublishDiagnosticsParams, 0)
 	for _, c := range params.Changes {
 		// only attempt to handle changes for files
 		if strings.HasPrefix(c.URI.SpanURI().Filename(), fileProtocol) {

@@ -16,42 +16,10 @@ package ndjson
 
 import (
 	"bufio"
+	"bytes"
+	"errors"
 	"io"
 )
-
-// Reader defines the read API for the underlying reader for the
-// NDJSONReader.
-type Reader interface {
-	Read() ([]byte, error)
-}
-
-// JSONReader represents a newline delimited JSON reader.
-type JSONReader struct {
-	reader Reader
-}
-
-// NewReader returns a new reader, using the underlying io.Reader
-// as input.
-func NewReader(r *bufio.Reader) *JSONReader {
-	return &JSONReader{
-		reader: &LineReader{reader: r},
-	}
-}
-
-// Read returns a full JSON document.
-func (r *JSONReader) Read() ([]byte, error) {
-	line, err := r.reader.Read()
-	if err != nil && err != io.EOF {
-		return nil, err
-	}
-
-	if len(line) != 0 {
-		return line, nil
-	}
-
-	// EOF seen and there's nothing left in the reader, return EOF.
-	return nil, err
-}
 
 // LineReader represents a reader that reads from the underlying reader
 // line by line, separated by '\n'.
@@ -59,8 +27,29 @@ type LineReader struct {
 	reader *bufio.Reader
 }
 
+// NewReader returns a new reader, using the underlying io.Reader
+// as input.
+func NewReader(r *bufio.Reader) *LineReader {
+	return &LineReader{reader: r}
+}
+
 // Read returns a single line (with '\n' ended) from the underlying reader.
 // An error is returned iff there is an error with the underlying reader.
 func (r *LineReader) Read() ([]byte, error) {
-	return r.reader.ReadBytes('\n')
+	for {
+		line, err := r.reader.ReadBytes('\n')
+		if err != nil && !errors.Is(err, io.EOF) {
+			return nil, err
+		}
+
+		// skip blank lines
+		if len(line) != 0 && !bytes.Equal(line, []byte{'\n'}) {
+			return line, nil
+		}
+
+		// EOF seen and there's nothing left in the reader, return EOF.
+		if errors.Is(err, io.EOF) {
+			return nil, err
+		}
+	}
 }

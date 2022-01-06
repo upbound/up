@@ -17,6 +17,7 @@ package ndjson
 import (
 	"bufio"
 	"bytes"
+	"errors"
 	"io"
 	"testing"
 
@@ -53,8 +54,38 @@ func TestJSONReader(t *testing.T) {
 			reason: "Should successfully read multi line (newline delimited) JSON file.",
 			args: args{
 				doc: []byte(`{"thing":"1"}
+		{"thing":"2"}
+		{"thing":"3"}`),
+			},
+			want: want{
+				docsRead: 3,
+			},
+		},
+		"MultiNDJSONObjectsBlankLine": {
+			reason: "Should successfully read multi line (newline delimited) JSON file with blank line.",
+			args: args{
+				doc: []byte(`{"thing":"1"}
+		{"thing":"2"}
+
+		{"thing":"3"}`),
+			},
+			want: want{
+				docsRead: 3,
+			},
+		},
+		"MultiNDJSONObjectsTrailingLine": {
+			reason: "Should successfully read multi line (newline delimited) JSON file with blank line and trailing line.",
+			args: args{
+				doc: []byte(`{"thing":"1"}
 {"thing":"2"}
-{"thing":"3"}`),
+
+{"thing":"3"}
+
+
+
+
+
+`),
 			},
 			want: want{
 				docsRead: 3,
@@ -92,7 +123,7 @@ func TestJSONReader(t *testing.T) {
 		}
 
 		// we expect to eventually see an EOF, test if we saw other errors
-		if err != io.EOF {
+		if !errors.Is(err, io.EOF) {
 			if diff := cmp.Diff(tc.want.err, err, test.EquateErrors()); diff != "" {
 				t.Errorf("\n%s\nNDJSONReader(...): -want err, +got err:\n%s", tc.reason, diff)
 			}

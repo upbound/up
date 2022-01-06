@@ -176,13 +176,12 @@ func (r *Resolver) ResolveDigest(ctx context.Context, d v1beta1.Dependency) (str
 
 	desc, err := r.f.Head(ctx, ref)
 	if err != nil {
-		e, ok := err.(*transport.Error)
-		if !ok {
-			return "", err
-		}
-		if e.StatusCode == http.StatusNotFound {
-			// couldn't find the specified tag, it appears to be invalid
-			return "", errors.New(errTagDoesNotExist)
+		var e *transport.Error
+		if errors.As(err, &e) {
+			if e.StatusCode == http.StatusNotFound {
+				// couldn't find the specified tag, it appears to be invalid
+				return "", errors.New(errTagDoesNotExist)
+			}
 		}
 		return "", err
 	}

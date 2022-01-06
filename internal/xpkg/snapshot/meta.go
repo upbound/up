@@ -177,7 +177,7 @@ func (v *VersionValidator) validate(i int, d v1beta1.Dependency) error {
 	vers, err := v.manager.Versions(context.Background(), d)
 	if err != nil {
 		// TODO(@tnthornton) add debug logging here
-		return nil
+		return nil // nolint:nilerr
 	}
 	if len(vers) == 0 {
 		return &validator.MetaValidation{

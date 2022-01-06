@@ -45,7 +45,7 @@ const (
 	testProviderConfigsCRD      = "providerconfigs.helm.crossplane.io.yaml"
 	testProviderConfigUsagesCRD = "providerconfigusages.helm.crossplane.io.yaml"
 	testDigestFile              = "sha256:295bcd0e6dc396cf0f5ef638c8a7610a571ff2dcef3aa0447398f25b5a0eafc7"
-	testPackageJSONFile2        = "package.ndjson2"
+	testPackageJSONFile2        = "package2.ndjson"
 )
 
 func TestFromImage(t *testing.T) {

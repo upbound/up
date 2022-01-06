@@ -140,8 +140,8 @@ func NewFactory(workdir string, opts ...FactoryOption) (*Factory, error) {
 // New constructs a new Snapshot at the given workdir, with the supplied logger.
 func (f *Factory) New(opts ...Option) (*Snapshot, error) {
 	s := &Snapshot{
-		// log is not set to a default so that we can supply the consistently
-		// share it with the supporting subsystems.
+		// log is not set to a default so that we can share the logger consistently
+		// with the corresponding subsystems.
 		log:        f.log,
 		objScheme:  f.objScheme,
 		metaScheme: f.metaScheme,
@@ -151,6 +151,8 @@ func (f *Factory) New(opts ...Option) (*Snapshot, error) {
 	// use the manager instance from the Factory
 	s.dm = f.m
 
+	// TODO(@tnthornton) see about moving workspace up to Factory
+	// and have the workspace's view returned from the Parse call.
 	w, err := workspace.New(f.workdir, workspace.WithLogger(s.log))
 	if err != nil {
 		return nil, err
@@ -270,7 +272,8 @@ func (s *Snapshot) ReParseFile(path string) error {
 	return s.wsview.ParseFile(path)
 }
 
-// UpdateContent updates the current immem content representation for the provided file uri.
+// UpdateContent updates the current in-memory content representation for the
+// provided file uri.
 func (s *Snapshot) UpdateContent(ctx context.Context, uri span.URI, changes []protocol.TextDocumentContentChangeEvent) error {
 	if len(changes) == 0 {
 		return errors.New(errNoChangesSupplied)
@@ -353,10 +356,10 @@ func (s *Snapshot) loadWSValidators() error { // nolint:gocyclo
 		dm := json.NewSerializerWithOptions(json.DefaultMetaFactory, s.metaScheme, s.metaScheme, json.SerializerOptions{Yaml: true})
 		for {
 			b, err := yr.Read()
-			if err != nil && err != io.EOF {
+			if err != nil && !errors.Is(err, io.EOF) {
 				return err
 			}
-			if err == io.EOF {
+			if errors.Is(err, io.EOF) {
 				break
 			}
 			if len(b) == 0 {
@@ -441,7 +444,7 @@ func validationDiagnostics(res *validate.Result, n ast.Node, gvk schema.GroupVer
 	diags := []protocol.Diagnostic{}
 	for _, err := range res.Errors {
 		var e *verror
-		switch et := err.(type) {
+		switch et := err.(type) { //nolint:errorlint
 		case *verrors.Validation:
 			e = &verror{
 				code:    et.Code(),

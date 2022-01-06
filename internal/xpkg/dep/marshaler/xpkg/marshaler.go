@@ -115,9 +115,9 @@ func (r *Marshaler) FromImage(i xpkg.Image) (*ParsedPackage, error) {
 	return finalizePkg(pkg)
 }
 
-// FromDir takes an afero.Fs, path to a directory, registry reference, and name
-// returns a ParsedPackage based on the directories contents for consumption by
-// upstream callers.
+// FromDir takes an afero.Fs and a path to a directory and returns a
+// ParsedPackage based on the directories contents for consumption by upstream
+// callers.
 func (r *Marshaler) FromDir(fs afero.Fs, path string) (*ParsedPackage, error) {
 	parts := strings.Split(path, "@")
 	if len(parts) != 2 {
