@@ -26,18 +26,16 @@ import (
 	"github.com/spf13/afero"
 	"github.com/spf13/afero/tarfs"
 	"k8s.io/apimachinery/pkg/runtime"
-	"k8s.io/apimachinery/pkg/runtime/schema"
 
 	xpmetav1 "github.com/crossplane/crossplane/apis/pkg/meta/v1"
 
+	"github.com/crossplane/crossplane-runtime/pkg/parser"
 	"github.com/crossplane/crossplane/apis/pkg/v1beta1"
 
 	"github.com/upbound/up/internal/xpkg"
 	"github.com/upbound/up/internal/xpkg/parser/linter"
 	"github.com/upbound/up/internal/xpkg/parser/ndjson"
 	"github.com/upbound/up/internal/xpkg/parser/yaml"
-	"github.com/upbound/up/internal/xpkg/validator"
-	"github.com/upbound/up/internal/xpkg/validator/object"
 )
 
 const (
@@ -51,7 +49,7 @@ const (
 
 // Marshaler represents a xpkg Marshaler
 type Marshaler struct {
-	yp PackageParser
+	yp parser.Parser
 	jp JSONPackageParser
 }
 
@@ -83,7 +81,7 @@ type MarshalerOption func(*Marshaler)
 
 // WithYamlParser modifies the Marshaler by setting the supplied PackageParser as
 // the Resolver's parser.
-func WithYamlParser(p PackageParser) MarshalerOption {
+func WithYamlParser(p parser.Parser) MarshalerOption {
 	return func(r *Marshaler) {
 		r.yp = p
 	}
@@ -203,41 +201,7 @@ func finalizePkg(pkg *ParsedPackage) (*ParsedPackage, error) { // nolint:gocyclo
 		return nil, err
 	}
 
-	// generate GVK -> validators map for the package
-	allValidators := map[schema.GroupVersionKind]validator.Validator{}
-
-	for _, o := range pkg.Objects() {
-		// switch rd := o.(type) {
-		// case *v1beta1ext.CustomResourceDefinition:
-		// 	if err := validatorsFromV1Beta1CRD(rd, v); err != nil {
-		// 		return nil, err
-		// 	}
-		// case *v1ext.CustomResourceDefinition:
-		// 	if err := validatorsFromV1CRD(rd, v); err != nil {
-		// 		return nil, err
-		// 	}
-		// case *xpv1beta1ext.CompositeResourceDefinition:
-		// 	if err := validatorsFromV1Beta1XRD(rd, v); err != nil {
-		// 		return nil, err
-		// 	}
-		// case *xpv1ext.CompositeResourceDefinition:
-		// 	if err := validatorsFromV1XRD(rd, v); err != nil {
-		// 		return nil, err
-		// 	}
-		// default:
-		// 	return nil, errors.New(errObjectNotKnownType)
-		// }
-		validators, err := object.ValidatorsForObj(o)
-		if err != nil {
-			return nil, err
-		}
-		for gvk, v := range validators {
-			allValidators[gvk] = v
-		}
-	}
-
 	pkg.Deps = deps
-	pkg.GVKtoV = allValidators
 
 	return pkg, nil
 }

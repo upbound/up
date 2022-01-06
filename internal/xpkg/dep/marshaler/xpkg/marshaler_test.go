@@ -54,10 +54,9 @@ func TestFromImage(t *testing.T) {
 	}
 
 	type want struct {
-		pkg           *ParsedPackage
-		numObjects    int
-		numValidators int
-		err           error
+		pkg        *ParsedPackage
+		numObjects int
+		err        error
 	}
 
 	cases := map[string]struct {
@@ -114,8 +113,7 @@ func TestFromImage(t *testing.T) {
 					Reg:   "index.docker.io",
 					Ver:   "v0.20.0",
 				},
-				numObjects:    2,
-				numValidators: 4,
+				numObjects: 2,
 			},
 		},
 		"ErrInvalidPackageImage": {
@@ -236,10 +234,9 @@ func TestFromDir(t *testing.T) {
 		path string
 	}
 	type want struct {
-		pkg           *ParsedPackage
-		numObjects    int
-		numValidators int
-		err           error
+		pkg        *ParsedPackage
+		numObjects int
+		err        error
 	}
 
 	cases := map[string]struct {
@@ -289,8 +286,7 @@ func TestFromDir(t *testing.T) {
 					Reg:     "index.docker.io",
 					Ver:     "v0.9.0",
 				},
-				numObjects:    2,
-				numValidators: 4,
+				numObjects: 2,
 			},
 		},
 		"SuccessNonDockerHubPackage": {
@@ -335,8 +331,7 @@ func TestFromDir(t *testing.T) {
 					Reg:     "registry.upbound.io",
 					Ver:     "v0.9.0",
 				},
-				numObjects:    2,
-				numValidators: 4,
+				numObjects: 2,
 			},
 		},
 		"ErrInvalidPackagePath": {
@@ -395,10 +390,6 @@ func TestFromDir(t *testing.T) {
 				}
 
 				if diff := cmp.Diff(tc.want.pkg.Type(), pkg.Type()); diff != "" {
-					t.Errorf("\n%s\nFromDir(...): -want err, +got err:\n%s", tc.reason, diff)
-				}
-
-				if diff := cmp.Diff(tc.want.numValidators, len(pkg.Validators())); diff != "" {
 					t.Errorf("\n%s\nFromDir(...): -want err, +got err:\n%s", tc.reason, diff)
 				}
 

@@ -32,7 +32,6 @@ import (
 	apiextv1 "k8s.io/apiextensions-apiserver/pkg/apis/apiextensions/v1"
 	apimetav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
-	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/utils/pointer"
 	"sigs.k8s.io/yaml"
 
@@ -213,7 +212,7 @@ func TestSnapshot(t *testing.T) {
 		objs []runtime.Object
 	}
 	type want struct {
-		keys []schema.GroupVersionKind
+		keys []string
 		err  error
 	}
 
@@ -222,7 +221,7 @@ func TestSnapshot(t *testing.T) {
 		args   args
 		want   want
 	}{
-		"SuccessAllRelatedDepsInCache": {
+		"SuccessAllRelatedDepsInCacheNonDockerHubPackage": {
 			args: args{
 				dep: v1beta1.Dependency{
 					Package:     "registry.upbound.io/upbound/platform-ref-aws",
@@ -279,17 +278,70 @@ func TestSnapshot(t *testing.T) {
 				},
 			},
 			want: want{
-				keys: []schema.GroupVersionKind{
-					{
-						Group:   "crossplane.io",
-						Version: "v1alpha1",
-						Kind:    "testcrd",
+				keys: []string{
+					"registry.upbound.io/upbound/platform-ref-aws",
+				},
+			},
+		},
+		"SuccessAllRelatedDepsInCacheDockerHubPackage": {
+			args: args{
+				dep: v1beta1.Dependency{
+					Package:     "crossplane/provider-aws",
+					Type:        v1beta1.ConfigurationPackageType,
+					Constraints: "v0.2.1",
+				},
+				meta: &metav1.Provider{
+					TypeMeta: apimetav1.TypeMeta{
+						APIVersion: "meta.pkg.crossplane.io/v1alpha1",
+						Kind:       "Provider",
 					},
-					{
-						Group:   "crossplane.io",
-						Version: "v1beta1",
-						Kind:    "testcrd",
+					Spec: metav1.ProviderSpec{
+						MetaSpec: metav1.MetaSpec{},
 					},
+				},
+				objs: []runtime.Object{
+					&apiextv1.CustomResourceDefinition{
+						TypeMeta: apimetav1.TypeMeta{
+							APIVersion: "apiextensions.k8s.io/v1",
+							Kind:       "CustomResourceDefinition",
+						},
+						ObjectMeta: apimetav1.ObjectMeta{
+							Name: "crd1",
+						},
+						Spec: apiextv1.CustomResourceDefinitionSpec{
+							Names: apiextv1.CustomResourceDefinitionNames{
+								Plural:   "tests",
+								Singular: "test",
+								Kind:     "testcrd",
+							},
+							Group: "crossplane.io",
+							Versions: []apiextv1.CustomResourceDefinitionVersion{
+								{
+									Name: "v1alpha1",
+									Schema: &apiextv1.CustomResourceValidation{
+										OpenAPIV3Schema: &apiextv1.JSONSchemaProps{
+											ID:          "id-v1alpha1",
+											Description: "desc1",
+										},
+									},
+								},
+								{
+									Name: "v1beta1",
+									Schema: &apiextv1.CustomResourceValidation{
+										OpenAPIV3Schema: &apiextv1.JSONSchemaProps{
+											ID:          "id-v1beta1",
+											Description: "desc2",
+										},
+									},
+								},
+							},
+						},
+					},
+				},
+			},
+			want: want{
+				keys: []string{
+					"crossplane/provider-aws",
 				},
 			},
 		},
@@ -350,7 +402,7 @@ func TestSnapshot(t *testing.T) {
 				},
 			},
 			want: want{
-				keys: []schema.GroupVersionKind{},
+				keys: []string{},
 			},
 		},
 	}
@@ -383,7 +435,7 @@ func TestSnapshot(t *testing.T) {
 			}
 
 			for _, k := range tc.want.keys {
-				_, ok := got.validators[k]
+				_, ok := got.Packages()[k]
 
 				if diff := cmp.Diff(true, ok); diff != "" {
 					t.Errorf("\n%s\nSnapshot(...): -want err, +got err:\n%s", tc.reason, diff)

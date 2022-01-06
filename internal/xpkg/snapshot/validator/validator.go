@@ -41,3 +41,33 @@ func (e *MetaValidation) Code() int32 {
 func (e *MetaValidation) Error() string {
 	return e.Message
 }
+
+// ObjectValidator provides a mechanism for grouping various validators for a
+// given object type.
+type ObjectValidator struct {
+	validators []Validator
+}
+
+// New returns a new ObjectValidator.
+func New(schemaValidator Validator, others ...Validator) *ObjectValidator {
+	validators := []Validator{schemaValidator}
+
+	return &ObjectValidator{
+		validators: append(validators, others...),
+	}
+}
+
+// Validate implements the validator.Validator interface, providing a way to
+// validate more than just the strict schema for a given runtime.Object.
+func (o *ObjectValidator) Validate(data interface{}) *validate.Result {
+	errs := make([]error, 0)
+
+	for _, v := range o.validators {
+		result := v.Validate(data)
+		errs = append(errs, result.Errors...)
+	}
+
+	return &validate.Result{
+		Errors: errs,
+	}
+}

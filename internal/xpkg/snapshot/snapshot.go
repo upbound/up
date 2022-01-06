@@ -21,13 +21,11 @@ import (
 	"errors"
 	"fmt"
 	"io"
-	"path/filepath"
 	"strings"
 	"sync"
 
 	"github.com/goccy/go-yaml/ast"
 
-	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/apimachinery/pkg/runtime/serializer/json"
@@ -35,7 +33,6 @@ import (
 
 	apimachyaml "k8s.io/apimachinery/pkg/util/yaml"
 	verrors "k8s.io/kube-openapi/pkg/validation/errors"
-	k8syaml "sigs.k8s.io/yaml"
 
 	"github.com/crossplane/crossplane-runtime/pkg/logging"
 	"github.com/crossplane/crossplane/apis/pkg/v1beta1"
@@ -48,9 +45,7 @@ import (
 	"github.com/upbound/up/internal/xpkg/dep/cache"
 	"github.com/upbound/up/internal/xpkg/dep/manager"
 	mxpkg "github.com/upbound/up/internal/xpkg/dep/marshaler/xpkg"
-	"github.com/upbound/up/internal/xpkg/validator"
-	"github.com/upbound/up/internal/xpkg/validator/meta"
-	"github.com/upbound/up/internal/xpkg/validator/object"
+	"github.com/upbound/up/internal/xpkg/snapshot/validator"
 	"github.com/upbound/up/internal/xpkg/workspace"
 )
 
@@ -80,11 +75,12 @@ type Snapshot struct {
 	// need this lock.
 	mu sync.RWMutex
 
-	m   DepManager
+	dm  DepManager
 	w   *workspace.Workspace
 	log logging.Logger
 
-	objScheme *runtime.Scheme
+	objScheme  *runtime.Scheme
+	metaScheme *runtime.Scheme
 	// packages includes the parsed packages from the defined package
 	// dependencies.
 	packages map[string]*mxpkg.ParsedPackage
@@ -103,7 +99,8 @@ type Factory struct {
 	workdir string
 	// initialize the object scheme once for the factory as this won't change
 	// during its lifecycle.
-	objScheme *runtime.Scheme
+	objScheme  *runtime.Scheme
+	metaScheme *runtime.Scheme
 }
 
 // NewFactory returns a new Snapshot Factory instance.
@@ -125,7 +122,13 @@ func NewFactory(workdir string, opts ...FactoryOption) (*Factory, error) {
 		return nil, err
 	}
 
+	metaScheme, err := xpkg.BuildMetaScheme()
+	if err != nil {
+		return nil, err
+	}
+
 	f.objScheme = objScheme
+	f.metaScheme = metaScheme
 
 	for _, o := range opts {
 		o(f)
@@ -141,11 +144,12 @@ func (f *Factory) New(opts ...Option) (*Snapshot, error) {
 		// share it with the supporting subsystems.
 		log:        f.log,
 		objScheme:  f.objScheme,
+		metaScheme: f.metaScheme,
 		validators: make(map[schema.GroupVersionKind]validator.Validator),
 	}
 
 	// use the manager instance from the Factory
-	s.m = f.m
+	s.dm = f.m
 
 	w, err := workspace.New(f.workdir, workspace.WithLogger(s.log))
 	if err != nil {
@@ -186,14 +190,24 @@ func (s *Snapshot) init() error {
 		if err != nil {
 			return err
 		}
-		extView, err := s.m.View(context.Background(), deps)
+		extView, err := s.dm.View(context.Background(), deps)
 		if err != nil {
 			return err
 		}
 
 		// add external dependency validators to snapshot validators
-		for gvk, v := range extView.Validators() {
-			s.validators[gvk] = v
+		for _, pkg := range extView.Packages() {
+
+			for _, o := range pkg.Objects() {
+				validators, err := s.ValidatorsForObj(o)
+				if err != nil {
+					// skip adding the validator
+					continue
+				}
+				for gvk, v := range validators {
+					s.validators[gvk] = v
+				}
+			}
 		}
 
 		s.packages = extView.Packages()
@@ -333,9 +347,10 @@ func (s *Snapshot) updateChanges(_ context.Context, uri span.URI, changes []prot
 func (s *Snapshot) loadWSValidators() error { // nolint:gocyclo
 	wsValidators := map[schema.GroupVersionKind]validator.Validator{}
 
-	for f, d := range s.wsview.FileDetails() {
+	for _, d := range s.wsview.FileDetails() {
 		yr := apimachyaml.NewYAMLReader(bufio.NewReader(bytes.NewReader(d.Body)))
 		do := json.NewSerializerWithOptions(json.DefaultMetaFactory, s.objScheme, s.objScheme, json.SerializerOptions{Yaml: true})
+		dm := json.NewSerializerWithOptions(json.DefaultMetaFactory, s.metaScheme, s.metaScheme, json.SerializerOptions{Yaml: true})
 		for {
 			b, err := yr.Read()
 			if err != nil && err != io.EOF {
@@ -347,28 +362,18 @@ func (s *Snapshot) loadWSValidators() error { // nolint:gocyclo
 			if len(b) == 0 {
 				continue
 			}
-			if isMeta(f.Filename()) {
-				// just need to get gvk from this file
-				mobj := &unstructured.Unstructured{}
-				if err := k8syaml.Unmarshal(b, mobj); err != nil {
-					continue
-				}
-				m, err := meta.New(s.m, s.packages)
-				if err != nil {
-					continue
-				}
-
-				wsValidators[mobj.GetObjectKind().GroupVersionKind()] = m
-				continue
-			}
 
 			o, _, err := do.Decode(b, nil, nil)
 			if err != nil {
-				// skip YAML document if we cannot unmarshal to runtime.Object
-				continue
+				// attempt to decode as a meta object
+				o, _, err = dm.Decode(b, nil, nil)
+				if err != nil {
+					// skip YAML document if we cannot unmarshal to runtime.Object
+					continue
+				}
 			}
 
-			validators, err := object.ValidatorsForObj(o)
+			validators, err := s.ValidatorsForObj(o)
 			if err != nil {
 				// skip YAML document if we cannot acquire validators for object
 				continue
@@ -377,44 +382,6 @@ func (s *Snapshot) loadWSValidators() error { // nolint:gocyclo
 			for gvk, v := range validators {
 				wsValidators[gvk] = v
 			}
-
-			// TODO(hasheddan): handle v1beta1 CRDs, as well as all XRD API versions.
-			// crd := &extv1.CustomResourceDefinition{}
-			// if err := k8syaml.Unmarshal(b, crd); err != nil {
-			// 	// Skip YAML document if we cannot unmarshal to v1 CRD.
-			// 	continue
-			// }
-			// internal := &ext.CustomResourceDefinition{}
-			// if err := extv1.Convert_v1_CustomResourceDefinition_To_apiextensions_CustomResourceDefinition(crd, internal, nil); err != nil {
-			// 	return err
-			// }
-			// // NOTE(hasheddan): If top-level validation is set, we use it for
-			// // all versions and continue.
-			// if internal.Spec.Validation != nil {
-			// 	sv, _, err := validation.NewSchemaValidator(internal.Spec.Validation)
-			// 	if err != nil {
-			// 		return err
-			// 	}
-			// 	for _, v := range internal.Spec.Versions {
-			// 		validators[schema.GroupVersionKind{
-			// 			Group:   internal.Spec.Group,
-			// 			Version: v.Name,
-			// 			Kind:    internal.Spec.Names.Kind,
-			// 		}] = vcrd.NewV1(sv)
-			// 	}
-			// 	continue
-			// }
-			// for _, v := range internal.Spec.Versions {
-			// 	sv, _, err := validation.NewSchemaValidator(v.Schema)
-			// 	if err != nil {
-			// 		return err
-			// 	}
-			// 	validators[schema.GroupVersionKind{
-			// 		Group:   internal.Spec.Group,
-			// 		Version: v.Name,
-			// 		Kind:    internal.Spec.Names.Kind,
-			// 	}] = vcrd.NewV1(sv)
-			// }
 		}
 	}
 
@@ -423,11 +390,6 @@ func (s *Snapshot) loadWSValidators() error { // nolint:gocyclo
 	}
 
 	return nil
-}
-
-// isMeta tests whether the supplied filename matches our expected meta filename.
-func isMeta(filename string) bool {
-	return filepath.Base(filename) == xpkg.MetaFile
 }
 
 // ValidateAllFiles performs validations on all files in Snapshot.

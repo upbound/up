@@ -16,39 +16,22 @@ package xpls
 
 import (
 	"context"
-	"os"
-
-	"github.com/alecthomas/kong"
 
 	"github.com/crossplane/crossplane-runtime/pkg/logging"
 	"github.com/sourcegraph/jsonrpc2"
 	"sigs.k8s.io/controller-runtime/pkg/log/zap"
 
-	"github.com/upbound/up/internal/config"
 	"github.com/upbound/up/internal/xpls"
 	"github.com/upbound/up/internal/xpls/handler"
 )
 
-func (c *serveCmd) AfterApply(kongCtx *kong.Context) error {
-	cacheRoot, err := config.CleanDirWithTilde(c.Cache, os.UserHomeDir)
-	if err != nil {
-		return err
-	}
-
-	c.cacheRoot = cacheRoot
-
-	return nil
-}
-
 // serveCmd starts the language server.
 type serveCmd struct {
-	cacheRoot string
-
 	// TODO(@tnthornton) cache dir doesn't seem to be the responsibility of the
 	// serve command. It seems like we can easily get into an inconsistent state
 	// if someone specifies config element from the command line. We should move
 	// this to the config.
-	Cache   string `default:"~/.up/cache" help:"Directory path for dependency schema cache."`
+	Cache   string `default:"~/.up/cache" help:"Directory path for dependency schema cache." type:"path"`
 	Verbose bool   `help:"Run server with verbose logging."`
 }
 

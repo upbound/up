@@ -22,7 +22,6 @@ import (
 	"github.com/pkg/errors"
 	"github.com/spf13/afero"
 
-	"github.com/upbound/up/internal/config"
 	"github.com/upbound/up/internal/xpkg"
 	"github.com/upbound/up/internal/xpkg/dep"
 	"github.com/upbound/up/internal/xpkg/dep/cache"
@@ -41,43 +40,43 @@ func (c *depCmd) AfterApply(kongCtx *kong.Context) error {
 	ctx := context.Background()
 	fs := afero.NewOsFs()
 
-	cacheRoot, err := config.CleanDirWithTilde(c.CacheDir, os.UserHomeDir)
+	cache, err := cache.NewLocal(c.CacheDir)
 	if err != nil {
 		return err
 	}
 
-	cache, err := cache.NewLocal(cacheRoot)
-	if err != nil {
-		return err
-	}
-
-	r := image.NewResolver()
-
-	m, err := manager.New(
-		manager.WithCache(cache),
-		manager.WithResolver(r),
-	)
-
-	if err != nil {
-		return err
-	}
-
-	c.m = m
 	c.c = cache
 
-	wd, err := os.Getwd()
-	if err != nil {
-		return err
-	}
+	// only parse the workspace if we aren't attempting to clean the cache
+	if !c.CleanCache {
 
-	ws, err := workspace.New(wd, workspace.WithFS(fs))
-	if err != nil {
-		return err
-	}
-	c.ws = ws
+		r := image.NewResolver()
 
-	if err := ws.Parse(); err != nil {
-		return err
+		m, err := manager.New(
+			manager.WithCache(cache),
+			manager.WithResolver(r),
+		)
+
+		if err != nil {
+			return err
+		}
+
+		c.m = m
+
+		wd, err := os.Getwd()
+		if err != nil {
+			return err
+		}
+
+		ws, err := workspace.New(wd, workspace.WithFS(fs))
+		if err != nil {
+			return err
+		}
+		c.ws = ws
+
+		if err := ws.Parse(); err != nil {
+			return err
+		}
 	}
 
 	// workaround interfaces not being bindable ref: https://github.com/alecthomas/kong/issues/48
@@ -94,7 +93,7 @@ type depCmd struct {
 	// TODO(@tnthornton) remove cacheDir flag. Having a user supplied flag
 	// can result in broken behavior between xpls and dep. CacheDir should
 	// only be supplied by the Config.
-	CacheDir   string `short:"d" help:"Directory used for caching package images." default:"~/.up/cache/" env:"CACHE_DIR"`
+	CacheDir   string `short:"d" help:"Directory used for caching package images." default:"~/.up/cache/" env:"CACHE_DIR" type:"path"`
 	CleanCache bool   `short:"c" help:"Clean dep cache."`
 
 	Package string `arg:"" optional:"" help:"Package to be added."`

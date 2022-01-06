@@ -27,7 +27,6 @@ import (
 	"github.com/google/go-containerregistry/pkg/name"
 	v1 "github.com/google/go-containerregistry/pkg/v1"
 	"github.com/spf13/afero"
-	"k8s.io/apimachinery/pkg/runtime/schema"
 
 	"github.com/crossplane/crossplane-runtime/pkg/logging"
 	"github.com/crossplane/crossplane/apis/pkg/v1beta1"
@@ -36,7 +35,6 @@ import (
 	"github.com/upbound/up/internal/xpkg/dep/cache"
 	xpkg "github.com/upbound/up/internal/xpkg/dep/marshaler/xpkg"
 	"github.com/upbound/up/internal/xpkg/dep/resolver/image"
-	"github.com/upbound/up/internal/xpkg/validator"
 )
 
 var (
@@ -166,7 +164,6 @@ func WithWatchInterval(i *time.Duration) Option {
 // View returns a View corresponding to the supplied dependency slice
 // (both defined and transitive).
 func (m *Manager) View(ctx context.Context, deps []v1beta1.Dependency) (*View, error) {
-	validators := make(map[schema.GroupVersionKind]validator.Validator)
 	packages := make(map[string]*xpkg.ParsedPackage)
 
 	for _, d := range deps {
@@ -178,16 +175,12 @@ func (m *Manager) View(ctx context.Context, deps []v1beta1.Dependency) (*View, e
 			return nil, err
 		}
 		for _, p := range acc {
-			for k, v := range p.Validators() {
-				validators[k] = v
-			}
 			packages[p.Name()] = p
 		}
 	}
 
 	return &View{
-		packages:   packages,
-		validators: validators,
+		packages: packages,
 	}, nil
 }
 
@@ -313,7 +306,7 @@ func (m *Manager) addPkg(ctx context.Context, d v1beta1.Dependency) (*xpkg.Parse
 
 	p, err := m.x.FromImage(ixpkg.Image{
 		Meta: ixpkg.ImageMeta{
-			Repo:     tag.RepositoryStr(),
+			Repo:     deriveRepoName(tag),
 			Registry: tag.RegistryStr(),
 			Version:  t,
 			Digest:   digest.String(),
@@ -331,6 +324,13 @@ func (m *Manager) addPkg(ctx context.Context, d v1beta1.Dependency) (*xpkg.Parse
 	}
 
 	return p, nil
+}
+
+func deriveRepoName(t name.Tag) string {
+	if t.Registry.Name() == name.DefaultRegistry {
+		return t.RepositoryStr()
+	}
+	return t.Repository.Name()
 }
 
 func (m *Manager) retrievePkg(ctx context.Context, d v1beta1.Dependency) (*xpkg.ParsedPackage, error) {
@@ -436,16 +436,10 @@ func (m *Manager) finalizeLocalDepVersion(_ context.Context, d *v1beta1.Dependen
 
 // View represents the processed View corresponding to some dependencies.
 type View struct {
-	packages   map[string]*xpkg.ParsedPackage
-	validators map[schema.GroupVersionKind]validator.Validator
+	packages map[string]*xpkg.ParsedPackage
 }
 
 // Packages returns the packages map for the view.
 func (v *View) Packages() map[string]*xpkg.ParsedPackage {
 	return v.packages
-}
-
-// Validators returns the validators map for the view.
-func (v *View) Validators() map[schema.GroupVersionKind]validator.Validator {
-	return v.validators
 }

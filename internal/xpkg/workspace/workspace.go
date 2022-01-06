@@ -199,12 +199,14 @@ func (v *View) ParseFile(path string) error {
 		return err
 	}
 	for _, doc := range f.Docs {
-		if _, err := v.parseDoc(doc, path); err != nil {
-			// We attempt to parse subsequent documents if we encounter an error
-			// in a preceding one.
-			// TODO(hasheddan): errors should be aggregated and returned as
-			// diagnostics.
-			continue
+		if doc.Body != nil {
+			if _, err := v.parseDoc(doc, path); err != nil {
+				// We attempt to parse subsequent documents if we encounter an error
+				// in a preceding one.
+				// TODO(hasheddan): errors should be aggregated and returned as
+				// diagnostics.
+				continue
+			}
 		}
 	}
 	return nil
