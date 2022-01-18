@@ -86,7 +86,7 @@ func (m *Validator) Validate(data interface{}) *validate.Result {
 		return validator.Nop
 	}
 
-	errs := make([]error, 0)
+	errs := []error{}
 
 	// validate the current apiVersion of the meta file
 	errs = append(errs, validateAPIVersion(o))

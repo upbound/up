@@ -9,6 +9,7 @@ require (
 	github.com/cpuguy83/go-md2man/v2 v2.0.1 // indirect
 	github.com/crossplane/crossplane v1.5.0
 	github.com/crossplane/crossplane-runtime v0.15.1-0.20210930095326-d5661210733b
+	github.com/crossplane/crossplane/controller/apiextensions v0.0.0-00010101000000-000000000000
 	github.com/docker/docker v20.10.7+incompatible
 	github.com/fatih/color v1.13.0 // indirect
 	github.com/goccy/go-yaml v1.9.5-0.20211210133106-251b4db627e0
@@ -45,6 +46,7 @@ require (
 )
 
 replace (
+	github.com/crossplane/crossplane/controller/apiextensions => ./internal/vendor/github.com/crossplane/crossplane/controller/apiextensions
 	github.com/docker/distribution => github.com/docker/distribution v0.0.0-20191216044856-a8371794149d
 	github.com/docker/docker => github.com/moby/moby v17.12.0-ce-rc1.0.20200618181300-9dc6525e6118+incompatible
 	github.com/golang/tools => ./internal/vendor/golang.org/x/tools

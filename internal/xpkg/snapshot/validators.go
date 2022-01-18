@@ -44,8 +44,8 @@ const (
 )
 
 // ValidatorsForObj returns a mapping of GVK -> validator for the given runtime.Object.
-func (s *Snapshot) ValidatorsForObj(o runtime.Object) (map[schema.GroupVersionKind]validator.Validator, error) { // nolint:gocyclo
-	validators := make(map[schema.GroupVersionKind]validator.Validator)
+func ValidatorsForObj(o runtime.Object, s *Snapshot) (map[schema.GroupVersionKind]*validator.ObjectValidator, error) { // nolint:gocyclo
+	validators := make(map[schema.GroupVersionKind]*validator.ObjectValidator)
 
 	switch rd := o.(type) {
 	case *extv1beta1.CustomResourceDefinition:
@@ -62,6 +62,14 @@ func (s *Snapshot) ValidatorsForObj(o runtime.Object) (map[schema.GroupVersionKi
 		}
 	case *xpextv1.CompositeResourceDefinition:
 		if err := validatorsFromV1XRD(rd, validators); err != nil {
+			return nil, err
+		}
+	case *xpextv1.Composition:
+		if err := s.validatorsForV1XR(rd, validators); err != nil {
+			return nil, err
+		}
+	case *xpextv1beta1.Composition:
+		if err := s.validatorsForV1Beta1XR(rd, validators); err != nil {
 			return nil, err
 		}
 	case *metav1.Configuration:
@@ -87,7 +95,7 @@ func (s *Snapshot) ValidatorsForObj(o runtime.Object) (map[schema.GroupVersionKi
 	return validators, nil
 }
 
-func validatorsFromV1Beta1CRD(c *extv1beta1.CustomResourceDefinition, acc map[schema.GroupVersionKind]validator.Validator) error {
+func validatorsFromV1Beta1CRD(c *extv1beta1.CustomResourceDefinition, acc map[schema.GroupVersionKind]*validator.ObjectValidator) error {
 
 	internal := &apiextensions.CustomResourceDefinition{}
 	if err := extv1beta1.Convert_v1beta1_CustomResourceDefinition_To_apiextensions_CustomResourceDefinition(c, internal, nil); err != nil {
@@ -100,7 +108,7 @@ func validatorsFromV1Beta1CRD(c *extv1beta1.CustomResourceDefinition, acc map[sc
 			return err
 		}
 		for _, v := range internal.Spec.Versions {
-			acc[gvk(internal.Spec.Group, v.Name, internal.Spec.Names.Kind)] = validator.New(sv)
+			appendToValidators(gvk(internal.Spec.Group, v.Name, internal.Spec.Names.Kind), acc, sv)
 		}
 		return nil
 	}
@@ -109,26 +117,26 @@ func validatorsFromV1Beta1CRD(c *extv1beta1.CustomResourceDefinition, acc map[sc
 		if err != nil {
 			return err
 		}
-		acc[gvk(internal.Spec.Group, v.Name, internal.Spec.Names.Kind)] = validator.New(sv)
+		appendToValidators(gvk(internal.Spec.Group, v.Name, internal.Spec.Names.Kind), acc, sv)
 	}
 
 	return nil
 }
 
-func validatorsFromV1CRD(c *extv1.CustomResourceDefinition, acc map[schema.GroupVersionKind]validator.Validator) error {
+func validatorsFromV1CRD(c *extv1.CustomResourceDefinition, acc map[schema.GroupVersionKind]*validator.ObjectValidator) error {
 
 	for _, v := range c.Spec.Versions {
 		sv, _, err := newV1SchemaValidator(*v.Schema.OpenAPIV3Schema)
 		if err != nil {
 			return err
 		}
-		acc[gvk(c.Spec.Group, v.Name, c.Spec.Names.Kind)] = validator.New(sv)
+		appendToValidators(gvk(c.Spec.Group, v.Name, c.Spec.Names.Kind), acc, sv)
 	}
 
 	return nil
 }
 
-func validatorsFromV1Beta1XRD(x *xpextv1beta1.CompositeResourceDefinition, acc map[schema.GroupVersionKind]validator.Validator) error {
+func validatorsFromV1Beta1XRD(x *xpextv1beta1.CompositeResourceDefinition, acc map[schema.GroupVersionKind]*validator.ObjectValidator) error {
 	for _, v := range x.Spec.Versions {
 		schema, err := buildSchema(v.Schema.OpenAPIV3Schema)
 		if err != nil {
@@ -141,13 +149,14 @@ func validatorsFromV1Beta1XRD(x *xpextv1beta1.CompositeResourceDefinition, acc m
 		}
 
 		if x.Spec.ClaimNames != nil {
-			acc[gvk(x.Spec.Group, v.Name, x.Spec.ClaimNames.Kind)] = validator.New(sv)
+			appendToValidators(gvk(x.Spec.Group, v.Name, x.Spec.ClaimNames.Kind), acc, sv)
 		}
+		appendToValidators(gvk(x.Spec.Group, v.Name, x.Spec.Names.Kind), acc, sv)
 	}
 	return nil
 }
 
-func validatorsFromV1XRD(x *xpextv1.CompositeResourceDefinition, acc map[schema.GroupVersionKind]validator.Validator) error {
+func validatorsFromV1XRD(x *xpextv1.CompositeResourceDefinition, acc map[schema.GroupVersionKind]*validator.ObjectValidator) error {
 	for _, v := range x.Spec.Versions {
 
 		schema, err := buildSchema(v.Schema.OpenAPIV3Schema)
@@ -161,46 +170,75 @@ func validatorsFromV1XRD(x *xpextv1.CompositeResourceDefinition, acc map[schema.
 		}
 
 		if x.Spec.ClaimNames != nil {
-			acc[gvk(x.Spec.Group, v.Name, x.Spec.ClaimNames.Kind)] = validator.New(sv)
+			appendToValidators(gvk(x.Spec.Group, v.Name, x.Spec.ClaimNames.Kind), acc, sv)
 		}
+		appendToValidators(gvk(x.Spec.Group, v.Name, x.Spec.Names.Kind), acc, sv)
 	}
 	return nil
 }
 
-func (s *Snapshot) validatorsForV1Configuration(c *metav1.Configuration, acc map[schema.GroupVersionKind]validator.Validator) error {
-	v, err := DefaultMetaValidators(s)
+func (s *Snapshot) validatorsForV1XR(x *xpextv1.Composition, acc map[schema.GroupVersionKind]*validator.ObjectValidator) error {
+	v, err := DefaultCompositionValidators(s)
 	if err != nil {
 		return err
 	}
-	acc[gvk(c.GroupVersionKind().Group, c.GroupVersionKind().Version, c.GroupVersionKind().Kind)] = validator.New(v)
+	appendToValidators(x.GroupVersionKind(), acc, v)
 	return nil
 }
 
-func (s *Snapshot) validatorsForV1Alpha1Configuration(c *metav1alpha1.Configuration, acc map[schema.GroupVersionKind]validator.Validator) error {
-	v, err := DefaultMetaValidators(s)
+func (s *Snapshot) validatorsForV1Beta1XR(x *xpextv1beta1.Composition, acc map[schema.GroupVersionKind]*validator.ObjectValidator) error {
+	v, err := DefaultCompositionValidators(s)
 	if err != nil {
 		return err
 	}
-	acc[gvk(c.GroupVersionKind().Group, c.GroupVersionKind().Version, c.GroupVersionKind().Kind)] = validator.New(v)
+	appendToValidators(x.GroupVersionKind(), acc, v)
 	return nil
 }
 
-func (s *Snapshot) validatorsForV1Provider(c *metav1.Provider, acc map[schema.GroupVersionKind]validator.Validator) error {
+func (s *Snapshot) validatorsForV1Configuration(c *metav1.Configuration, acc map[schema.GroupVersionKind]*validator.ObjectValidator) error {
 	v, err := DefaultMetaValidators(s)
 	if err != nil {
 		return err
 	}
-	acc[gvk(c.GroupVersionKind().Group, c.GroupVersionKind().Version, c.GroupVersionKind().Kind)] = validator.New(v)
+	appendToValidators(c.GroupVersionKind(), acc, v)
 	return nil
 }
 
-func (s *Snapshot) validatorsForV1Alpha1Provider(c *metav1alpha1.Provider, acc map[schema.GroupVersionKind]validator.Validator) error {
+func (s *Snapshot) validatorsForV1Alpha1Configuration(c *metav1alpha1.Configuration, acc map[schema.GroupVersionKind]*validator.ObjectValidator) error {
 	v, err := DefaultMetaValidators(s)
 	if err != nil {
 		return err
 	}
-	acc[gvk(c.GroupVersionKind().Group, c.GroupVersionKind().Version, c.GroupVersionKind().Kind)] = validator.New(v)
+	appendToValidators(c.GroupVersionKind(), acc, v)
 	return nil
+}
+
+func (s *Snapshot) validatorsForV1Provider(c *metav1.Provider, acc map[schema.GroupVersionKind]*validator.ObjectValidator) error {
+	v, err := DefaultMetaValidators(s)
+	if err != nil {
+		return err
+	}
+	appendToValidators(c.GroupVersionKind(), acc, v)
+	return nil
+}
+
+func (s *Snapshot) validatorsForV1Alpha1Provider(c *metav1alpha1.Provider, acc map[schema.GroupVersionKind]*validator.ObjectValidator) error {
+	v, err := DefaultMetaValidators(s)
+	if err != nil {
+		return err
+	}
+	appendToValidators(c.GroupVersionKind(), acc, v)
+	return nil
+}
+
+func appendToValidators(gvk schema.GroupVersionKind, acc map[schema.GroupVersionKind]*validator.ObjectValidator, v validator.Validator) {
+	curr, ok := acc[gvk]
+	if !ok {
+		curr = validator.New(v)
+	} else {
+		curr.AddToChain(v)
+	}
+	acc[gvk] = curr
 }
 
 func buildSchema(s runtime.RawExtension) (*extv1.JSONSchemaProps, error) {

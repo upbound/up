@@ -59,24 +59,24 @@ func (e *Validation) Error() string {
 // ObjectValidator provides a mechanism for grouping various validators for a
 // given object type.
 type ObjectValidator struct {
-	validators []Validator
+	chain []Validator
 }
 
 // New returns a new ObjectValidator.
-func New(schemaValidator Validator, others ...Validator) *ObjectValidator {
-	validators := []Validator{schemaValidator}
+func New(validators ...Validator) *ObjectValidator {
+	chain := make([]Validator, 0)
 
 	return &ObjectValidator{
-		validators: append(validators, others...),
+		chain: append(chain, validators...),
 	}
 }
 
 // Validate implements the validator.Validator interface, providing a way to
 // validate more than just the strict schema for a given runtime.Object.
 func (o *ObjectValidator) Validate(data interface{}) *validate.Result {
-	errs := make([]error, 0)
+	errs := []error{}
 
-	for _, v := range o.validators {
+	for _, v := range o.chain {
 		result := v.Validate(data)
 		errs = append(errs, result.Errors...)
 	}
@@ -84,4 +84,10 @@ func (o *ObjectValidator) Validate(data interface{}) *validate.Result {
 	return &validate.Result{
 		Errors: errs,
 	}
+}
+
+// AddToChain adds the given validators to the internal validation chain for
+// the ObjectValidator.
+func (o *ObjectValidator) AddToChain(validators ...Validator) {
+	o.chain = append(o.chain, validators...)
 }
