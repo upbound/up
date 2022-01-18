@@ -1,3 +1,3 @@
 module github.com/crossplane/crossplane/controller/apiextensions
 
-go 1.16
+go 1.17

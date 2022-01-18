@@ -43,8 +43,6 @@ const (
 
 	errIncorrectErrType = "incorrect validaton error type seen"
 	errInvalidType      = "invalid type passed in, expected Unstructured"
-
-	warnNoDefinitionFound = "no definition found for resource"
 )
 
 // CompositionValidator defines a validator for compositions.
@@ -152,13 +150,7 @@ func (p *PatchesValidator) validate(idx int, cd resource.Composed) []error {
 	cdgvk := cd.GetObjectKind().GroupVersionKind()
 	v, ok := p.s.validators[cdgvk]
 	if !ok {
-		return []error{
-			&validator.Validation{
-				TypeCode: validator.WarningTypeCode,
-				Message:  fmt.Sprintf(errFmt, warnNoDefinitionFound, cdgvk),
-				Name:     fmt.Sprintf(resourceBaseFmt, idx, "apiVersion"),
-			},
-		}
+		return gvkDNEWarning(cdgvk, fmt.Sprintf(resourceBaseFmt, idx, "apiVersion"))
 	}
 
 	result := v.Validate(cd)

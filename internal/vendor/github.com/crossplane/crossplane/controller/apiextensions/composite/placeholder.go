@@ -1,7 +1,7 @@
 package composite
 
 const (
-	placeholderName      = "placeholder-name"
-	placeholderNamespace = "placeholder-namespace"
-	placeholderUID       = "placeholder-uid"
+	PlaceholderName      = "placeholder-name"
+	PlaceholderNamespace = "placeholder-namespace"
+	PlaceholderUID       = "placeholder-uid"
 )
