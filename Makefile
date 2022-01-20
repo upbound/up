@@ -1,6 +1,5 @@
 # ====================================================================================
 # Setup Project
-
 PROJECT_NAME := up
 PROJECT_REPO := github.com/upbound/$(PROJECT_NAME)
 
@@ -33,6 +32,7 @@ GO_STATIC_PACKAGES = $(GO_PROJECT)/cmd/up
 GO_LDFLAGS += -X $(GO_PROJECT)/internal/version.version=$(VERSION)
 GO_SUBDIRS += cmd internal
 GO111MODULE = on
+
 -include build/makelib/golang.mk
 
 # ====================================================================================
@@ -79,3 +79,7 @@ submodules:
 	@git submodule update --init --recursive
 
 .PHONY: submodules fallthrough
+
+install:
+	@$(MAKE) go.install
+	@echo "New 'up' binary located at $(GOPATH)/bin/up, please ensure $(GOPATH)/bin is prepended to your 'PATH'"

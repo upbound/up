@@ -18,7 +18,7 @@
 // https://github.com/golang/go/wiki/Modules#how-can-i-track-tool-dependencies-for-a-module
 
 // Add license headers to all files.
-//go:generate go run -tags generate github.com/google/addlicense -v -c "Upbound Inc" . ../cmd
+//go:generate go run -tags generate github.com/google/addlicense -v -ignore **/testdata/*.yaml -ignore **/vendor/** -c "Upbound Inc" . ../cmd
 
 package internal
 

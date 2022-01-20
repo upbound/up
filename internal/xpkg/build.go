@@ -20,7 +20,6 @@ import (
 	"context"
 	"io"
 
-	"github.com/crossplane/crossplane-runtime/pkg/parser"
 	pkgmetav1 "github.com/crossplane/crossplane/apis/pkg/meta/v1"
 	v1 "github.com/google/go-containerregistry/pkg/v1"
 	"github.com/google/go-containerregistry/pkg/v1/empty"
@@ -28,6 +27,10 @@ import (
 	"github.com/google/go-containerregistry/pkg/v1/tarball"
 	"github.com/pkg/errors"
 	"k8s.io/apimachinery/pkg/runtime"
+
+	"github.com/crossplane/crossplane-runtime/pkg/parser"
+
+	"github.com/upbound/up/internal/xpkg/parser/linter"
 )
 
 const (
@@ -101,7 +104,7 @@ func Build(ctx context.Context, b parser.Backend, p parser.Parser) (v1.Image, ru
 
 	// TODO(hasheddan): make linter selection logic configurable.
 	meta := metas[0]
-	var linter parser.Linter
+	var linter linter.Linter
 	if meta.GetObjectKind().GroupVersionKind().Kind == pkgmetav1.ConfigurationKind {
 		linter = NewConfigurationLinter()
 	} else {
