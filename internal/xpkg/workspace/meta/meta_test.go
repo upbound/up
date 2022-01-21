@@ -26,8 +26,10 @@ import (
 
 	"github.com/crossplane/crossplane-runtime/pkg/test"
 	metav1 "github.com/crossplane/crossplane/apis/pkg/meta/v1"
+	metav1alpha1 "github.com/crossplane/crossplane/apis/pkg/meta/v1alpha1"
 	"github.com/crossplane/crossplane/apis/pkg/v1beta1"
 
+	"github.com/upbound/up/internal/xpkg"
 	"github.com/upbound/up/internal/xpkg/dep"
 	"github.com/upbound/up/internal/xpkg/dep/resolver/image"
 )
@@ -82,6 +84,40 @@ func TestUpsert(t *testing.T) {
 				},
 			},
 		},
+		"AddEntryNoPriorV1alpha1": {
+			reason: "Should not return an error if package is created at path.",
+			args: args{
+				dep: dep.NewWithType(
+					"crossplane/provider-gcp@v1.0.0",
+					string(v1beta1.ConfigurationPackageType),
+				),
+				metaFile: &metav1alpha1.Configuration{
+					TypeMeta: apimetav1.TypeMeta{
+						APIVersion: "meta.pkg.crossplane.io/v1",
+						Kind:       "Configuration",
+					},
+					ObjectMeta: apimetav1.ObjectMeta{
+						Name: "getting-started-with-aws",
+					},
+					Spec: metav1alpha1.ConfigurationSpec{
+						MetaSpec: metav1alpha1.MetaSpec{
+							Crossplane: &metav1alpha1.CrossplaneConstraints{
+								Version: ">=1.0.0-0",
+							},
+						},
+					},
+				},
+			},
+			want: want{
+				deps: []v1beta1.Dependency{
+					{
+						Package:     "crossplane/provider-gcp",
+						Type:        v1beta1.ConfigurationPackageType,
+						Constraints: "v1.0.0",
+					},
+				},
+			},
+		},
 		"InsertNewEntry": {
 			reason: "Should not return an error if package is created at path.",
 			args: args{
@@ -103,6 +139,51 @@ func TestUpsert(t *testing.T) {
 								Version: ">=1.0.0-0",
 							},
 							DependsOn: []metav1.Dependency{
+								{
+									Provider: pointer.String("crossplane/provider-aws"),
+									Version:  ">=1.0.5",
+								},
+							},
+						},
+					},
+				},
+			},
+			want: want{
+				deps: []v1beta1.Dependency{
+					{
+						Package:     "crossplane/provider-aws",
+						Type:        v1beta1.ProviderPackageType,
+						Constraints: ">=1.0.5",
+					},
+					{
+						Package:     "crossplane/provider-gcp",
+						Type:        v1beta1.ProviderPackageType,
+						Constraints: "v1.0.0",
+					},
+				},
+			},
+		},
+		"InsertNewEntryV1alpha1": {
+			reason: "Should not return an error if package is created at path.",
+			args: args{
+				dep: dep.NewWithType(
+					"crossplane/provider-gcp@v1.0.0",
+					string(v1beta1.ProviderPackageType),
+				),
+				metaFile: &metav1alpha1.Provider{
+					TypeMeta: apimetav1.TypeMeta{
+						APIVersion: "meta.pkg.crossplane.io/v1",
+						Kind:       "Provider",
+					},
+					ObjectMeta: apimetav1.ObjectMeta{
+						Name: "getting-started-with-aws",
+					},
+					Spec: metav1alpha1.ProviderSpec{
+						MetaSpec: metav1alpha1.MetaSpec{
+							Crossplane: &metav1alpha1.CrossplaneConstraints{
+								Version: ">=1.0.0-0",
+							},
+							DependsOn: []metav1alpha1.Dependency{
 								{
 									Provider: pointer.String("crossplane/provider-aws"),
 									Version:  ">=1.0.5",
@@ -192,6 +273,30 @@ func TestUpsertDeps(t *testing.T) {
 				},
 			},
 		},
+		"EmptyDependencyListV1alpha1": {
+			reason: "Should return an updated deps list with the included provider, for v1alpha1.",
+			args: args{
+				dep: dep.NewWithType(
+					"crossplane/provider-aws@v1.0.0",
+					string(v1beta1.ProviderPackageType),
+				),
+				pkg: &metav1alpha1.Configuration{
+					Spec: metav1alpha1.ConfigurationSpec{
+						MetaSpec: metav1alpha1.MetaSpec{
+							DependsOn: []metav1alpha1.Dependency{},
+						},
+					},
+				},
+			},
+			want: want{
+				deps: []metav1.Dependency{
+					{
+						Provider: pointer.StringPtr("crossplane/provider-aws"),
+						Version:  "v1.0.0",
+					},
+				},
+			},
+		},
 		"InsertIntoDependencyList": {
 			reason: "Should return an updated deps list with 2 entries.",
 			args: args{
@@ -203,6 +308,39 @@ func TestUpsertDeps(t *testing.T) {
 					Spec: metav1.ConfigurationSpec{
 						MetaSpec: metav1.MetaSpec{
 							DependsOn: []metav1.Dependency{
+								{
+									Configuration: pointer.String("crossplane/provider-aws"),
+									Version:       "v1.0.0",
+								},
+							},
+						},
+					},
+				},
+			},
+			want: want{
+				deps: []metav1.Dependency{
+					{
+						Configuration: pointer.String("crossplane/provider-aws"),
+						Version:       "v1.0.0",
+					},
+					{
+						Provider: pointer.String("crossplane/provider-gcp"),
+						Version:  "v1.0.1",
+					},
+				},
+			},
+		},
+		"InsertIntoDependencyListV1alpha1": {
+			reason: "Should return an updated deps list with 2 entries, even for v1alpha packages.",
+			args: args{
+				dep: dep.NewWithType(
+					"crossplane/provider-gcp@v1.0.1",
+					string(v1beta1.ProviderPackageType),
+				),
+				pkg: &metav1alpha1.Configuration{
+					Spec: metav1alpha1.ConfigurationSpec{
+						MetaSpec: metav1alpha1.MetaSpec{
+							DependsOn: []metav1alpha1.Dependency{
 								{
 									Configuration: pointer.String("crossplane/provider-aws"),
 									Version:       "v1.0.0",
@@ -254,6 +392,35 @@ func TestUpsertDeps(t *testing.T) {
 				},
 			},
 		},
+		"UpdateDependencyListV1alpha1": {
+			reason: "Should return an updated deps list with the provider version updated, for v1alpha1.",
+			args: args{
+				dep: dep.NewWithType(
+					"crossplane/provider-aws@v1.0.1",
+					string(v1beta1.ConfigurationPackageType),
+				),
+				pkg: &metav1alpha1.Provider{
+					Spec: metav1alpha1.ProviderSpec{
+						MetaSpec: metav1alpha1.MetaSpec{
+							DependsOn: []metav1alpha1.Dependency{
+								{
+									Configuration: pointer.String("crossplane/provider-aws"),
+									Version:       "v1.0.0",
+								},
+							},
+						},
+					},
+				},
+			},
+			want: want{
+				deps: []metav1.Dependency{
+					{
+						Configuration: pointer.String("crossplane/provider-aws"),
+						Version:       "v1.0.1",
+					},
+				},
+			},
+		},
 		"UseDefaultTag": {
 			reason: "Should return an error indicating the package name is invalid.",
 			args: args{
@@ -265,6 +432,35 @@ func TestUpsertDeps(t *testing.T) {
 					Spec: metav1.ProviderSpec{
 						MetaSpec: metav1.MetaSpec{
 							DependsOn: []metav1.Dependency{
+								{
+									Provider: pointer.String("crossplane/provider-aws"),
+									Version:  "v1.0.0",
+								},
+							},
+						},
+					},
+				},
+			},
+			want: want{
+				deps: []metav1.Dependency{
+					{
+						Provider: pointer.String("crossplane/provider-aws"),
+						Version:  image.DefaultVer,
+					},
+				},
+			},
+		},
+		"UseDefaultTagV1alpha1": {
+			reason: "Should return an error indicating the package name is invalid, for v1alpha1.",
+			args: args{
+				dep: dep.NewWithType(
+					"crossplane/provider-aws",
+					string(v1beta1.ProviderPackageType),
+				),
+				pkg: &metav1alpha1.Provider{
+					Spec: metav1alpha1.ProviderSpec{
+						MetaSpec: metav1alpha1.MetaSpec{
+							DependsOn: []metav1alpha1.Dependency{
 								{
 									Provider: pointer.String("crossplane/provider-aws"),
 									Version:  "v1.0.0",
@@ -311,6 +507,34 @@ func TestUpsertDeps(t *testing.T) {
 				err: errors.New(errMetaContainsDupeDep),
 			},
 		},
+		"DuplicateDepV1alpha1": {
+			reason: "Should return an error indicating duplicate dependencies detected, v1alpha1.",
+			args: args{
+				dep: dep.NewWithType(
+					"crossplane/provider-aws",
+					string(v1beta1.ProviderPackageType),
+				),
+				pkg: &metav1alpha1.Provider{
+					Spec: metav1alpha1.ProviderSpec{
+						MetaSpec: metav1alpha1.MetaSpec{
+							DependsOn: []metav1alpha1.Dependency{
+								{
+									Provider: pointer.String("crossplane/provider-aws"),
+									Version:  "v1.0.0",
+								},
+								{
+									Provider: pointer.String("crossplane/provider-aws"),
+									Version:  "v1.0.1",
+								},
+							},
+						},
+					},
+				},
+			},
+			want: want{
+				err: errors.New(errMetaContainsDupeDep),
+			},
+		},
 	}
 
 	for name, tc := range cases {
@@ -323,7 +547,7 @@ func TestUpsertDeps(t *testing.T) {
 			}
 
 			if tc.want.deps != nil {
-				p := tc.args.pkg.(metav1.Pkg)
+				p, _ := xpkg.TryConvertToPkg(tc.args.pkg, &metav1.Provider{}, &metav1.Configuration{})
 				if diff := cmp.Diff(tc.want.deps, p.GetDependencies()); diff != "" {
 					t.Errorf("\n%s\nUpsertDeps(...): -want err, +got err:\n%s", tc.reason, diff)
 				}
@@ -364,6 +588,42 @@ func TestDependsOn(t *testing.T) {
 								Version: ">=1.0.0-0",
 							},
 							DependsOn: []metav1.Dependency{
+								{
+									Provider: pointer.String("crossplane/provider-aws"),
+									Version:  "v1.0.0",
+								},
+							},
+						},
+					},
+				},
+			},
+			want: want{
+				deps: []v1beta1.Dependency{
+					{
+						Package:     "crossplane/provider-aws",
+						Type:        v1beta1.ProviderPackageType,
+						Constraints: "v1.0.0",
+					},
+				},
+			},
+		},
+		"SingleDependencyV1alpha1": {
+			reason: "Should return a slice with a single entry even for v1alpha1 files.",
+			args: args{
+				metaFile: &metav1alpha1.Configuration{
+					TypeMeta: apimetav1.TypeMeta{
+						APIVersion: "meta.pkg.crossplane.io/v1",
+						Kind:       "Configuration",
+					},
+					ObjectMeta: apimetav1.ObjectMeta{
+						Name: "getting-started-with-aws",
+					},
+					Spec: metav1alpha1.ConfigurationSpec{
+						MetaSpec: metav1alpha1.MetaSpec{
+							Crossplane: &metav1alpha1.CrossplaneConstraints{
+								Version: ">=1.0.0-0",
+							},
+							DependsOn: []metav1alpha1.Dependency{
 								{
 									Provider: pointer.String("crossplane/provider-aws"),
 									Version:  "v1.0.0",
