@@ -28,9 +28,9 @@ import (
 
 	"github.com/crossplane/crossplane-runtime/pkg/logging"
 
+	"github.com/upbound/up/internal/version"
 	"github.com/upbound/up/internal/xpkg/dep/manager"
 	"github.com/upbound/up/internal/xpkg/snapshot"
-	"github.com/upbound/up/internal/xpls/version"
 )
 
 var (
@@ -42,6 +42,8 @@ const (
 	defaultWatchInterval = "100ms"
 	fileProtocol         = "file://"
 	fileWatchGlob        = "**/*.yaml"
+	newVersionMsgFmt     = `Version %s of up is now available. Current version is %s.
+	Update for the latest features!`
 
 	errParseWorkspace     = "failed to parse workspace"
 	errPublishDiagnostics = "failed to publish diagnostics"
@@ -299,12 +301,9 @@ func (s *Server) checkForUpdates() {
 			return
 		}
 
-		msg := `Version %s of up is now available. Current version is %s.
-		Update for the latest features!`
-
 		s.showMessage(context.Background(), &protocol.ShowMessageParams{
 			Type:    protocol.Info,
-			Message: fmt.Sprintf(msg, remote, local),
+			Message: fmt.Sprintf(newVersionMsgFmt, remote, local),
 		})
 	}()
 }
