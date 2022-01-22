@@ -18,6 +18,20 @@ import (
 	"k8s.io/kube-openapi/pkg/validation/validate"
 )
 
+// All code responses can be used to differentiate errors for different handling
+// by the consumer
+const (
+	// WarningTypeCode indicates a warning is being returned.
+	WarningTypeCode = 100
+	// ErrorTypeCode indicates an error is being returned.
+	ErrorTypeCode = 500
+
+	// NOTE(@tnthornton) api-server uses error code 422 and 600+ to indicate
+	// validation errors. As long as we're deferring to their logic for
+	// k8s type validations, we need to be sure to not overload those error
+	// codes.
+)
+
 // Nop is used for no-op validator results.
 var Nop = &validate.Result{}
 
@@ -26,19 +40,19 @@ type Validator interface {
 	Validate(data interface{}) *validate.Result
 }
 
-// MetaValidation represents a failure of a meta file condition.
-type MetaValidation struct {
-	code    int32
-	Message string
-	Name    string
+// Validation represents a failure of a file condition.
+type Validation struct {
+	TypeCode int32
+	Message  string
+	Name     string
 }
 
 // Code returns the code corresponding to the MetaValidation.
-func (e *MetaValidation) Code() int32 {
-	return e.code
+func (e *Validation) Code() int32 {
+	return e.TypeCode
 }
 
-func (e *MetaValidation) Error() string {
+func (e *Validation) Error() string {
 	return e.Message
 }
 

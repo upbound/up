@@ -22,12 +22,14 @@ import (
 	"io/ioutil"
 	"strings"
 
+	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/kube-openapi/pkg/validation/validate"
 	"sigs.k8s.io/yaml"
 
 	"github.com/Masterminds/semver"
 	"github.com/crossplane/crossplane-runtime/pkg/parser"
-	pkgmetav1 "github.com/crossplane/crossplane/apis/pkg/meta/v1"
+	metav1 "github.com/crossplane/crossplane/apis/pkg/meta/v1"
+	"github.com/crossplane/crossplane/apis/pkg/meta/v1alpha1"
 	"github.com/crossplane/crossplane/apis/pkg/v1beta1"
 
 	"github.com/upbound/up/internal/xpkg"
@@ -37,13 +39,15 @@ import (
 )
 
 const (
+	apiVersionField  = "apiVersion"
 	dependsOnPathFmt = "spec.dependsOn[%d].%s"
 	versionField     = "version"
 
-	errFailedConvertToPkg = "unable to convert to package"
-	errPackageDNEFmt      = "Package %s does not exist locally. Please run `up xpkg dep` to fix."
-	errVersionDENFmt      = "Version matching %s does not exist locally. Please run `up xpkg dep` to fix."
-	errWrongPkgTypeFmt    = "Incorrect package type. '%s' does not match type for %s of '%s'"
+	errAPIVersionDeprecatedFmt = "%s is deprecated in favor of %s"
+	errFailedConvertToPkg      = "unable to convert to package"
+	errPackageDNEFmt           = "Package %s does not exist locally. Please run `up xpkg dep` to fix."
+	errVersionDENFmt           = "Version matching %s does not exist locally. Please run `up xpkg dep` to fix."
+	errWrongPkgTypeFmt         = "Incorrect package type. '%s' does not match type for %s of '%s'"
 )
 
 // Validator defines a validator for meta files.
@@ -76,13 +80,16 @@ func DefaultMetaValidators(s *Snapshot) (*Validator, error) {
 // Validate performs validation rules on the given data input per the rules
 // defined for the Validator.
 func (m *Validator) Validate(data interface{}) *validate.Result {
-	pkg, err := m.Marshal(data)
+	pkg, o, err := m.Marshal(data)
 	if err != nil {
 		// TODO(@tnthornton) add debug logging
 		return validator.Nop
 	}
 
 	errs := make([]error, 0)
+
+	// validate the current apiVersion of the meta file
+	errs = append(errs, validateAPIVersion(o))
 
 	for i, d := range pkg.GetDependencies() {
 		cd := manager.ConvertToV1beta1(d)
@@ -97,31 +104,59 @@ func (m *Validator) Validate(data interface{}) *validate.Result {
 }
 
 // Marshal marshals the given data object into a Pkg, errors otherwise.
-func (m *Validator) Marshal(data interface{}) (pkgmetav1.Pkg, error) {
+func (m *Validator) Marshal(data interface{}) (metav1.Pkg, runtime.Object, error) {
 	b, err := yaml.Marshal(data)
 	if err != nil {
-		return nil, err
+		return nil, nil, err
 	}
 
 	// convert data to a package
 	ppkg, err := m.p.Parse(context.Background(), ioutil.NopCloser(bytes.NewReader(b)))
 	if err != nil {
-		return nil, err
+		return nil, nil, err
 	}
 
 	if len(ppkg.GetMeta()) != 1 {
-		return nil, err
+		return nil, nil, err
 	}
 
-	pkg, ok := xpkg.TryConvertToPkg(ppkg.GetMeta()[0], &pkgmetav1.Provider{}, &pkgmetav1.Configuration{})
+	o := ppkg.GetMeta()[0]
+	pkg, ok := xpkg.TryConvertToPkg(o, &metav1.Provider{}, &metav1.Configuration{})
 	if !ok {
-		return nil, errors.New(errFailedConvertToPkg)
+		return nil, nil, errors.New(errFailedConvertToPkg)
 	}
-	return pkg, nil
+	return pkg, o, nil
 }
 
 type metaValidator interface {
 	validate(int, v1beta1.Dependency) error
+}
+
+// validateAPIVersion tests if the provided object is a deprecated version
+func validateAPIVersion(o runtime.Object) error {
+	switch o.(type) {
+	case *v1alpha1.Configuration:
+		return &validator.Validation{
+			Name: apiVersionField,
+			Message: fmt.Sprintf(
+				errAPIVersionDeprecatedFmt,
+				o.GetObjectKind().GroupVersionKind().GroupVersion(),
+				metav1.ConfigurationGroupVersionKind.GroupVersion(),
+			),
+			TypeCode: validator.WarningTypeCode,
+		}
+	case *v1alpha1.Provider:
+		return &validator.Validation{
+			Name: apiVersionField,
+			Message: fmt.Sprintf(
+				errAPIVersionDeprecatedFmt,
+				o.GetObjectKind().GroupVersionKind().GroupVersion(),
+				metav1.ProviderGroupVersionKind.GroupVersion(),
+			),
+			TypeCode: validator.WarningTypeCode,
+		}
+	}
+	return nil
 }
 
 // TypeValidator validates the dependency type matches the supplied dependency
@@ -144,7 +179,7 @@ func (v *TypeValidator) validate(i int, d v1beta1.Dependency) error {
 		return nil
 	}
 	if got.Type() != d.Type {
-		return &validator.MetaValidation{
+		return &validator.Validation{
 			Name: fmt.Sprintf(dependsOnPathFmt, i, strings.ToLower(string(d.Type))),
 			Message: fmt.Sprintf(errWrongPkgTypeFmt,
 				strings.ToLower(string(d.Type)),
@@ -180,13 +215,13 @@ func (v *VersionValidator) validate(i int, d v1beta1.Dependency) error {
 		return nil // nolint:nilerr
 	}
 	if len(vers) == 0 {
-		return &validator.MetaValidation{
+		return &validator.Validation{
 			Name:    fmt.Sprintf(dependsOnPathFmt, i, strings.ToLower(string(d.Type))),
 			Message: fmt.Sprintf(errPackageDNEFmt, d.Package),
 		}
 	}
 	if !versionMatch(d.Constraints, vers) {
-		return &validator.MetaValidation{
+		return &validator.Validation{
 			Name:    fmt.Sprintf(dependsOnPathFmt, i, versionField),
 			Message: fmt.Sprintf(errVersionDENFmt, d.Constraints),
 		}

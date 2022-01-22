@@ -31,8 +31,8 @@ import (
 
 	xpextv1 "github.com/crossplane/crossplane/apis/apiextensions/v1"
 	xpextv1beta1 "github.com/crossplane/crossplane/apis/apiextensions/v1beta1"
-	v1 "github.com/crossplane/crossplane/apis/pkg/meta/v1"
-	"github.com/crossplane/crossplane/apis/pkg/v1beta1"
+	metav1 "github.com/crossplane/crossplane/apis/pkg/meta/v1"
+	metav1alpha1 "github.com/crossplane/crossplane/apis/pkg/meta/v1alpha1"
 
 	"github.com/upbound/up/internal/xpkg/snapshot/validator"
 )
@@ -64,20 +64,20 @@ func (s *Snapshot) ValidatorsForObj(o runtime.Object) (map[schema.GroupVersionKi
 		if err := validatorsFromV1XRD(rd, validators); err != nil {
 			return nil, err
 		}
-	case *v1.Configuration:
+	case *metav1.Configuration:
 		if err := s.validatorsForV1Configuration(rd, validators); err != nil {
 			return nil, err
 		}
-	case *v1beta1.Configuration:
-		if err := s.validatorsForV1Beta1Configuration(rd, validators); err != nil {
+	case *metav1alpha1.Configuration:
+		if err := s.validatorsForV1Alpha1Configuration(rd, validators); err != nil {
 			return nil, err
 		}
-	case *v1.Provider:
+	case *metav1.Provider:
 		if err := s.validatorsForV1Provider(rd, validators); err != nil {
 			return nil, err
 		}
-	case *v1beta1.Provider:
-		if err := s.validatorsForV1Beta1Provider(rd, validators); err != nil {
+	case *metav1alpha1.Provider:
+		if err := s.validatorsForV1Alpha1Provider(rd, validators); err != nil {
 			return nil, err
 		}
 	default:
@@ -167,7 +167,7 @@ func validatorsFromV1XRD(x *xpextv1.CompositeResourceDefinition, acc map[schema.
 	return nil
 }
 
-func (s *Snapshot) validatorsForV1Configuration(c *v1.Configuration, acc map[schema.GroupVersionKind]validator.Validator) error {
+func (s *Snapshot) validatorsForV1Configuration(c *metav1.Configuration, acc map[schema.GroupVersionKind]validator.Validator) error {
 	v, err := DefaultMetaValidators(s)
 	if err != nil {
 		return err
@@ -176,7 +176,7 @@ func (s *Snapshot) validatorsForV1Configuration(c *v1.Configuration, acc map[sch
 	return nil
 }
 
-func (s *Snapshot) validatorsForV1Beta1Configuration(c *v1beta1.Configuration, acc map[schema.GroupVersionKind]validator.Validator) error {
+func (s *Snapshot) validatorsForV1Alpha1Configuration(c *metav1alpha1.Configuration, acc map[schema.GroupVersionKind]validator.Validator) error {
 	v, err := DefaultMetaValidators(s)
 	if err != nil {
 		return err
@@ -185,7 +185,7 @@ func (s *Snapshot) validatorsForV1Beta1Configuration(c *v1beta1.Configuration, a
 	return nil
 }
 
-func (s *Snapshot) validatorsForV1Provider(c *v1.Provider, acc map[schema.GroupVersionKind]validator.Validator) error {
+func (s *Snapshot) validatorsForV1Provider(c *metav1.Provider, acc map[schema.GroupVersionKind]validator.Validator) error {
 	v, err := DefaultMetaValidators(s)
 	if err != nil {
 		return err
@@ -194,7 +194,7 @@ func (s *Snapshot) validatorsForV1Provider(c *v1.Provider, acc map[schema.GroupV
 	return nil
 }
 
-func (s *Snapshot) validatorsForV1Beta1Provider(c *v1beta1.Provider, acc map[schema.GroupVersionKind]validator.Validator) error {
+func (s *Snapshot) validatorsForV1Alpha1Provider(c *metav1alpha1.Provider, acc map[schema.GroupVersionKind]validator.Validator) error {
 	v, err := DefaultMetaValidators(s)
 	if err != nil {
 		return err

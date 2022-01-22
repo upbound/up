@@ -23,15 +23,17 @@ import (
 	sigsyaml "sigs.k8s.io/yaml"
 
 	v1 "github.com/crossplane/crossplane/apis/pkg/meta/v1"
+	"github.com/crossplane/crossplane/apis/pkg/meta/v1alpha1"
 	"github.com/crossplane/crossplane/apis/pkg/v1beta1"
 
+	"github.com/upbound/up/internal/xpkg"
 	"github.com/upbound/up/internal/xpkg/dep/manager"
 )
 
 const (
-	errInvalidMetaFile     = "invalid meta type supplied"
-	errMetaContainsDupeDep = "meta file contains duplicate dependency"
-	errNotAPackage         = "invalid package type supplied"
+	errInvalidMetaFile           = "invalid meta type supplied"
+	errMetaContainsDupeDep       = "meta file contains duplicate dependency"
+	errUnsupportedPackageVersion = "unsupported package version supplied"
 )
 
 // Meta provides helpful methods for interacting with a metafile's
@@ -50,9 +52,9 @@ func New(obj runtime.Object) *Meta {
 
 // DependsOn returns a slice of v1beta1.Dependency that this workspace depends on.
 func (m *Meta) DependsOn() ([]v1beta1.Dependency, error) {
-	pkg, ok := m.obj.(v1.Pkg)
+	pkg, ok := xpkg.TryConvertToPkg(m.obj, &v1.Provider{}, &v1.Configuration{})
 	if !ok {
-		return nil, errors.New(errNotAPackage)
+		return nil, errors.New(errUnsupportedPackageVersion)
 	}
 
 	out := make([]v1beta1.Dependency, len(pkg.GetDependencies()))
@@ -82,7 +84,11 @@ func (m *Meta) Bytes() ([]byte, error) {
 	t := apimetav1.Time{}
 
 	switch v := m.obj.(type) {
+	case *v1alpha1.Configuration:
+		t = v.GetCreationTimestamp()
 	case *v1.Configuration:
+		t = v.GetCreationTimestamp()
+	case *v1alpha1.Provider:
 		t = v.GetCreationTimestamp()
 	case *v1.Provider:
 		t = v.GetCreationTimestamp()
@@ -101,10 +107,13 @@ func (m *Meta) Bytes() ([]byte, error) {
 	return data, nil
 }
 
+// upsertDeps takes a v1beta1.Dependency and a runtime.Object of type that can
+// be converted to a v1.Pkg and returns an updated runtime.Object with a slice
+// of dependencies that includes the provided dependency d.
 func upsertDeps(d v1beta1.Dependency, o runtime.Object) error { // nolint:gocyclo
-	p, ok := o.(v1.Pkg)
+	p, ok := xpkg.TryConvertToPkg(o, &v1.Provider{}, &v1.Configuration{})
 	if !ok {
-		return errors.New(errNotAPackage)
+		return errors.New(errUnsupportedPackageVersion)
 	}
 	deps := p.GetDependencies()
 
@@ -142,9 +151,13 @@ func upsertDeps(d v1beta1.Dependency, o runtime.Object) error { // nolint:gocycl
 		deps = append(deps, dep)
 	}
 
-	switch v := p.(type) {
+	switch v := o.(type) {
+	case *v1alpha1.Configuration:
+		v.Spec.DependsOn = convertToV1alpha1(deps)
 	case *v1.Configuration:
 		v.Spec.DependsOn = deps
+	case *v1alpha1.Provider:
+		v.Spec.DependsOn = convertToV1alpha1(deps)
 	case *v1.Provider:
 		v.Spec.DependsOn = deps
 	}
@@ -169,4 +182,12 @@ func cleanNullTs(p runtime.Object) ([]byte, error) {
 	delete(m["metadata"].(map[string]interface{}), "creationTimestamp")
 
 	return sigsyaml.Marshal(m)
+}
+
+func convertToV1alpha1(deps []v1.Dependency) []v1alpha1.Dependency {
+	alphaDeps := make([]v1alpha1.Dependency, 0)
+	for _, d := range deps {
+		alphaDeps = append(alphaDeps, manager.ConvertToV1alpha1(d))
+	}
+	return alphaDeps
 }

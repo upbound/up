@@ -451,7 +451,7 @@ func validationDiagnostics(res *validate.Result, n ast.Node, gvk schema.GroupVer
 				message: fmt.Sprintf("%s (%s)", et.Error(), gvk),
 				name:    et.Name,
 			}
-		case *validator.MetaValidation:
+		case *validator.Validation:
 			e = &verror{
 				code:    et.Code(),
 				message: et.Error(),
@@ -497,6 +497,18 @@ func validationDiagnostics(res *validate.Result, n ast.Node, gvk schema.GroupVer
 				default:
 					endCh = tok.Position.Column + len(tok.Value) - 1
 				}
+
+				// handle different types of diagnostic notifications
+				var sev protocol.DiagnosticSeverity
+				switch c := e.code; {
+				case c == validator.WarningTypeCode:
+					sev = protocol.SeverityWarning
+				case c == validator.ErrorTypeCode:
+					sev = protocol.SeverityError
+				case c >= 422:
+					sev = protocol.SeverityError
+				}
+
 				// TODO(hasheddan): token position reflects file line
 				// and column by NOT being zero-indexed, but VSCode
 				// interprets ranges with zero-indexing. We should
@@ -513,7 +525,7 @@ func validationDiagnostics(res *validate.Result, n ast.Node, gvk schema.GroupVer
 						},
 					},
 					Message:  e.Error(),
-					Severity: protocol.SeverityError,
+					Severity: sev,
 					Source:   serverName,
 				})
 			}
