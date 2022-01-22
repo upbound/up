@@ -16,6 +16,7 @@ package server
 
 import (
 	"context"
+	"fmt"
 	"strings"
 	"sync"
 	"time"
@@ -27,6 +28,7 @@ import (
 
 	"github.com/crossplane/crossplane-runtime/pkg/logging"
 
+	"github.com/upbound/up/internal/version"
 	"github.com/upbound/up/internal/xpkg/dep/manager"
 	"github.com/upbound/up/internal/xpkg/snapshot"
 )
@@ -40,6 +42,8 @@ const (
 	defaultWatchInterval = "100ms"
 	fileProtocol         = "file://"
 	fileWatchGlob        = "**/*.yaml"
+	newVersionMsgFmt     = `Version %s of up is now available. Current version is %s.
+	Update for the latest features!`
 
 	errParseWorkspace     = "failed to parse workspace"
 	errPublishDiagnostics = "failed to publish diagnostics"
@@ -51,6 +55,7 @@ const (
 type Server struct {
 	conn *jsonrpc2.Conn
 
+	i   *version.Informer
 	log logging.Logger
 	m   *manager.Manager
 	mu  sync.RWMutex
@@ -82,6 +87,8 @@ func New(opts ...Option) (*Server, error) {
 	}
 
 	s.m = m
+
+	s.i = version.NewInformer(version.WithLogger(s.log))
 
 	return s, nil
 }
@@ -144,6 +151,7 @@ func (s *Server) Initialize(ctx context.Context, conn *jsonrpc2.Conn, id jsonrpc
 	}
 
 	s.registerWatchFilesCapability()
+	s.checkForUpdates()
 }
 
 // DidChange handles calls to DidChange.
@@ -255,6 +263,12 @@ func (s *Server) publishDiagnostics(ctx context.Context, params *protocol.Publis
 	}
 }
 
+func (s *Server) showMessage(ctx context.Context, params *protocol.ShowMessageParams) {
+	if err := s.conn.Notify(ctx, "window/showMessage", params); err != nil {
+		s.log.Debug(errPublishDiagnostics, "error", err)
+	}
+}
+
 func (s *Server) registerWatchFilesCapability() {
 	go func() {
 		if err := s.conn.Call(context.Background(), "client/registerCapability", &protocol.RegistrationParams{
@@ -275,6 +289,22 @@ func (s *Server) registerWatchFilesCapability() {
 		}, nil); err != nil {
 			s.log.Debug(errRegisteringWatches, "error", err)
 		}
+	}()
+}
+
+func (s *Server) checkForUpdates() {
+	go func() {
+
+		local, remote, ok := s.i.CanUpgrade()
+		if !ok {
+			// can't upgrade, nothing to do
+			return
+		}
+
+		s.showMessage(context.Background(), &protocol.ShowMessageParams{
+			Type:    protocol.Info,
+			Message: fmt.Sprintf(newVersionMsgFmt, remote, local),
+		})
 	}()
 }
 
