@@ -48,6 +48,7 @@ const (
 	errParseWorkspace     = "failed to parse workspace"
 	errPublishDiagnostics = "failed to publish diagnostics"
 	errRegisteringWatches = "failed to register workspace watchers"
+	errValidateMeta       = "failed to validate crossplane.yaml file in workspace"
 	errValidateNodes      = "failed to validate nodes in workspace"
 )
 
@@ -151,6 +152,7 @@ func (s *Server) Initialize(ctx context.Context, conn *jsonrpc2.Conn, id jsonrpc
 	}
 
 	s.registerWatchFilesCapability()
+	s.checkMetaFile()
 	s.checkForUpdates()
 }
 
@@ -304,6 +306,20 @@ func (s *Server) checkForUpdates() {
 		s.showMessage(context.Background(), &protocol.ShowMessageParams{
 			Type:    protocol.Info,
 			Message: fmt.Sprintf(newVersionMsgFmt, remote, local),
+		})
+	}()
+}
+
+func (s *Server) checkMetaFile() {
+	go func() {
+		uri, diags, err := s.snap.ValidateMeta()
+		if err != nil {
+			s.log.Debug(errValidateMeta, "error", err)
+			return
+		}
+		s.publishDiagnostics(context.Background(), &protocol.PublishDiagnosticsParams{
+			URI:         protocol.URIFromSpanURI(uri),
+			Diagnostics: diags,
 		})
 	}()
 }
