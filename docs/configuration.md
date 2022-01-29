@@ -14,12 +14,12 @@ installations.
 ### Format
 
 `up` allows users to define profiles that contain sets of preferences and
-credentials for interacting with Upbound. This enables easily executing
-commands as different users, or in different accounts. In the example below,
-five profiles are defined: `default`, `dev`, `staging`, `prod`, and `ci`. Any
-`up cloud` commands will use the specified profile when pass `--profile` or
-`UP_PROFILE` is set to its name. If a profile is not set, `up` will use the
-profile specified as `default`, which in this case is actually named `default`.
+credentials for interacting with Upbound. This enables easily executing commands
+as different users, or in different accounts. In the example below, five
+profiles are defined: `default`, `dev`, `staging`, `prod`, and `ci`. Commands
+will use the specified profile when set via the `--profile` flag or `UP_PROFILE`
+environment variable. If a profile is not set, `up` will use the profile
+specified as `default`, which in this case is actually named `default`.
 
 ```json
 {
