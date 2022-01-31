@@ -344,6 +344,11 @@ func (v *View) Meta() *meta.Meta {
 	return v.meta
 }
 
+// MetaLocation returns the meta file's location (on disk) in the current View.
+func (v *View) MetaLocation() string {
+	return v.metaLocation
+}
+
 // Nodes returns the View's Nodes.
 func (v *View) Nodes() map[NodeIdentifier]Node {
 	return v.nodes

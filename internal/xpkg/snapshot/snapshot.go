@@ -21,6 +21,8 @@ import (
 	"errors"
 	"fmt"
 	"io"
+	"os"
+	"path/filepath"
 	"strings"
 	"sync"
 
@@ -188,7 +190,7 @@ func (s *Snapshot) init() error {
 
 	meta := s.wsview.Meta()
 	if meta != nil {
-		deps, err := s.wsview.Meta().DependsOn()
+		deps, err := meta.DependsOn()
 		if err != nil {
 			return err
 		}
@@ -403,6 +405,19 @@ func (s *Snapshot) ValidateAllFiles() (map[span.URI][]protocol.Diagnostic, error
 		results[f] = diags
 	}
 	return results, nil
+}
+
+// ValidateMeta performs validations specifically on the meta file. This is
+// specifically helpful when performing background validations and not
+// responding to validation requests synchronously.
+func (s *Snapshot) ValidateMeta() (span.URI, []protocol.Diagnostic, error) {
+	if s.wsview.MetaLocation() == "" {
+		// nothing to do here, there is no crossplane.yaml in this snapshot
+		return "", nil, os.ErrNotExist
+	}
+	uri := span.URIFromPath(filepath.Join(s.wsview.MetaLocation(), xpkg.MetaFile))
+	diags, _ := s.Validate(uri)
+	return uri, diags, nil
 }
 
 // Validate performs validation on all filtered nodes and returns diagnostics
