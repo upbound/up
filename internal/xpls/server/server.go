@@ -49,6 +49,7 @@ const (
 	errPublishDiagnostics = "failed to publish diagnostics"
 	errRegisteringWatches = "failed to register workspace watchers"
 	errValidateMeta       = "failed to validate crossplane.yaml file in workspace"
+	errShowMessage        = "failed to show message"
 	errValidateNodes      = "failed to validate nodes in workspace"
 )
 
@@ -267,7 +268,7 @@ func (s *Server) publishDiagnostics(ctx context.Context, params *protocol.Publis
 
 func (s *Server) showMessage(ctx context.Context, params *protocol.ShowMessageParams) {
 	if err := s.conn.Notify(ctx, "window/showMessage", params); err != nil {
-		s.log.Debug(errPublishDiagnostics, "error", err)
+		s.log.Debug(errShowMessage, "error", err)
 	}
 }
 
@@ -296,7 +297,6 @@ func (s *Server) registerWatchFilesCapability() {
 
 func (s *Server) checkForUpdates() {
 	go func() {
-
 		local, remote, ok := s.i.CanUpgrade()
 		if !ok {
 			// can't upgrade, nothing to do

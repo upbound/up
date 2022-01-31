@@ -203,7 +203,7 @@ func (s *Snapshot) init() error {
 		for _, pkg := range extView.Packages() {
 
 			for _, o := range pkg.Objects() {
-				validators, err := s.ValidatorsForObj(o)
+				validators, err := ValidatorsForObj(o, s)
 				if err != nil {
 					// skip adding the validator
 					continue
@@ -350,51 +350,58 @@ func (s *Snapshot) updateChanges(_ context.Context, uri span.URI, changes []prot
 // loadWSValidators processes the details from the parsed workspace, extracting
 // the corresponding validators and applying them to the workspace.
 func (s *Snapshot) loadWSValidators() error { // nolint:gocyclo
-	wsValidators := map[schema.GroupVersionKind]validator.Validator{}
-
 	for _, d := range s.wsview.FileDetails() {
-		yr := apimachyaml.NewYAMLReader(bufio.NewReader(bytes.NewReader(d.Body)))
-		do := json.NewSerializerWithOptions(json.DefaultMetaFactory, s.objScheme, s.objScheme, json.SerializerOptions{Yaml: true})
-		dm := json.NewSerializerWithOptions(json.DefaultMetaFactory, s.metaScheme, s.metaScheme, json.SerializerOptions{Yaml: true})
-		for {
-			b, err := yr.Read()
-			if err != nil && !errors.Is(err, io.EOF) {
-				return err
-			}
-			if errors.Is(err, io.EOF) {
-				break
-			}
-			if len(b) == 0 {
+		validators, err := s.validatorsFromBytes(d.Body)
+		if err != nil {
+			continue
+		}
+		for gvk, v := range validators {
+			s.validators[gvk] = v
+		}
+	}
+	return nil
+}
+
+func (s *Snapshot) validatorsFromBytes(b []byte) (map[schema.GroupVersionKind]validator.Validator, error) {
+	result := map[schema.GroupVersionKind]validator.Validator{}
+
+	yr := apimachyaml.NewYAMLReader(bufio.NewReader(bytes.NewReader(b)))
+	do := json.NewSerializerWithOptions(json.DefaultMetaFactory, s.objScheme, s.objScheme, json.SerializerOptions{Yaml: true})
+	dm := json.NewSerializerWithOptions(json.DefaultMetaFactory, s.metaScheme, s.metaScheme, json.SerializerOptions{Yaml: true})
+	for {
+		b, err := yr.Read()
+		if err != nil && !errors.Is(err, io.EOF) {
+			return nil, err
+		}
+		if errors.Is(err, io.EOF) {
+			break
+		}
+		if len(b) == 0 {
+			continue
+		}
+
+		o, _, err := do.Decode(b, nil, nil)
+		if err != nil {
+			// attempt to decode as a meta object
+			o, _, err = dm.Decode(b, nil, nil)
+			if err != nil {
+				// skip YAML document if we cannot unmarshal to runtime.Object
 				continue
 			}
+		}
 
-			o, _, err := do.Decode(b, nil, nil)
-			if err != nil {
-				// attempt to decode as a meta object
-				o, _, err = dm.Decode(b, nil, nil)
-				if err != nil {
-					// skip YAML document if we cannot unmarshal to runtime.Object
-					continue
-				}
-			}
+		validators, err := ValidatorsForObj(o, s)
+		if err != nil {
+			// skip YAML document if we cannot acquire validators for object
+			continue
+		}
 
-			validators, err := s.ValidatorsForObj(o)
-			if err != nil {
-				// skip YAML document if we cannot acquire validators for object
-				continue
-			}
-
-			for gvk, v := range validators {
-				wsValidators[gvk] = v
-			}
+		for gvk, v := range validators {
+			result[gvk] = v
 		}
 	}
 
-	for gvk, v := range wsValidators {
-		s.validators[gvk] = v
-	}
-
-	return nil
+	return result, nil
 }
 
 // ValidateAllFiles performs validations on all files in Snapshot.
