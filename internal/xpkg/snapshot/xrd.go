@@ -34,6 +34,10 @@ import (
 	"github.com/upbound/up/internal/xpkg/snapshot/validator"
 )
 
+var (
+	mapKeyRE = regexp.MustCompile(`(\[([a-zA-Z]*)\])`)
+)
+
 // XRDValidator defines a validator for xrd files.
 type XRDValidator struct {
 	validators []xrdValidator
@@ -165,16 +169,15 @@ func cleanFieldPath(fieldVal string) string {
 
 type cleaner func(string) string
 
-// if the validations were all move to spec.validation, update the path
+// if the validations were all moved to spec.validation, update the path
 // to point to spec.version[0]
 func replaceValidation(fieldVal string) string {
 	return strings.Replace(fieldVal, "spec.validation", "spec.versions[0].schema", 1)
 }
 
-// paths are return from CRD validations using map[key].field notation
+// paths are returned from CRD validations using map[key].field notation
 func replaceMapKeys(fieldVal string) string {
-	sampleRegexp := regexp.MustCompile(`(\[([a-zA-Z]*)\])`)
-	return sampleRegexp.ReplaceAllString(fieldVal, ".$2")
+	return mapKeyRE.ReplaceAllString(fieldVal, ".$2")
 }
 
 func trimInvalidDollarSign(fieldVal string) string {

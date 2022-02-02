@@ -162,7 +162,7 @@ func validatorsFromV1Beta1XRD(x *xpextv1beta1.CompositeResourceDefinition, acc m
 
 func validatorsFromV1XRD(x *xpextv1.CompositeResourceDefinition, acc map[schema.GroupVersionKind]*validator.ObjectValidator) error {
 	errs := validateOpenAPIV3Schema(x)
-	if errs != nil {
+	if len(errs) != 0 {
 		// NOTE (@tnthornton) we're using this as a mechanism to ensure we don't
 		// cause upstream validators to panic while evaluating a broken schema.
 		// The error contents are meaningless, hence specifically grabbing the
