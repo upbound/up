@@ -33,6 +33,7 @@ import (
 	xpextv1beta1 "github.com/crossplane/crossplane/apis/apiextensions/v1beta1"
 	metav1 "github.com/crossplane/crossplane/apis/pkg/meta/v1"
 	metav1alpha1 "github.com/crossplane/crossplane/apis/pkg/meta/v1alpha1"
+	"github.com/crossplane/crossplane/xcrd"
 
 	"github.com/upbound/up/internal/xpkg/snapshot/validator"
 )
@@ -62,6 +63,9 @@ func ValidatorsForObj(o runtime.Object, s *Snapshot) (map[schema.GroupVersionKin
 		}
 	case *xpextv1.CompositeResourceDefinition:
 		if err := validatorsFromV1XRD(rd, validators); err != nil {
+			return nil, err
+		}
+		if err := validatorsForV1XRD(rd, validators); err != nil {
 			return nil, err
 		}
 	case *xpextv1.Composition:
@@ -157,6 +161,15 @@ func validatorsFromV1Beta1XRD(x *xpextv1beta1.CompositeResourceDefinition, acc m
 }
 
 func validatorsFromV1XRD(x *xpextv1.CompositeResourceDefinition, acc map[schema.GroupVersionKind]*validator.ObjectValidator) error {
+	errs := validateOpenAPIV3Schema(x)
+	if len(errs) != 0 {
+		// NOTE (@tnthornton) we're using this as a mechanism to ensure we don't
+		// cause upstream validators to panic while evaluating a broken schema.
+		// The error contents are meaningless, hence specifically grabbing the
+		// first in the slice.
+		return errs[0]
+	}
+
 	for _, v := range x.Spec.Versions {
 
 		schema, err := buildSchema(v.Schema.OpenAPIV3Schema)
@@ -174,6 +187,15 @@ func validatorsFromV1XRD(x *xpextv1.CompositeResourceDefinition, acc map[schema.
 		}
 		appendToValidators(gvk(x.Spec.Group, v.Name, x.Spec.Names.Kind), acc, sv)
 	}
+	return nil
+}
+
+func validatorsForV1XRD(x *xpextv1.CompositeResourceDefinition, acc map[schema.GroupVersionKind]*validator.ObjectValidator) error {
+	v, err := DefaultXRDValidators()
+	if err != nil {
+		return err
+	}
+	appendToValidators(schema.FromAPIVersionAndKind(x.APIVersion, x.Kind), acc, v)
 	return nil
 }
 
@@ -242,7 +264,7 @@ func appendToValidators(gvk schema.GroupVersionKind, acc map[schema.GroupVersion
 }
 
 func buildSchema(s runtime.RawExtension) (*extv1.JSONSchemaProps, error) {
-	schema := BaseProps()
+	schema := xcrd.BaseProps()
 
 	p, required, err := getProps("spec", s)
 	if err != nil {
@@ -253,7 +275,7 @@ func buildSchema(s runtime.RawExtension) (*extv1.JSONSchemaProps, error) {
 	for k, v := range p {
 		specProps.Properties[k] = v
 	}
-	for k, v := range CompositeResourceClaimSpecProps() {
+	for k, v := range xcrd.CompositeResourceClaimSpecProps() {
 		specProps.Properties[k] = v
 	}
 
@@ -268,7 +290,7 @@ func buildSchema(s runtime.RawExtension) (*extv1.JSONSchemaProps, error) {
 	for k, v := range statusP {
 		statusProps.Properties[k] = v
 	}
-	for k, v := range CompositeResourceStatusProps() {
+	for k, v := range xcrd.CompositeResourceStatusProps() {
 		statusProps.Properties[k] = v
 	}
 
@@ -296,129 +318,6 @@ func gvk(group, version, kind string) schema.GroupVersionKind {
 		Group:   group,
 		Version: version,
 		Kind:    kind,
-	}
-}
-
-// NOTE (@tnthornton) the below functions came from https://github.com/crossplane/crossplane/blob/master/internal/xcrd/schemas.go
-// with slight modification to use runtime.RawExtension in the getProps signature.
-
-// BaseProps is a partial OpenAPIV3Schema for the spec fields that Crossplane
-// expects to be present for all CRDs that it creates.
-func BaseProps() *extv1.JSONSchemaProps {
-	return &extv1.JSONSchemaProps{
-		Type:     "object",
-		Required: []string{"spec"},
-		Properties: map[string]extv1.JSONSchemaProps{
-			"apiVersion": {
-				Type: "string",
-			},
-			"kind": {
-				Type: "string",
-			},
-			"metadata": {
-				// NOTE(muvaf): api-server takes care of validating
-				// metadata.
-				Type: "object",
-			},
-			"spec": {
-				Type:       "object",
-				Properties: map[string]extv1.JSONSchemaProps{},
-			},
-			"status": {
-				Type:       "object",
-				Properties: map[string]extv1.JSONSchemaProps{},
-			},
-		},
-	}
-}
-
-// CompositeResourceClaimSpecProps is a partial OpenAPIV3Schema for the spec
-// fields that Crossplane expects to be present for all published infrastructure
-// resources.
-func CompositeResourceClaimSpecProps() map[string]extv1.JSONSchemaProps {
-	return map[string]extv1.JSONSchemaProps{
-		"compositionRef": {
-			Type:     "object",
-			Required: []string{"name"},
-			Properties: map[string]extv1.JSONSchemaProps{
-				"name": {Type: "string"},
-			},
-		},
-		"compositionSelector": {
-			Type:     "object",
-			Required: []string{"matchLabels"},
-			Properties: map[string]extv1.JSONSchemaProps{
-				"matchLabels": {
-					Type: "object",
-					AdditionalProperties: &extv1.JSONSchemaPropsOrBool{
-						Allows: true,
-						Schema: &extv1.JSONSchemaProps{Type: "string"},
-					},
-				},
-			},
-		},
-		"compositionRevisionRef": {
-			Type:     "object",
-			Required: []string{"name"},
-			Properties: map[string]extv1.JSONSchemaProps{
-				"name": {Type: "string"},
-			},
-		},
-		"compositionUpdatePolicy": {
-			Type: "string",
-			Enum: []extv1.JSON{
-				{Raw: []byte(`"Automatic"`)},
-				{Raw: []byte(`"Manual"`)},
-			},
-			Default: &extv1.JSON{Raw: []byte(`"Automatic"`)},
-		},
-		"resourceRef": {
-			Type:     "object",
-			Required: []string{"apiVersion", "kind", "name"},
-			Properties: map[string]extv1.JSONSchemaProps{
-				"apiVersion": {Type: "string"},
-				"kind":       {Type: "string"},
-				"name":       {Type: "string"},
-			},
-		},
-		"writeConnectionSecretToRef": {
-			Type:     "object",
-			Required: []string{"name"},
-			Properties: map[string]extv1.JSONSchemaProps{
-				"name": {Type: "string"},
-			},
-		},
-	}
-}
-
-// CompositeResourceStatusProps is a partial OpenAPIV3Schema for the status
-// fields that Crossplane expects to be present for all defined or published
-// infrastructure resources.
-func CompositeResourceStatusProps() map[string]extv1.JSONSchemaProps {
-	return map[string]extv1.JSONSchemaProps{
-		"conditions": {
-			Description: "Conditions of the resource.",
-			Type:        "array",
-			Items: &extv1.JSONSchemaPropsOrArray{
-				Schema: &extv1.JSONSchemaProps{
-					Type:     "object",
-					Required: []string{"lastTransitionTime", "reason", "status", "type"},
-					Properties: map[string]extv1.JSONSchemaProps{
-						"lastTransitionTime": {Type: "string", Format: "date-time"},
-						"message":            {Type: "string"},
-						"reason":             {Type: "string"},
-						"status":             {Type: "string"},
-						"type":               {Type: "string"},
-					},
-				},
-			},
-		},
-		"connectionDetails": {
-			Type: "object",
-			Properties: map[string]extv1.JSONSchemaProps{
-				"lastPublishedTime": {Type: "string", Format: "date-time"},
-			},
-		},
 	}
 }
 

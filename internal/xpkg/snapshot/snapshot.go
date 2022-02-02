@@ -448,9 +448,13 @@ func (s *Snapshot) Validate(uri span.URI) ([]protocol.Diagnostic, error) { // no
 		gvk := n.GetGVK()
 		v, ok := s.validators[gvk]
 		if !ok {
+			// we couldn't find a validator for the given GVK, surface a warning
+			dneResult := &validate.Result{
+				Errors: gvkDNEWarning(gvk, "apiVersion"),
+			}
+
+			diags = append(diags, validationDiagnostics(dneResult, n.GetAST(), n.GetGVK())...)
 			continue
-			// TODO(@tnthornton) if we can't find the validator for the given node, we should
-			// surface that error in the editor.
 		}
 
 		diags = append(diags, validationDiagnostics(v.Validate(n.GetObject()), n.GetAST(), n.GetGVK())...)
@@ -488,7 +492,7 @@ func validationDiagnostics(res *validate.Result, n ast.Node, gvk schema.GroupVer
 		// don't have a valid path.
 		if len(e.name) > 0 && e.name != "." {
 			errPath := e.name
-			if e.code == verrors.RequiredFailCode {
+			if e.code == verrors.RequiredFailCode || e.code == validator.ErrorTypeCode {
 				idx := strings.LastIndex(e.name, ".")
 				if idx != 0 {
 					errPath = e.name[:idx]

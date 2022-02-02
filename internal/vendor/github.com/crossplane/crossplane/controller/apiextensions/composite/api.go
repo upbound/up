@@ -399,7 +399,7 @@ func (c *APIConfigurator) Configure(ctx context.Context, cp resource.Composite, 
 	// is looking for these details as a configuration source.
 	cp.SetWriteConnectionSecretToReference(&xpv1.SecretReference{
 		Name:      string(cp.GetUID()),
-		Namespace: placeholderNamespace,
+		Namespace: PlaceholderNamespace,
 	})
 
 	return nil

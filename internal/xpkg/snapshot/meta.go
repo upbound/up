@@ -50,8 +50,8 @@ const (
 	errWrongPkgTypeFmt         = "Incorrect package type. '%s' does not match type for %s of '%s'"
 )
 
-// Validator defines a validator for meta files.
-type Validator struct {
+// MetaValidator defines a validator for meta files.
+type MetaValidator struct {
 	p *parser.PackageParser
 	// TODO(@tnthornton) move to accepting a snapshot rather than the map
 	// once Snapshots are first class citizens.
@@ -60,7 +60,7 @@ type Validator struct {
 }
 
 // DefaultMetaValidators returns a new Meta validator.
-func DefaultMetaValidators(s *Snapshot) (*Validator, error) {
+func DefaultMetaValidators(s *Snapshot) (*MetaValidator, error) {
 	p, err := pyaml.New()
 	if err != nil {
 		return nil, err
@@ -71,7 +71,7 @@ func DefaultMetaValidators(s *Snapshot) (*Validator, error) {
 		NewVersionValidator(s.dm),
 	}
 
-	return &Validator{
+	return &MetaValidator{
 		p:          p,
 		validators: validators,
 	}, nil
@@ -79,7 +79,7 @@ func DefaultMetaValidators(s *Snapshot) (*Validator, error) {
 
 // Validate performs validation rules on the given data input per the rules
 // defined for the Validator.
-func (m *Validator) Validate(data interface{}) *validate.Result {
+func (m *MetaValidator) Validate(data interface{}) *validate.Result {
 	pkg, o, err := m.Marshal(data)
 	if err != nil {
 		// TODO(@tnthornton) add debug logging
@@ -104,7 +104,7 @@ func (m *Validator) Validate(data interface{}) *validate.Result {
 }
 
 // Marshal marshals the given data object into a Pkg, errors otherwise.
-func (m *Validator) Marshal(data interface{}) (metav1.Pkg, runtime.Object, error) {
+func (m *MetaValidator) Marshal(data interface{}) (metav1.Pkg, runtime.Object, error) {
 	b, err := yaml.Marshal(data)
 	if err != nil {
 		return nil, nil, err

@@ -290,8 +290,8 @@ func (r *Reconciler) Reconcile(ctx context.Context, comp *v1.Composition) ([]res
 	// that could be reasonably moved into an injected dependency.
 
 	cr := r.newComposite()
-	cr.SetName(placeholderName)
-	cr.SetUID(types.UID(placeholderUID))
+	cr.SetName(PlaceholderName)
+	cr.SetUID(types.UID(PlaceholderUID))
 
 	// TODO(negz): Composition validation should be handled by a validation
 	// webhook, not by this controller.
