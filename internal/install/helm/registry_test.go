@@ -55,7 +55,7 @@ func TestRegistryPullerRun(t *testing.T) {
 				repoURL: u,
 			},
 			chartName: "~?",
-			err:       errors.Wrap(name.NewErrBadName("could not parse reference: registry.upbound.io/enterprise/~?:v1.0.0"), errImageReference),
+			err:       errors.Wrap(errors.New("could not parse reference: registry.upbound.io/enterprise/~?:v1.0.0"), errImageReference),
 		},
 		"ErrorFetch": {
 			reason: "If we fail to fetch image we should return an error.",
