@@ -39,9 +39,10 @@ import (
 )
 
 const (
-	errFmtGetProps        = "cannot get %q properties from validation schema"
-	errObjectNotKnownType = "object is not a known type"
-	errParseValidation    = "cannot parse validation schema"
+	errFailedToGetValidatorsXRD = "failed to get validators from XRD"
+	errFmtGetProps              = "cannot get %q properties from validation schema"
+	errObjectNotKnownType       = "object is not a known type"
+	errParseValidation          = "cannot parse validation schema"
 )
 
 // ValidatorsForObj returns a mapping of GVK -> validator for the given runtime.Object.
@@ -63,7 +64,8 @@ func ValidatorsForObj(o runtime.Object, s *Snapshot) (map[schema.GroupVersionKin
 		}
 	case *xpextv1.CompositeResourceDefinition:
 		if err := validatorsFromV1XRD(rd, validators); err != nil {
-			return nil, err
+			// XR validators failed we should log this and move on
+			s.log.Debug(errFailedToGetValidatorsXRD, "info", err)
 		}
 		if err := validatorsForV1XRD(rd, validators); err != nil {
 			return nil, err
