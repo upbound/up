@@ -51,6 +51,7 @@ func (c *Cmd) AfterApply(kongCtx *kong.Context) error {
 // Cmd contains commands for managing enterprise.
 type Cmd struct {
 	Install   installCmd   `cmd:"" group:"enterprise" help:"Install enterprise."`
+	Mail      mailCmd      `cmd:"" group:"enterprise" help:"[EXPERIMENTAL] Run a local mail portal."`
 	Uninstall uninstallCmd `cmd:"" group:"enterprise" help:"Uninstall enterprise."`
 	Upgrade   upgradeCmd   `cmd:"" group:"enterprise" help:"Upgrade enterprise."`
 
