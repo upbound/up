@@ -144,20 +144,24 @@ func validatorsFromV1CRD(c *extv1.CustomResourceDefinition, acc map[schema.Group
 
 func validatorsFromV1Beta1XRD(x *xpextv1beta1.CompositeResourceDefinition, acc map[schema.GroupVersionKind]*validator.ObjectValidator) error {
 	for _, v := range x.Spec.Versions {
-		schema, err := buildSchema(v.Schema.OpenAPIV3Schema)
-		if err != nil {
-			return err
-		}
+		// NOTE(tnthornton) if the version does not have a schema, do not
+		// attempt to create a validator.
+		if v.Schema != nil {
+			schema, err := buildSchema(v.Schema.OpenAPIV3Schema)
+			if err != nil {
+				return err
+			}
 
-		sv, _, err := newV1SchemaValidator(*schema)
-		if err != nil {
-			return err
-		}
+			sv, _, err := newV1SchemaValidator(*schema)
+			if err != nil {
+				return err
+			}
 
-		if x.Spec.ClaimNames != nil {
-			appendToValidators(gvk(x.Spec.Group, v.Name, x.Spec.ClaimNames.Kind), acc, sv)
+			if x.Spec.ClaimNames != nil {
+				appendToValidators(gvk(x.Spec.Group, v.Name, x.Spec.ClaimNames.Kind), acc, sv)
+			}
+			appendToValidators(gvk(x.Spec.Group, v.Name, x.Spec.Names.Kind), acc, sv)
 		}
-		appendToValidators(gvk(x.Spec.Group, v.Name, x.Spec.Names.Kind), acc, sv)
 	}
 	return nil
 }
@@ -173,21 +177,24 @@ func validatorsFromV1XRD(x *xpextv1.CompositeResourceDefinition, acc map[schema.
 	}
 
 	for _, v := range x.Spec.Versions {
+		// NOTE(tnthornton) if the version does not have a schema, do not
+		// attempt to create a validator.
+		if v.Schema != nil {
+			schema, err := buildSchema(v.Schema.OpenAPIV3Schema)
+			if err != nil {
+				return err
+			}
 
-		schema, err := buildSchema(v.Schema.OpenAPIV3Schema)
-		if err != nil {
-			return err
-		}
+			sv, _, err := newV1SchemaValidator(*schema)
+			if err != nil {
+				return err
+			}
 
-		sv, _, err := newV1SchemaValidator(*schema)
-		if err != nil {
-			return err
+			if x.Spec.ClaimNames != nil {
+				appendToValidators(gvk(x.Spec.Group, v.Name, x.Spec.ClaimNames.Kind), acc, sv)
+			}
+			appendToValidators(gvk(x.Spec.Group, v.Name, x.Spec.Names.Kind), acc, sv)
 		}
-
-		if x.Spec.ClaimNames != nil {
-			appendToValidators(gvk(x.Spec.Group, v.Name, x.Spec.ClaimNames.Kind), acc, sv)
-		}
-		appendToValidators(gvk(x.Spec.Group, v.Name, x.Spec.Names.Kind), acc, sv)
 	}
 	return nil
 }
