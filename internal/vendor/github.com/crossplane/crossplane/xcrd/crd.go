@@ -51,7 +51,7 @@ const (
 
 // ForCompositeResource derives the CustomResourceDefinition for a composite
 // resource from the supplied CompositeResourceDefinition.
-// NOTE (@tnthornton) this implementation diverges from crossplane's due to
+// NOTE (tnthornton) this implementation diverges from crossplane's due to
 // explicitly wanting to test the schema shape and contents against the built in
 // CRD schema validations.
 func ForCompositeResource(xrd *v1.CompositeResourceDefinition) (*extv1.CustomResourceDefinition, error) {
@@ -78,9 +78,19 @@ func ForCompositeResource(xrd *v1.CompositeResourceDefinition) (*extv1.CustomRes
 
 		var props extv1.JSONSchemaProps
 
-		err := json.Unmarshal(vr.Schema.OpenAPIV3Schema.Raw, &props)
-		if err != nil {
-			return nil, err
+		if vr.Schema != nil {
+			err := json.Unmarshal(vr.Schema.OpenAPIV3Schema.Raw, &props)
+			if err != nil {
+				return nil, err
+			}
+		} else {
+			// NOTE(tnthornton) we're constructing a "fake" schema here to
+			// mimic behavior we anticipate the user will be performing next.
+			// Specifically, a schema on an XRD is _not_ required to exist.
+			// For this case, we define openApiSchema.Type = "object", so that
+			// the CRD validator does not erroneously return errors about the
+			// missing type.
+			props.Type = "object"
 		}
 
 		crd.Spec.Versions[i] = extv1.CustomResourceDefinitionVersion{

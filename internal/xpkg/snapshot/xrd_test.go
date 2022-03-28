@@ -223,6 +223,41 @@ func TestValidateOpenAPIV3Schema(t *testing.T) {
 				},
 			},
 		},
+		"NoSchemaDefined": {
+			reason: "Not defining a schema is valid.",
+			args: args{
+				xrd: &xpextv1.CompositeResourceDefinition{
+					TypeMeta: metav1.TypeMeta{
+						APIVersion: "apiextensions.crossplane.io/v1",
+						Kind:       "CompositeResourceDefinition",
+					},
+					ObjectMeta: metav1.ObjectMeta{
+						Name: "xpostgresqlinstances.database.example.org",
+					},
+					Spec: xpextv1.CompositeResourceDefinitionSpec{
+						Group: "database.example.org",
+						Names: v1.CustomResourceDefinitionNames{
+							Kind:   "XPostgreSQLInstance",
+							Plural: "xpostgresqlinstances",
+						},
+						ClaimNames: &v1.CustomResourceDefinitionNames{
+							Kind:   "PostgreSQLInstance",
+							Plural: "postgresqlinstances",
+						},
+						Versions: []xpextv1.CompositeResourceDefinitionVersion{
+							{
+								Name:          "v1alpha1",
+								Served:        true,
+								Referenceable: true,
+							},
+						},
+					},
+				},
+			},
+			want: want{
+				errs: nil,
+			},
+		},
 	}
 
 	for name, tc := range cases {
