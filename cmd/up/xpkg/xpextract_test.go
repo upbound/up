@@ -17,12 +17,15 @@ package xpkg
 import (
 	"archive/tar"
 	"bytes"
+	"context"
 	"io"
 	"strings"
 	"testing"
 
 	"github.com/crossplane/crossplane-runtime/pkg/test"
 	"github.com/google/go-cmp/cmp"
+	"github.com/google/go-containerregistry/pkg/name"
+	v1 "github.com/google/go-containerregistry/pkg/v1"
 	"github.com/google/go-containerregistry/pkg/v1/empty"
 	"github.com/google/go-containerregistry/pkg/v1/mutate"
 	"github.com/google/go-containerregistry/pkg/v1/random"
@@ -32,7 +35,6 @@ import (
 	"github.com/spf13/afero"
 
 	"github.com/upbound/up/internal/xpkg"
-	"github.com/upbound/up/internal/xpkg/dep/resolver/image"
 )
 
 func TestXPExtractRun(t *testing.T) {
@@ -73,7 +75,7 @@ func TestXPExtractRun(t *testing.T) {
 	cases := map[string]struct {
 		reason string
 		fs     afero.Fs
-		img    image.Fetcher
+		fetch  fetchFn
 		tag    string
 		out    string
 		want   error
@@ -86,34 +88,42 @@ func TestXPExtractRun(t *testing.T) {
 		"ErrorFetchPackage": {
 			reason: "Should return error if we fail to fetch package.",
 			tag:    "crossplane/provider-aws:v0.24.1",
-			img:    image.NewMockFetcher(image.WithError(errBoom)),
-			want:   errors.Wrap(errBoom, errFetchPackage),
+			fetch: func(_ context.Context, _ name.Reference) (v1.Image, error) {
+				return nil, errBoom
+			},
+			want: errors.Wrap(errBoom, errFetchPackage),
 		},
 		"ErrorMultipleAnnotatedLayers": {
 			reason: "Should return error if manifest contains multiple annotated layers.",
 			tag:    "crossplane/provider-aws:v0.24.1",
-			img:    image.NewMockFetcher(image.WithImage(randImgDup)),
-			want:   errors.New(errMultipleAnnotatedLayers),
+			fetch: func(_ context.Context, _ name.Reference) (v1.Image, error) {
+				return randImgDup, nil
+			},
+			want: errors.New(errMultipleAnnotatedLayers),
 		},
 		"ErrorFetchBadPackage": {
 			reason: "Should return error if image with contents does not have package.yaml.",
 			tag:    "crossplane/provider-aws:v0.24.1",
-			img:    image.NewMockFetcher(image.WithImage(randImg)),
-			want:   errors.Wrap(io.EOF, errOpenPackageStream),
+			fetch: func(_ context.Context, _ name.Reference) (v1.Image, error) {
+				return randImg, nil
+			},
+			want: errors.Wrap(io.EOF, errOpenPackageStream),
 		},
 		"Success": {
 			reason: "Should not return error if we successfully fetch package and extract contents.",
 			tag:    "crossplane/provider-aws:v0.24.1",
-			img:    image.NewMockFetcher(image.WithImage(packImg)),
-			fs:     afero.NewMemMapFs(),
-			out:    "out.gz",
+			fetch: func(_ context.Context, _ name.Reference) (v1.Image, error) {
+				return packImg, nil
+			},
+			fs:  afero.NewMemMapFs(),
+			out: "out.gz",
 		},
 	}
 	for name, tc := range cases {
 		t.Run(name, func(t *testing.T) {
 			err := (&xpExtractCmd{
 				fs:      tc.fs,
-				img:     tc.img,
+				fetch:   tc.fetch,
 				Package: tc.tag,
 				Output:  tc.out,
 			}).Run()

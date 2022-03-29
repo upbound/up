@@ -22,12 +22,14 @@ import (
 	"path/filepath"
 
 	"github.com/google/go-containerregistry/pkg/name"
+	v1 "github.com/google/go-containerregistry/pkg/v1"
+	"github.com/google/go-containerregistry/pkg/v1/daemon"
 	"github.com/google/go-containerregistry/pkg/v1/mutate"
+	"github.com/google/go-containerregistry/pkg/v1/remote"
 	"github.com/pkg/errors"
 	"github.com/spf13/afero"
 
 	"github.com/upbound/up/internal/xpkg"
-	"github.com/upbound/up/internal/xpkg/dep/resolver/image"
 )
 
 const (
@@ -49,22 +51,39 @@ const (
 	cacheContentExt     = ".gz"
 )
 
+// fetchFn fetches a package from a source.
+type fetchFn func(context.Context, name.Reference) (v1.Image, error)
+
+// registryFetch fetches a package from the registry.
+func registryFetch(ctx context.Context, r name.Reference) (v1.Image, error) {
+	return remote.Image(r, remote.WithContext(ctx))
+}
+
+// daemonFetch fetches a package from the Docker daemon.
+func daemonFetch(ctx context.Context, r name.Reference) (v1.Image, error) {
+	return daemon.Image(r, daemon.WithContext(ctx))
+}
+
 // AfterApply constructs and binds Upbound-specific context to any subcommands
 // that have Run() methods that receive it.
 func (c *xpExtractCmd) AfterApply() error {
 	c.fs = afero.NewOsFs()
-	c.img = image.NewLocalFetcher()
+	c.fetch = registryFetch
+	if c.FromDaemon {
+		c.fetch = daemonFetch
+	}
 	return nil
 }
 
 // xpExtractCmd extracts package contents into a Crossplane cache compatible
 // format.
 type xpExtractCmd struct {
-	fs  afero.Fs
-	img image.Fetcher
+	fs    afero.Fs
+	fetch fetchFn
 
-	Package string `arg:"" help:"Name of the package to extract. Must be a valid OCI image tag."`
-	Output  string `short:"o" help:"Package output file path. Extension must be .gz or will be replaced." default:"out.gz"`
+	Package    string `arg:"" help:"Name of the package to extract. Must be a valid OCI image tag. If registry is not specified registry.upbound.io will be used."`
+	FromDaemon bool   `help:"Indicates that the image should be fetched from the Docker daemon instead of the registry."`
+	Output     string `short:"o" help:"Package output file path. Extension must be .gz or will be replaced." default:"out.gz"`
 }
 
 // Run runs the xp extract cmd.
@@ -78,7 +97,7 @@ func (c *xpExtractCmd) Run() error { //nolint:gocyclo
 	}
 
 	// Fetch package.
-	img, err := c.img.Fetch(context.Background(), name)
+	img, err := c.fetch(context.Background(), name)
 	if err != nil {
 		return errors.Wrap(err, errFetchPackage)
 	}
