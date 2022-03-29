@@ -21,8 +21,6 @@ import (
 	"github.com/crossplane/crossplane-runtime/pkg/test"
 	"github.com/crossplane/crossplane/apis/pkg/v1beta1"
 	"github.com/google/go-cmp/cmp"
-	"github.com/google/go-containerregistry/pkg/name"
-	v1 "github.com/google/go-containerregistry/pkg/v1"
 	"github.com/pkg/errors"
 )
 
@@ -152,45 +150,4 @@ func TestResolveTag(t *testing.T) {
 			}
 		})
 	}
-}
-
-type MockFetcher struct {
-	tags []string
-	err  error
-}
-
-func NewMockFetcher(opts ...MockOption) *MockFetcher {
-	f := &MockFetcher{}
-	for _, o := range opts {
-		o(f)
-	}
-	return f
-}
-
-// MockOption modifies the mock resolver.
-type MockOption func(*MockFetcher)
-
-func WithTags(tags []string) MockOption {
-	return func(m *MockFetcher) {
-		m.tags = tags
-	}
-}
-
-func WithError(err error) MockOption {
-	return func(m *MockFetcher) {
-		m.err = err
-	}
-}
-
-func (m *MockFetcher) Fetch(ctx context.Context, ref name.Reference, secrets ...string) (v1.Image, error) {
-	return nil, nil
-}
-func (m *MockFetcher) Head(ctx context.Context, ref name.Reference, secrets ...string) (*v1.Descriptor, error) {
-	return nil, nil
-}
-func (m *MockFetcher) Tags(ctx context.Context, ref name.Reference, secrets ...string) ([]string, error) {
-	if m.tags != nil {
-		return m.tags, nil
-	}
-	return nil, m.err
 }
