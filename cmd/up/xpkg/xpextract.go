@@ -17,16 +17,17 @@ package xpkg
 import (
 	"archive/tar"
 	"compress/gzip"
+	"context"
 	"io"
 	"path/filepath"
 
 	"github.com/google/go-containerregistry/pkg/name"
 	"github.com/google/go-containerregistry/pkg/v1/mutate"
-	"github.com/google/go-containerregistry/pkg/v1/remote"
 	"github.com/pkg/errors"
 	"github.com/spf13/afero"
 
 	"github.com/upbound/up/internal/xpkg"
+	"github.com/upbound/up/internal/xpkg/dep/resolver/image"
 )
 
 const (
@@ -52,16 +53,18 @@ const (
 // that have Run() methods that receive it.
 func (c *xpExtractCmd) AfterApply() error {
 	c.fs = afero.NewOsFs()
+	c.img = image.NewLocalFetcher()
 	return nil
 }
 
 // xpExtractCmd extracts package contents into a Crossplane cache compatible
 // format.
 type xpExtractCmd struct {
-	fs afero.Fs
+	fs  afero.Fs
+	img image.Fetcher
 
-	Tag    string `arg:"" help:"Tag of the package to extract. Must be a valid OCI image tag."`
-	Output string `short:"o" help:"Package output file path. Extension must be .gz or will be replaced." default:"out.gz"`
+	Package string `arg:"" help:"Name of the package to extract. Must be a valid OCI image tag."`
+	Output  string `short:"o" help:"Package output file path. Extension must be .gz or will be replaced." default:"out.gz"`
 }
 
 // Run runs the xp extract cmd.
@@ -69,13 +72,13 @@ func (c *xpExtractCmd) Run() error { //nolint:gocyclo
 	// NOTE(hasheddan): most of the logic in this method is from the machinery
 	// used in Crossplane's package cache and should be updated to use shared
 	// libraries if moved to crossplane-runtime.
-	tag, err := name.NewTag(c.Tag, name.WithDefaultRegistry(upboundRegistry))
+	name, err := name.ParseReference(c.Package, name.WithDefaultRegistry(upboundRegistry))
 	if err != nil {
 		return errors.Wrap(err, errInvalidTag)
 	}
 
 	// Fetch package.
-	img, err := remote.Image(tag)
+	img, err := c.img.Fetch(context.Background(), name)
 	if err != nil {
 		return errors.Wrap(err, errFetchPackage)
 	}
