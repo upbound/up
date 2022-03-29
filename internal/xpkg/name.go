@@ -78,6 +78,11 @@ func ToDNSLabel(s string) string { // nolint:gocyclo
 // extension it will be replaced.
 func BuildPath(path, name string) string {
 	full := filepath.Join(path, name)
-	ext := filepath.Ext(full)
-	return full[0:len(full)-len(ext)] + XpkgExtension
+	return ReplaceExt(full, XpkgExtension)
+}
+
+// ReplaceExt replaces the file extension of the given path.
+func ReplaceExt(path, ext string) string {
+	old := filepath.Ext(path)
+	return path[0:len(path)-len(old)] + ext
 }
