@@ -11,6 +11,7 @@ Groups:
 - [Enterprise](#enterprise)
 - [UXP](#uxp)
 - [XPKG](#xpkg)
+- [XPLS](#xpls)
 
 ## Top-Level
 
@@ -173,6 +174,12 @@ prompted for their License ID and Token on installation.
 - `uninstall` 
     - Behavior: Uninstalls Upbound Enterprise from the cluster specified by
       currently configured `kubeconfig`.
+- `mail` (_EXPERIMENTAL_)
+    - Flags:
+        - `-p,--port = INT` (Default: `8085`): Port used for mail portal.
+        - `--verbose = BOOL`: Run server with verbose logging.
+    - Behavior: Runs a local mail portal for Upbound Enterprise when configured
+      to send emails as Kubernetes Secrets.
 
 **Group Flags**
 
@@ -287,6 +294,30 @@ on-disk UXP packages.
       Crossplane packages and is a valid OCI image. Build will fail if package
       is malformed or contains resources that are not compatible with its type
       (e.g. a `Provider` package containing a `Composition`).
+- `xp-extract <package>` (_EXPERIMENTAL_)
+    - Flags:.
+        - `--from-daemon = BOOL`: Indicates that the image should be fetched
+          from the Docker daemon instead of the registry.
+        - `-o, --output = STRING` (Default: `out.gz`): Package output file path.
+          Extension must be .gz or will be replaced
+    - Behavior: Extract package contents into a Crossplane cache compatible
+      format. `package` must be a valid OCI image reference and is fetched from
+      a remote registry unless `--from-daemon` is specified. The [Upbound
+      Registry] (`registry.upbound.io`) will be used by default if reference
+      does not specify.
+- `init`
+    - Flags:.
+        - `-p, --package-root = STRING` (Default: `.`): Path to directory where
+          package will be initialized.
+        - `-t, --type = STRING` (Default: `configuration`): Type of package to
+          initialize.
+    - Behavior: Initializes a package in the specified directory.
+- `dep [package]`
+    - Flags:.
+        - `--cache-dir = STRING` (Default: `~/.up/cache`): Path to package
+          dependency cache.
+        - `-c, --clean-cache = BOOL`: Clean the dependency cache.
+    - Behavior: Adds a package to the dependency cache.
 - `push <tag>`
     - Flags:.
         - `-f, --package = STRING`: Path to package. If not specified and only
@@ -294,6 +325,19 @@ on-disk UXP packages.
     - Behavior: Pushes a UXP package (`.xpkg`) to an OCI compliant registry. The
       [Upbound Registry] (`registry.upbound.io`) will be used by default if tag
       does not specify.
+
+## XPLS
+
+Format: `up xpls <cmd> ...`
+
+Commands in the **XPLS** group are used to interact with the Crossplane language
+server. 
+
+- `serve`
+    - Flags:
+        - `--cache = STRING` (Default: `~/.up/cache`): Path to package cache.
+        - `--verbose = BOOL`: Run server with verbose logging.
+    - Behavior: Runs the Crossplane language server.
 
 <!-- Named Links -->
 [Upbound Software License]: https://licenses.upbound.io/upbound-software-license.html
