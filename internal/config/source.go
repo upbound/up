@@ -25,55 +25,71 @@ import (
 
 // Source is a source for interacting with a Config.
 type Source interface {
+	Initialize() error
 	GetConfig() (*Config, error)
 	UpdateConfig(*Config) error
 }
 
-// NewFSSource constructs a new FSSource.
-func NewFSSource(modifiers ...FSSourceModifier) (*FSSource, error) {
+// NewFSSource constructs a new FSSource. Path must be supplied via modifier or
+// Initialize must be called to use default.
+// NOTE(hasheddan): using empty path by default is a bit of a footgun, so we
+// should consider refactoring here. The motivation for the current design is to
+// allow for flexibility in cases where the consumer does not want to create if
+// the path does not exist, or they want to provide the FSSource as the default
+// without handling an error in construction (see Docker credential helper for
+// example).
+func NewFSSource(modifiers ...FSSourceModifier) *FSSource {
 	src := &FSSource{
-		fs:   afero.NewOsFs(),
-		home: os.UserHomeDir,
+		fs: afero.NewOsFs(),
 	}
 	for _, m := range modifiers {
 		m(src)
 	}
-	h, err := src.home()
-	if err != nil {
-		return nil, err
-	}
-	src.dirPath = filepath.Join(h, ConfigDir)
-	src.path = filepath.Join(src.dirPath, ConfigFile)
-	_, err = src.fs.Stat(src.path)
-	if err != nil {
-		if !os.IsNotExist(err) {
-			return nil, err
-		}
-		if err := src.fs.MkdirAll(filepath.Join(h, ConfigDir), 0755); err != nil {
-			return nil, err
-		}
-		f, err := src.fs.OpenFile(src.path, os.O_CREATE, 0600)
-		if err != nil {
-			return nil, err
-		}
-		defer f.Close() // nolint:errcheck
-	}
-	return src, nil
+
+	return src
 }
 
 // FSSourceModifier modifies an FSSource.
 type FSSourceModifier func(*FSSource)
 
-// FSSource provides a filesystem source for interacting with a Config.
-type FSSource struct {
-	fs      afero.Fs
-	home    HomeDirFn
-	path    string
-	dirPath string
+// WithPath sets the config path for the filesystem source.
+func WithPath(p string) FSSourceModifier {
+	return func(f *FSSource) {
+		f.path = filepath.Clean(p)
+	}
 }
 
-// HomeDirFn indicates the location of a user's home directory.
-type HomeDirFn func() (string, error)
+// FSSource provides a filesystem source for interacting with a Config.
+type FSSource struct {
+	fs   afero.Fs
+	path string
+}
+
+// Initialize creates a config in the filesystem if one does not exist. If path
+// is not defined the default path is constructed.
+func (src *FSSource) Initialize() error {
+	if src.path == "" {
+		p, err := GetDefaultPath()
+		if err != nil {
+			return err
+		}
+		src.path = p
+	}
+	if _, err := src.fs.Stat(src.path); err != nil {
+		if !os.IsNotExist(err) {
+			return err
+		}
+		if err := src.fs.MkdirAll(filepath.Dir(src.path), 0755); err != nil {
+			return err
+		}
+		f, err := src.fs.OpenFile(src.path, os.O_CREATE, 0600)
+		if err != nil {
+			return err
+		}
+		defer f.Close() // nolint:errcheck
+	}
+	return nil
+}
 
 // GetConfig fetches the config from a filesystem.
 func (src *FSSource) GetConfig() (*Config, error) {
