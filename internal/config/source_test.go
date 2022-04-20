@@ -54,7 +54,7 @@ func TestInitialize(t *testing.T) {
 			},
 		},
 		"SuccessSuppliedExists": {
-			reason: "If path is supplied an already exists do not return error.",
+			reason: "If path is supplied and already exists do not return error.",
 			modifiers: []FSSourceModifier{
 				func(f *FSSource) {
 					f.path = "/.up/config.json"
