@@ -15,6 +15,9 @@
 package config
 
 import (
+	"os"
+	"path/filepath"
+
 	"github.com/pkg/errors"
 )
 
@@ -37,18 +40,22 @@ type Config struct {
 	Upbound Upbound `json:"upbound"`
 }
 
-// Extract performs extraction of configuration from the default source, which
-// is the ~/.up/config.json file on the local filesystem.
-func Extract() (*Config, Source, error) {
-	src, err := NewFSSource()
-	if err != nil {
-		return nil, nil, err
-	}
+// Extract performs extraction of configuration from the provided source.
+func Extract(src Source) (*Config, error) {
 	conf, err := src.GetConfig()
 	if err != nil {
-		return nil, nil, err
+		return nil, err
 	}
-	return conf, src, nil
+	return conf, nil
+}
+
+// GetDefaultPath returns the default config path or error.
+func GetDefaultPath() (string, error) {
+	h, err := os.UserHomeDir()
+	if err != nil {
+		return "", err
+	}
+	return filepath.Join(h, ConfigDir, ConfigFile), nil
 }
 
 // Upbound contains configuration information for Upbound.
