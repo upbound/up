@@ -54,7 +54,8 @@ fallthrough: submodules
 build.init: build.bundle.init
 
 build.bundle.init:
-	@mkdir -p $(abspath $(OUTPUT_DIR)/bundle)
+	@mkdir -p $(abspath $(OUTPUT_DIR)/bundle/up)
+	@mkdir -p $(abspath $(OUTPUT_DIR)/bundle/docker-credential-up)
 
 ifeq ($(OS),linux)
 build.artifacts.platform: build.artifacts.bundle.platform build.artifacts.pkg.platform
@@ -64,10 +65,13 @@ endif
 
 build.artifacts.bundle.platform:
 	@sha256sum $(GO_OUT_DIR)/up$(GO_OUT_EXT) | head -c 64 >  $(GO_OUT_DIR)/up.sha256
-	@tar -czvf $(abspath $(OUTPUT_DIR)/bundle/$(PLATFORM)).tar.gz -C $(GO_BIN_DIR) $(PLATFORM)
+	@tar -czvf $(abspath $(OUTPUT_DIR)/bundle/up/$(PLATFORM)).tar.gz -C $(GO_BIN_DIR) $(PLATFORM)/up$(GO_OUT_EXT) $(PLATFORM)/up.sha256
+	@sha256sum $(GO_OUT_DIR)/docker-credential-up$(GO_OUT_EXT) | head -c 64 >  $(GO_OUT_DIR)/docker-credential-up.sha256
+	@tar -czvf $(abspath $(OUTPUT_DIR)/bundle/docker-credential-up/$(PLATFORM)).tar.gz -C $(GO_BIN_DIR) $(PLATFORM)/docker-credential-up$(GO_OUT_EXT) $(PLATFORM)/docker-credential-up.sha256
 
 build.artifacts.pkg.platform:
-	@cat nfpm.yaml | GO_BIN_DIR=$(GO_BIN_DIR) envsubst > $(CACHE_DIR)/nfpm.yaml
+	@cat nfpm_up.yaml | GO_BIN_DIR=$(GO_BIN_DIR) envsubst > $(CACHE_DIR)/nfpm_up.yaml
+	@cat nfpm_docker-credential-up.yaml | GO_BIN_DIR=$(GO_BIN_DIR) envsubst > $(CACHE_DIR)/nfpm_docker-credential-up.yaml
 	@mkdir -p $(OUTPUT_DIR)/deb/$(PLATFORM)
 	@CACHE_DIR=$(CACHE_DIR) OUTPUT_DIR=$(OUTPUT_DIR) PLATFORM=$(PLATFORM) PACKAGER=deb $(GO) generate -tags packaging ./...
 	@mkdir -p $(OUTPUT_DIR)/rpm/$(PLATFORM)
