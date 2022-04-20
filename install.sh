@@ -67,15 +67,32 @@ if ! curl -sLO ${url}; then
   exit 1
 fi
 
-chmod +x up
+if [ $BIN = "up" ]; then
+  chmod +x up
 
-echo "Up downloaded successfully!"
-echo "By proceeding, you are accepting to comply with terms and conditions in https://licenses.upbound.io/upbound-software-license.html"
-echo
-echo "Run the following commands to finish installation:"
-echo
-echo sudo mv up /usr/local/bin/
-echo up --version
-echo
-echo "Visit https://upbound.io to get started. 🚀"
-echo "Have a nice day! 👋\n"
+  echo "Up downloaded successfully!"
+  echo "By proceeding, you are accepting to comply with terms and conditions in https://licenses.upbound.io/upbound-software-license.html"
+  echo
+  echo "Run the following commands to finish installation:"
+  echo
+  echo sudo mv up /usr/local/bin/
+  echo up --version
+  echo
+  echo "Visit https://upbound.io to get started. 🚀"
+  echo "Have a nice day! 👋\n"
+fi
+
+if [ $BIN = "docker-credential-up" ]; then
+  chmod +x docker-credential-up
+
+  echo "Upbound Docker Credential Helper downloaded successfully!"
+  echo "By proceeding, you are accepting to comply with terms and conditions in https://licenses.upbound.io/upbound-software-license.html"
+  echo
+  echo "Run the following commands to finish installation:"
+  echo
+  echo sudo mv docker-credential-up /usr/local/bin/
+  echo docker-credential-up -v
+  echo
+  echo 'Add "xpkg.upbound.io": "up" to the "credHelpers" section of your Docker config file. 🚀'
+  echo "Have a nice day! 👋\n"
+fi
