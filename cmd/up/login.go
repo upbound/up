@@ -58,7 +58,11 @@ func (c *loginCmd) BeforeApply() error { //nolint:unparam
 }
 
 func (c *loginCmd) AfterApply(kongCtx *kong.Context) error {
-	conf, src, err := config.Extract()
+	src := config.NewFSSource()
+	if err := src.Initialize(); err != nil {
+		return err
+	}
+	conf, err := config.Extract(src)
 	if err != nil {
 		return err
 	}

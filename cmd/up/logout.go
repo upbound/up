@@ -35,7 +35,11 @@ const (
 
 // AfterApply sets default values in login after assignment and validation.
 func (c *logoutCmd) AfterApply() error {
-	conf, _, err := config.Extract()
+	src := config.NewFSSource()
+	if err := src.Initialize(); err != nil {
+		return err
+	}
+	conf, err := config.Extract(src)
 	if err != nil {
 		return err
 	}
