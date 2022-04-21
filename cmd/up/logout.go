@@ -19,6 +19,7 @@ import (
 	"net/http"
 	"net/url"
 
+	"github.com/alecthomas/kong"
 	"github.com/pkg/errors"
 
 	"github.com/upbound/up-sdk-go"
@@ -30,11 +31,13 @@ import (
 const (
 	logoutPath = "/v1/logout"
 
-	errLogoutFailed = "unable to logout"
+	errLogoutFailed      = "unable to logout"
+	errGetProfile        = "failed to get profile"
+	errRemoveTokenFailed = "failed to remove token"
 )
 
 // AfterApply sets default values in login after assignment and validation.
-func (c *logoutCmd) AfterApply() error {
+func (c *logoutCmd) AfterApply(kongCtx *kong.Context) error {
 	src := config.NewFSSource()
 	if err := src.Initialize(); err != nil {
 		return err
@@ -43,18 +46,37 @@ func (c *logoutCmd) AfterApply() error {
 	if err != nil {
 		return err
 	}
+	upCtx := &upbound.Context{
+		Profile:  c.Profile,
+		Account:  c.Account,
+		Endpoint: c.Endpoint,
+		Cfg:      conf,
+		CfgSrc:   src,
+	}
 	var profile config.Profile
-	if c.Profile == "" {
-		_, profile, err = conf.GetDefaultUpboundProfile()
+	var name string
+	if upCtx.Profile == "" {
+		name, profile, err = upCtx.Cfg.GetDefaultUpboundProfile()
 		if err != nil {
 			return err
 		}
+		upCtx.Profile = name
+		upCtx.ID = profile.ID
 	} else {
-		profile, err = conf.GetUpboundProfile(c.Profile)
+		profile, err = upCtx.Cfg.GetUpboundProfile(upCtx.Profile)
 		if err != nil {
 			return err
 		}
 	}
+	// If account has not already been set, use the profile default.
+	if upCtx.Account == "" {
+		upCtx.Account = profile.Account
+	}
+	// If no account is set in profile, return an error.
+	if upCtx.Account == "" {
+		return errors.New(errNoAccount)
+	}
+	kongCtx.Bind(upCtx)
 	cfg, err := upbound.BuildSDKConfig(profile.Session, c.Endpoint)
 	if err != nil {
 		return err
@@ -74,13 +96,25 @@ type logoutCmd struct {
 }
 
 // Run executes the logout command.
-func (c *logoutCmd) Run() error {
+func (c *logoutCmd) Run(upCtx *upbound.Context) error {
 	ctx, cancel := context.WithTimeout(context.Background(), defaultTimeout)
 	defer cancel()
 	req, err := c.client.NewRequest(ctx, http.MethodPost, logoutPath, "", nil)
 	if err != nil {
 		return errors.Wrap(err, errLogoutFailed)
 	}
-	// TODO(hasheddan): consider removing session token from config.
-	return errors.Wrap(c.client.Do(req, nil), errLogoutFailed)
+	if err := c.client.Do(req, nil); err != nil {
+		return errors.Wrap(err, errLogoutFailed)
+	}
+
+	// Logout is successful, remove token from config and update.
+	profile, err := upCtx.Cfg.GetUpboundProfile(upCtx.Profile)
+	if err != nil {
+		return errors.Wrap(err, errGetProfile)
+	}
+	profile.Session = ""
+	if err := upCtx.Cfg.AddOrUpdateUpboundProfile(upCtx.Profile, profile); err != nil {
+		return errors.Wrap(err, errRemoveTokenFailed)
+	}
+	return errors.Wrap(upCtx.CfgSrc.UpdateConfig(upCtx.Cfg), errUpdateConfig)
 }
