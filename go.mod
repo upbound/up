@@ -11,6 +11,7 @@ require (
 	github.com/crossplane/crossplane/controller/apiextensions v0.0.0-00010101000000-000000000000
 	github.com/crossplane/crossplane/xcrd v0.0.0-00010101000000-000000000000
 	github.com/docker/docker v20.10.12+incompatible
+	github.com/docker/docker-credential-helpers v0.6.4
 	github.com/goccy/go-yaml v1.9.5-0.20211210133106-251b4db627e0
 	github.com/golang-jwt/jwt v3.2.1+incompatible
 	github.com/golang/tools v0.1.7
@@ -78,7 +79,6 @@ require (
 	github.com/davecgh/go-spew v1.1.1 // indirect
 	github.com/docker/cli v20.10.12+incompatible // indirect
 	github.com/docker/distribution v2.7.1+incompatible // indirect
-	github.com/docker/docker-credential-helpers v0.6.4 // indirect
 	github.com/docker/go-connections v0.4.0 // indirect
 	github.com/docker/go-metrics v0.0.1 // indirect
 	github.com/docker/go-units v0.4.0 // indirect

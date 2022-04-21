@@ -1,3 +1,4 @@
+//go:build packaging
 // +build packaging
 
 // Copyright 2021 Upbound Inc
@@ -19,7 +20,9 @@ package build
 // NOTE(hasheddan): See the below link for details on what is happening here.
 // https://github.com/golang/go/wiki/Modules#how-can-i-track-tool-dependencies-for-a-module
 
-//go:generate go run github.com/goreleaser/nfpm/v2/cmd/nfpm pkg --config $CACHE_DIR/nfpm.yaml --packager $PACKAGER --target $OUTPUT_DIR/$PACKAGER/$PLATFORM/up.$PACKAGER
+//go:generate go run github.com/goreleaser/nfpm/v2/cmd/nfpm pkg --config $CACHE_DIR/nfpm_up.yaml --packager $PACKAGER --target $OUTPUT_DIR/$PACKAGER/$PLATFORM/up.$PACKAGER
+
+//go:generate go run github.com/goreleaser/nfpm/v2/cmd/nfpm pkg --config $CACHE_DIR/nfpm_docker-credential-up.yaml --packager $PACKAGER --target $OUTPUT_DIR/$PACKAGER/$PLATFORM/docker-credential-up.$PACKAGER
 
 import (
 	_ "github.com/goreleaser/nfpm/v2/cmd/nfpm" //nolint:typecheck

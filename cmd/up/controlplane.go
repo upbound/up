@@ -40,7 +40,11 @@ const (
 func (c *controlPlaneCmd) AfterApply(kongCtx *kong.Context) error {
 	// TODO(hasheddan): the majority of this logic can be used generically
 	// across upbound commands when others are implemented.
-	conf, src, err := config.Extract()
+	src := config.NewFSSource()
+	if err := src.Initialize(); err != nil {
+		return err
+	}
+	conf, err := config.Extract(src)
 	if err != nil {
 		return err
 	}

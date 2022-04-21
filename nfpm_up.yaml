@@ -1,0 +1,13 @@
+name: up
+arch: "${GOARCH}"
+platform: "${GOOS}"
+version: "${VERSION}"
+section: "default"
+priority: "extra"
+maintainer: "Dan Mangum <dan@upbound.io>"
+description: The official Upbound CLI.
+homepage: "https://upbound.io"
+license: "Upbound Software License"
+contents:
+- src: "${GO_BIN_DIR}/${PLATFORM}/up"
+  dst: /usr/local/bin/up

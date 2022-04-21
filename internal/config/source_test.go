@@ -24,8 +24,58 @@ import (
 	"github.com/spf13/afero"
 )
 
+var _ Source = &FSSource{}
+var _ Source = &MockSource{}
+
 // TODO(hasheddan): a mock afero.Fs could increase test coverage here with
 // simulated failed file opens and writes.
+
+func TestInitialize(t *testing.T) {
+	cases := map[string]struct {
+		reason    string
+		modifiers []FSSourceModifier
+		want      error
+	}{
+		"SuccessNotSuppliedNotExists": {
+			reason: "If path is not supplied use default and create if not exist.",
+			modifiers: []FSSourceModifier{
+				func(f *FSSource) {
+					f.fs = afero.NewMemMapFs()
+				},
+			},
+		},
+		"SuccessSuppliedNotExists": {
+			reason: "If path is supplied but doesn't already exist create it.",
+			modifiers: []FSSourceModifier{
+				func(f *FSSource) {
+					f.path = "/.up/config.json"
+					f.fs = afero.NewMemMapFs()
+				},
+			},
+		},
+		"SuccessSuppliedExists": {
+			reason: "If path is supplied and already exists do not return error.",
+			modifiers: []FSSourceModifier{
+				func(f *FSSource) {
+					f.path = "/.up/config.json"
+					fs := afero.NewMemMapFs()
+					file, _ := fs.Create("/.up/config.json")
+					defer file.Close()
+					f.fs = fs
+				},
+			},
+		},
+	}
+	for name, tc := range cases {
+		t.Run(name, func(t *testing.T) {
+			src := NewFSSource(tc.modifiers...)
+			err := src.Initialize()
+			if diff := cmp.Diff(tc.want, err, test.EquateErrors()); diff != "" {
+				t.Errorf("\n%s\nInitialize(...): -want error, +got error:\n%s", tc.reason, diff)
+			}
+		})
+	}
+}
 
 func TestGetConfig(t *testing.T) {
 	testConf := &Config{
@@ -48,25 +98,11 @@ func TestGetConfig(t *testing.T) {
 			},
 			want: &Config{},
 		},
-		"SuccessfulAlternateHome": {
-			reason: "Setting an alternate home directory should resolve correctly.",
-			modifiers: []FSSourceModifier{
-				func(f *FSSource) {
-					f.fs = afero.NewMemMapFs()
-					f.home = func() (string, error) {
-						return "/", nil
-					}
-				},
-			},
-			want: &Config{},
-		},
 		"Successful": {
-			reason: "Setting an alternate home directory should resolve correctly.",
+			reason: "If we are able to get config we should it.",
 			modifiers: []FSSourceModifier{
 				func(f *FSSource) {
-					f.home = func() (string, error) {
-						return "/", nil
-					}
+					f.path = "/.up/config.json"
 					fs := afero.NewMemMapFs()
 					file, _ := fs.OpenFile("/.up/config.json", os.O_CREATE, 0600)
 					defer file.Close()
@@ -80,10 +116,7 @@ func TestGetConfig(t *testing.T) {
 	}
 	for name, tc := range cases {
 		t.Run(name, func(t *testing.T) {
-			src, err := NewFSSource(tc.modifiers...)
-			if err != nil {
-				t.Fatal(err)
-			}
+			src := NewFSSource(tc.modifiers...)
 			conf, err := src.GetConfig()
 			if diff := cmp.Diff(tc.err, err, test.EquateErrors()); diff != "" {
 				t.Errorf("\n%s\nGetConfig(...): -want error, +got error:\n%s", tc.reason, diff)
@@ -127,11 +160,8 @@ func TestUpdateConfig(t *testing.T) {
 	}
 	for name, tc := range cases {
 		t.Run(name, func(t *testing.T) {
-			src, err := NewFSSource(tc.modifiers...)
-			if err != nil {
-				t.Fatal(err)
-			}
-			err = src.UpdateConfig(tc.conf)
+			src := NewFSSource(tc.modifiers...)
+			err := src.UpdateConfig(tc.conf)
 			if diff := cmp.Diff(tc.err, err, test.EquateErrors()); diff != "" {
 				t.Errorf("\n%s\nUpdateConfig(...): -want error, +got error:\n%s", tc.reason, diff)
 			}
