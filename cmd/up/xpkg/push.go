@@ -24,6 +24,7 @@ import (
 	"github.com/pkg/errors"
 	"github.com/spf13/afero"
 
+	"github.com/upbound/up/internal/credhelper"
 	"github.com/upbound/up/internal/xpkg"
 )
 
@@ -47,6 +48,7 @@ type pushCmd struct {
 
 	Tag     string `arg:"" help:"Tag of the package to be pushed. Must be a valid OCI image tag."`
 	Package string `short:"f" help:"Path to package. If not specified and only one package exists in current directory it will be used."`
+	Profile string `env:"UP_PROFILE" help:"Profile used to execute command."`
 }
 
 // Run runs the push cmd.
@@ -73,7 +75,14 @@ func (c *pushCmd) Run() error {
 	if err != nil {
 		return err
 	}
-	if err := remote.Write(tag, img, remote.WithAuthFromKeychain(authn.DefaultKeychain)); err != nil {
+	if err := remote.Write(tag, img, remote.WithAuthFromKeychain(
+		authn.NewMultiKeychain(
+			authn.NewKeychainFromHelper(
+				credhelper.New(credhelper.WithProfile(c.Profile)),
+			),
+			authn.DefaultKeychain,
+		),
+	)); err != nil {
 		return err
 	}
 	return nil
