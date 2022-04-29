@@ -322,6 +322,8 @@ on-disk UXP packages.
     - Flags:.
         - `-f, --package = STRING`: Path to package. If not specified and only
           one package exists in current directory it will be used.
+        - `--profile = STRING` (Env: `UP_PROFILE`); Profile with which to
+          perform the specified command.
     - Behavior: Pushes a UXP package (`.xpkg`) to an OCI compliant registry. The
       [Upbound Registry] (`registry.upbound.io`) will be used by default if tag
       does not specify.

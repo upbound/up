@@ -5,23 +5,42 @@
 </a>
 
 `up` is the official CLI for interacting with [Upbound Cloud], Upbound
-Enterprise, and [Universal Crossplane (UXP)].
+Enterprise, and [Universal Crossplane (UXP)]. It is also the primary tool for
+building [Crossplane packages] and pushing them to registries.
+
+For users who wish to use other OCI clients for pushing packages,
+`docker-credential-up` is an implementation of the Docker [credential helper
+protocol] and can be used as an authentication mechanism for pushing packages by
+adding it your Docker config file.
 
 ## Install
 
-`up` can be downloaded by using the official installation script, or can be
-installed via a variety of common package managers.
+Both `up` and `docker-credential-up` can be downloaded by using the official
+installation script, or can be installed via a variety of common package
+managers.
 
 ### Install Script:
 
+**up**
 ```
 curl -sL https://cli.upbound.io | sh
 ```
 
+**docker-credential-up**
+```
+curl -sL https://cli.upbound.io | BIN=docker-credential-up sh
+```
+
 ### Homebrew
 
+**up**
 ```
 brew install upbound/tap/up
+```
+
+**docker-credential-up**
+```
+brew install upbound/tap/docker-credential-up
 ```
 
 ### Deb/RPM Packages
@@ -29,12 +48,24 @@ brew install upbound/tap/up
 Deb and RPM packages are available for Linux platforms, but currently require
 manual download and install.
 
+**up**
 ```
 curl -sLo up.deb https://cli.upbound.io/stable/${VERSION}/deb/linux_${ARCH}/up.deb
 ```
 
+**docker-credential-up**
+```
+curl -sLo up.deb https://cli.upbound.io/stable/${VERSION}/deb/linux_${ARCH}/docker-credential-up.deb
+```
+
+**up**
 ```
 curl -sLo up.rpm https://cli.upbound.io/stable/${VERSION}/rpm/linux_${ARCH}/up.rpm
+```
+
+**docker-credential-up**
+```
+curl -sLo up.rpm https://cli.upbound.io/stable/${VERSION}/rpm/linux_${ARCH}/docker-credential-up.rpm
 ```
 
 ## Setup
@@ -73,6 +104,36 @@ To upgrade a Crossplane installation to a compatible UXP version:
 up uxp upgrade vX.Y.Z-up.N -n <crossplane-namespace>
 ```
 
+### Build and Push Packages
+
+`up` can be used to build and push Crossplane packages. If pushing to Upbound,
+the same credentials acquired via `up login` can be used.
+
+To build a package in your current directory:
+
+```
+up xpkg build
+```
+
+To push the package:
+
+```
+up xpkg push hasheddan/cool-xpkg:v0.1.0
+```
+
+If you prefer to use Docker, or any other OCI client, you can add the following
+to your config file after downloading `docker-credential-up` to use your Upbound
+credentials when pushing.
+
+```json
+{
+	"credHelpers": {
+		"xpkg.upbound.io": "up",
+		"registry.upbound.io": "up"
+	}
+}
+```
+
 ## Usage
 
 See the documentation on [supported commands] and [common workflows] for more
@@ -83,6 +144,8 @@ information.
 [Upbound Cloud]: https://cloud.upbound.io/
 [Universal Crossplane (UXP)]: https://github.com/upbound/universal-crossplane
 [UXP]: https://github.com/upbound/universal-crossplane
+[Crossplane packages]: https://crossplane.io/docs/v1.7/reference/xpkg.html
+[credential helper protocol]: https://github.com/docker/docker-credential-helpers
 [configuration documentation]: docs/configuration.md
 [Crossplane]: https://crossplane.io
 [supported commands]: docs/commands.md
