@@ -24,51 +24,19 @@ import (
 	"github.com/pkg/errors"
 )
 
-// PackageAddendum creates a mutate.Addendum that contains the package details
-// (XRs, XRDs, CRDs, etc) that make up a xpkg in its layer as well as the
-// base annotation.
-func PackageAddendum(b *bytes.Buffer) (mutate.Addendum, error) {
-	// Write on-disk package contents to tarball.
-	tarBuf := new(bytes.Buffer)
-	tw := tar.NewWriter(tarBuf)
-
-	hdr := &tar.Header{
-		Name: StreamFile,
-		Mode: int64(StreamFileMode),
-		Size: int64(b.Len()),
-	}
-
-	if err := writeLayer(tw, hdr, b); err != nil {
-		return mutate.Addendum{}, err
-	}
-
-	// Build image layer from tarball.
-	layer, err := tarball.LayerFromReader(tarBuf)
-	if err != nil {
-		return mutate.Addendum{}, errors.Wrap(err, errLayerFromTar)
-	}
-
-	return mutate.Addendum{
-		Layer: layer,
-		Annotations: map[string]string{
-			AnnotationKey: PackageAnnotation,
-		},
-	}, nil
-}
-
-// ExamplesAddendum creates a mutate.Addendum that contains the examples for the
-// xpkg as well as the upbound annotation.
-func ExamplesAddendum(b *bytes.Buffer) (mutate.Addendum, error) {
+// Addendum creates a mutate.Addendum that contains the layer contents for the
+// xpkg as well as the specified annotation.
+func Addendum(r io.Reader, fileName, annotation string, fileSize int64) (mutate.Addendum, error) {
 	tarBuf := new(bytes.Buffer)
 	tw := tar.NewWriter(tarBuf)
 
 	exHdr := &tar.Header{
-		Name: XpkgExamplesFile,
+		Name: fileName,
 		Mode: int64(StreamFileMode),
-		Size: int64(b.Len()),
+		Size: fileSize,
 	}
 
-	if err := writeLayer(tw, exHdr, b); err != nil {
+	if err := writeLayer(tw, exHdr, r); err != nil {
 		return mutate.Addendum{}, err
 	}
 
@@ -80,7 +48,7 @@ func ExamplesAddendum(b *bytes.Buffer) (mutate.Addendum, error) {
 	return mutate.Addendum{
 		Layer: layer,
 		Annotations: map[string]string{
-			AnnotationKey: ExamplesAnnotation,
+			AnnotationKey: annotation,
 		},
 	}, nil
 }

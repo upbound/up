@@ -133,7 +133,7 @@ func Build(ctx context.Context, pkgBackend, exBackend parser.Backend, p parser.P
 
 	addendums := make([]mutate.Addendum, 0)
 
-	pkgAddendum, err := PackageAddendum(pkgBuf)
+	pkgAddendum, err := Addendum(pkgBuf, StreamFile, PackageAnnotation, int64(pkgBuf.Len()))
 	if err != nil {
 		return nil, nil, err
 	}
@@ -147,7 +147,7 @@ func Build(ctx context.Context, pkgBackend, exBackend parser.Backend, p parser.P
 			return nil, nil, errors.Wrap(err, errParserExample)
 		}
 
-		exAddendum, err := ExamplesAddendum(exBuf)
+		exAddendum, err := Addendum(exBuf, XpkgExamplesFile, ExamplesAnnotation, int64(exBuf.Len()))
 		if err != nil {
 			return nil, nil, err
 		}

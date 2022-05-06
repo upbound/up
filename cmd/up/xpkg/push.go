@@ -16,8 +16,6 @@ package xpkg
 
 import (
 	"archive/tar"
-	"bytes"
-	"io/ioutil"
 	"os"
 
 	"github.com/google/go-containerregistry/pkg/authn"
@@ -114,14 +112,14 @@ func annotate(i v1.Image) (v1.Image, error) { //nolint:gocyclo
 		return nil, err
 	}
 
-	pkgBytes, err := ioutil.ReadAll(pkgYaml)
+	pkgInfo, err := fs.Stat(xpkg.StreamFile)
 	if err != nil {
 		return nil, err
 	}
 
 	addendums := []mutate.Addendum{}
 
-	pkgAdd, err := xpkg.PackageAddendum(bytes.NewBuffer(pkgBytes))
+	pkgAdd, err := xpkg.Addendum(pkgYaml, xpkg.StreamFile, xpkg.PackageAnnotation, pkgInfo.Size())
 	if err != nil {
 		return nil, err
 	}
@@ -133,11 +131,11 @@ func annotate(i v1.Image) (v1.Image, error) { //nolint:gocyclo
 	}
 
 	if exYaml != nil {
-		exBytes, err := ioutil.ReadAll(exYaml)
+		exInfo, err := fs.Stat(xpkg.XpkgExamplesFile)
 		if err != nil {
 			return nil, err
 		}
-		exAdd, err := xpkg.ExamplesAddendum(bytes.NewBuffer(exBytes))
+		exAdd, err := xpkg.Addendum(exYaml, xpkg.XpkgExamplesFile, xpkg.ExamplesAnnotation, exInfo.Size())
 		if err != nil {
 			return nil, err
 		}
