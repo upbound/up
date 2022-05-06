@@ -17,16 +17,17 @@ package xpkg
 import (
 	"archive/tar"
 	"bytes"
+	"fmt"
 	"io"
 
-	"github.com/google/go-containerregistry/pkg/v1/mutate"
+	v1 "github.com/google/go-containerregistry/pkg/v1"
 	"github.com/google/go-containerregistry/pkg/v1/tarball"
 	"github.com/pkg/errors"
 )
 
-// Addendum creates a mutate.Addendum that contains the layer contents for the
-// xpkg as well as the specified annotation.
-func Addendum(r io.Reader, fileName, annotation string, fileSize int64) (mutate.Addendum, error) {
+// Layer creates a v1.Layer that represetns the layer contents for the xpkg and
+// adds a corresponding label to the image Config for the layer.
+func Layer(r io.Reader, fileName, annotation string, fileSize int64, cfg *v1.Config) (v1.Layer, error) {
 	tarBuf := new(bytes.Buffer)
 	tw := tar.NewWriter(tarBuf)
 
@@ -37,20 +38,23 @@ func Addendum(r io.Reader, fileName, annotation string, fileSize int64) (mutate.
 	}
 
 	if err := writeLayer(tw, exHdr, r); err != nil {
-		return mutate.Addendum{}, err
+		return nil, err
 	}
 
 	layer, err := tarball.LayerFromReader(tarBuf)
 	if err != nil {
-		return mutate.Addendum{}, errors.Wrap(err, errLayerFromTar)
+		return nil, errors.Wrap(err, errLayerFromTar)
 	}
 
-	return mutate.Addendum{
-		Layer: layer,
-		Annotations: map[string]string{
-			AnnotationKey: annotation,
-		},
-	}, nil
+	d, err := layer.Digest()
+	if err != nil {
+		return nil, errors.Wrap(err, errDigestInvalid)
+	}
+
+	// add annotation label to config
+	cfg.Labels[fmt.Sprintf("%s:%s", AnnotationKey, annotation)] = d.String()
+
+	return layer, nil
 }
 
 func writeLayer(tw *tar.Writer, hdr *tar.Header, buf io.Reader) error {

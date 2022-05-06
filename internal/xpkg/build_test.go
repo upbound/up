@@ -17,6 +17,7 @@ package xpkg
 import (
 	"archive/tar"
 	"context"
+	"fmt"
 	"io"
 	"io/ioutil"
 	"os"
@@ -25,7 +26,6 @@ import (
 	"github.com/google/go-cmp/cmp"
 	v1 "github.com/google/go-containerregistry/pkg/v1"
 	"github.com/google/go-containerregistry/pkg/v1/mutate"
-	"github.com/google/go-containerregistry/pkg/v1/partial"
 	"github.com/pkg/errors"
 	"github.com/spf13/afero"
 	"github.com/spf13/afero/tarfs"
@@ -149,10 +149,10 @@ func TestBuildExamples(t *testing.T) {
 		fs          withFsFn
 	}
 	type want struct {
-		pkgExists   bool
-		exExists    bool
-		annotations []string
-		err         error
+		pkgExists bool
+		exExists  bool
+		labels    []string
+		err       error
 	}
 
 	cases := map[string]struct {
@@ -175,8 +175,8 @@ func TestBuildExamples(t *testing.T) {
 			},
 			want: want{
 				pkgExists: true,
-				annotations: []string{
-					PackageAnnotation,
+				labels: []string{
+					label(PackageAnnotation),
 				},
 			},
 		},
@@ -199,9 +199,9 @@ func TestBuildExamples(t *testing.T) {
 			want: want{
 				pkgExists: true,
 				exExists:  true,
-				annotations: []string{
-					PackageAnnotation,
-					ExamplesAnnotation,
+				labels: []string{
+					label(PackageAnnotation),
+					label(ExamplesAnnotation),
 				},
 			},
 		},
@@ -225,9 +225,9 @@ func TestBuildExamples(t *testing.T) {
 			want: want{
 				pkgExists: true,
 				exExists:  true,
-				annotations: []string{
-					PackageAnnotation,
-					ExamplesAnnotation,
+				labels: []string{
+					label(PackageAnnotation),
+					label(ExamplesAnnotation),
 				},
 			},
 		},
@@ -267,7 +267,7 @@ func TestBuildExamples(t *testing.T) {
 			if diff := cmp.Diff(tc.want.exExists, len(contents.exBytes) != 0); diff != "" {
 				t.Errorf("\n%s\nBuildExamples(...): -want err, +got err:\n%s", tc.reason, diff)
 			}
-			if diff := cmp.Diff(tc.want.annotations, contents.annotations); diff != "" {
+			if diff := cmp.Diff(tc.want.labels, contents.labels); diff != "" {
 				t.Errorf("\n%s\nBuildExamples(...): -want err, +got err:\n%s", tc.reason, diff)
 			}
 			if diff := cmp.Diff(nil, err, test.EquateErrors()); diff != "" {
@@ -278,14 +278,14 @@ func TestBuildExamples(t *testing.T) {
 }
 
 type xpkgContents struct {
-	annotations []string
-	pkgBytes    []byte
-	exBytes     []byte
+	labels   []string
+	pkgBytes []byte
+	exBytes  []byte
 }
 
 func readImg(i v1.Image) (xpkgContents, error) {
 	contents := xpkgContents{
-		annotations: make([]string, 0),
+		labels: make([]string, 0),
 	}
 
 	reader := mutate.Extract(i)
@@ -314,27 +314,33 @@ func readImg(i v1.Image) (xpkgContents, error) {
 		contents.exBytes = exBytes
 	}
 
-	annotations, err := allAnnotations(i)
+	labels, err := allLabels(i)
 	if err != nil {
 		return contents, err
 	}
 
-	contents.annotations = annotations
+	contents.labels = labels
 
 	return contents, nil
 }
 
-func allAnnotations(i partial.WithManifest) ([]string, error) {
-	annotationVals := []string{}
+func allLabels(i v1.Image) ([]string, error) {
+	labels := []string{}
 
-	manifest, err := i.Manifest()
+	cfgFile, err := i.ConfigFile()
 	if err != nil {
-		return annotationVals, err
+		return labels, err
 	}
 
-	for _, layer := range manifest.Layers {
-		annotationVals = append(annotationVals, layer.Annotations[AnnotationKey])
+	cfg := cfgFile.Config
+
+	for label := range cfg.Labels {
+		labels = append(labels, label)
 	}
 
-	return annotationVals, nil
+	return labels, nil
+}
+
+func label(annotation string) string {
+	return fmt.Sprintf("%s:%s", AnnotationKey, annotation)
 }

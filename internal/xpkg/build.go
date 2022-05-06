@@ -41,7 +41,10 @@ const (
 	errInitBackend   = "failed to initialize package parsing backend"
 	errTarFromStream = "failed to build tarball from stream"
 	errLayerFromTar  = "failed to convert tarball to image layer"
+	errDigestInvalid = "failed to get digest from image layer"
 	errBuildImage    = "failed to build image from layers"
+	errConfigFile    = "failed to get config file from image"
+	errMutateConfig  = "failed to mutate config for image"
 )
 
 // annotatedTeeReadCloser is a copy of io.TeeReader that implements
@@ -148,13 +151,21 @@ func (b *Builder) Build(ctx context.Context) (v1.Image, runtime.Object, error) {
 		return nil, nil, errors.Wrap(err, errLintPackage)
 	}
 
-	addendums := make([]mutate.Addendum, 0)
+	layers := make([]v1.Layer, 0)
+	img := empty.Image
+	cfgFile, err := img.ConfigFile()
+	if err != nil {
+		return nil, nil, errors.Wrap(err, errConfigFile)
+	}
 
-	pkgAddendum, err := Addendum(pkgBuf, StreamFile, PackageAnnotation, int64(pkgBuf.Len()))
+	cfg := cfgFile.Config
+	cfg.Labels = make(map[string]string, 0)
+
+	pkgLayer, err := Layer(pkgBuf, StreamFile, PackageAnnotation, int64(pkgBuf.Len()), &cfg)
 	if err != nil {
 		return nil, nil, err
 	}
-	addendums = append(addendums, pkgAddendum)
+	layers = append(layers, pkgLayer)
 
 	// examples exist, create the layer
 	if examplesExist {
@@ -164,20 +175,25 @@ func (b *Builder) Build(ctx context.Context) (v1.Image, runtime.Object, error) {
 			return nil, nil, errors.Wrap(err, errParserExample)
 		}
 
-		exAddendum, err := Addendum(exBuf, XpkgExamplesFile, ExamplesAnnotation, int64(exBuf.Len()))
+		exLayer, err := Layer(exBuf, XpkgExamplesFile, ExamplesAnnotation, int64(exBuf.Len()), &cfg)
 		if err != nil {
 			return nil, nil, err
 		}
-		addendums = append(addendums, exAddendum)
+		layers = append(layers, exLayer)
 	}
 
-	img := empty.Image
-	for _, a := range addendums {
-		img, err = mutate.Append(img, a)
+	for _, l := range layers {
+		img, err = mutate.AppendLayers(img, l)
 		if err != nil {
 			return nil, nil, errors.Wrap(err, errBuildImage)
 		}
 	}
+
+	img, err = mutate.Config(img, cfg)
+	if err != nil {
+		return nil, nil, errors.Wrap(err, errMutateConfig)
+	}
+
 	return img, meta, nil
 }
 
