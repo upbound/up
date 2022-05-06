@@ -83,21 +83,38 @@ func (t *teeReader) Annotate() interface{} {
 	return anno.Annotate()
 }
 
+// Builder defines an xpkg Builder.
+type Builder struct {
+	pb parser.Backend
+	eb parser.Backend
+
+	pp parser.Parser
+	ep *examples.Parser
+}
+
+// New returns a new Builder.
+func New(pkg, ex parser.Backend, pp parser.Parser, ep *examples.Parser) *Builder {
+	return &Builder{
+		pb: pkg,
+		eb: ex,
+		pp: pp,
+		ep: ep,
+	}
+}
+
 // Build compiles a Crossplane package from an on-disk package.
-// TODO(tnthornton) we should work towards cleaning up this API. It feels
-// pretty clunky at the moment.
-func Build(ctx context.Context, pkgBackend, exBackend parser.Backend, p parser.Parser, e *examples.Parser) (v1.Image, runtime.Object, error) { // nolint:gocyclo
+func (b *Builder) Build(ctx context.Context) (v1.Image, runtime.Object, error) { // nolint:gocyclo
 	// assume examples exist
 	examplesExist := true
 	// Get package YAML stream.
-	pkgReader, err := pkgBackend.Init(ctx)
+	pkgReader, err := b.pb.Init(ctx)
 	if err != nil {
 		return nil, nil, errors.Wrap(err, errInitBackend)
 	}
 	defer func() { _ = pkgReader.Close() }()
 
 	// Get examples YAML stream.
-	exReader, err := exBackend.Init(ctx)
+	exReader, err := b.eb.Init(ctx)
 	if err != nil && !os.IsNotExist(err) {
 		return nil, nil, errors.Wrap(err, errInitBackend)
 	}
@@ -109,7 +126,7 @@ func Build(ctx context.Context, pkgBackend, exBackend parser.Backend, p parser.P
 
 	// Copy stream once to parse and once write to tarball.
 	pkgBuf := new(bytes.Buffer)
-	pkg, err := p.Parse(ctx, annotatedTeeReadCloser(pkgReader, pkgBuf))
+	pkg, err := b.pp.Parse(ctx, annotatedTeeReadCloser(pkgReader, pkgBuf))
 	if err != nil {
 		return nil, nil, errors.Wrap(err, errParserPackage)
 	}
@@ -142,7 +159,7 @@ func Build(ctx context.Context, pkgBackend, exBackend parser.Backend, p parser.P
 	// examples exist, create the layer
 	if examplesExist {
 		exBuf := new(bytes.Buffer)
-		_, err = e.Parse(ctx, annotatedTeeReadCloser(exReader, exBuf))
+		_, err = b.ep.Parse(ctx, annotatedTeeReadCloser(exReader, exBuf))
 		if err != nil {
 			return nil, nil, errors.Wrap(err, errParserExample)
 		}

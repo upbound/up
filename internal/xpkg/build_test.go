@@ -121,7 +121,9 @@ func TestBuild(t *testing.T) {
 
 	for name, tc := range cases {
 		t.Run(name, func(t *testing.T) {
-			_, _, err := Build(context.TODO(), tc.args.be, tc.args.ex, tc.args.p, tc.args.e)
+			builder := New(tc.args.be, tc.args.ex, tc.args.p, tc.args.e)
+
+			_, _, err := builder.Build(context.TODO())
 
 			if diff := cmp.Diff(tc.want, err, test.EquateErrors()); diff != "" {
 				t.Errorf("\n%s\nBuild(...): -want err, +got err:\n%s", tc.reason, diff)
@@ -249,7 +251,9 @@ func TestBuildExamples(t *testing.T) {
 				parser.FsFilters(defaultFilters...),
 			)
 
-			img, _, err := Build(context.TODO(), pkgBe, pkgEx, pkgp, examples.New())
+			builder := New(pkgBe, pkgEx, pkgp, examples.New())
+
+			img, _, err := builder.Build(context.TODO())
 
 			if diff := cmp.Diff(tc.want.err, err, test.EquateErrors()); diff != "" {
 				t.Errorf("\n%s\nBuildExamples(...): -want err, +got err:\n%s", tc.reason, diff)

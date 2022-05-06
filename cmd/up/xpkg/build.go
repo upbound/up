@@ -42,12 +42,50 @@ const (
 // that have Run() methods that receive it.
 func (c *buildCmd) AfterApply() error {
 	c.fs = afero.NewOsFs()
+
+	root, err := filepath.Abs(c.PackageRoot)
+	if err != nil {
+		return err
+	}
+	c.root = root
+
+	ex, err := filepath.Abs(c.ExamplesRoot)
+	if err != nil {
+		return err
+	}
+
+	pp, err := yaml.New()
+	if err != nil {
+		return err
+	}
+
+	c.builder = xpkg.New(
+		parser.NewFsBackend(
+			c.fs,
+			parser.FsDir(root),
+			parser.FsFilters(
+				append(
+					buildFilters(root, c.Ignore),
+					xpkg.SkipContains(examplesDir))...),
+		),
+		parser.NewFsBackend(
+			c.fs,
+			parser.FsDir(ex),
+			parser.FsFilters(
+				buildFilters(ex, c.Ignore)...),
+		),
+		pp,
+		examples.New(),
+	)
+
 	return nil
 }
 
 // buildCmd builds a crossplane package.
 type buildCmd struct {
-	fs afero.Fs
+	fs      afero.Fs
+	builder *xpkg.Builder
+	root    string
 
 	Name string `optional:"" help:"Name of the package to be built. Uses name in crossplane.yaml if not specified. Does not correspond to package tag."`
 
@@ -58,26 +96,8 @@ type buildCmd struct {
 
 // Run executes the build command.
 func (c *buildCmd) Run() error { //nolint:gocyclo
-	root, err := filepath.Abs(c.PackageRoot)
-	if err != nil {
-		return err
-	}
 
-	ex, err := filepath.Abs(c.ExamplesRoot)
-	if err != nil {
-		return err
-	}
-
-	p, err := yaml.New()
-	if err != nil {
-		return err
-	}
-
-	img, meta, err := xpkg.Build(context.Background(),
-		parser.NewFsBackend(c.fs, parser.FsDir(root), parser.FsFilters(append(buildFilters(root, c.Ignore), xpkg.SkipContains(examplesDir))...)),
-		parser.NewFsBackend(c.fs, parser.FsDir(ex), parser.FsFilters(buildFilters(ex, c.Ignore)...)),
-		p,
-		examples.New())
+	img, meta, err := c.builder.Build(context.Background())
 	if err != nil {
 		return errors.Wrap(err, errBuildPackage)
 	}
@@ -96,7 +116,7 @@ func (c *buildCmd) Run() error { //nolint:gocyclo
 		pkgName = xpkg.FriendlyID(pkgMeta.GetName(), hash.Hex)
 	}
 
-	f, err := c.fs.Create(xpkg.BuildPath(root, pkgName))
+	f, err := c.fs.Create(xpkg.BuildPath(c.root, pkgName))
 	if err != nil {
 		return errors.Wrap(err, errCreatePackage)
 	}
