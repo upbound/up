@@ -15,6 +15,9 @@
 package credhelper
 
 import (
+	"fmt"
+	"strings"
+
 	"github.com/crossplane/crossplane-runtime/pkg/logging"
 	"github.com/docker/docker-credential-helpers/credentials"
 	"github.com/pkg/errors"
@@ -28,20 +31,32 @@ const (
 	errExtractConfig     = "unable to extract config"
 	errGetDefaultProfile = "unable to get default profile in config"
 	errGetProfile        = "unable to get specified profile in config"
+	errNotSupported      = "serverURL is not supported by helper"
 )
 
-const defaultDockerUser = "_token"
+const (
+	defaultDockerUser = "_token"
+	defaultEndpoint   = "upbound.io"
+)
 
 // Helper is a docker credential helper for Upbound.
 type Helper struct {
 	log logging.Logger
 
-	profile string
-	src     config.Source
+	endpoint string
+	profile  string
+	src      config.Source
 }
 
 // Opt sets a helper option.
 type Opt func(h *Helper)
+
+// WithEndpoint sets the helper endpoint.
+func WithEndpoint(e string) Opt {
+	return func(h *Helper) {
+		h.endpoint = e
+	}
+}
 
 // WithLogger sets the helper logger.
 func WithLogger(l logging.Logger) Opt {
@@ -95,6 +110,15 @@ func (h *Helper) List() (map[string]string, error) {
 
 // Get gets credentials for the supplied server.
 func (h *Helper) Get(serverURL string) (string, string, error) {
+	// check if serverURL is an upbound.io URL OR if the serverURL matches
+	// the configured target endpoint.
+	if !strings.Contains(serverURL, defaultEndpoint) && h.endpoint == "" {
+		return "", "", fmt.Errorf(errNotSupported)
+	}
+	if h.endpoint != "" && serverURL != h.endpoint {
+		return "", "", fmt.Errorf(errNotSupported)
+	}
+
 	if err := h.src.Initialize(); err != nil {
 		return "", "", errors.Wrap(err, errInitializeSource)
 	}

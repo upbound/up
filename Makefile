@@ -57,7 +57,7 @@ build.bundle.init:
 	@mkdir -p $(abspath $(OUTPUT_DIR)/bundle/up)
 	@mkdir -p $(abspath $(OUTPUT_DIR)/bundle/docker-credential-up)
 
-ifeq ($(OS),linux)
+ifeq ($(HOSTOS),linux)
 build.artifacts.platform: build.artifacts.bundle.platform build.artifacts.pkg.platform
 else
 build.artifacts.platform: build.artifacts.bundle.platform

@@ -52,9 +52,10 @@ func (c *pushCmd) AfterApply() error {
 type pushCmd struct {
 	fs afero.Fs
 
-	Tag     string `arg:"" help:"Tag of the package to be pushed. Must be a valid OCI image tag."`
-	Package string `short:"f" help:"Path to package. If not specified and only one package exists in current directory it will be used."`
-	Profile string `env:"UP_PROFILE" help:"Profile used to execute command."`
+	Tag      string `arg:"" help:"Tag of the package to be pushed. Must be a valid OCI image tag."`
+	Package  string `short:"f" help:"Path to package. If not specified and only one package exists in current directory it will be used."`
+	Endpoint string `env:"UP_ENDPOINT" help:"Registry endpoint used to execute command."`
+	Profile  string `env:"UP_PROFILE" help:"Profile used to execute command."`
 }
 
 // Run runs the push cmd.
@@ -91,7 +92,10 @@ func (c *pushCmd) Run() error {
 	if err := remote.Write(tag, aimg, remote.WithAuthFromKeychain(
 		authn.NewMultiKeychain(
 			authn.NewKeychainFromHelper(
-				credhelper.New(credhelper.WithProfile(c.Profile)),
+				credhelper.New(
+					credhelper.WithEndpoint(c.Endpoint),
+					credhelper.WithProfile(c.Profile),
+				),
 			),
 			authn.DefaultKeychain,
 		),
