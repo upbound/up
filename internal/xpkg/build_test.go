@@ -15,18 +15,47 @@
 package xpkg
 
 import (
+	"archive/tar"
 	"context"
 	"io"
+	"io/ioutil"
+	"os"
 	"testing"
 
 	"github.com/google/go-cmp/cmp"
+	v1 "github.com/google/go-containerregistry/pkg/v1"
+	"github.com/google/go-containerregistry/pkg/v1/mutate"
+	"github.com/google/go-containerregistry/pkg/v1/partial"
 	"github.com/pkg/errors"
+	"github.com/spf13/afero"
+	"github.com/spf13/afero/tarfs"
 
 	"github.com/crossplane/crossplane-runtime/pkg/parser"
 	"github.com/crossplane/crossplane-runtime/pkg/test"
+
+	"github.com/upbound/up/internal/xpkg/parser/examples"
+	"github.com/upbound/up/internal/xpkg/parser/yaml"
 )
 
-var _ parser.Backend = &MockBackend{}
+var (
+	testCRD  []byte
+	testMeta []byte
+	testEx1  []byte
+	testEx2  []byte
+	testEx3  []byte
+	testEx4  []byte
+
+	_ parser.Backend = &MockBackend{}
+)
+
+func init() {
+	testCRD, _ = afero.ReadFile(afero.NewOsFs(), "testdata/providerconfigs.helm.crossplane.io.yaml")
+	testMeta, _ = afero.ReadFile(afero.NewOsFs(), "testdata/provider_meta.yaml")
+	testEx1, _ = afero.ReadFile(afero.NewOsFs(), "testdata/examples/ec2/instance.yaml")
+	testEx2, _ = afero.ReadFile(afero.NewOsFs(), "testdata/examples/ec2/internetgateway.yaml")
+	testEx3, _ = afero.ReadFile(afero.NewOsFs(), "testdata/examples/ecr/repository.yaml")
+	testEx4, _ = afero.ReadFile(afero.NewOsFs(), "testdata/examples/provider.yaml")
+}
 
 type MockBackend struct {
 	MockInit func() (io.ReadCloser, error)
@@ -59,7 +88,9 @@ func TestBuild(t *testing.T) {
 
 	type args struct {
 		be parser.Backend
+		ex parser.Backend
 		p  parser.Parser
+		e  *examples.Parser
 	}
 	cases := map[string]struct {
 		reason string
@@ -79,6 +110,7 @@ func TestBuild(t *testing.T) {
 			reason: "Should return an error if we fail to parse package.",
 			args: args{
 				be: parser.NewEchoBackend(""),
+				ex: parser.NewEchoBackend(""),
 				p: &MockParser{
 					MockParse: NewMockParseFn(nil, errBoom),
 				},
@@ -89,11 +121,216 @@ func TestBuild(t *testing.T) {
 
 	for name, tc := range cases {
 		t.Run(name, func(t *testing.T) {
-			_, _, err := Build(context.TODO(), tc.args.be, tc.args.p)
+			_, _, err := Build(context.TODO(), tc.args.be, tc.args.ex, tc.args.p, tc.args.e)
 
 			if diff := cmp.Diff(tc.want, err, test.EquateErrors()); diff != "" {
 				t.Errorf("\n%s\nBuild(...): -want err, +got err:\n%s", tc.reason, diff)
 			}
 		})
 	}
+}
+
+func TestBuildExamples(t *testing.T) {
+	pkgp, _ := yaml.New()
+
+	defaultFilters := []parser.FilterFn{
+		parser.SkipDirs(),
+		parser.SkipNotYAML(),
+		parser.SkipEmpty(),
+	}
+
+	type withFsFn func() afero.Fs
+
+	type args struct {
+		rootDir     string
+		examplesDir string
+		fs          withFsFn
+	}
+	type want struct {
+		pkgExists   bool
+		exExists    bool
+		annotations []string
+		err         error
+	}
+
+	cases := map[string]struct {
+		reason string
+		args   args
+		want   want
+	}{
+		"SuccessNoExamples": {
+			args: args{
+				rootDir:     "/ws",
+				examplesDir: "/ws/examples",
+				fs: func() afero.Fs {
+					fs := afero.NewMemMapFs()
+					_ = fs.Mkdir("/ws", os.ModePerm)
+					_ = fs.Mkdir("/ws/crds", os.ModePerm)
+					_ = afero.WriteFile(fs, "/ws/crossplane.yaml", testMeta, os.ModePerm)
+					_ = afero.WriteFile(fs, "/ws/crds/crd.yaml", testCRD, os.ModePerm)
+					return fs
+				},
+			},
+			want: want{
+				pkgExists: true,
+				annotations: []string{
+					PackageAnnotation,
+				},
+			},
+		},
+		"SuccessExamplesAtRoot": {
+			args: args{
+				rootDir:     "/ws",
+				examplesDir: "/ws/examples",
+				fs: func() afero.Fs {
+					fs := afero.NewMemMapFs()
+					_ = fs.Mkdir("/ws", os.ModePerm)
+					_ = afero.WriteFile(fs, "/ws/crossplane.yaml", testMeta, os.ModePerm)
+					_ = afero.WriteFile(fs, "/ws/crds/crd.yaml", testCRD, os.ModePerm)
+					_ = afero.WriteFile(fs, "/ws/examples/ec2/instance.yaml", testEx1, os.ModePerm)
+					_ = afero.WriteFile(fs, "/ws/examples/ec2/internetgateway.yaml", testEx2, os.ModePerm)
+					_ = afero.WriteFile(fs, "/ws/examples/ecr/repository.yaml", testEx3, os.ModePerm)
+					_ = afero.WriteFile(fs, "/ws/examples/provider.yaml", testEx4, os.ModePerm)
+					return fs
+				},
+			},
+			want: want{
+				pkgExists: true,
+				exExists:  true,
+				annotations: []string{
+					PackageAnnotation,
+					ExamplesAnnotation,
+				},
+			},
+		},
+		"SuccessExamplesAtCustomDir": {
+			args: args{
+				rootDir:     "/ws",
+				examplesDir: "/other_directory/examples",
+				fs: func() afero.Fs {
+					fs := afero.NewMemMapFs()
+					_ = fs.Mkdir("/ws", os.ModePerm)
+					_ = fs.Mkdir("/other_directory", os.ModePerm)
+					_ = afero.WriteFile(fs, "/ws/crossplane.yaml", testMeta, os.ModePerm)
+					_ = afero.WriteFile(fs, "/ws/crds/crd.yaml", testCRD, os.ModePerm)
+					_ = afero.WriteFile(fs, "/other_directory/examples/ec2/instance.yaml", testEx1, os.ModePerm)
+					_ = afero.WriteFile(fs, "/other_directory/examples/ec2/internetgateway.yaml", testEx2, os.ModePerm)
+					_ = afero.WriteFile(fs, "/other_directory/examples/ecr/repository.yaml", testEx3, os.ModePerm)
+					_ = afero.WriteFile(fs, "/other_directory/examples/provider.yaml", testEx4, os.ModePerm)
+					return fs
+				},
+			},
+			want: want{
+				pkgExists: true,
+				exExists:  true,
+				annotations: []string{
+					PackageAnnotation,
+					ExamplesAnnotation,
+				},
+			},
+		},
+	}
+
+	for name, tc := range cases {
+		t.Run(name, func(t *testing.T) {
+			pkgBe := parser.NewFsBackend(
+				tc.args.fs(),
+				parser.FsDir(tc.args.rootDir),
+				parser.FsFilters([]parser.FilterFn{
+					parser.SkipDirs(),
+					parser.SkipNotYAML(),
+					parser.SkipEmpty(),
+					SkipContains("examples/"), // don't try to parse the examples in the package
+				}...),
+			)
+			pkgEx := parser.NewFsBackend(
+				tc.args.fs(),
+				parser.FsDir(tc.args.examplesDir),
+				parser.FsFilters(defaultFilters...),
+			)
+
+			img, _, err := Build(context.TODO(), pkgBe, pkgEx, pkgp, examples.New())
+
+			if diff := cmp.Diff(tc.want.err, err, test.EquateErrors()); diff != "" {
+				t.Errorf("\n%s\nBuildExamples(...): -want err, +got err:\n%s", tc.reason, diff)
+			}
+
+			// validate the xpkg img has the correct annotations, etc
+			contents, err := readImg(img)
+			if diff := cmp.Diff(tc.want.pkgExists, len(contents.pkgBytes) != 0); diff != "" {
+				t.Errorf("\n%s\nBuildExamples(...): -want err, +got err:\n%s", tc.reason, diff)
+			}
+			if diff := cmp.Diff(tc.want.exExists, len(contents.exBytes) != 0); diff != "" {
+				t.Errorf("\n%s\nBuildExamples(...): -want err, +got err:\n%s", tc.reason, diff)
+			}
+			if diff := cmp.Diff(tc.want.annotations, contents.annotations); diff != "" {
+				t.Errorf("\n%s\nBuildExamples(...): -want err, +got err:\n%s", tc.reason, diff)
+			}
+			if diff := cmp.Diff(nil, err, test.EquateErrors()); diff != "" {
+				t.Errorf("\n%s\nBuildExamples(...): -want err, +got err:\n%s", tc.reason, diff)
+			}
+		})
+	}
+}
+
+type xpkgContents struct {
+	annotations []string
+	pkgBytes    []byte
+	exBytes     []byte
+}
+
+func readImg(i v1.Image) (xpkgContents, error) {
+	contents := xpkgContents{
+		annotations: make([]string, 0),
+	}
+
+	reader := mutate.Extract(i)
+	fs := tarfs.New(tar.NewReader(reader))
+	pkgYaml, err := fs.Open(StreamFile)
+	if err != nil {
+		return contents, err
+	}
+
+	pkgBytes, err := ioutil.ReadAll(pkgYaml)
+	if err != nil {
+		return contents, err
+	}
+	contents.pkgBytes = pkgBytes
+
+	exYaml, err := fs.Open(XpkgExamplesFile)
+	if err != nil && !os.IsNotExist(err) {
+		return contents, err
+	}
+
+	if exYaml != nil {
+		exBytes, err := ioutil.ReadAll(exYaml)
+		if err != nil {
+			return contents, err
+		}
+		contents.exBytes = exBytes
+	}
+
+	annotations, err := allAnnotations(i)
+	if err != nil {
+		return contents, err
+	}
+
+	contents.annotations = annotations
+
+	return contents, nil
+}
+
+func allAnnotations(i partial.WithManifest) ([]string, error) {
+	annotationVals := []string{}
+
+	manifest, err := i.Manifest()
+	if err != nil {
+		return annotationVals, err
+	}
+
+	for _, layer := range manifest.Layers {
+		annotationVals = append(annotationVals, layer.Annotations[AnnotationKey])
+	}
+
+	return annotationVals, nil
 }

@@ -32,9 +32,9 @@ import (
 	"github.com/crossplane/crossplane/apis/pkg/meta/v1alpha1"
 	"github.com/crossplane/crossplane/apis/pkg/v1beta1"
 
-	"github.com/upbound/up/internal/xpkg"
 	"github.com/upbound/up/internal/xpkg/dep/manager"
 	pyaml "github.com/upbound/up/internal/xpkg/parser/yaml"
+	"github.com/upbound/up/internal/xpkg/scheme"
 	"github.com/upbound/up/internal/xpkg/snapshot/validator"
 )
 
@@ -121,7 +121,7 @@ func (m *MetaValidator) Marshal(data interface{}) (metav1.Pkg, runtime.Object, e
 	}
 
 	o := ppkg.GetMeta()[0]
-	pkg, ok := xpkg.TryConvertToPkg(o, &metav1.Provider{}, &metav1.Configuration{})
+	pkg, ok := scheme.TryConvertToPkg(o, &metav1.Provider{}, &metav1.Configuration{})
 	if !ok {
 		return nil, nil, errors.New(errFailedConvertToPkg)
 	}

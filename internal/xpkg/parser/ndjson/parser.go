@@ -28,6 +28,7 @@ import (
 	"github.com/crossplane/crossplane-runtime/pkg/parser"
 
 	"github.com/upbound/up/internal/xpkg"
+	"github.com/upbound/up/internal/xpkg/scheme"
 )
 
 const (
@@ -66,11 +67,11 @@ func (p *Package) GetObjects() []runtime.Object {
 
 // New returns a new NDJSONPackageParser
 func New() (*PackageParser, error) {
-	metaScheme, err := xpkg.BuildMetaScheme()
+	metaScheme, err := scheme.BuildMetaScheme()
 	if err != nil {
 		return nil, errors.New(errBuildMetaScheme)
 	}
-	objScheme, err := xpkg.BuildObjectScheme()
+	objScheme, err := scheme.BuildObjectScheme()
 	if err != nil {
 		return nil, errors.New(errBuildObjectScheme)
 	}

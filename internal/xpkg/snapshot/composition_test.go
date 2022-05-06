@@ -31,13 +31,13 @@ import (
 	"github.com/crossplane/crossplane-runtime/pkg/test"
 	v1 "github.com/crossplane/crossplane/apis/apiextensions/v1"
 
-	"github.com/upbound/up/internal/xpkg"
+	"github.com/upbound/up/internal/xpkg/scheme"
 	"github.com/upbound/up/internal/xpkg/snapshot/validator"
 )
 
 func TestCompositionValidation(t *testing.T) {
-	objScheme, _ := xpkg.BuildObjectScheme()
-	metaScheme, _ := xpkg.BuildMetaScheme()
+	objScheme, _ := scheme.BuildObjectScheme()
+	metaScheme, _ := scheme.BuildMetaScheme()
 
 	s := &Snapshot{
 		objScheme:  objScheme,

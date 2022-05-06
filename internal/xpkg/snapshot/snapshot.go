@@ -47,6 +47,7 @@ import (
 	"github.com/upbound/up/internal/xpkg/dep/cache"
 	"github.com/upbound/up/internal/xpkg/dep/manager"
 	mxpkg "github.com/upbound/up/internal/xpkg/dep/marshaler/xpkg"
+	"github.com/upbound/up/internal/xpkg/scheme"
 	"github.com/upbound/up/internal/xpkg/snapshot/validator"
 	"github.com/upbound/up/internal/xpkg/workspace"
 )
@@ -119,12 +120,12 @@ func NewFactory(workdir string, opts ...FactoryOption) (*Factory, error) {
 
 	f.m = m
 
-	objScheme, err := xpkg.BuildObjectScheme()
+	objScheme, err := scheme.BuildObjectScheme()
 	if err != nil {
 		return nil, err
 	}
 
-	metaScheme, err := xpkg.BuildMetaScheme()
+	metaScheme, err := scheme.BuildMetaScheme()
 	if err != nil {
 		return nil, err
 	}

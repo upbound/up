@@ -15,29 +15,31 @@
 package xpkg
 
 import (
-	"archive/tar"
 	"bytes"
 	"context"
 	"io"
+	"os"
+	"strings"
 
 	pkgmetav1 "github.com/crossplane/crossplane/apis/pkg/meta/v1"
 	v1 "github.com/google/go-containerregistry/pkg/v1"
 	"github.com/google/go-containerregistry/pkg/v1/empty"
 	"github.com/google/go-containerregistry/pkg/v1/mutate"
-	"github.com/google/go-containerregistry/pkg/v1/tarball"
 	"github.com/pkg/errors"
 	"k8s.io/apimachinery/pkg/runtime"
 
 	"github.com/crossplane/crossplane-runtime/pkg/parser"
 
+	"github.com/upbound/up/internal/xpkg/parser/examples"
 	"github.com/upbound/up/internal/xpkg/parser/linter"
 )
 
 const (
 	errParserPackage = "failed to parse package"
+	errParserExample = "failed to parse examples"
 	errLintPackage   = "failed to lint package"
 	errInitBackend   = "failed to initialize package parsing backend"
-	errTarFromStream = "failed to build tarball from package stream"
+	errTarFromStream = "failed to build tarball from stream"
 	errLayerFromTar  = "failed to convert tarball to image layer"
 	errBuildImage    = "failed to build image from layers"
 )
@@ -82,17 +84,32 @@ func (t *teeReader) Annotate() interface{} {
 }
 
 // Build compiles a Crossplane package from an on-disk package.
-func Build(ctx context.Context, b parser.Backend, p parser.Parser) (v1.Image, runtime.Object, error) { // nolint:gocyclo
-	// Get YAML stream.
-	r, err := b.Init(ctx)
+// TODO(tnthornton) we should work towards cleaning up this API. It feels
+// pretty clunky at the moment.
+func Build(ctx context.Context, pkgBackend, exBackend parser.Backend, p parser.Parser, e *examples.Parser) (v1.Image, runtime.Object, error) { // nolint:gocyclo
+	// assume examples exist
+	examplesExist := true
+	// Get package YAML stream.
+	pkgReader, err := pkgBackend.Init(ctx)
 	if err != nil {
 		return nil, nil, errors.Wrap(err, errInitBackend)
 	}
-	defer func() { _ = r.Close() }()
+	defer func() { _ = pkgReader.Close() }()
+
+	// Get examples YAML stream.
+	exReader, err := exBackend.Init(ctx)
+	if err != nil && !os.IsNotExist(err) {
+		return nil, nil, errors.Wrap(err, errInitBackend)
+	}
+	defer func() { _ = exReader.Close() }()
+	// examples/ doesn't exist
+	if os.IsNotExist(err) {
+		examplesExist = false
+	}
 
 	// Copy stream once to parse and once write to tarball.
-	buf := new(bytes.Buffer)
-	pkg, err := p.Parse(ctx, annotatedTeeReadCloser(r, buf))
+	pkgBuf := new(bytes.Buffer)
+	pkg, err := p.Parse(ctx, annotatedTeeReadCloser(pkgReader, pkgBuf))
 	if err != nil {
 		return nil, nil, errors.Wrap(err, errParserPackage)
 	}
@@ -114,35 +131,42 @@ func Build(ctx context.Context, b parser.Backend, p parser.Parser) (v1.Image, ru
 		return nil, nil, errors.Wrap(err, errLintPackage)
 	}
 
-	// Write on-disk package contents to tarball.
-	tarBuf := new(bytes.Buffer)
-	tw := tar.NewWriter(tarBuf)
+	addendums := make([]mutate.Addendum, 0)
 
-	hdr := &tar.Header{
-		Name: StreamFile,
-		Mode: int64(StreamFileMode),
-		Size: int64(buf.Len()),
-	}
-	if err := tw.WriteHeader(hdr); err != nil {
-		return nil, nil, errors.Wrap(err, errTarFromStream)
-	}
-	if _, err = io.Copy(tw, buf); err != nil {
-		return nil, nil, errors.Wrap(err, errTarFromStream)
-	}
-	if err := tw.Close(); err != nil {
-		return nil, nil, errors.Wrap(err, errTarFromStream)
-	}
-
-	// Build image layer from tarball.
-	layer, err := tarball.LayerFromReader(tarBuf)
+	pkgAddendum, err := PackageAddendum(pkgBuf)
 	if err != nil {
-		return nil, nil, errors.Wrap(err, errLayerFromTar)
+		return nil, nil, err
+	}
+	addendums = append(addendums, pkgAddendum)
+
+	// examples exist, create the layer
+	if examplesExist {
+		exBuf := new(bytes.Buffer)
+		_, err = e.Parse(ctx, annotatedTeeReadCloser(exReader, exBuf))
+		if err != nil {
+			return nil, nil, errors.Wrap(err, errParserExample)
+		}
+
+		exAddendum, err := ExamplesAddendum(exBuf)
+		if err != nil {
+			return nil, nil, err
+		}
+		addendums = append(addendums, exAddendum)
 	}
 
-	// Append layer to to scratch image.
-	img, err := mutate.AppendLayers(empty.Image, layer)
-	if err != nil {
-		return nil, nil, errors.Wrap(err, errBuildImage)
+	img := empty.Image
+	for _, a := range addendums {
+		img, err = mutate.Append(img, a)
+		if err != nil {
+			return nil, nil, errors.Wrap(err, errBuildImage)
+		}
 	}
 	return img, meta, nil
+}
+
+// SkipContains supplies a FilterFn that skips paths that contain the give pattern.
+func SkipContains(pattern string) parser.FilterFn {
+	return func(path string, info os.FileInfo) (bool, error) {
+		return strings.Contains(path, pattern), nil
+	}
 }

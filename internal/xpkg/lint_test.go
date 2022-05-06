@@ -32,6 +32,8 @@ import (
 	v1 "github.com/crossplane/crossplane/apis/apiextensions/v1"
 	pkgmetav1 "github.com/crossplane/crossplane/apis/pkg/meta/v1"
 	pkgmetav1alpha1 "github.com/crossplane/crossplane/apis/pkg/meta/v1alpha1"
+
+	"github.com/upbound/up/internal/xpkg/scheme"
 )
 
 var (
@@ -92,8 +94,8 @@ metadata:
 	v1Comp           = &v1.Composition{}
 	_                = yaml.Unmarshal(v1CompBytes, v1Comp)
 
-	meta, _ = BuildMetaScheme()
-	obj, _  = BuildObjectScheme()
+	meta, _ = scheme.BuildMetaScheme()
+	obj, _  = scheme.BuildObjectScheme()
 	p       = parser.New(meta, obj)
 )
 

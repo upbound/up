@@ -25,6 +25,7 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 
 	"github.com/upbound/up/internal/xpkg"
+	"github.com/upbound/up/internal/xpkg/parser/examples"
 	"github.com/upbound/up/internal/xpkg/parser/yaml"
 )
 
@@ -33,6 +34,8 @@ const (
 	errBuildPackage    = "failed to build package"
 	errImageDigest     = "failed to get package digest"
 	errCreatePackage   = "failed to create package file"
+
+	examplesDir = "examples/"
 )
 
 // AfterApply constructs and binds Upbound-specific context to any subcommands
@@ -48,13 +51,19 @@ type buildCmd struct {
 
 	Name string `optional:"" help:"Name of the package to be built. Uses name in crossplane.yaml if not specified. Does not correspond to package tag."`
 
-	PackageRoot string   `short:"f" help:"Path to package directory." default:"."`
-	Ignore      []string `help:"Paths, specified relative to --package-root, to exclude from the package."`
+	PackageRoot  string   `short:"f" help:"Path to package directory." default:"."`
+	ExamplesRoot string   `short:"e" help:"Path to package examples directory." default:"./examples"`
+	Ignore       []string `help:"Paths, specified relative to --package-root, to exclude from the package."`
 }
 
 // Run executes the build command.
-func (c *buildCmd) Run() error {
+func (c *buildCmd) Run() error { //nolint:gocyclo
 	root, err := filepath.Abs(c.PackageRoot)
+	if err != nil {
+		return err
+	}
+
+	ex, err := filepath.Abs(c.ExamplesRoot)
 	if err != nil {
 		return err
 	}
@@ -65,8 +74,10 @@ func (c *buildCmd) Run() error {
 	}
 
 	img, meta, err := xpkg.Build(context.Background(),
-		parser.NewFsBackend(c.fs, parser.FsDir(root), parser.FsFilters(buildFilters(root, c.Ignore)...)),
-		p)
+		parser.NewFsBackend(c.fs, parser.FsDir(root), parser.FsFilters(append(buildFilters(root, c.Ignore), xpkg.SkipContains(examplesDir))...)),
+		parser.NewFsBackend(c.fs, parser.FsDir(ex), parser.FsFilters(buildFilters(ex, c.Ignore)...)),
+		p,
+		examples.New())
 	if err != nil {
 		return errors.Wrap(err, errBuildPackage)
 	}

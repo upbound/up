@@ -40,13 +40,15 @@ import (
 )
 
 const (
-	testProviderPkgYaml = "testdata/provider_package.yaml"
+	testdata = "../../../testdata"
 
 	testProviderConfigsCRD      = "providerconfigs.helm.crossplane.io.yaml"
 	testProviderConfigUsagesCRD = "providerconfigusages.helm.crossplane.io.yaml"
 	testDigestFile              = "sha256:295bcd0e6dc396cf0f5ef638c8a7610a571ff2dcef3aa0447398f25b5a0eafc7"
 	testPackageJSONFile2        = "package2.ndjson"
 )
+
+var testProviderPkgYaml = filepath.Join(testdata, "provider_package.yaml")
 
 func TestFromImage(t *testing.T) {
 	type args struct {
@@ -184,26 +186,26 @@ func TestFromDir(t *testing.T) {
 	_ = inmemfs.MkdirAll(path2, os.ModePerm)
 
 	// write files to the above path
-	json, _ := testdatafs.Open(filepath.Join("testdata", xpkg.JSONStreamFile))
+	json, _ := testdatafs.Open(filepath.Join(testdata, xpkg.JSONStreamFile))
 	defer json.Close()
-	meta, _ := testdatafs.Open(filepath.Join("testdata", xpkg.MetaFile))
+	meta, _ := testdatafs.Open(filepath.Join(testdata, xpkg.MetaFile))
 	defer meta.Close()
-	crd1, _ := testdatafs.Open(filepath.Join("testdata", testProviderConfigsCRD))
+	crd1, _ := testdatafs.Open(filepath.Join(testdata, testProviderConfigsCRD))
 	defer crd1.Close()
-	crd2, _ := testdatafs.Open(filepath.Join("testdata", testProviderConfigUsagesCRD))
+	crd2, _ := testdatafs.Open(filepath.Join(testdata, testProviderConfigUsagesCRD))
 	defer crd2.Close()
-	sha, _ := testdatafs.Open(filepath.Join("testdata", testDigestFile))
+	sha, _ := testdatafs.Open(filepath.Join(testdata, testDigestFile))
 	defer sha.Close()
 
-	json2, _ := testdatafs.Open(filepath.Join("testdata", testPackageJSONFile2))
+	json2, _ := testdatafs.Open(filepath.Join(testdata, testPackageJSONFile2))
 	defer json.Close()
-	meta2, _ := testdatafs.Open(filepath.Join("testdata", xpkg.MetaFile))
+	meta2, _ := testdatafs.Open(filepath.Join(testdata, xpkg.MetaFile))
 	defer meta.Close()
-	crd12, _ := testdatafs.Open(filepath.Join("testdata", testProviderConfigsCRD))
+	crd12, _ := testdatafs.Open(filepath.Join(testdata, testProviderConfigsCRD))
 	defer crd1.Close()
-	crd22, _ := testdatafs.Open(filepath.Join("testdata", testProviderConfigUsagesCRD))
+	crd22, _ := testdatafs.Open(filepath.Join(testdata, testProviderConfigUsagesCRD))
 	defer crd2.Close()
-	sha2, _ := testdatafs.Open(filepath.Join("testdata", testDigestFile))
+	sha2, _ := testdatafs.Open(filepath.Join(testdata, testDigestFile))
 	defer sha.Close()
 
 	targetPkgJSON, _ := inmemfs.Create(filepath.Join(path1, xpkg.JSONStreamFile))
