@@ -17,15 +17,17 @@ package xpkg
 import (
 	"archive/tar"
 	"context"
-	"fmt"
 	"io"
 	"io/ioutil"
 	"os"
+	"sort"
 	"testing"
 
 	"github.com/google/go-cmp/cmp"
+	"github.com/google/go-cmp/cmp/cmpopts"
 	v1 "github.com/google/go-containerregistry/pkg/v1"
 	"github.com/google/go-containerregistry/pkg/v1/mutate"
+	"github.com/google/go-containerregistry/pkg/v1/partial"
 	"github.com/pkg/errors"
 	"github.com/spf13/afero"
 	"github.com/spf13/afero/tarfs"
@@ -176,7 +178,7 @@ func TestBuildExamples(t *testing.T) {
 			want: want{
 				pkgExists: true,
 				labels: []string{
-					label(PackageAnnotation),
+					PackageAnnotation,
 				},
 			},
 		},
@@ -200,8 +202,8 @@ func TestBuildExamples(t *testing.T) {
 				pkgExists: true,
 				exExists:  true,
 				labels: []string{
-					label(PackageAnnotation),
-					label(ExamplesAnnotation),
+					PackageAnnotation,
+					ExamplesAnnotation,
 				},
 			},
 		},
@@ -226,8 +228,8 @@ func TestBuildExamples(t *testing.T) {
 				pkgExists: true,
 				exExists:  true,
 				labels: []string{
-					label(PackageAnnotation),
-					label(ExamplesAnnotation),
+					PackageAnnotation,
+					ExamplesAnnotation,
 				},
 			},
 		},
@@ -261,13 +263,18 @@ func TestBuildExamples(t *testing.T) {
 
 			// validate the xpkg img has the correct annotations, etc
 			contents, err := readImg(img)
+			// sort the contents slice for test comparison
+			sort.Strings(contents.labels)
+
 			if diff := cmp.Diff(tc.want.pkgExists, len(contents.pkgBytes) != 0); diff != "" {
 				t.Errorf("\n%s\nBuildExamples(...): -want err, +got err:\n%s", tc.reason, diff)
 			}
 			if diff := cmp.Diff(tc.want.exExists, len(contents.exBytes) != 0); diff != "" {
 				t.Errorf("\n%s\nBuildExamples(...): -want err, +got err:\n%s", tc.reason, diff)
 			}
-			if diff := cmp.Diff(tc.want.labels, contents.labels); diff != "" {
+			if diff := cmp.Diff(tc.want.labels, contents.labels, cmpopts.SortSlices(func(i, j int) bool {
+				return contents.labels[i] < contents.labels[j]
+			})); diff != "" {
 				t.Errorf("\n%s\nBuildExamples(...): -want err, +got err:\n%s", tc.reason, diff)
 			}
 			if diff := cmp.Diff(nil, err, test.EquateErrors()); diff != "" {
@@ -324,7 +331,7 @@ func readImg(i v1.Image) (xpkgContents, error) {
 	return contents, nil
 }
 
-func allLabels(i v1.Image) ([]string, error) {
+func allLabels(i partial.WithConfigFile) ([]string, error) {
 	labels := []string{}
 
 	cfgFile, err := i.ConfigFile()
@@ -334,13 +341,9 @@ func allLabels(i v1.Image) ([]string, error) {
 
 	cfg := cfgFile.Config
 
-	for label := range cfg.Labels {
+	for _, label := range cfg.Labels {
 		labels = append(labels, label)
 	}
 
 	return labels, nil
-}
-
-func label(annotation string) string {
-	return fmt.Sprintf("%s:%s", AnnotationKey, annotation)
 }

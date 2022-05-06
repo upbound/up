@@ -52,7 +52,7 @@ func Layer(r io.Reader, fileName, annotation string, fileSize int64, cfg *v1.Con
 	}
 
 	// add annotation label to config
-	cfg.Labels[fmt.Sprintf("%s:%s", AnnotationKey, annotation)] = d.String()
+	cfg.Labels[Label(d.String())] = annotation
 
 	return layer, nil
 }
@@ -69,4 +69,9 @@ func writeLayer(tw *tar.Writer, hdr *tar.Header, buf io.Reader) error {
 		return errors.Wrap(err, errTarFromStream)
 	}
 	return nil
+}
+
+// Label constructs a specially formated label using the annotationKey.
+func Label(annotation string) string {
+	return fmt.Sprintf("%s:%s", AnnotationKey, annotation)
 }

@@ -159,7 +159,7 @@ func (b *Builder) Build(ctx context.Context) (v1.Image, runtime.Object, error) {
 	}
 
 	cfg := cfgFile.Config
-	cfg.Labels = make(map[string]string, 0)
+	cfg.Labels = make(map[string]string)
 
 	pkgLayer, err := Layer(pkgBuf, StreamFile, PackageAnnotation, int64(pkgBuf.Len()), &cfg)
 	if err != nil {
@@ -170,8 +170,7 @@ func (b *Builder) Build(ctx context.Context) (v1.Image, runtime.Object, error) {
 	// examples exist, create the layer
 	if examplesExist {
 		exBuf := new(bytes.Buffer)
-		_, err = b.ep.Parse(ctx, annotatedTeeReadCloser(exReader, exBuf))
-		if err != nil {
+		if _, err = b.ep.Parse(ctx, annotatedTeeReadCloser(exReader, exBuf)); err != nil {
 			return nil, nil, errors.Wrap(err, errParserExample)
 		}
 

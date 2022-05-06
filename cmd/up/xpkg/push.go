@@ -15,7 +15,7 @@
 package xpkg
 
 import (
-	"archive/tar"
+	"net/url"
 	"os"
 
 	"github.com/google/go-containerregistry/pkg/authn"
@@ -27,7 +27,6 @@ import (
 	"github.com/google/go-containerregistry/pkg/v1/tarball"
 	"github.com/pkg/errors"
 	"github.com/spf13/afero"
-	"github.com/spf13/afero/tarfs"
 
 	"github.com/upbound/up/internal/credhelper"
 	"github.com/upbound/up/internal/xpkg"
@@ -52,10 +51,10 @@ func (c *pushCmd) AfterApply() error {
 type pushCmd struct {
 	fs afero.Fs
 
-	Tag      string `arg:"" help:"Tag of the package to be pushed. Must be a valid OCI image tag."`
-	Package  string `short:"f" help:"Path to package. If not specified and only one package exists in current directory it will be used."`
-	Endpoint string `env:"UP_ENDPOINT" help:"Registry endpoint used to execute command."`
-	Profile  string `env:"UP_PROFILE" help:"Profile used to execute command."`
+	Tag      string   `arg:"" help:"Tag of the package to be pushed. Must be a valid OCI image tag."`
+	Package  string   `short:"f" help:"Path to package. If not specified and only one package exists in current directory it will be used."`
+	Endpoint *url.URL `env:"UP_ENDPOINT" default:"https://api.upbound.io " help:"Registry endpoint used to execute command."`
+	Profile  string   `env:"UP_PROFILE" help:"Profile used to execute command."`
 }
 
 // Run runs the push cmd.
@@ -93,7 +92,6 @@ func (c *pushCmd) Run() error {
 		authn.NewMultiKeychain(
 			authn.NewKeychainFromHelper(
 				credhelper.New(
-					credhelper.WithEndpoint(c.Endpoint),
 					credhelper.WithProfile(c.Profile),
 				),
 			),
@@ -109,41 +107,39 @@ func (c *pushCmd) Run() error {
 // layers with their corresponding annotations, returning a new v1.Image
 // containing the annotation details.
 func annotate(i v1.Image) (v1.Image, error) { //nolint:gocyclo
-	reader := mutate.Extract(i)
-	fs := tarfs.New(tar.NewReader(reader))
-	pkgYaml, err := fs.Open(xpkg.StreamFile)
+
+	cfgFile, err := i.ConfigFile()
 	if err != nil {
 		return nil, err
 	}
 
-	pkgInfo, err := fs.Stat(xpkg.StreamFile)
+	cfg := cfgFile.Config
+
+	layers, err := i.Layers()
 	if err != nil {
 		return nil, err
 	}
 
-	addendums := []mutate.Addendum{}
+	addendums := make([]mutate.Addendum, 0)
 
-	pkgAdd, err := xpkg.Addendum(pkgYaml, xpkg.StreamFile, xpkg.PackageAnnotation, pkgInfo.Size())
-	if err != nil {
-		return nil, err
-	}
-	addendums = append(addendums, pkgAdd)
-
-	exYaml, err := fs.Open(xpkg.XpkgExamplesFile)
-	if err != nil && !os.IsNotExist(err) {
-		return nil, err
-	}
-
-	if exYaml != nil {
-		exInfo, err := fs.Stat(xpkg.XpkgExamplesFile)
+	for _, l := range layers {
+		d, err := l.Digest()
 		if err != nil {
 			return nil, err
 		}
-		exAdd, err := xpkg.Addendum(exYaml, xpkg.XpkgExamplesFile, xpkg.ExamplesAnnotation, exInfo.Size())
-		if err != nil {
-			return nil, err
+		if annotation, ok := cfg.Labels[xpkg.Label(d.String())]; ok {
+			addendums = append(addendums, mutate.Addendum{
+				Layer: l,
+				Annotations: map[string]string{
+					xpkg.AnnotationKey: annotation,
+				},
+			})
 		}
-		addendums = append(addendums, exAdd)
+	}
+
+	// we didn't find any annotations, return original image
+	if len(addendums) == 0 {
+		return i, nil
 	}
 
 	img := empty.Image
@@ -153,5 +149,6 @@ func annotate(i v1.Image) (v1.Image, error) { //nolint:gocyclo
 			return nil, errors.Wrap(err, errBuildImage)
 		}
 	}
-	return img, nil
+
+	return mutate.Config(img, cfg)
 }

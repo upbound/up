@@ -15,7 +15,6 @@
 package credhelper
 
 import (
-	"fmt"
 	"testing"
 
 	"github.com/crossplane/crossplane-runtime/pkg/test"
@@ -65,15 +64,6 @@ func TestGet(t *testing.T) {
 			},
 			want: want{
 				err: errors.Wrap(errBoom, errInitializeSource),
-			},
-		},
-		"ErrorEndpointNotSupported": {
-			reason: "Should return error if we are targeting an unsupported endpoint.",
-			args: args{
-				server: "index.docker.io",
-			},
-			want: want{
-				err: fmt.Errorf(errNotSupported),
 			},
 		},
 		"ErrorExtractConfig": {
@@ -157,36 +147,6 @@ func TestGet(t *testing.T) {
 						}, nil
 					},
 				}),
-			},
-			want: want{
-				user:   defaultDockerUser,
-				secret: testSecret,
-			},
-		},
-		"SuccessConfiguredEndpoint": {
-			reason: "If we successfully get profile return credentials.",
-			args: args{
-				server: "test.server",
-			},
-			opts: []Opt{
-				WithProfile(testProfile),
-				WithSource(&config.MockSource{
-					InitializeFn: func() error {
-						return nil
-					},
-					GetConfigFn: func() (*config.Config, error) {
-						return &config.Config{
-							Upbound: config.Upbound{
-								Profiles: map[string]config.Profile{
-									testProfile: {
-										Session: testSecret,
-									},
-								},
-							},
-						}, nil
-					},
-				}),
-				WithEndpoint("test.server"),
 			},
 			want: want{
 				user:   defaultDockerUser,
