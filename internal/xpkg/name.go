@@ -38,8 +38,22 @@ const (
 	// XpkgExtension is the extension for compiled Crossplane packages.
 	XpkgExtension string = ".xpkg"
 
-	// XpkgMatchPattern is the match pattern for identifying compiled Crossplane packages.
+	// XpkgMatchPattern is the match pattern for identifying compiled Crossplane
+	// packages.
 	XpkgMatchPattern string = "*" + XpkgExtension
+
+	// XpkgExamplesFile is the name of the file in a Crossplane package image
+	// that contains the examples YAML stream.
+	XpkgExamplesFile string = "/.up/examples.yaml"
+
+	// AnnotationKey is the key value for xpkg annotations.
+	AnnotationKey string = "io.crossplane.xpkg"
+	// PackageAnnotation is the annotation value used for the package.yaml
+	// layer.
+	PackageAnnotation string = "base"
+	// ExamplesAnnotation is the annotation value used for the examples.yaml
+	// layer.
+	ExamplesAnnotation string = "upbound"
 )
 
 func truncate(str string, num int) string {

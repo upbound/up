@@ -26,8 +26,8 @@ import (
 	"github.com/crossplane/crossplane/apis/pkg/meta/v1alpha1"
 	"github.com/crossplane/crossplane/apis/pkg/v1beta1"
 
-	"github.com/upbound/up/internal/xpkg"
 	"github.com/upbound/up/internal/xpkg/dep/manager"
+	"github.com/upbound/up/internal/xpkg/scheme"
 )
 
 const (
@@ -52,7 +52,7 @@ func New(obj runtime.Object) *Meta {
 
 // DependsOn returns a slice of v1beta1.Dependency that this workspace depends on.
 func (m *Meta) DependsOn() ([]v1beta1.Dependency, error) {
-	pkg, ok := xpkg.TryConvertToPkg(m.obj, &v1.Provider{}, &v1.Configuration{})
+	pkg, ok := scheme.TryConvertToPkg(m.obj, &v1.Provider{}, &v1.Configuration{})
 	if !ok {
 		return nil, errors.New(errUnsupportedPackageVersion)
 	}
@@ -111,7 +111,7 @@ func (m *Meta) Bytes() ([]byte, error) {
 // be converted to a v1.Pkg and returns an updated runtime.Object with a slice
 // of dependencies that includes the provided dependency d.
 func upsertDeps(d v1beta1.Dependency, o runtime.Object) error { // nolint:gocyclo
-	p, ok := xpkg.TryConvertToPkg(o, &v1.Provider{}, &v1.Configuration{})
+	p, ok := scheme.TryConvertToPkg(o, &v1.Provider{}, &v1.Configuration{})
 	if !ok {
 		return errors.New(errUnsupportedPackageVersion)
 	}

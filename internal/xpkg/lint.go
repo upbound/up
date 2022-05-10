@@ -27,6 +27,7 @@ import (
 	pkgmetav1 "github.com/crossplane/crossplane/apis/pkg/meta/v1"
 
 	"github.com/upbound/up/internal/xpkg/parser/linter"
+	"github.com/upbound/up/internal/xpkg/scheme"
 )
 
 const (
@@ -62,7 +63,7 @@ func OneMeta(pkg linter.Package) error {
 
 // IsProvider checks that an object is a Provider meta type.
 func IsProvider(o runtime.Object) error {
-	po, _ := TryConvert(o, &pkgmetav1.Provider{})
+	po, _ := scheme.TryConvert(o, &pkgmetav1.Provider{})
 	if _, ok := po.(*pkgmetav1.Provider); !ok {
 		return errors.New(errNotMetaProvider)
 	}
@@ -71,7 +72,7 @@ func IsProvider(o runtime.Object) error {
 
 // IsConfiguration checks that an object is a Configuration meta type.
 func IsConfiguration(o runtime.Object) error {
-	po, _ := TryConvert(o, &pkgmetav1.Configuration{})
+	po, _ := scheme.TryConvert(o, &pkgmetav1.Configuration{})
 	if _, ok := po.(*pkgmetav1.Configuration); !ok {
 		return errors.New(errNotMetaConfiguration)
 	}
@@ -80,7 +81,7 @@ func IsConfiguration(o runtime.Object) error {
 
 // PackageValidSemver checks that the package uses valid semver ranges.
 func PackageValidSemver(o runtime.Object) error {
-	p, ok := TryConvertToPkg(o, &pkgmetav1.Provider{}, &pkgmetav1.Configuration{})
+	p, ok := scheme.TryConvertToPkg(o, &pkgmetav1.Provider{}, &pkgmetav1.Configuration{})
 	if !ok {
 		return errors.New(errNotMeta)
 	}

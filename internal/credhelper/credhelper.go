@@ -30,7 +30,9 @@ const (
 	errGetProfile        = "unable to get specified profile in config"
 )
 
-const defaultDockerUser = "_token"
+const (
+	defaultDockerUser = "_token"
+)
 
 // Helper is a docker credential helper for Upbound.
 type Helper struct {

@@ -15,10 +15,14 @@
 package xpkg
 
 import (
+	"net/url"
 	"os"
 
 	"github.com/google/go-containerregistry/pkg/authn"
 	"github.com/google/go-containerregistry/pkg/name"
+	v1 "github.com/google/go-containerregistry/pkg/v1"
+	"github.com/google/go-containerregistry/pkg/v1/empty"
+	"github.com/google/go-containerregistry/pkg/v1/mutate"
 	"github.com/google/go-containerregistry/pkg/v1/remote"
 	"github.com/google/go-containerregistry/pkg/v1/tarball"
 	"github.com/pkg/errors"
@@ -31,6 +35,7 @@ import (
 const (
 	errGetwd           = "failed to get working directory while searching for package"
 	errFindPackageinWd = "failed to find a package in current working directory"
+	errBuildImage      = "failed to build image from layers"
 )
 
 const upboundRegistry = "registry.upbound.io"
@@ -46,9 +51,10 @@ func (c *pushCmd) AfterApply() error {
 type pushCmd struct {
 	fs afero.Fs
 
-	Tag     string `arg:"" help:"Tag of the package to be pushed. Must be a valid OCI image tag."`
-	Package string `short:"f" help:"Path to package. If not specified and only one package exists in current directory it will be used."`
-	Profile string `env:"UP_PROFILE" help:"Profile used to execute command."`
+	Tag      string   `arg:"" help:"Tag of the package to be pushed. Must be a valid OCI image tag."`
+	Package  string   `short:"f" help:"Path to package. If not specified and only one package exists in current directory it will be used."`
+	Endpoint *url.URL `env:"UP_ENDPOINT" default:"https://api.upbound.io " help:"Registry endpoint used to execute command."`
+	Profile  string   `env:"UP_PROFILE" help:"Profile used to execute command."`
 }
 
 // Run runs the push cmd.
@@ -75,10 +81,19 @@ func (c *pushCmd) Run() error {
 	if err != nil {
 		return err
 	}
-	if err := remote.Write(tag, img, remote.WithAuthFromKeychain(
+
+	// annotate image layers
+	aimg, err := annotate(img)
+	if err != nil {
+		return err
+	}
+
+	if err := remote.Write(tag, aimg, remote.WithAuthFromKeychain(
 		authn.NewMultiKeychain(
 			authn.NewKeychainFromHelper(
-				credhelper.New(credhelper.WithProfile(c.Profile)),
+				credhelper.New(
+					credhelper.WithProfile(c.Profile),
+				),
 			),
 			authn.DefaultKeychain,
 		),
@@ -86,4 +101,54 @@ func (c *pushCmd) Run() error {
 		return err
 	}
 	return nil
+}
+
+// annotate reads in the layers of the given v1.Image and annotates the xpkg
+// layers with their corresponding annotations, returning a new v1.Image
+// containing the annotation details.
+func annotate(i v1.Image) (v1.Image, error) { //nolint:gocyclo
+
+	cfgFile, err := i.ConfigFile()
+	if err != nil {
+		return nil, err
+	}
+
+	cfg := cfgFile.Config
+
+	layers, err := i.Layers()
+	if err != nil {
+		return nil, err
+	}
+
+	addendums := make([]mutate.Addendum, 0)
+
+	for _, l := range layers {
+		d, err := l.Digest()
+		if err != nil {
+			return nil, err
+		}
+		if annotation, ok := cfg.Labels[xpkg.Label(d.String())]; ok {
+			addendums = append(addendums, mutate.Addendum{
+				Layer: l,
+				Annotations: map[string]string{
+					xpkg.AnnotationKey: annotation,
+				},
+			})
+		}
+	}
+
+	// we didn't find any annotations, return original image
+	if len(addendums) == 0 {
+		return i, nil
+	}
+
+	img := empty.Image
+	for _, a := range addendums {
+		img, err = mutate.Append(img, a)
+		if err != nil {
+			return nil, errors.Wrap(err, errBuildImage)
+		}
+	}
+
+	return mutate.Config(img, cfg)
 }

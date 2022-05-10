@@ -25,6 +25,7 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 
 	"github.com/upbound/up/internal/xpkg"
+	"github.com/upbound/up/internal/xpkg/parser/examples"
 	"github.com/upbound/up/internal/xpkg/parser/yaml"
 )
 
@@ -33,40 +34,70 @@ const (
 	errBuildPackage    = "failed to build package"
 	errImageDigest     = "failed to get package digest"
 	errCreatePackage   = "failed to create package file"
+
+	examplesDir = "examples/"
 )
 
 // AfterApply constructs and binds Upbound-specific context to any subcommands
 // that have Run() methods that receive it.
 func (c *buildCmd) AfterApply() error {
 	c.fs = afero.NewOsFs()
+
+	root, err := filepath.Abs(c.PackageRoot)
+	if err != nil {
+		return err
+	}
+	c.root = root
+
+	ex, err := filepath.Abs(c.ExamplesRoot)
+	if err != nil {
+		return err
+	}
+
+	pp, err := yaml.New()
+	if err != nil {
+		return err
+	}
+
+	c.builder = xpkg.New(
+		parser.NewFsBackend(
+			c.fs,
+			parser.FsDir(root),
+			parser.FsFilters(
+				append(
+					buildFilters(root, c.Ignore),
+					xpkg.SkipContains(examplesDir))...),
+		),
+		parser.NewFsBackend(
+			c.fs,
+			parser.FsDir(ex),
+			parser.FsFilters(
+				buildFilters(ex, c.Ignore)...),
+		),
+		pp,
+		examples.New(),
+	)
+
 	return nil
 }
 
 // buildCmd builds a crossplane package.
 type buildCmd struct {
-	fs afero.Fs
+	fs      afero.Fs
+	builder *xpkg.Builder
+	root    string
 
 	Name string `optional:"" help:"Name of the package to be built. Uses name in crossplane.yaml if not specified. Does not correspond to package tag."`
 
-	PackageRoot string   `short:"f" help:"Path to package directory." default:"."`
-	Ignore      []string `help:"Paths, specified relative to --package-root, to exclude from the package."`
+	PackageRoot  string   `short:"f" help:"Path to package directory." default:"."`
+	ExamplesRoot string   `short:"e" help:"Path to package examples directory." default:"./examples"`
+	Ignore       []string `help:"Paths, specified relative to --package-root, to exclude from the package."`
 }
 
 // Run executes the build command.
-func (c *buildCmd) Run() error {
-	root, err := filepath.Abs(c.PackageRoot)
-	if err != nil {
-		return err
-	}
+func (c *buildCmd) Run() error { //nolint:gocyclo
 
-	p, err := yaml.New()
-	if err != nil {
-		return err
-	}
-
-	img, meta, err := xpkg.Build(context.Background(),
-		parser.NewFsBackend(c.fs, parser.FsDir(root), parser.FsFilters(buildFilters(root, c.Ignore)...)),
-		p)
+	img, meta, err := c.builder.Build(context.Background())
 	if err != nil {
 		return errors.Wrap(err, errBuildPackage)
 	}
@@ -85,7 +116,7 @@ func (c *buildCmd) Run() error {
 		pkgName = xpkg.FriendlyID(pkgMeta.GetName(), hash.Hex)
 	}
 
-	f, err := c.fs.Create(xpkg.BuildPath(root, pkgName))
+	f, err := c.fs.Create(xpkg.BuildPath(c.root, pkgName))
 	if err != nil {
 		return errors.Wrap(err, errCreatePackage)
 	}

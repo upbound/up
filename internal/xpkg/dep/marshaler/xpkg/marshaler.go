@@ -36,6 +36,7 @@ import (
 	"github.com/upbound/up/internal/xpkg/parser/linter"
 	"github.com/upbound/up/internal/xpkg/parser/ndjson"
 	"github.com/upbound/up/internal/xpkg/parser/yaml"
+	"github.com/upbound/up/internal/xpkg/scheme"
 )
 
 const (
@@ -207,7 +208,7 @@ func finalizePkg(pkg *ParsedPackage) (*ParsedPackage, error) { // nolint:gocyclo
 }
 
 func determineDeps(o runtime.Object) ([]v1beta1.Dependency, error) {
-	pkg, ok := xpkg.TryConvertToPkg(o, &xpmetav1.Provider{}, &xpmetav1.Configuration{})
+	pkg, ok := scheme.TryConvertToPkg(o, &xpmetav1.Provider{}, &xpmetav1.Configuration{})
 	if !ok {
 		return nil, errors.New(errFailedToConvertMetaToPackage)
 	}

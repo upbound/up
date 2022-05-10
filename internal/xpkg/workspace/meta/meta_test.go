@@ -29,9 +29,9 @@ import (
 	metav1alpha1 "github.com/crossplane/crossplane/apis/pkg/meta/v1alpha1"
 	"github.com/crossplane/crossplane/apis/pkg/v1beta1"
 
-	"github.com/upbound/up/internal/xpkg"
 	"github.com/upbound/up/internal/xpkg/dep"
 	"github.com/upbound/up/internal/xpkg/dep/resolver/image"
+	"github.com/upbound/up/internal/xpkg/scheme"
 )
 
 func TestUpsert(t *testing.T) {
@@ -547,7 +547,7 @@ func TestUpsertDeps(t *testing.T) {
 			}
 
 			if tc.want.deps != nil {
-				p, _ := xpkg.TryConvertToPkg(tc.args.pkg, &metav1.Provider{}, &metav1.Configuration{})
+				p, _ := scheme.TryConvertToPkg(tc.args.pkg, &metav1.Provider{}, &metav1.Configuration{})
 				if diff := cmp.Diff(tc.want.deps, p.GetDependencies()); diff != "" {
 					t.Errorf("\n%s\nUpsertDeps(...): -want err, +got err:\n%s", tc.reason, diff)
 				}

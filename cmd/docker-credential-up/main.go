@@ -25,7 +25,9 @@ import (
 	"github.com/upbound/up/internal/version"
 )
 
-const profile = "UP_PROFILE"
+const (
+	profile = "UP_PROFILE"
+)
 
 func main() {
 	var v bool
@@ -38,6 +40,8 @@ func main() {
 	}
 
 	// Build credential helper and defer execution to Docker.
-	h := credhelper.New(credhelper.WithProfile(os.Getenv(profile)))
+	h := credhelper.New(
+		credhelper.WithProfile(os.Getenv(profile)),
+	)
 	credentials.Serve(h)
 }

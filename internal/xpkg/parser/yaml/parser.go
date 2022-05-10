@@ -19,7 +19,7 @@ import (
 
 	"github.com/crossplane/crossplane-runtime/pkg/parser"
 
-	"github.com/upbound/up/internal/xpkg"
+	"github.com/upbound/up/internal/xpkg/scheme"
 )
 
 const (
@@ -29,11 +29,11 @@ const (
 
 // New returns a new PackageParser that targets yaml files.
 func New() (*parser.PackageParser, error) {
-	metaScheme, err := xpkg.BuildMetaScheme()
+	metaScheme, err := scheme.BuildMetaScheme()
 	if err != nil {
 		return nil, errors.New(errBuildMetaScheme)
 	}
-	objScheme, err := xpkg.BuildObjectScheme()
+	objScheme, err := scheme.BuildObjectScheme()
 	if err != nil {
 		return nil, errors.New(errBuildObjectScheme)
 	}
