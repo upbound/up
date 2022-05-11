@@ -19,6 +19,7 @@ import (
 	"compress/gzip"
 	"context"
 	"io"
+	"os"
 	"path/filepath"
 
 	"github.com/google/go-containerregistry/pkg/name"
@@ -26,6 +27,7 @@ import (
 	"github.com/google/go-containerregistry/pkg/v1/daemon"
 	"github.com/google/go-containerregistry/pkg/v1/mutate"
 	"github.com/google/go-containerregistry/pkg/v1/remote"
+	"github.com/google/go-containerregistry/pkg/v1/tarball"
 	"github.com/pkg/errors"
 	"github.com/spf13/afero"
 
@@ -33,6 +35,7 @@ import (
 )
 
 const (
+	errMustProvideTag          = "must provide package tag if fetching from registry or daemon"
 	errInvalidTag              = "package tag is not a valid reference"
 	errFetchPackage            = "failed to fetch package from remote"
 	errGetManifest             = "failed to get package image manifest from remote"
@@ -64,6 +67,12 @@ func daemonFetch(ctx context.Context, r name.Reference) (v1.Image, error) {
 	return daemon.Image(r, daemon.WithContext(ctx))
 }
 
+func xpkgFetch(path string) fetchFn {
+	return func(ctx context.Context, r name.Reference) (v1.Image, error) {
+		return tarball.ImageFromPath(filepath.Clean(path), nil)
+	}
+}
+
 // AfterApply constructs and binds Upbound-specific context to any subcommands
 // that have Run() methods that receive it.
 func (c *xpExtractCmd) AfterApply() error {
@@ -72,6 +81,32 @@ func (c *xpExtractCmd) AfterApply() error {
 	if c.FromDaemon {
 		c.fetch = daemonFetch
 	}
+	if c.FromXpkg {
+		// If package is not defined, attempt to find single package in current
+		// directory.
+		if c.Package == "" {
+			wd, err := os.Getwd()
+			if err != nil {
+				return errors.Wrap(err, errGetwd)
+			}
+			path, err := xpkg.FindXpkgInDir(c.fs, wd)
+			if err != nil {
+				return errors.Wrap(err, errFindPackageinWd)
+			}
+			c.Package = path
+		}
+		c.fetch = xpkgFetch(c.Package)
+	}
+	if !c.FromXpkg {
+		if c.Package == "" {
+			return errors.New(errMustProvideTag)
+		}
+		name, err := name.ParseReference(c.Package, name.WithDefaultRegistry(upboundRegistry))
+		if err != nil {
+			return errors.Wrap(err, errInvalidTag)
+		}
+		c.name = name
+	}
 	return nil
 }
 
@@ -79,10 +114,12 @@ func (c *xpExtractCmd) AfterApply() error {
 // format.
 type xpExtractCmd struct {
 	fs    afero.Fs
+	name  name.Reference
 	fetch fetchFn
 
-	Package    string `arg:"" help:"Name of the package to extract. Must be a valid OCI image tag. If registry is not specified registry.upbound.io will be used."`
-	FromDaemon bool   `help:"Indicates that the image should be fetched from the Docker daemon instead of the registry."`
+	Package    string `arg:"" optional:"" help:"Name of the package to extract. Must be a valid OCI image tag or a path if using --from-xpkg."`
+	FromDaemon bool   `xor:"xp-extract-from" help:"Indicates that the image should be fetched from the Docker daemon."`
+	FromXpkg   bool   `xor:"xp-extract-from" help:"Indicates that the image should be fetched from a local xpkg. If package is not specified and only one exists in current directory it will be used."`
 	Output     string `short:"o" help:"Package output file path. Extension must be .gz or will be replaced." default:"out.gz"`
 }
 
@@ -91,13 +128,9 @@ func (c *xpExtractCmd) Run() error { //nolint:gocyclo
 	// NOTE(hasheddan): most of the logic in this method is from the machinery
 	// used in Crossplane's package cache and should be updated to use shared
 	// libraries if moved to crossplane-runtime.
-	name, err := name.ParseReference(c.Package, name.WithDefaultRegistry(upboundRegistry))
-	if err != nil {
-		return errors.Wrap(err, errInvalidTag)
-	}
 
 	// Fetch package.
-	img, err := c.fetch(context.Background(), name)
+	img, err := c.fetch(context.Background(), c.name)
 	if err != nil {
 		return errors.Wrap(err, errFetchPackage)
 	}
