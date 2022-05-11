@@ -39,6 +39,7 @@ import (
 
 func TestXPExtractRun(t *testing.T) {
 	errBoom := errors.New("boom")
+	validTag := name.MustParseReference("crossplane/provider-aws:v0.24.1")
 	randLayer, _ := random.Layer(int64(1000), types.DockerLayer)
 	randImg, _ := mutate.Append(empty.Image, mutate.Addendum{
 		Layer: randLayer,
@@ -75,19 +76,14 @@ func TestXPExtractRun(t *testing.T) {
 	cases := map[string]struct {
 		reason string
 		fs     afero.Fs
+		name   name.Reference
 		fetch  fetchFn
-		tag    string
 		out    string
 		want   error
 	}{
-		"ErrorInvalidTag": {
-			reason: "Should return error if we fail to parse package name.",
-			tag:    "++++",
-			want:   errors.Wrap(errors.New("could not parse reference: ++++"), errInvalidTag),
-		},
 		"ErrorFetchPackage": {
 			reason: "Should return error if we fail to fetch package.",
-			tag:    "crossplane/provider-aws:v0.24.1",
+			name:   validTag,
 			fetch: func(_ context.Context, _ name.Reference) (v1.Image, error) {
 				return nil, errBoom
 			},
@@ -95,7 +91,7 @@ func TestXPExtractRun(t *testing.T) {
 		},
 		"ErrorMultipleAnnotatedLayers": {
 			reason: "Should return error if manifest contains multiple annotated layers.",
-			tag:    "crossplane/provider-aws:v0.24.1",
+			name:   validTag,
 			fetch: func(_ context.Context, _ name.Reference) (v1.Image, error) {
 				return randImgDup, nil
 			},
@@ -103,7 +99,7 @@ func TestXPExtractRun(t *testing.T) {
 		},
 		"ErrorFetchBadPackage": {
 			reason: "Should return error if image with contents does not have package.yaml.",
-			tag:    "crossplane/provider-aws:v0.24.1",
+			name:   validTag,
 			fetch: func(_ context.Context, _ name.Reference) (v1.Image, error) {
 				return randImg, nil
 			},
@@ -111,7 +107,7 @@ func TestXPExtractRun(t *testing.T) {
 		},
 		"Success": {
 			reason: "Should not return error if we successfully fetch package and extract contents.",
-			tag:    "crossplane/provider-aws:v0.24.1",
+			name:   validTag,
 			fetch: func(_ context.Context, _ name.Reference) (v1.Image, error) {
 				return packImg, nil
 			},
@@ -122,10 +118,10 @@ func TestXPExtractRun(t *testing.T) {
 	for name, tc := range cases {
 		t.Run(name, func(t *testing.T) {
 			err := (&xpExtractCmd{
-				fs:      tc.fs,
-				fetch:   tc.fetch,
-				Package: tc.tag,
-				Output:  tc.out,
+				fs:     tc.fs,
+				fetch:  tc.fetch,
+				name:   tc.name,
+				Output: tc.out,
 			}).Run()
 			if diff := cmp.Diff(tc.want, err, test.EquateErrors()); diff != "" {
 				t.Errorf("\n%s\nRun(...): -want error, +got error:\n%s", tc.reason, diff)
