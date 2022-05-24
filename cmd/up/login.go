@@ -136,8 +136,9 @@ func (c *loginCmd) Run(upCtx *upbound.Context) error { // nolint:gocyclo
 		return errors.Wrap(err, errLoginFailed)
 	}
 	// If no profile is specified, a new profile named `default` is used.
-	if upCtx.Profile.ID == "" {
-		upCtx.Profile.ID = defaultProfileName
+	profileName := c.Flags.Profile
+	if profileName == "" {
+		profileName = defaultProfileName
 	}
 	// If no account is specified and profile type is user, set profile account
 	// to user ID if not an email address. This is for convenience if a user is
@@ -145,7 +146,7 @@ func (c *loginCmd) Run(upCtx *upbound.Context) error { // nolint:gocyclo
 	if upCtx.Account == "" && profType == config.UserProfileType && !isEmail(auth.ID) {
 		upCtx.Account = auth.ID
 	}
-	if err := upCtx.Cfg.AddOrUpdateUpboundProfile(upCtx.Profile.ID, config.Profile{
+	if err := upCtx.Cfg.AddOrUpdateUpboundProfile(profileName, config.Profile{
 		ID:      auth.ID,
 		Type:    profType,
 		Session: session,
@@ -154,7 +155,7 @@ func (c *loginCmd) Run(upCtx *upbound.Context) error { // nolint:gocyclo
 		return errors.Wrap(err, errLoginFailed)
 	}
 	if len(upCtx.Cfg.Upbound.Profiles) == 1 {
-		if err := upCtx.Cfg.SetDefaultUpboundProfile(upCtx.Profile.ID); err != nil {
+		if err := upCtx.Cfg.SetDefaultUpboundProfile(profileName); err != nil {
 			return errors.Wrap(err, errLoginFailed)
 		}
 	}
