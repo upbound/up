@@ -15,10 +15,7 @@
 package main
 
 import (
-	"net/url"
-
 	"github.com/alecthomas/kong"
-	"github.com/pkg/errors"
 
 	"github.com/upbound/up-sdk-go/service/accounts"
 	cp "github.com/upbound/up-sdk-go/service/controlplanes"
@@ -27,58 +24,18 @@ import (
 	"github.com/upbound/up/cmd/up/controlplane"
 	"github.com/upbound/up/cmd/up/controlplane/kubeconfig"
 	"github.com/upbound/up/cmd/up/controlplane/token"
-	"github.com/upbound/up/internal/config"
 	"github.com/upbound/up/internal/upbound"
-)
-
-const (
-	errNoAccount = "no account was specified and a default could not be found"
 )
 
 // AfterApply constructs and binds a control plane client to any subcommands
 // that have Run() methods that receive it.
 func (c *controlPlaneCmd) AfterApply(kongCtx *kong.Context) error {
-	// TODO(hasheddan): the majority of this logic can be used generically
-	// across upbound commands when others are implemented.
-	src := config.NewFSSource()
-	if err := src.Initialize(); err != nil {
-		return err
-	}
-	conf, err := config.Extract(src)
+	upCtx, err := upbound.NewFromFlags(c.Flags)
 	if err != nil {
 		return err
 	}
-	upCtx := &upbound.Context{
-		Profile:  c.Profile,
-		Account:  c.Account,
-		Endpoint: c.Endpoint,
-		Cfg:      conf,
-		CfgSrc:   src,
-	}
-	var profile config.Profile
-	var name string
-	if upCtx.Profile == "" {
-		name, profile, err = upCtx.Cfg.GetDefaultUpboundProfile()
-		if err != nil {
-			return err
-		}
-		upCtx.Profile = name
-		upCtx.ID = profile.ID
-	} else {
-		profile, err = upCtx.Cfg.GetUpboundProfile(upCtx.Profile)
-		if err != nil {
-			return err
-		}
-	}
-	// If account has not already been set, use the profile default.
-	if upCtx.Account == "" {
-		upCtx.Account = profile.Account
-	}
-	// If no account is set in profile, return an error.
-	if upCtx.Account == "" {
-		return errors.New(errNoAccount)
-	}
-	cfg, err := upbound.BuildSDKConfig(profile.Session, upCtx.Endpoint)
+	kongCtx.Bind(upCtx)
+	cfg, err := upCtx.BuildSDKConfig(upCtx.Profile.Session)
 	if err != nil {
 		return err
 	}
@@ -100,7 +57,5 @@ type controlPlaneCmd struct {
 	Token      token.Cmd      `cmd:"" name:"token" help:"Interact with control plane tokens."`
 
 	// Common Upbound API configuration
-	Endpoint *url.URL `env:"UP_ENDPOINT" default:"https://api.upbound.io" help:"Endpoint used for Upbound API."`
-	Profile  string   `env:"UP_PROFILE" help:"Profile used to execute command."`
-	Account  string   `short:"a" env:"UP_ACCOUNT" help:"Account used to execute command."`
+	Flags upbound.Flags `embed:""`
 }

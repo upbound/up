@@ -17,14 +17,12 @@ package main
 import (
 	"context"
 	"net/http"
-	"net/url"
 
 	"github.com/alecthomas/kong"
 	"github.com/pkg/errors"
 
 	"github.com/upbound/up-sdk-go"
 
-	"github.com/upbound/up/internal/config"
 	"github.com/upbound/up/internal/upbound"
 )
 
@@ -38,46 +36,12 @@ const (
 
 // AfterApply sets default values in login after assignment and validation.
 func (c *logoutCmd) AfterApply(kongCtx *kong.Context) error {
-	src := config.NewFSSource()
-	if err := src.Initialize(); err != nil {
-		return err
-	}
-	conf, err := config.Extract(src)
+	upCtx, err := upbound.NewFromFlags(c.Flags)
 	if err != nil {
 		return err
 	}
-	upCtx := &upbound.Context{
-		Profile:  c.Profile,
-		Account:  c.Account,
-		Endpoint: c.Endpoint,
-		Cfg:      conf,
-		CfgSrc:   src,
-	}
-	var profile config.Profile
-	var name string
-	if upCtx.Profile == "" {
-		name, profile, err = upCtx.Cfg.GetDefaultUpboundProfile()
-		if err != nil {
-			return err
-		}
-		upCtx.Profile = name
-		upCtx.ID = profile.ID
-	} else {
-		profile, err = upCtx.Cfg.GetUpboundProfile(upCtx.Profile)
-		if err != nil {
-			return err
-		}
-	}
-	// If account has not already been set, use the profile default.
-	if upCtx.Account == "" {
-		upCtx.Account = profile.Account
-	}
-	// If no account is set in profile, return an error.
-	if upCtx.Account == "" {
-		return errors.New(errNoAccount)
-	}
 	kongCtx.Bind(upCtx)
-	cfg, err := upbound.BuildSDKConfig(profile.Session, c.Endpoint)
+	cfg, err := upCtx.BuildSDKConfig(upCtx.Profile.Session)
 	if err != nil {
 		return err
 	}
@@ -90,9 +54,7 @@ type logoutCmd struct {
 	client up.Client
 
 	// Common Upbound API configuration
-	Endpoint *url.URL `env:"UP_ENDPOINT" default:"https://api.upbound.io" help:"Endpoint used for Upbound API."`
-	Profile  string   `env:"UP_PROFILE" help:"Profile used to execute command."`
-	Account  string   `short:"a" env:"UP_ACCOUNT" help:"Account used to execute command."`
+	Flags upbound.Flags `embed:""`
 }
 
 // Run executes the logout command.
@@ -108,12 +70,12 @@ func (c *logoutCmd) Run(upCtx *upbound.Context) error {
 	}
 
 	// Logout is successful, remove token from config and update.
-	profile, err := upCtx.Cfg.GetUpboundProfile(upCtx.Profile)
+	profile, err := upCtx.Cfg.GetUpboundProfile(upCtx.Profile.ID)
 	if err != nil {
 		return errors.Wrap(err, errGetProfile)
 	}
 	profile.Session = ""
-	if err := upCtx.Cfg.AddOrUpdateUpboundProfile(upCtx.Profile, profile); err != nil {
+	if err := upCtx.Cfg.AddOrUpdateUpboundProfile(upCtx.Profile.ID, profile); err != nil {
 		return errors.Wrap(err, errRemoveTokenFailed)
 	}
 	return errors.Wrap(upCtx.CfgSrc.UpdateConfig(upCtx.Cfg), errUpdateConfig)
