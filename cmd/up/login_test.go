@@ -59,7 +59,7 @@ func TestRun(t *testing.T) {
 				Password: "cool-pass",
 			},
 			ctx: &upbound.Context{
-				Domain: defaultURL,
+				APIEndpoint: defaultURL,
 			},
 			err: errors.Wrap(errBoom, errLoginFailed),
 		},
