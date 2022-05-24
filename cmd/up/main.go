@@ -45,10 +45,6 @@ var cli struct {
 
 	License licenseCmd `cmd:"" help:"Print Up license information."`
 
-	// TODO(hasheddan): the following commands interact with the Upbound API,
-	// but handle building upboundCtx individually in order to avoid reading the
-	// configuration file for all commands that are nested under the root. We
-	// should investigate refactoring structure to allow deduplicating logic.
 	Login        loginCmd        `cmd:"" help:"Login to Upbound."`
 	Logout       logoutCmd       `cmd:"" help:"Logout of Upbound."`
 	ControlPlane controlPlaneCmd `cmd:"" name:"controlplane" aliases:"ctp" group:"controlplane" help:"Interact with control planes."`
