@@ -15,6 +15,8 @@
 package credhelper
 
 import (
+	"strings"
+
 	"github.com/crossplane/crossplane-runtime/pkg/logging"
 	"github.com/docker/docker-credential-helpers/credentials"
 	"github.com/pkg/errors"
@@ -28,6 +30,7 @@ const (
 	errExtractConfig     = "unable to extract config"
 	errGetDefaultProfile = "unable to get default profile in config"
 	errGetProfile        = "unable to get specified profile in config"
+	errUnsupportedDomain = "supplied server URL is not supported"
 )
 
 const (
@@ -39,6 +42,7 @@ type Helper struct {
 	log logging.Logger
 
 	profile string
+	domain  string
 	src     config.Source
 }
 
@@ -49,6 +53,13 @@ type Opt func(h *Helper)
 func WithLogger(l logging.Logger) Opt {
 	return func(h *Helper) {
 		h.log = l
+	}
+}
+
+// WithDomain sets the allowed registry domain.
+func WithDomain(d string) Opt {
+	return func(h *Helper) {
+		h.domain = d
 	}
 }
 
@@ -97,6 +108,9 @@ func (h *Helper) List() (map[string]string, error) {
 
 // Get gets credentials for the supplied server.
 func (h *Helper) Get(serverURL string) (string, string, error) {
+	if !strings.Contains(serverURL, h.domain) {
+		return "", "", errors.New(errUnsupportedDomain)
+	}
 	if err := h.src.Initialize(); err != nil {
 		return "", "", errors.Wrap(err, errInitializeSource)
 	}

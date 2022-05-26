@@ -26,7 +26,8 @@ import (
 )
 
 const (
-	profile = "UP_PROFILE"
+	profileEnv = "UP_PROFILE"
+	domainEnv  = "UP_DOMAIN"
 )
 
 func main() {
@@ -41,7 +42,8 @@ func main() {
 
 	// Build credential helper and defer execution to Docker.
 	h := credhelper.New(
-		credhelper.WithProfile(os.Getenv(profile)),
+		credhelper.WithDomain(os.Getenv(domainEnv)),
+		credhelper.WithProfile(os.Getenv(profileEnv)),
 	)
 	credentials.Serve(h)
 }

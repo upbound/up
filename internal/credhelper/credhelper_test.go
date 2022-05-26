@@ -50,6 +50,18 @@ func TestGet(t *testing.T) {
 		opts   []Opt
 		want   want
 	}{
+		"ErrorUnsupportedDomain": {
+			reason: "Should return error if domain is not supported.",
+			args: args{
+				server: testServer,
+			},
+			opts: []Opt{
+				WithDomain("registry.upbound.io"),
+			},
+			want: want{
+				err: errors.New(errUnsupportedDomain),
+			},
+		},
 		"ErrorInitializeSource": {
 			reason: "Should return error if we fail to initialize source.",
 			args: args{

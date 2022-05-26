@@ -20,7 +20,6 @@ import (
 	"encoding/json"
 	"io"
 	"net/http"
-	"net/url"
 	"os"
 	"strings"
 	"time"
@@ -58,24 +57,11 @@ func (c *loginCmd) BeforeApply() error { //nolint:unparam
 }
 
 func (c *loginCmd) AfterApply(kongCtx *kong.Context) error {
-	src := config.NewFSSource()
-	if err := src.Initialize(); err != nil {
-		return err
-	}
-	conf, err := config.Extract(src)
+	upCtx, err := upbound.NewFromFlags(c.Flags)
 	if err != nil {
 		return err
 	}
-	kongCtx.Bind(&upbound.Context{
-		Profile:  c.Profile,
-		Account:  c.Account,
-		Endpoint: c.Endpoint,
-		Cfg:      conf,
-		CfgSrc:   src,
-	})
-	if c.Token != "" {
-		return nil
-	}
+	kongCtx.Bind(upCtx)
 	if c.Username == "" {
 		username, err := c.prompter.Prompt("Username", false)
 		if err != nil {
@@ -105,9 +91,7 @@ type loginCmd struct {
 	Token    string `short:"t" env:"UP_TOKEN" xor:"identifier" help:"Token used to execute command. '-' to read from stdin."`
 
 	// Common Upbound API configuration
-	Endpoint *url.URL `env:"UP_ENDPOINT" default:"https://api.upbound.io" help:"Endpoint used for Upbound API."`
-	Profile  string   `env:"UP_PROFILE" help:"Profile used to execute command."`
-	Account  string   `short:"a" env:"UP_ACCOUNT" help:"Account used to execute command."`
+	Flags upbound.Flags `embed:""`
 }
 
 // Run executes the login command.
@@ -136,8 +120,8 @@ func (c *loginCmd) Run(upCtx *upbound.Context) error { // nolint:gocyclo
 	if err != nil {
 		return errors.Wrap(err, errLoginFailed)
 	}
-	upCtx.Endpoint.Path = loginPath
-	req, err := http.NewRequestWithContext(ctx, http.MethodPost, upCtx.Endpoint.String(), bytes.NewReader(jsonStr))
+	upCtx.APIEndpoint.Path = loginPath
+	req, err := http.NewRequestWithContext(ctx, http.MethodPost, upCtx.APIEndpoint.String(), bytes.NewReader(jsonStr))
 	if err != nil {
 		return errors.Wrap(err, errLoginFailed)
 	}
@@ -151,14 +135,10 @@ func (c *loginCmd) Run(upCtx *upbound.Context) error { // nolint:gocyclo
 	if err != nil {
 		return errors.Wrap(err, errLoginFailed)
 	}
-	// If profile is not set, we assume operation on profile designated as
-	// default in config.
-	if upCtx.Profile == "" {
-		upCtx.Profile = upCtx.Cfg.Upbound.Default
-	}
-	// If no default profile is specified, the profile is named `default`.
-	if upCtx.Profile == "" {
-		upCtx.Profile = defaultProfileName
+	// If no profile is specified, a new profile named `default` is used.
+	profileName := c.Flags.Profile
+	if profileName == "" {
+		profileName = defaultProfileName
 	}
 	// If no account is specified and profile type is user, set profile account
 	// to user ID if not an email address. This is for convenience if a user is
@@ -166,7 +146,7 @@ func (c *loginCmd) Run(upCtx *upbound.Context) error { // nolint:gocyclo
 	if upCtx.Account == "" && profType == config.UserProfileType && !isEmail(auth.ID) {
 		upCtx.Account = auth.ID
 	}
-	if err := upCtx.Cfg.AddOrUpdateUpboundProfile(upCtx.Profile, config.Profile{
+	if err := upCtx.Cfg.AddOrUpdateUpboundProfile(profileName, config.Profile{
 		ID:      auth.ID,
 		Type:    profType,
 		Session: session,
@@ -175,7 +155,7 @@ func (c *loginCmd) Run(upCtx *upbound.Context) error { // nolint:gocyclo
 		return errors.Wrap(err, errLoginFailed)
 	}
 	if len(upCtx.Cfg.Upbound.Profiles) == 1 {
-		if err := upCtx.Cfg.SetDefaultUpboundProfile(upCtx.Profile); err != nil {
+		if err := upCtx.Cfg.SetDefaultUpboundProfile(profileName); err != nil {
 			return errors.Wrap(err, errLoginFailed)
 		}
 	}
