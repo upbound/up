@@ -19,6 +19,7 @@ import (
 	"path/filepath"
 
 	"github.com/crossplane/crossplane-runtime/pkg/parser"
+	"github.com/google/go-containerregistry/pkg/name"
 	"github.com/google/go-containerregistry/pkg/v1/tarball"
 	"github.com/pkg/errors"
 	"github.com/spf13/afero"
@@ -78,6 +79,10 @@ func (c *buildCmd) AfterApply() error {
 		examples.New(),
 	)
 
+	// NOTE(hasheddan): we currently only support fetching controller image from
+	// daemon, but may opt to support additional sources in the future.
+	c.fetch = daemonFetch
+
 	return nil
 }
 
@@ -86,9 +91,11 @@ type buildCmd struct {
 	fs      afero.Fs
 	builder *xpkg.Builder
 	root    string
+	fetch   fetchFn
 
 	Name string `optional:"" help:"Name of the package to be built. Uses name in crossplane.yaml if not specified. Does not correspond to package tag."`
 
+	Controller   string   `help:"Controller image used as base for package."`
 	PackageRoot  string   `short:"f" help:"Path to package directory." default:"."`
 	ExamplesRoot string   `short:"e" help:"Path to package examples directory." default:"./examples"`
 	Ignore       []string `help:"Paths, specified relative to --package-root, to exclude from the package."`
@@ -96,8 +103,19 @@ type buildCmd struct {
 
 // Run executes the build command.
 func (c *buildCmd) Run() error { //nolint:gocyclo
-
-	img, meta, err := c.builder.Build(context.Background())
+	var buildOpts []xpkg.BuildOpt
+	if c.Controller != "" {
+		ref, err := name.ParseReference(c.Controller)
+		if err != nil {
+			return err
+		}
+		base, err := c.fetch(context.Background(), ref)
+		if err != nil {
+			return err
+		}
+		buildOpts = append(buildOpts, xpkg.WithController(base))
+	}
+	img, meta, err := c.builder.Build(context.Background(), buildOpts...)
 	if err != nil {
 		return errors.Wrap(err, errBuildPackage)
 	}

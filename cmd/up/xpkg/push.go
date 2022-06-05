@@ -108,13 +108,10 @@ func (c *pushCmd) Run() error {
 // layers with their corresponding annotations, returning a new v1.Image
 // containing the annotation details.
 func annotate(i v1.Image) (v1.Image, error) { //nolint:gocyclo
-
 	cfgFile, err := i.ConfigFile()
 	if err != nil {
 		return nil, err
 	}
-
-	cfg := cfgFile.Config
 
 	layers, err := i.Layers()
 	if err != nil {
@@ -128,14 +125,18 @@ func annotate(i v1.Image) (v1.Image, error) { //nolint:gocyclo
 		if err != nil {
 			return nil, err
 		}
-		if annotation, ok := cfg.Labels[xpkg.Label(d.String())]; ok {
+		if annotation, ok := cfgFile.Config.Labels[xpkg.Label(d.String())]; ok {
 			addendums = append(addendums, mutate.Addendum{
 				Layer: l,
 				Annotations: map[string]string{
 					xpkg.AnnotationKey: annotation,
 				},
 			})
+			continue
 		}
+		addendums = append(addendums, mutate.Addendum{
+			Layer: l,
+		})
 	}
 
 	// we didn't find any annotations, return original image
@@ -151,5 +152,5 @@ func annotate(i v1.Image) (v1.Image, error) { //nolint:gocyclo
 		}
 	}
 
-	return mutate.Config(img, cfg)
+	return mutate.ConfigFile(img, cfgFile)
 }
