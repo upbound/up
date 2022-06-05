@@ -105,8 +105,30 @@ func New(pkg, ex parser.Backend, pp parser.Parser, ep *examples.Parser) *Builder
 	}
 }
 
+type buildOpts struct {
+	base v1.Image
+}
+
+// A BuildOpt modifies how a package is built.
+type BuildOpt func(*buildOpts)
+
+// WithController sets the controller image that should serve as the base for
+// the package.
+func WithController(img v1.Image) BuildOpt {
+	return func(o *buildOpts) {
+		o.base = img
+	}
+}
+
 // Build compiles a Crossplane package from an on-disk package.
-func (b *Builder) Build(ctx context.Context) (v1.Image, runtime.Object, error) { // nolint:gocyclo
+func (b *Builder) Build(ctx context.Context, opts ...BuildOpt) (v1.Image, runtime.Object, error) { // nolint:gocyclo
+	bOpts := &buildOpts{
+		base: empty.Image,
+	}
+	for _, o := range opts {
+		o(bOpts)
+	}
+
 	// assume examples exist
 	examplesExist := true
 	// Get package YAML stream.
@@ -152,8 +174,7 @@ func (b *Builder) Build(ctx context.Context) (v1.Image, runtime.Object, error) {
 	}
 
 	layers := make([]v1.Layer, 0)
-	img := empty.Image
-	cfgFile, err := img.ConfigFile()
+	cfgFile, err := bOpts.base.ConfigFile()
 	if err != nil {
 		return nil, nil, errors.Wrap(err, errConfigFile)
 	}
@@ -182,18 +203,18 @@ func (b *Builder) Build(ctx context.Context) (v1.Image, runtime.Object, error) {
 	}
 
 	for _, l := range layers {
-		img, err = mutate.AppendLayers(img, l)
+		bOpts.base, err = mutate.AppendLayers(bOpts.base, l)
 		if err != nil {
 			return nil, nil, errors.Wrap(err, errBuildImage)
 		}
 	}
 
-	img, err = mutate.Config(img, cfg)
+	bOpts.base, err = mutate.Config(bOpts.base, cfg)
 	if err != nil {
 		return nil, nil, errors.Wrap(err, errMutateConfig)
 	}
 
-	return img, meta, nil
+	return bOpts.base, meta, nil
 }
 
 // SkipContains supplies a FilterFn that skips paths that contain the give pattern.
