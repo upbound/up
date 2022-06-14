@@ -93,8 +93,8 @@ type buildCmd struct {
 	root    string
 	fetch   fetchFn
 
-	Name string `optional:"" help:"Name of the package to be built. Uses name in crossplane.yaml if not specified. Does not correspond to package tag."`
-
+	Name         string   `optional:"" xor:"xpkg-build-out" help:"[DEPRECATED: use --output] Name of the package to be built. Uses name in crossplane.yaml if not specified. Does not correspond to package tag."`
+	Output       string   `optional:"" short:"o" xor:"xpkg-build-out" help:"Path for package output."`
 	Controller   string   `help:"Controller image used as base for package."`
 	PackageRoot  string   `short:"f" help:"Path to package directory." default:"."`
 	ExamplesRoot string   `short:"e" help:"Path to package examples directory." default:"./examples"`
@@ -125,16 +125,20 @@ func (c *buildCmd) Run() error { //nolint:gocyclo
 		return errors.Wrap(err, errImageDigest)
 	}
 
-	pkgName := c.Name
-	if pkgName == "" {
-		pkgMeta, ok := meta.(metav1.Object)
-		if !ok {
-			return errors.New(errGetNameFromMeta)
+	output := filepath.Clean(c.Output)
+	if c.Output == "" {
+		pkgName := c.Name
+		if pkgName == "" {
+			pkgMeta, ok := meta.(metav1.Object)
+			if !ok {
+				return errors.New(errGetNameFromMeta)
+			}
+			pkgName = xpkg.FriendlyID(pkgMeta.GetName(), hash.Hex)
 		}
-		pkgName = xpkg.FriendlyID(pkgMeta.GetName(), hash.Hex)
+		output = xpkg.BuildPath(c.root, pkgName)
 	}
 
-	f, err := c.fs.Create(xpkg.BuildPath(c.root, pkgName))
+	f, err := c.fs.Create(output)
 	if err != nil {
 		return errors.Wrap(err, errCreatePackage)
 	}
