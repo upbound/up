@@ -44,7 +44,7 @@ const (
 
 	// XpkgExamplesFile is the name of the file in a Crossplane package image
 	// that contains the examples YAML stream.
-	XpkgExamplesFile string = "/.up/examples.yaml"
+	XpkgExamplesFile string = ".up/examples.yaml"
 
 	// AnnotationKey is the key value for xpkg annotations.
 	AnnotationKey string = "io.crossplane.xpkg"
