@@ -263,6 +263,7 @@ jobs:
         env:
           AWS_ACCESS_KEY_ID: ${{ secrets.AWS_USR }}
           AWS_SECRET_ACCESS_KEY: ${{ secrets.AWS_PSW }}
+          AWS_DEFAULT_REGION: us-east-1
           GIT_API_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 
       - name: Promote Artifacts in S3 and Docker Hub
@@ -273,3 +274,4 @@ jobs:
           CHANNEL: main
           AWS_ACCESS_KEY_ID: ${{ secrets.AWS_USR }}
           AWS_SECRET_ACCESS_KEY: ${{ secrets.AWS_PSW }}
+          AWS_DEFAULT_REGION: us-east-1
