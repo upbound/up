@@ -15,8 +15,11 @@
 package xpkg
 
 import (
+	"context"
+	"fmt"
 	"net/url"
 	"os"
+	"path/filepath"
 
 	"github.com/google/go-containerregistry/pkg/authn"
 	"github.com/google/go-containerregistry/pkg/name"
@@ -27,6 +30,7 @@ import (
 	"github.com/google/go-containerregistry/pkg/v1/tarball"
 	"github.com/pkg/errors"
 	"github.com/spf13/afero"
+	"golang.org/x/sync/errgroup"
 
 	"github.com/upbound/up/internal/credhelper"
 	"github.com/upbound/up/internal/xpkg"
@@ -52,13 +56,13 @@ type pushCmd struct {
 	fs afero.Fs
 
 	Tag     string   `arg:"" help:"Tag of the package to be pushed. Must be a valid OCI image tag."`
-	Package string   `short:"f" help:"Path to package. If not specified and only one package exists in current directory it will be used."`
+	Package []string `short:"f" help:"Path to packages. If not specified and only one package exists in current directory it will be used."`
 	Domain  *url.URL `env:"UP_DOMAIN" default:"https://upbound.io" help:"Root Upbound domain."`
 	Profile string   `env:"UP_PROFILE" help:"Profile used to execute command."`
 }
 
 // Run runs the push cmd.
-func (c *pushCmd) Run() error {
+func (c *pushCmd) Run() error { //nolint:gocyclo
 	tag, err := name.NewTag(c.Tag, name.WithDefaultRegistry(upboundRegistry))
 	if err != nil {
 		return err
@@ -66,7 +70,7 @@ func (c *pushCmd) Run() error {
 
 	// If package is not defined, attempt to find single package in current
 	// directory.
-	if c.Package == "" {
+	if len(c.Package) == 0 {
 		wd, err := os.Getwd()
 		if err != nil {
 			return errors.Wrap(err, errGetwd)
@@ -75,31 +79,89 @@ func (c *pushCmd) Run() error {
 		if err != nil {
 			return errors.Wrap(err, errFindPackageinWd)
 		}
-		c.Package = path
-	}
-	img, err := tarball.ImageFromPath(c.Package, nil)
-	if err != nil {
-		return err
+		c.Package = []string{path}
 	}
 
-	// annotate image layers
-	aimg, err := annotate(img)
-	if err != nil {
-		return err
-	}
-
-	if err := remote.Write(tag, aimg, remote.WithAuthFromKeychain(
-		authn.NewMultiKeychain(
-			authn.NewKeychainFromHelper(
-				credhelper.New(
-					credhelper.WithDomain(c.Domain.Hostname()),
-					credhelper.WithProfile(c.Profile),
-				),
+	kc := authn.NewMultiKeychain(
+		authn.NewKeychainFromHelper(
+			credhelper.New(
+				credhelper.WithDomain(c.Domain.Hostname()),
+				credhelper.WithProfile(c.Profile),
 			),
-			authn.DefaultKeychain,
 		),
-	)); err != nil {
+		authn.DefaultKeychain,
+	)
+
+	adds := make([]mutate.IndexAddendum, len(c.Package))
+
+	// NOTE(hasheddan): the errgroup context is passed to each image write,
+	// meaning that if one fails it will cancel others that are in progress.
+	g, ctx := errgroup.WithContext(context.Background())
+	for i, x := range c.Package {
+		// pin range variables for use in go func
+		i, x := i, x
+		g.Go(func() error {
+			img, err := tarball.ImageFromPath(filepath.Clean(x), nil)
+			if err != nil {
+				return err
+			}
+
+			// annotate image layers
+			aimg, err := annotate(img)
+			if err != nil {
+				return err
+			}
+
+			var t name.Reference = tag
+			if len(c.Package) > 1 {
+				d, err := aimg.Digest()
+				if err != nil {
+					return err
+				}
+				t, err = name.NewDigest(fmt.Sprintf("%s@%s", tag.Repository.Name(), d.String()), name.WithDefaultRegistry(upboundRegistry))
+				if err != nil {
+					return err
+				}
+
+				mt, err := aimg.MediaType()
+				if err != nil {
+					return err
+				}
+
+				conf, err := aimg.ConfigFile()
+				if err != nil {
+					return err
+				}
+
+				adds[i] = mutate.IndexAddendum{
+					Add: aimg,
+					Descriptor: v1.Descriptor{
+						MediaType: mt,
+						Platform: &v1.Platform{
+							Architecture: conf.Architecture,
+							OS:           conf.OS,
+							OSVersion:    conf.OSVersion,
+						},
+					},
+				}
+			}
+			if err := remote.Write(t, aimg, remote.WithAuthFromKeychain(kc), remote.WithContext(ctx)); err != nil {
+				return err
+			}
+			return nil
+		})
+	}
+
+	// Error if writing any images failed.
+	if err := g.Wait(); err != nil {
 		return err
+	}
+
+	// If we pushed more than one xpkg then we need to write index.
+	if len(c.Package) > 1 {
+		if err := remote.WriteIndex(tag, mutate.AppendManifests(empty.Index, adds...), remote.WithAuthFromKeychain(kc)); err != nil {
+			return err
+		}
 	}
 	return nil
 }
