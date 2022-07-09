@@ -33,6 +33,8 @@ const (
 	// UpboundKubeconfigKeyFmt is the format for Upbound control plane entries
 	// in a kubeconfig file.
 	UpboundKubeconfigKeyFmt = "upbound-%s"
+
+	k8sResource = "k8s"
 )
 
 // GetKubeConfig constructs a Kubernetes REST config from the specified
@@ -52,7 +54,7 @@ func BuildControlPlaneKubeconfig(proxy *url.URL, id uuid.UUID, token, kube strin
 		return err
 	}
 	key := fmt.Sprintf(UpboundKubeconfigKeyFmt, id.String())
-	proxy.Path = path.Join(proxy.Path, id.String())
+	proxy.Path = path.Join(proxy.Path, id.String(), k8sResource)
 	conf.Clusters[key] = &api.Cluster{
 		Server: proxy.String(),
 	}
