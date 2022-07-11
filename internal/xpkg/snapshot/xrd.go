@@ -15,6 +15,7 @@
 package snapshot
 
 import (
+	"context"
 	"encoding/json"
 	"errors"
 	"fmt"
@@ -145,7 +146,8 @@ func validateOpenAPIV3Schema(xrd *xpextv1.CompositeResourceDefinition) []error {
 	if err := extv1.Convert_v1_CustomResourceDefinition_To_apiextensions_CustomResourceDefinition(crd, internal, nil); err != nil {
 		return nil
 	}
-	felist := validation.ValidateCustomResourceDefinition(internal)
+	// TODO(hasheddan): propagate actual context to validation.
+	felist := validation.ValidateCustomResourceDefinition(context.TODO(), internal)
 	if felist != nil {
 		return felist.ToAggregate().Errors()
 	}
