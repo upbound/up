@@ -255,7 +255,9 @@ func NewManager(config *rest.Config, chartName string, repoURL *url.URL, modifie
 			Password: h.password,
 		})), withRepoURL(h.repoURL))
 	} else {
-		p := action.NewPull()
+		// TODO(hasheddan): we currently use our own OCI client instead of the
+		// upstream Helm support.
+		p := action.NewPullWithOpts(action.WithConfig(&action.Configuration{}))
 		p.DestDir = h.cacheDir
 		p.Username = h.username
 		p.Password = h.password
