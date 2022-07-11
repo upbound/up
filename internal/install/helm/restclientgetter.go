@@ -46,7 +46,10 @@ func (c *restClientGetter) ToDiscoveryClient() (discovery.CachedDiscoveryInterfa
 	if err != nil {
 		return nil, err
 	}
-	config.Burst = 100
+	// NOTE(hasheddan): these values match the burst and QPS values in kubectl.
+	// xref: https://github.com/kubernetes/kubernetes/pull/105520
+	config.Burst = 300
+	config.QPS = 50
 	discoveryClient, _ := discovery.NewDiscoveryClientForConfig(config)
 	return memory.NewMemCacheClient(discoveryClient), nil
 }
