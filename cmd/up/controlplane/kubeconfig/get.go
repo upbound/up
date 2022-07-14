@@ -26,13 +26,13 @@ import (
 	"github.com/upbound/up/internal/upbound"
 )
 
-// AfterApply sets default values in command before assignment and validation.
+// AfterApply sets default values in command after assignment and validation.
 func (c *getCmd) AfterApply() error {
 	c.stdin = os.Stdin
 	return nil
 }
 
-// getCmd gets kubeconfig data for an Upbound Cloud control plane.
+// getCmd gets kubeconfig data for an Upbound control plane.
 type getCmd struct {
 	stdin io.Reader
 

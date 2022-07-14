@@ -10,7 +10,6 @@ require (
 	github.com/crossplane/crossplane-runtime v0.15.1-0.20210930095326-d5661210733b
 	github.com/crossplane/crossplane/controller/apiextensions v0.0.0-00010101000000-000000000000
 	github.com/crossplane/crossplane/xcrd v0.0.0-00010101000000-000000000000
-	github.com/docker/docker v20.10.14+incompatible
 	github.com/docker/docker-credential-helpers v0.6.4
 	github.com/goccy/go-yaml v1.9.5-0.20211210133106-251b4db627e0
 	github.com/golang-jwt/jwt v3.2.1+incompatible
@@ -26,7 +25,7 @@ require (
 	github.com/sourcegraph/jsonrpc2 v0.1.0
 	github.com/spf13/afero v1.6.0
 	github.com/spf13/cobra v1.4.0
-	github.com/upbound/up-sdk-go v0.1.0
+	github.com/upbound/up-sdk-go v0.1.1-0.20220714102715-9a343e819f7e
 	golang.org/x/sync v0.0.0-20210220032951-036812b2e83c
 	golang.org/x/term v0.0.0-20210927222741-03fcf44c2211
 	helm.sh/helm/v3 v3.9.0
@@ -43,15 +42,8 @@ require (
 )
 
 require (
-	cloud.google.com/go v0.99.0 // indirect
 	github.com/AlekSi/pointer v1.1.0 // indirect
 	github.com/Azure/go-ansiterm v0.0.0-20210617225240-d185dfc1b5a1 // indirect
-	github.com/Azure/go-autorest v14.2.0+incompatible // indirect
-	github.com/Azure/go-autorest/autorest v0.11.20 // indirect
-	github.com/Azure/go-autorest/autorest/adal v0.9.15 // indirect
-	github.com/Azure/go-autorest/autorest/date v0.3.0 // indirect
-	github.com/Azure/go-autorest/logger v0.2.1 // indirect
-	github.com/Azure/go-autorest/tracing v0.6.0 // indirect
 	github.com/BurntSushi/toml v1.0.0 // indirect
 	github.com/MakeNowJust/heredoc v0.0.0-20170808103936-bb23615498cd // indirect
 	github.com/Masterminds/goutils v1.1.1 // indirect
@@ -80,6 +72,7 @@ require (
 	github.com/davecgh/go-spew v1.1.1 // indirect
 	github.com/docker/cli v20.10.12+incompatible // indirect
 	github.com/docker/distribution v2.8.1+incompatible // indirect
+	github.com/docker/docker v20.10.14+incompatible // indirect
 	github.com/docker/go-connections v0.4.0 // indirect
 	github.com/docker/go-metrics v0.0.1 // indirect
 	github.com/docker/go-units v0.4.0 // indirect
@@ -104,7 +97,6 @@ require (
 	github.com/go-openapi/swag v0.19.14 // indirect
 	github.com/gobwas/glob v0.2.3 // indirect
 	github.com/gogo/protobuf v1.3.2 // indirect
-	github.com/golang-jwt/jwt/v4 v4.0.0 // indirect
 	github.com/golang/groupcache v0.0.0-20210331224755-41bb18bfe9da // indirect
 	github.com/golang/protobuf v1.5.2 // indirect
 	github.com/google/btree v1.0.1 // indirect
