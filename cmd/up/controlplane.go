@@ -23,7 +23,6 @@ import (
 
 	"github.com/upbound/up/cmd/up/controlplane"
 	"github.com/upbound/up/cmd/up/controlplane/kubeconfig"
-	"github.com/upbound/up/cmd/up/controlplane/token"
 	"github.com/upbound/up/internal/upbound"
 )
 
@@ -48,13 +47,11 @@ func (c *controlPlaneCmd) AfterApply(kongCtx *kong.Context) error {
 
 // controlPlaneCmd contains commands for interacting with control planes.
 type controlPlaneCmd struct {
-	Attach controlplane.AttachCmd `cmd:"" help:"Attach a self-hosted control plane."`
 	Create controlplane.CreateCmd `cmd:"" help:"Create a hosted control plane."`
 	Delete controlplane.DeleteCmd `cmd:"" help:"Delete a control plane."`
 	List   controlplane.ListCmd   `cmd:"" help:"List control planes for the account."`
 
 	Kubeconfig kubeconfig.Cmd `cmd:"" name:"kubeconfig" help:"Manage control plane kubeconfig data."`
-	Token      token.Cmd      `cmd:"" name:"token" help:"Interact with control plane tokens."`
 
 	// Common Upbound API configuration
 	Flags upbound.Flags `embed:""`
