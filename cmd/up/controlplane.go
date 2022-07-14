@@ -19,7 +19,7 @@ import (
 
 	"github.com/upbound/up-sdk-go/service/accounts"
 	cp "github.com/upbound/up-sdk-go/service/controlplanes"
-	"github.com/upbound/up-sdk-go/service/tokens"
+	op "github.com/upbound/up-sdk-go/service/oldplanes"
 
 	"github.com/upbound/up/cmd/up/controlplane"
 	"github.com/upbound/up/cmd/up/controlplane/kubeconfig"
@@ -39,8 +39,9 @@ func (c *controlPlaneCmd) AfterApply(kongCtx *kong.Context) error {
 		return err
 	}
 	kongCtx.Bind(upCtx)
+	kongCtx.Bind(c.MCPExperimental)
 	kongCtx.Bind(cp.NewClient(cfg))
-	kongCtx.Bind(tokens.NewClient(cfg))
+	kongCtx.Bind(op.NewClient(cfg))
 	kongCtx.Bind(accounts.NewClient(cfg))
 	return nil
 }
@@ -52,6 +53,8 @@ type controlPlaneCmd struct {
 	List   controlplane.ListCmd   `cmd:"" help:"List control planes for the account."`
 
 	Kubeconfig kubeconfig.Cmd `cmd:"" name:"kubeconfig" help:"Manage control plane kubeconfig data."`
+
+	MCPExperimental bool `env:"UP_MCP_EXPERIMENTAL" help:"Use experimental managed control planes API."`
 
 	// Common Upbound API configuration
 	Flags upbound.Flags `embed:""`
