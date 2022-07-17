@@ -69,21 +69,12 @@ Top-level flags can be passed for any top-level or group-specific command.
 
 Format: `up controlplane <cmd> ...` Alias: `up ctp <cmd> ...`
 
-- `attach <name>`
-    - Flags:
-      - `-d,--description = STRING`: Control plane description.
-      - `--view-only`: creates the self-hosted control plane as view only.
-    - Behavior: Creates a self-hosted control plane in Upbound and returns token
-      to connect a UXP instance to it. The name of the token is randomly
-      generated.
 - `create <name>`
     - Flags:
         - `--description = STRING`: Control plane description.
     - Behavior: Creates a hosted control plane in Upbound.
 - `delete <id>`
-    - Behavior: Deletes a control plane in Upbound. If control plane is hosted,
-      the UXP cluster will be deleted. If the control plane is self-hosted, the
-      UXP cluster will begin failing to connect to Upbound.
+    - Behavior: Deletes a control plane in Upbound.
 - `list`
     - Behavior: Lists all control planes for the configured account.
 
@@ -96,6 +87,8 @@ commands may choose not to utilize the group flags when not relevant.
   specified command. Can be either an organization or a personal account.
 - `--endpoint = URL` (Env: `UP_ENDPOINT`) (Default: `https://api.upbound.io`):
   Endpoint to use when communicating with the Upbound API.
+- `--mcp-experimental = BOOL` (Env: `UP_MCP_EXPERIMENTAL`): Use experimental
+  control planes API.
 - `--profile = STRING` (Env: `UP_PROFILE`); Profile with which to perform the
   specified command.
 
@@ -117,21 +110,6 @@ Format: `up controlplane kubeconfig <cmd> ...` Alias: `up ctp kubeconfig
       `--token` flag must be provided and must be a valid Upbound API token. A
       new context will be created for the cluster and authentication data and it
       will be set as current.
-
-**Subgroup: Token**
-
-Format: `up controlplane token <cmd> ...` Alias: `up ctp token <cmd>...`
-
-- `create <control-plane-ID>`
-    - Flags:
-        - `--name = STRING`: Name of control plane token. Name is randomly
-          generated if not specified.
-    - Behavior: Creates a token for the specified self-hosted control plane ID
-      and prints it to stdout.
-- `delete <token-ID>`
-    - Behavior: Deletes the control plane token with the specified ID.
-- `list <control-plane-ID>`
-    - Behavior: Lists all tokens for the specified control plane.
 
 ## Enterprise
 
