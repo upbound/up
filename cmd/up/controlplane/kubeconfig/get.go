@@ -17,18 +17,22 @@ package kubeconfig
 import (
 	"fmt"
 	"io"
-	"net/url"
 	"os"
 	"strings"
 
 	"github.com/google/uuid"
+	"github.com/pkg/errors"
 
 	"github.com/upbound/up/internal/kube"
 	"github.com/upbound/up/internal/upbound"
 )
 
+const (
+	errSetAccount = "must set account when using MCP experimental API"
+)
+
 // AfterApply sets default values in command after assignment and validation.
-func (c *getCmd) AfterApply(experimental bool) error {
+func (c *getCmd) AfterApply(experimental bool, upCtx *upbound.Context) error {
 	c.stdin = os.Stdin
 
 	if !experimental {
@@ -38,6 +42,11 @@ func (c *getCmd) AfterApply(experimental bool) error {
 		}
 		c.id = u
 	}
+
+	if experimental && upCtx.Account == "" {
+		return errors.New(errSetAccount)
+	}
+
 	return nil
 }
 
@@ -45,9 +54,8 @@ func (c *getCmd) AfterApply(experimental bool) error {
 type getCmd struct {
 	stdin io.Reader
 
-	File  string   `type:"path" short:"f" help:"File to merge kubeconfig."`
-	Proxy *url.URL `env:"UP_PROXY" default:"https://proxy.upbound.io/controlPlanes" help:"Endpoint used for Upbound Proxy."`
-	Token string   `required:"" help:"API token used to authenticate."`
+	File  string `type:"path" short:"f" help:"File to merge kubeconfig."`
+	Token string `required:"" help:"API token used to authenticate."`
 
 	id uuid.UUID
 
@@ -66,9 +74,9 @@ func (c *getCmd) Run(experimental bool, upCtx *upbound.Context) error {
 	}
 
 	if experimental {
-		c.Proxy.Path = fmt.Sprintf("/v1/%s", c.Proxy.Path)
-		return kube.BuildControlPlaneKubeconfig(c.Proxy, c.ID, c.Token, c.File)
+		upCtx.ProxyEndpoint.Path = fmt.Sprintf("/v1/%s", upCtx.Account)
+		return kube.BuildControlPlaneKubeconfig(upCtx.ProxyEndpoint, c.ID, c.Token, c.File)
 	}
 
-	return kube.BuildControlPlaneKubeconfig(c.Proxy, c.id.String(), c.Token, c.File)
+	return kube.BuildControlPlaneKubeconfig(upCtx.ProxyEndpoint, c.id.String(), c.Token, c.File)
 }

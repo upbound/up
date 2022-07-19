@@ -32,6 +32,8 @@ const (
 
 	// Default API subdomain.
 	apiSubdomain = "api."
+	// Default proxy subdomain.
+	proxySubdomain = "proxy."
 	// Default registry subdomain.
 	xpkgSubdomain = "xpkg."
 )
@@ -44,6 +46,7 @@ type Flags struct {
 	Account string   `short:"a" env:"UP_ACCOUNT" help:"Account used to execute command."`
 
 	APIEndpoint      *url.URL `env:"OVERRIDE_API_ENDPOINT" hidden:"" name:"override-api-endpoint" help:"Overrides the default API endpoint."`
+	ProxyEndpoint    *url.URL `env:"OVERRIDE_PROXY_ENDPOINT" hidden:"" name:"override-proxy-endpoint" help:"Overrides the default proxy endpoint."`
 	RegistryEndpoint *url.URL `env:"OVERRIDE_REGISTRY_ENDPOINT" hidden:"" name:"override-registry-endpoint" help:"Overrides the default registry endpoint."`
 }
 
@@ -54,6 +57,7 @@ type Context struct {
 	Account          string
 	Domain           *url.URL
 	APIEndpoint      *url.URL
+	ProxyEndpoint    *url.URL
 	RegistryEndpoint *url.URL
 	Cfg              *config.Config
 	CfgSrc           config.Source
@@ -82,6 +86,13 @@ func NewFromFlags(f Flags) (*Context, error) {
 		u := *c.Domain
 		u.Host = apiSubdomain + u.Host
 		c.APIEndpoint = &u
+	}
+
+	c.ProxyEndpoint = f.ProxyEndpoint
+	if c.ProxyEndpoint == nil {
+		u := *c.Domain
+		u.Host = proxySubdomain + u.Host
+		c.ProxyEndpoint = &u
 	}
 
 	c.RegistryEndpoint = f.RegistryEndpoint
