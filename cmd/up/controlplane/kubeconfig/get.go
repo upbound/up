@@ -74,9 +74,10 @@ func (c *getCmd) Run(experimental bool, upCtx *upbound.Context) error {
 	}
 
 	if experimental {
-		upCtx.ProxyEndpoint.Path = fmt.Sprintf("/v1/%s", upCtx.Account)
+		upCtx.ProxyEndpoint.Path = fmt.Sprintf("/v1/controlPlanes/%s", upCtx.Account)
 		return kube.BuildControlPlaneKubeconfig(upCtx.ProxyEndpoint, c.ID, c.Token, c.File)
 	}
 
+	upCtx.ProxyEndpoint.Path = "/controlPlanes"
 	return kube.BuildControlPlaneKubeconfig(upCtx.ProxyEndpoint, c.id.String(), c.Token, c.File)
 }
