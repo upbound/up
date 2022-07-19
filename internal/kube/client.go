@@ -19,7 +19,6 @@ import (
 	"net/url"
 	"path"
 
-	"github.com/google/uuid"
 	"k8s.io/client-go/rest"
 	"k8s.io/client-go/tools/clientcmd"
 	"k8s.io/client-go/tools/clientcmd/api"
@@ -46,15 +45,15 @@ func GetKubeConfig(path string) (*rest.Config, error) {
 }
 
 // BuildControlPlaneKubeconfig builds a kubeconfig entry for a control plane.
-func BuildControlPlaneKubeconfig(proxy *url.URL, id uuid.UUID, token, kube string) error { //nolint:interfacer
+func BuildControlPlaneKubeconfig(proxy *url.URL, id string, token, kube string) error { //nolint:interfacer
 	po := clientcmd.NewDefaultPathOptions()
 	po.LoadingRules.ExplicitPath = kube
 	conf, err := po.GetStartingConfig()
 	if err != nil {
 		return err
 	}
-	key := fmt.Sprintf(UpboundKubeconfigKeyFmt, id.String())
-	proxy.Path = path.Join(proxy.Path, id.String(), k8sResource)
+	key := fmt.Sprintf(UpboundKubeconfigKeyFmt, id)
+	proxy.Path = path.Join(proxy.Path, id, k8sResource)
 	conf.Clusters[key] = &api.Cluster{
 		Server: proxy.String(),
 	}

@@ -15,6 +15,7 @@
 package kubeconfig
 
 import (
+	"fmt"
 	"io"
 	"net/url"
 	"os"
@@ -27,8 +28,16 @@ import (
 )
 
 // AfterApply sets default values in command after assignment and validation.
-func (c *getCmd) AfterApply() error {
+func (c *getCmd) AfterApply(experimental bool) error {
 	c.stdin = os.Stdin
+
+	if !experimental {
+		u, err := uuid.Parse(c.ID)
+		if err != nil {
+			return err
+		}
+		c.id = u
+	}
 	return nil
 }
 
@@ -37,14 +46,16 @@ type getCmd struct {
 	stdin io.Reader
 
 	File  string   `type:"path" short:"f" help:"File to merge kubeconfig."`
-	Proxy *url.URL `env:"UP_PROXY" default:"https://proxy.upbound.io/v1/controlPlanes" help:"Endpoint used for Upbound Proxy."`
+	Proxy *url.URL `env:"UP_PROXY" default:"https://proxy.upbound.io/controlPlanes" help:"Endpoint used for Upbound Proxy."`
 	Token string   `required:"" help:"API token used to authenticate."`
 
-	ID uuid.UUID `arg:"" name:"control-plane-ID" required:"" help:"ID of control plane."`
+	id uuid.UUID
+
+	ID string `arg:"" name:"control-plane-ID" required:"" help:"ID of control plane. ID is name if using experimental MCP API."`
 }
 
 // Run executes the get command.
-func (c *getCmd) Run(upCtx *upbound.Context) error {
+func (c *getCmd) Run(experimental bool, upCtx *upbound.Context) error {
 	// TODO(hasheddan): consider implementing a custom decoder
 	if c.Token == "-" {
 		b, err := io.ReadAll(c.stdin)
@@ -53,5 +64,11 @@ func (c *getCmd) Run(upCtx *upbound.Context) error {
 		}
 		c.Token = strings.TrimSpace(string(b))
 	}
-	return kube.BuildControlPlaneKubeconfig(c.Proxy, c.ID, c.Token, c.File)
+
+	if experimental {
+		c.Proxy.Path = fmt.Sprintf("/v1/%s", c.Proxy.Path)
+		return kube.BuildControlPlaneKubeconfig(c.Proxy, c.ID, c.Token, c.File)
+	}
+
+	return kube.BuildControlPlaneKubeconfig(c.Proxy, c.id.String(), c.Token, c.File)
 }
