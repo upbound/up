@@ -17,6 +17,7 @@ package main
 import (
 	"bytes"
 	"context"
+	"crypto/tls"
 	"encoding/json"
 	"io"
 	"net/http"
@@ -49,8 +50,6 @@ const (
 
 // BeforeApply sets default values in login before assignment and validation.
 func (c *loginCmd) BeforeApply() error { //nolint:unparam
-	// NOTE(hasheddan): client timeout is handled with request context.
-	c.client = &http.Client{}
 	c.stdin = os.Stdin
 	c.prompter = input.NewPrompter()
 	return nil
@@ -60,6 +59,17 @@ func (c *loginCmd) AfterApply(kongCtx *kong.Context) error {
 	upCtx, err := upbound.NewFromFlags(c.Flags)
 	if err != nil {
 		return err
+	}
+	// NOTE(hasheddan): client timeout is handled with request context.
+	// TODO(hasheddan): we can't use the typical up-sdk-go client here because
+	// we need to read session cookie from body. We should add support in the
+	// SDK so that we can be consistent across all commands.
+	c.client = &http.Client{
+		Transport: &http.Transport{
+			TLSClientConfig: &tls.Config{
+				InsecureSkipVerify: upCtx.InsecureSkipTLSVerify,
+			},
+		},
 	}
 	kongCtx.Bind(upCtx)
 	if c.Username == "" {
