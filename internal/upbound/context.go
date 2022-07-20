@@ -15,6 +15,7 @@
 package upbound
 
 import (
+	"crypto/tls"
 	"net/http"
 	"net/http/cookiejar"
 	"net/url"
@@ -45,6 +46,10 @@ type Flags struct {
 	Profile string   `env:"UP_PROFILE" help:"Profile used to execute command."`
 	Account string   `short:"a" env:"UP_ACCOUNT" help:"Account used to execute command."`
 
+	// Insecure
+	InsecureSkipTLSVerify bool `env:"UP_INSECURE_SKIP_TLS_VERIFY" help:"[INSECURE] Skip verifying TLS certificates."`
+
+	// Hidden
 	APIEndpoint      *url.URL `env:"OVERRIDE_API_ENDPOINT" hidden:"" name:"override-api-endpoint" help:"Overrides the default API endpoint."`
 	ProxyEndpoint    *url.URL `env:"OVERRIDE_PROXY_ENDPOINT" hidden:"" name:"override-proxy-endpoint" help:"Overrides the default proxy endpoint."`
 	RegistryEndpoint *url.URL `env:"OVERRIDE_REGISTRY_ENDPOINT" hidden:"" name:"override-registry-endpoint" help:"Overrides the default registry endpoint."`
@@ -52,10 +57,13 @@ type Flags struct {
 
 // Context includes common data that Upbound consumers may utilize.
 type Context struct {
-	Profile          config.Profile
-	Token            string
-	Account          string
-	Domain           *url.URL
+	Profile config.Profile
+	Token   string
+	Account string
+	Domain  *url.URL
+
+	InsecureSkipTLSVerify bool
+
 	APIEndpoint      *url.URL
 	ProxyEndpoint    *url.URL
 	RegistryEndpoint *url.URL
@@ -120,6 +128,8 @@ func NewFromFlags(f Flags) (*Context, error) {
 		c.Account = c.Profile.Account
 	}
 
+	c.InsecureSkipTLSVerify = f.InsecureSkipTLSVerify
+
 	return c, nil
 }
 
@@ -135,10 +145,16 @@ func (c *Context) BuildSDKConfig(session string) (*up.Config, error) {
 		Value: session,
 	},
 	})
+	tr := &http.Transport{
+		TLSClientConfig: &tls.Config{
+			InsecureSkipVerify: c.InsecureSkipTLSVerify, //nolint:gosec
+		},
+	}
 	client := up.NewClient(func(u *up.HTTPClient) {
 		u.BaseURL = c.APIEndpoint
 		u.HTTP = &http.Client{
-			Jar: cj,
+			Jar:       cj,
+			Transport: tr,
 		}
 		u.UserAgent = UserAgent
 	})
