@@ -67,7 +67,7 @@ func (c *loginCmd) AfterApply(kongCtx *kong.Context) error {
 	c.client = &http.Client{
 		Transport: &http.Transport{
 			TLSClientConfig: &tls.Config{
-				InsecureSkipVerify: upCtx.InsecureSkipTLSVerify,
+				InsecureSkipVerify: upCtx.InsecureSkipTLSVerify, //nolint:gosec
 			},
 		},
 	}

@@ -147,7 +147,7 @@ func (c *Context) BuildSDKConfig(session string) (*up.Config, error) {
 	})
 	tr := &http.Transport{
 		TLSClientConfig: &tls.Config{
-			InsecureSkipVerify: c.InsecureSkipTLSVerify,
+			InsecureSkipVerify: c.InsecureSkipTLSVerify, //nolint:gosec
 		},
 	}
 	client := up.NewClient(func(u *up.HTTPClient) {
