@@ -12,13 +12,17 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-package enterprise
+package upbound
 
 import (
 	"context"
 	"io"
+	"time"
 
 	"github.com/pkg/errors"
+	corev1 "k8s.io/api/core/v1"
+	kerrors "k8s.io/apimachinery/pkg/api/errors"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/client-go/kubernetes"
 	"sigs.k8s.io/yaml"
 
@@ -31,22 +35,33 @@ import (
 )
 
 const (
-	errParseUpgradeParameters = "unable to parse upgrade parameters"
+	defaultTimeout         = 30 * time.Second
+	defaultSecretAccessKey = "access_key"
+	defaultSecretSignature = "signature"
+	defaultImagePullSecret = "upbound-pull-secret"
+
+	errReadParametersFile     = "unable to read parameters file"
+	errParseInstallParameters = "unable to parse install parameters"
+	errGetRegistryToken       = "failed to acquire auth token"
+	errGetAccessKey           = "failed to acquire access key"
+	errCreateImagePullSecret  = "failed to create image pull secret"
+	errCreateLicenseSecret    = "failed to create license secret"
+	errCreateNamespace        = "failed to create namespace"
 )
 
 // BeforeApply sets default values in login before assignment and validation.
-func (c *upgradeCmd) BeforeApply() error {
+func (c *installCmd) BeforeApply() error {
 	c.prompter = input.NewPrompter()
 	return nil
 }
 
 // AfterApply sets default values in command after assignment and validation.
-func (c *upgradeCmd) AfterApply(insCtx *install.Context) error {
+func (c *installCmd) AfterApply(insCtx *install.Context) error {
 	id, err := c.prompter.Prompt("License ID", false)
 	if err != nil {
 		return err
 	}
-	token, err := c.prompter.Prompt("Token", true)
+	token, err := c.prompter.Prompt("License Key", true)
 	if err != nil {
 		return err
 	}
@@ -56,6 +71,7 @@ func (c *upgradeCmd) AfterApply(insCtx *install.Context) error {
 	if err != nil {
 		return err
 	}
+	c.kClient = client
 	secret := kube.NewSecretApplicator(client)
 	c.pullSecret = newImagePullApplicator(secret)
 	auth := auth.NewProvider(
@@ -70,18 +86,17 @@ func (c *upgradeCmd) AfterApply(insCtx *install.Context) error {
 		license.WithProductID(c.ProductID),
 	)
 	c.access = newAccessKeyApplicator(auth, license, secret)
-	ins, err := helm.NewManager(insCtx.Kubeconfig,
-		enterpriseChart,
+	mgr, err := helm.NewManager(insCtx.Kubeconfig,
+		upboundChart,
 		c.Repo,
 		helm.WithNamespace(insCtx.Namespace),
 		helm.WithBasicAuth(id, token),
 		helm.IsOCI(),
-		helm.WithChart(c.Bundle),
-		helm.RollbackOnError(c.Rollback))
+		helm.WithChart(c.Bundle))
 	if err != nil {
 		return err
 	}
-	c.mgr = ins
+	c.mgr = mgr
 	base := map[string]interface{}{}
 	if c.File != nil {
 		defer c.File.Close() //nolint:errcheck,gosec
@@ -100,34 +115,42 @@ func (c *upgradeCmd) AfterApply(insCtx *install.Context) error {
 	return nil
 }
 
-// upgradeCmd upgrades enterprise.
-type upgradeCmd struct {
+// installCmd installs Upbound.
+type installCmd struct {
 	mgr        install.Manager
 	parser     install.ParameterParser
+	kClient    kubernetes.Interface
 	prompter   input.Prompter
 	access     *accessKeyApplicator
 	pullSecret *imagePullApplicator
 	id         string
 	token      string
 
-	// NOTE(hasheddan): version is currently required for upgrade with OCI image
-	// as latest strategy is undetermined.
-	Version string `arg:"" help:"Enterprise version to upgrade to."`
-
-	Rollback bool `help:"Rollback to previously installed version on failed upgrade."`
+	Version string `arg:"" help:"Upbound version to install."`
 
 	commonParams
 	install.CommonParams
 }
 
-// Run executes the upgrade command.
-func (c *upgradeCmd) Run(insCtx *install.Context) error {
+// Run executes the install command.
+func (c *installCmd) Run(insCtx *install.Context) error {
+
 	ctx, cancel := context.WithTimeout(context.Background(), defaultTimeout)
 	defer cancel()
 
 	params, err := c.parser.Parse()
 	if err != nil {
-		return errors.Wrap(err, errParseUpgradeParameters)
+		return errors.Wrap(err, errParseInstallParameters)
+	}
+
+	// Create namespace if it does not exist.
+	_, err = c.kClient.CoreV1().Namespaces().Create(ctx, &corev1.Namespace{
+		ObjectMeta: metav1.ObjectMeta{
+			Name: insCtx.Namespace,
+		},
+	}, metav1.CreateOptions{})
+	if err != nil && !kerrors.IsAlreadyExists(err) {
+		return errors.Wrap(err, errCreateNamespace)
 	}
 
 	// Create or update image pull secret.
@@ -146,5 +169,9 @@ func (c *upgradeCmd) Run(insCtx *install.Context) error {
 		}
 	}
 
-	return c.mgr.Upgrade(c.Version, params)
+	err = c.mgr.Install(c.Version, params)
+	if err != nil {
+		return err
+	}
+	return err
 }

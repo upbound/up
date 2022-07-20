@@ -12,7 +12,7 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-package enterprise
+package upbound
 
 import (
 	"context"
@@ -32,7 +32,7 @@ import (
 	"github.com/upbound/up/internal/license"
 )
 
-const enterpriseChart = "enterprise"
+const upboundChart = "upbound"
 
 // AfterApply constructs and binds Upbound-specific context to any subcommands
 // that have Run() methods that receive it.
@@ -48,36 +48,36 @@ func (c *Cmd) AfterApply(kongCtx *kong.Context) error {
 	return nil
 }
 
-// Cmd contains commands for managing enterprise.
+// Cmd contains commands for managing Upbound.
 type Cmd struct {
-	Install   installCmd   `cmd:"" group:"enterprise" help:"Install enterprise."`
-	Mail      mailCmd      `cmd:"" group:"enterprise" help:"[EXPERIMENTAL] Run a local mail portal."`
-	Uninstall uninstallCmd `cmd:"" group:"enterprise" help:"Uninstall enterprise."`
-	Upgrade   upgradeCmd   `cmd:"" group:"enterprise" help:"Upgrade enterprise."`
+	Install   installCmd   `cmd:"" group:"upbound" help:"Install Upbound."`
+	Mail      mailCmd      `cmd:"" group:"upbound" help:"[EXPERIMENTAL] Run a local mail portal."`
+	Uninstall uninstallCmd `cmd:"" group:"upbound" help:"Uninstall Upbound."`
+	Upgrade   upgradeCmd   `cmd:"" group:"upbound" help:"Upgrade Upbound."`
 
 	Kubeconfig string `type:"existingfile" help:"Override default kubeconfig path."`
-	Namespace  string `short:"n" env:"ENTERPRISE_NAMESPACE" default:"upbound-enterprise" help:"Kubernetes namespace for enterprise."`
+	Namespace  string `short:"n" env:"UPBOUND_NAMESPACE" default:"upbound-system" help:"Kubernetes namespace for Upbound."`
 }
 
-// commonParams are common parameters used across enterprise install and upgrade
+// commonParams are common parameters used across Upbound install and upgrade
 // commands.
 type commonParams struct {
-	LicenseSecretName string `default:"upbound-enterprise-license" help:"Name of secret that will be populated with license data."`
-	SkipLicense       bool   `hidden:"" help:"Skip providing a license for enterprise install."`
+	LicenseSecretName string `default:"upbound-license" help:"Name of secret that will be populated with license data."`
+	SkipLicense       bool   `hidden:"" help:"Skip providing a license for Upbound install."`
 
-	Repo      *url.URL `hidden:"" env:"ENTERPRISE_REPO" default:"registry.upbound.io/enterprise" help:"Set repo for enterprise."`
-	Registry  *url.URL `hidden:"" env:"ENTERPRISE_REGISTRY_ENDPOINT" default:"https://registry.upbound.io" help:"Set registry for authentication."`
-	DMV       *url.URL `hidden:"" env:"ENTERPRISE_DMV_ENDPOINT" default:"https://dmv.upbound.io" help:"Set dmv for enterprise."`
-	OrgID     string   `hidden:"" env:"ENTERPRISE_ORG_ID" default:"enterprise" help:"Set orgID for enterprise."`
-	ProductID string   `hidden:"" env:"ENTERPRISE_PRODUCT_ID" default:"enterprise" help:"Set productID for enterprise."`
+	Repo      *url.URL `hidden:"" env:"UPBOUND_REPO" default:"xpkg.upbound.io/upbound" help:"Set repo for Upbound."`
+	Registry  *url.URL `hidden:"" env:"UPBOUND_REGISTRY_ENDPOINT" default:"https://xpkg.upbound.io" help:"Set registry for authentication."`
+	DMV       *url.URL `hidden:"" env:"UPBOUND_DMV_ENDPOINT" default:"https://dmv.upbound.io" help:"Set DMV for Upbound."`
+	OrgID     string   `hidden:"" env:"UPBOUND_ORG_ID" default:"upbound" help:"Set orgID for Upbound."`
+	ProductID string   `hidden:"" env:"UPBOUND_PRODUCT_ID" default:"upbound" help:"Set productID for Upbound."`
 
-	KeyVersionOverride string `hidden:"" env:"ENTERPRISE_KEY_VERSION" help:"Set the key version to use for enterprise install."`
+	KeyVersionOverride string `hidden:"" env:"UPBOUND_KEY_VERSION" help:"Set the key version to use for Upbound install."`
 }
 
 // TODO(hasheddan): consider refactoring shared applicator's below into a common
 // interface.
 
-// accessKeyApplicator fetches an enterprise access key and signature and
+// accessKeyApplicator fetches an Upbound access key and signature and
 // creates or updates a Secret with its contents.
 type accessKeyApplicator struct {
 	auth    auth.Provider

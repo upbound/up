@@ -12,7 +12,7 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-package enterprise
+package upbound
 
 import (
 	"net/url"
@@ -26,7 +26,7 @@ func (c *uninstallCmd) AfterApply(insCtx *install.Context) error {
 	// NOTE(hasheddan): we do not specify credentials or that chart is from an
 	// OCI image as they are inconsequential at uninstall time.
 	mgr, err := helm.NewManager(insCtx.Kubeconfig,
-		enterpriseChart,
+		upboundChart,
 		&url.URL{},
 		helm.WithNamespace(insCtx.Namespace))
 	if err != nil {
@@ -36,7 +36,7 @@ func (c *uninstallCmd) AfterApply(insCtx *install.Context) error {
 	return nil
 }
 
-// uninstallCmd uninstalls enterprise.
+// uninstallCmd uninstalls Upbound.
 type uninstallCmd struct {
 	mgr install.Manager
 }
