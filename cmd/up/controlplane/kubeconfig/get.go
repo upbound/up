@@ -15,9 +15,9 @@
 package kubeconfig
 
 import (
-	"fmt"
 	"io"
 	"os"
+	"path"
 	"strings"
 
 	"github.com/google/uuid"
@@ -74,10 +74,10 @@ func (c *getCmd) Run(experimental bool, upCtx *upbound.Context) error {
 	}
 
 	if experimental {
-		upCtx.ProxyEndpoint.Path = fmt.Sprintf("/v1/controlPlanes/%s", upCtx.Account)
-		return kube.BuildControlPlaneKubeconfig(upCtx.ProxyEndpoint, c.ID, c.Token, c.File)
+		upCtx.ProxyEndpoint.Path = "/v1/controlPlanes"
+		return kube.BuildControlPlaneKubeconfig(upCtx.ProxyEndpoint, path.Join(upCtx.Account, c.ID), c.Token, c.File, true)
 	}
 
 	upCtx.ProxyEndpoint.Path = "/controlPlanes"
-	return kube.BuildControlPlaneKubeconfig(upCtx.ProxyEndpoint, c.id.String(), c.Token, c.File)
+	return kube.BuildControlPlaneKubeconfig(upCtx.ProxyEndpoint, c.id.String(), c.Token, c.File, false)
 }

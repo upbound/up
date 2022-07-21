@@ -18,6 +18,7 @@ import (
 	"fmt"
 	"net/url"
 	"path"
+	"strings"
 
 	"k8s.io/client-go/rest"
 	"k8s.io/client-go/tools/clientcmd"
@@ -33,6 +34,7 @@ const (
 	// in a kubeconfig file.
 	UpboundKubeconfigKeyFmt = "upbound-%s"
 
+	// k8sResource is appended to server path when using experimental mode.
 	k8sResource = "k8s"
 )
 
@@ -45,15 +47,20 @@ func GetKubeConfig(path string) (*rest.Config, error) {
 }
 
 // BuildControlPlaneKubeconfig builds a kubeconfig entry for a control plane.
-func BuildControlPlaneKubeconfig(proxy *url.URL, id string, token, kube string) error { //nolint:interfacer
+// TODO(hasheddan): consider refactoring this function to be less specific to
+// the one command that consumes it.
+func BuildControlPlaneKubeconfig(proxy *url.URL, id string, token, kube string, experimental bool) error { //nolint:interfacer
 	po := clientcmd.NewDefaultPathOptions()
 	po.LoadingRules.ExplicitPath = kube
 	conf, err := po.GetStartingConfig()
 	if err != nil {
 		return err
 	}
-	key := fmt.Sprintf(UpboundKubeconfigKeyFmt, id)
-	proxy.Path = path.Join(proxy.Path, id, k8sResource)
+	key := fmt.Sprintf(UpboundKubeconfigKeyFmt, strings.ReplaceAll(id, "/", "-"))
+	proxy.Path = path.Join(proxy.Path, id)
+	if experimental {
+		proxy.Path = path.Join(proxy.Path, k8sResource)
+	}
 	conf.Clusters[key] = &api.Cluster{
 		Server: proxy.String(),
 	}
