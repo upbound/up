@@ -15,33 +15,37 @@
 package upbound
 
 import (
-	"net/url"
+	"context"
+
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/runtime/schema"
+	"k8s.io/client-go/dynamic"
 
 	"github.com/upbound/up/internal/install"
-	"github.com/upbound/up/internal/install/helm"
 )
 
 // AfterApply sets default values in command after assignment and validation.
 func (c *uninstallCmd) AfterApply(insCtx *install.Context) error {
-	// NOTE(hasheddan): we do not specify credentials or that chart is from an
-	// OCI image as they are inconsequential at uninstall time.
-	mgr, err := helm.NewManager(insCtx.Kubeconfig,
-		upboundChart,
-		&url.URL{},
-		helm.WithNamespace(insCtx.Namespace))
+	client, err := dynamic.NewForConfig(insCtx.Kubeconfig)
 	if err != nil {
 		return err
 	}
-	c.mgr = mgr
+	c.kClient = client
 	return nil
 }
 
 // uninstallCmd uninstalls Upbound.
 type uninstallCmd struct {
-	mgr install.Manager
+	kClient dynamic.Interface
+
+	Name string `arg:"" optional:"" default:"install" help:"Name of Upbound install."`
 }
 
 // Run executes the uninstall command.
 func (c *uninstallCmd) Run(insCtx *install.Context) error {
-	return c.mgr.Uninstall()
+	return c.kClient.Resource(schema.GroupVersionResource{
+		Group:    "distribution.upbound.io",
+		Version:  "v1alpha1",
+		Resource: "upbounds",
+	}).Delete(context.Background(), c.Name, metav1.DeleteOptions{})
 }
