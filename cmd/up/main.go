@@ -21,7 +21,7 @@ import (
 
 	"github.com/alecthomas/kong"
 
-	"github.com/upbound/up/cmd/up/enterprise"
+	"github.com/upbound/up/cmd/up/upbound"
 	"github.com/upbound/up/cmd/up/uxp"
 	"github.com/upbound/up/cmd/up/xpkg"
 	"github.com/upbound/up/cmd/up/xpls"
@@ -49,10 +49,10 @@ var cli struct {
 	Logout       logoutCmd       `cmd:"" help:"Logout of Upbound."`
 	ControlPlane controlPlaneCmd `cmd:"" name:"controlplane" aliases:"ctp" group:"controlplane" help:"Interact with control planes."`
 
-	Enterprise enterprise.Cmd `cmd:"" help:"Interact with Enterprise."`
-	UXP        uxp.Cmd        `cmd:"" help:"Interact with UXP."`
-	XPKG       xpkg.Cmd       `cmd:"" help:"Interact with UXP packages."`
-	XPLS       xpls.Cmd       `cmd:"" help:"Start xpls language server."`
+	Upbound upbound.Cmd `cmd:"" help:"Interact with Upbound."`
+	UXP     uxp.Cmd     `cmd:"" help:"Interact with UXP."`
+	XPKG    xpkg.Cmd    `cmd:"" help:"Interact with UXP packages."`
+	XPLS    xpls.Cmd    `cmd:"" help:"Start xpls language server."`
 }
 
 func main() {

@@ -12,7 +12,7 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-package enterprise
+package upbound
 
 import (
 	"bytes"
@@ -90,7 +90,7 @@ func (c *mailCmd) AfterApply(insCtx *install.Context) error {
 	return nil
 }
 
-// mailCmd runs the Upbound Enterprise Mail Portal.
+// mailCmd runs the Upbound Mail Portal.
 type mailCmd struct {
 	log     logging.Logger
 	kClient kubernetes.Interface
