@@ -8,7 +8,7 @@ interacts.
 Groups:
 - [Top-Level](#top-level)
 - [Control Plane](#control-plane)
-- [Enterprise](#enterprise)
+- [Upbound](#upbound)
 - [UXP](#uxp)
 - [XPKG](#xpkg)
 - [XPLS](#xpls)
@@ -111,64 +111,62 @@ Format: `up controlplane kubeconfig <cmd> ...` Alias: `up ctp kubeconfig
       new context will be created for the cluster and authentication data and it
       will be set as current.
 
-## Enterprise
+## Upbound
 
-Format: `up enterprise <cmd> ...`
+Format: `up upbound <cmd> ...`
 
-Commands in the **Enterprise** group are used to install and manage Upbound
-Enterprise - a self-hosted, single-tenant Upbound instance. Installing and
-upgrading Upbound Enterprise requires an Upbound customer license. Users will be
-prompted for their License ID and Token on installation.
+Commands in the **Upbound** group are used to install and manage Upbound.
+Installing and upgrading Upbound requires an Upbound customer license. Users
+will be prompted for their License ID and License Key on installation.
 
 - `install <version>`
     - Flags:
-        - `--license-secret-name = STRING` (Default:
-          `upbound-enterprise-license`): Allows setting the name of the license
-          `Secret` that is created on installation. The default value is
-          expected, so passing an alternate value for this flag usually requires
-          modifying the installation configuration using one of the following
-          flags.
-        - `--set = KEY=VALUE`: Set install parameters for Upbound Enterprise.
-          Flag can be passed multiple times and multiple key-value pairs can be
-          provided in a comma-separated list.
-        - `-f,--file = FILE`: YAML file with parameters for Upbound Enterprise
-          install. Follows format of Helm-style values file.
-    - Behavior: Installs Upbound Enterprise into cluster specified by currently
-      configured `kubeconfig`. When using Helm as install engine, the command
-      mirrors the behavior of `helm install`. If `[version]` is not provided,
-      the latest chart version will be used from the either the stable or
-      unstable repository.
+        - `--license-secret-name = STRING` (Default: `upbound-license`): Allows
+          setting the name of the license `Secret` that is created on
+          installation. The default value is expected, so passing an alternate
+          value for this flag usually requires modifying the installation
+          configuration using one of the following flags.
+        - `--set = KEY=VALUE`: Set install parameters for Upbound. Flag can be
+          passed multiple times and multiple key-value pairs can be provided in
+          a comma-separated list.
+        - `-f,--file = FILE`: YAML file with parameters for Upbound install.
+          Follows format of Helm-style values file.
+    - Behavior: Installs Upbound into cluster specified by currently configured
+      `kubeconfig`. When using Helm as install engine, the command mirrors the
+      behavior of `helm install`. If `[version]` is not provided, the latest
+      chart version will be used from the either the stable or unstable
+      repository.
 - `upgrade <version>` 
     - Flags:
         - `--rollback = BOOL`: Indicates that the upgrade should be rolled back
           in case of failure.
-        - `--set = KEY=VALUE`: Set install parameters for Upbound Enterprise.
-          Flag can be passed multiple times and multiple key-value pairs can be
-          provided in a comma-separated list.
-        - `-f,--file = FILE`: YAML file with parameters for Upbound Enterprise
-          install. Follows format of Helm-style values file.
-    - Behavior: Upgrades Upbound Enterprise in cluster specified by currently
-      configured `kubeconfig` in the specified namespace.
+        - `--set = KEY=VALUE`: Set install parameters for Upbound. Flag can be
+          passed multiple times and multiple key-value pairs can be provided in
+          a comma-separated list.
+        - `-f,--file = FILE`: YAML file with parameters for Upbound install.
+          Follows format of Helm-style values file.
+    - Behavior: Upgrades Upbound in cluster specified by currently configured
+      `kubeconfig` in the specified namespace.
 - `uninstall` 
-    - Behavior: Uninstalls Upbound Enterprise from the cluster specified by
-      currently configured `kubeconfig`.
+    - Behavior: Uninstalls Upbound from the cluster specified by currently
+      configured `kubeconfig`.
 - `mail` (_EXPERIMENTAL_)
     - Flags:
         - `-p,--port = INT` (Default: `8085`): Port used for mail portal.
         - `--verbose = BOOL`: Run server with verbose logging.
-    - Behavior: Runs a local mail portal for Upbound Enterprise when configured
-      to send emails as Kubernetes Secrets.
+    - Behavior: Runs a local mail portal for Upbound when configured to send
+      emails as Kubernetes Secrets.
 
 **Group Flags**
 
-Group flags can be passed for any command in the **Enterprise** group. Some
+Group flags can be passed for any command in the **Upbound** group. Some
 commands may choose not to utilize the group flags when not relevant.
 
 - `--kubeconfig = STRING`: sets `kubeconfig` path. Same defaults as `kubectl`
   are used if not provided.
-- `-n,--namespace = STRING` (Env: `ENTERPRISE_NAMESPACE`) (Default:
-  `upbound-enterprise`): Kubernetes namespace used for installing and managing
-  Upbound Enterprise.
+- `-n,--namespace = STRING` (Env: `UPBOUND_NAMESPACE`) (Default:
+  `upbound-system`): Kubernetes namespace used for installing and managing
+  Upbound.
 
 ## UXP
 
