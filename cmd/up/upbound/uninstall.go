@@ -24,6 +24,12 @@ import (
 	"github.com/upbound/up/internal/install"
 )
 
+const (
+	upboundGroup          = "distribution.upbound.io"
+	upboundVersion        = "v1alpha1"
+	upboundResourcePlural = "upbounds"
+)
+
 // AfterApply sets default values in command after assignment and validation.
 func (c *uninstallCmd) AfterApply(insCtx *install.Context) error {
 	client, err := dynamic.NewForConfig(insCtx.Kubeconfig)
@@ -44,8 +50,8 @@ type uninstallCmd struct {
 // Run executes the uninstall command.
 func (c *uninstallCmd) Run(insCtx *install.Context) error {
 	return c.kClient.Resource(schema.GroupVersionResource{
-		Group:    "distribution.upbound.io",
-		Version:  "v1alpha1",
-		Resource: "upbounds",
+		Group:    upboundGroup,
+		Version:  upboundVersion,
+		Resource: upboundResourcePlural,
 	}).Delete(context.Background(), c.Name, metav1.DeleteOptions{})
 }
