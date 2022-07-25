@@ -72,7 +72,11 @@ func TestParse(t *testing.T) {
 			reason: "Should not return an error if the workspace is empty.",
 			opt: WithFS(func() afero.Fs {
 				fs := afero.NewMemMapFs()
-				_ = fs.Mkdir("/ws", os.ModePerm)
+				// NOTE(tnthornton) we're currently seeing `internal compiler error: OCALLMETH missed by typecheck`
+				// without this type check.
+				// TODO(tnthornton) file an issue upstream.
+				mem := fs.(*afero.MemMapFs)
+				_ = mem.Mkdir("/ws", os.ModePerm)
 				return fs
 			}()),
 		},
