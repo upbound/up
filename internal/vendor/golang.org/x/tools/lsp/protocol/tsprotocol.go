@@ -145,7 +145,7 @@ type CallHierarchyItem struct {
 	 * A data entry field that is preserved between a call hierarchy prepare and
 	 * incoming calls or outgoing calls requests.
 	 */
-	Data any `json:"data,omitempty"`
+	Data interface{} `json:"data,omitempty"`
 }
 
 /**
@@ -211,7 +211,7 @@ type CancelParams struct {
 	/**
 	 * The request id to cancel.
 	 */
-	ID any /*number | string*/ `json:"id"`
+	ID interface{} /*number | string*/ `json:"id"`
 }
 
 /**
@@ -284,7 +284,7 @@ type ClientCapabilities struct {
 	/**
 	 * Experimental client capabilities.
 	 */
-	Experimental any `json:"experimental,omitempty"`
+	Experimental interface{} `json:"experimental,omitempty"`
 }
 
 /**
@@ -359,7 +359,7 @@ type CodeAction struct {
 	 *
 	 * @since 3.16.0
 	 */
-	Data any `json:"data,omitempty"`
+	Data interface{} `json:"data,omitempty"`
 }
 
 /**
@@ -537,7 +537,7 @@ type CodeLens struct {
 	 * a [CodeLensRequest](#CodeLensRequest) and a [CodeLensResolveRequest]
 	 * (#CodeLensResolveRequest)
 	 */
-	Data any `json:"data,omitempty"`
+	Data interface{} `json:"data,omitempty"`
 }
 
 /**
@@ -963,7 +963,7 @@ type CompletionItem struct {
 	 * A data entry field that is preserved on a completion item between a
 	 * [CompletionRequest](#CompletionRequest) and a [CompletionResolveRequest](#CompletionResolveRequest).
 	 */
-	Data any `json:"data,omitempty"`
+	Data interface{} `json:"data,omitempty"`
 }
 
 /**
@@ -1320,7 +1320,7 @@ type Diagnostic struct {
 	/**
 	 * The diagnostic's code, which usually appear in the user interface.
 	 */
-	Code any/*integer | string*/ `json:"code,omitempty"`
+	Code interface{}/*integer | string*/ `json:"code,omitempty"`
 	/**
 	 * An optional property to describe the error code.
 	 *
@@ -1354,7 +1354,7 @@ type Diagnostic struct {
 	 *
 	 * @since 3.16.0
 	 */
-	Data any `json:"data,omitempty"`
+	Data interface{} `json:"data,omitempty"`
 }
 
 /**
@@ -1399,7 +1399,7 @@ type DidChangeConfigurationParams struct {
 	/**
 	 * The actual changed settings
 	 */
-	Settings any `json:"settings"`
+	Settings interface{} `json:"settings"`
 }
 
 /**
@@ -1564,7 +1564,7 @@ type DocumentDiagnosticParams struct {
  *
  * @since 3.17.0 - proposed state
  */
-type DocumentDiagnosticReport = any /*RelatedFullDocumentDiagnosticReport | RelatedUnchangedDocumentDiagnosticReport*/
+type DocumentDiagnosticReport = interface{} /*RelatedFullDocumentDiagnosticReport | RelatedUnchangedDocumentDiagnosticReport*/
 
 /**
  * A document filter denotes a document by different properties like
@@ -1697,7 +1697,7 @@ type DocumentLink struct {
 	 * A data entry field that is preserved on a document link between a
 	 * DocumentLinkRequest and a DocumentLinkResolveRequest.
 	 */
-	Data any `json:"data,omitempty"`
+	Data interface{} `json:"data,omitempty"`
 }
 
 /**
@@ -2530,7 +2530,7 @@ type InitializeParams struct {
 	/**
 	 * User provided initialization options.
 	 */
-	InitializationOptions any `json:"initializationOptions,omitempty"`
+	InitializationOptions interface{} `json:"initializationOptions,omitempty"`
 	/**
 	 * The initial trace setting. If omitted trace is disabled ('off').
 	 */
@@ -2934,7 +2934,7 @@ type PrepareRenameParams struct {
 	WorkDoneProgressParams
 }
 
-type PrepareSupportDefaultBehavior = any
+type PrepareSupportDefaultBehavior = interface{}
 
 /**
  * A previous result id in a workspace pull request.
@@ -2961,10 +2961,10 @@ type ProgressParams struct {
 	/**
 	 * The progress data.
 	 */
-	Value any `json:"value"`
+	Value interface{} `json:"value"`
 }
 
-type ProgressToken = any /*number | string*/
+type ProgressToken = interface{} /*number | string*/
 
 /**
  * The publish diagnostic client capabilities.
@@ -3107,7 +3107,7 @@ type Registration struct {
 	/**
 	 * Options necessary for the registration.
 	 */
-	RegisterOptions any `json:"registerOptions,omitempty"`
+	RegisterOptions interface{} `json:"registerOptions,omitempty"`
 }
 
 type RegistrationParams struct {
@@ -3145,7 +3145,7 @@ type RelatedFullDocumentDiagnosticReport struct {
 	 *
 	 * @since 3.17.0 - proposed state
 	 */
-	RelatedDocuments map[string]any/*[uri: string ** DocumentUri *]: FullDocumentDiagnosticReport | UnchangedDocumentDiagnosticReport;*/ `json:"relatedDocuments,omitempty"`
+	RelatedDocuments map[string]interface{}/*[uri: string ** DocumentUri *]: FullDocumentDiagnosticReport | UnchangedDocumentDiagnosticReport;*/ `json:"relatedDocuments,omitempty"`
 	FullDocumentDiagnosticReport
 }
 
@@ -3164,7 +3164,7 @@ type RelatedUnchangedDocumentDiagnosticReport struct {
 	 *
 	 * @since 3.17.0 - proposed state
 	 */
-	RelatedDocuments map[string]any/*[uri: string ** DocumentUri *]: FullDocumentDiagnosticReport | UnchangedDocumentDiagnosticReport;*/ `json:"relatedDocuments,omitempty"`
+	RelatedDocuments map[string]interface{}/*[uri: string ** DocumentUri *]: FullDocumentDiagnosticReport | UnchangedDocumentDiagnosticReport;*/ `json:"relatedDocuments,omitempty"`
 	UnchangedDocumentDiagnosticReport
 }
 
@@ -3410,7 +3410,7 @@ type SemanticTokensClientCapabilities struct {
 		 * The client will send the `textDocument/semanticTokens/full` request if
 		 * the server provides a corresponding handler.
 		 */
-		Full any/*boolean | <elided struct>*/ `json:"full,omitempty"`
+		Full interface{}/*boolean | <elided struct>*/ `json:"full,omitempty"`
 	} `json:"requests"`
 	/**
 	 * The token types that the client supports.
@@ -3510,7 +3510,7 @@ type SemanticTokensOptions struct {
 	/**
 	 * Server supports providing semantic tokens for a full document.
 	 */
-	Full any/*boolean | <elided struct>*/ `json:"full,omitempty"`
+	Full interface{}/*boolean | <elided struct>*/ `json:"full,omitempty"`
 	WorkDoneProgressOptions
 }
 
@@ -3572,7 +3572,7 @@ type ServerCapabilities struct {
 	 * Defines how text documents are synced. Is either a detailed structure defining each notification or
 	 * for backwards compatibility the TextDocumentSyncKind number.
 	 */
-	TextDocumentSync any/*TextDocumentSyncOptions | TextDocumentSyncKind*/ `json:"textDocumentSync,omitempty"`
+	TextDocumentSync interface{}/*TextDocumentSyncOptions | TextDocumentSyncKind*/ `json:"textDocumentSync,omitempty"`
 	/**
 	 * The server provides completion support.
 	 */
@@ -3588,7 +3588,7 @@ type ServerCapabilities struct {
 	/**
 	 * The server provides Goto Declaration support.
 	 */
-	DeclarationProvider any/* bool | DeclarationOptions | DeclarationRegistrationOptions*/ `json:"declarationProvider,omitempty"`
+	DeclarationProvider interface{}/* bool | DeclarationOptions | DeclarationRegistrationOptions*/ `json:"declarationProvider,omitempty"`
 	/**
 	 * The server provides goto definition support.
 	 */
@@ -3596,11 +3596,11 @@ type ServerCapabilities struct {
 	/**
 	 * The server provides Goto Type Definition support.
 	 */
-	TypeDefinitionProvider any/* bool | TypeDefinitionOptions | TypeDefinitionRegistrationOptions*/ `json:"typeDefinitionProvider,omitempty"`
+	TypeDefinitionProvider interface{}/* bool | TypeDefinitionOptions | TypeDefinitionRegistrationOptions*/ `json:"typeDefinitionProvider,omitempty"`
 	/**
 	 * The server provides Goto Implementation support.
 	 */
-	ImplementationProvider any/* bool | ImplementationOptions | ImplementationRegistrationOptions*/ `json:"implementationProvider,omitempty"`
+	ImplementationProvider interface{}/* bool | ImplementationOptions | ImplementationRegistrationOptions*/ `json:"implementationProvider,omitempty"`
 	/**
 	 * The server provides find references support.
 	 */
@@ -3618,7 +3618,7 @@ type ServerCapabilities struct {
 	 * specified if the client states that it supports
 	 * `codeActionLiteralSupport` in its initial `initialize` request.
 	 */
-	CodeActionProvider any/*boolean | CodeActionOptions*/ `json:"codeActionProvider,omitempty"`
+	CodeActionProvider interface{}/*boolean | CodeActionOptions*/ `json:"codeActionProvider,omitempty"`
 	/**
 	 * The server provides code lens.
 	 */
@@ -3630,7 +3630,7 @@ type ServerCapabilities struct {
 	/**
 	 * The server provides color provider support.
 	 */
-	ColorProvider any/* bool | DocumentColorOptions | DocumentColorRegistrationOptions*/ `json:"colorProvider,omitempty"`
+	ColorProvider interface{}/* bool | DocumentColorOptions | DocumentColorRegistrationOptions*/ `json:"colorProvider,omitempty"`
 	/**
 	 * The server provides workspace symbol support.
 	 */
@@ -3652,15 +3652,15 @@ type ServerCapabilities struct {
 	 * specified if the client states that it supports
 	 * `prepareSupport` in its initial `initialize` request.
 	 */
-	RenameProvider any/*boolean | RenameOptions*/ `json:"renameProvider,omitempty"`
+	RenameProvider interface{}/*boolean | RenameOptions*/ `json:"renameProvider,omitempty"`
 	/**
 	 * The server provides folding provider support.
 	 */
-	FoldingRangeProvider any/* bool | FoldingRangeOptions | FoldingRangeRegistrationOptions*/ `json:"foldingRangeProvider,omitempty"`
+	FoldingRangeProvider interface{}/* bool | FoldingRangeOptions | FoldingRangeRegistrationOptions*/ `json:"foldingRangeProvider,omitempty"`
 	/**
 	 * The server provides selection range support.
 	 */
-	SelectionRangeProvider any/* bool | SelectionRangeOptions | SelectionRangeRegistrationOptions*/ `json:"selectionRangeProvider,omitempty"`
+	SelectionRangeProvider interface{}/* bool | SelectionRangeOptions | SelectionRangeRegistrationOptions*/ `json:"selectionRangeProvider,omitempty"`
 	/**
 	 * The server provides execute command support.
 	 */
@@ -3670,19 +3670,19 @@ type ServerCapabilities struct {
 	 *
 	 * @since 3.16.0
 	 */
-	CallHierarchyProvider any/* bool | CallHierarchyOptions | CallHierarchyRegistrationOptions*/ `json:"callHierarchyProvider,omitempty"`
+	CallHierarchyProvider interface{}/* bool | CallHierarchyOptions | CallHierarchyRegistrationOptions*/ `json:"callHierarchyProvider,omitempty"`
 	/**
 	 * The server provides linked editing range support.
 	 *
 	 * @since 3.16.0
 	 */
-	LinkedEditingRangeProvider any/* bool | LinkedEditingRangeOptions | LinkedEditingRangeRegistrationOptions*/ `json:"linkedEditingRangeProvider,omitempty"`
+	LinkedEditingRangeProvider interface{}/* bool | LinkedEditingRangeOptions | LinkedEditingRangeRegistrationOptions*/ `json:"linkedEditingRangeProvider,omitempty"`
 	/**
 	 * The server provides semantic tokens support.
 	 *
 	 * @since 3.16.0
 	 */
-	SemanticTokensProvider any/*SemanticTokensOptions | SemanticTokensRegistrationOptions*/ `json:"semanticTokensProvider,omitempty"`
+	SemanticTokensProvider interface{}/*SemanticTokensOptions | SemanticTokensRegistrationOptions*/ `json:"semanticTokensProvider,omitempty"`
 	/**
 	 * The workspace server capabilities
 	 */
@@ -3692,17 +3692,17 @@ type ServerCapabilities struct {
 	 *
 	 * @since 3.16.0
 	 */
-	MonikerProvider any/* bool | MonikerOptions | MonikerRegistrationOptions*/ `json:"monikerProvider,omitempty"`
+	MonikerProvider interface{}/* bool | MonikerOptions | MonikerRegistrationOptions*/ `json:"monikerProvider,omitempty"`
 	/**
 	 * The server provides type hierarchy support.
 	 *
 	 * @since 3.17.0 - proposed state
 	 */
-	TypeHierarchyProvider any/* bool | TypeHierarchyOptions | TypeHierarchyRegistrationOptions*/ `json:"typeHierarchyProvider,omitempty"`
+	TypeHierarchyProvider interface{}/* bool | TypeHierarchyOptions | TypeHierarchyRegistrationOptions*/ `json:"typeHierarchyProvider,omitempty"`
 	/**
 	 * Experimental server capabilities.
 	 */
-	Experimental any `json:"experimental,omitempty"`
+	Experimental interface{} `json:"experimental,omitempty"`
 }
 
 type SetTraceParams struct {
@@ -4458,7 +4458,7 @@ type TypeHierarchyItem struct {
 	 * type hierarchy in the server, helping improve the performance on
 	 * resolving supertypes and subtypes.
 	 */
-	Data any `json:"data,omitempty"`
+	Data interface{} `json:"data,omitempty"`
 }
 
 /**
@@ -4802,7 +4802,7 @@ type WorkspaceDiagnosticReport struct {
  *
  * @since 3.17.0 - proposed state
  */
-type WorkspaceDocumentDiagnosticReport = any /*WorkspaceFullDocumentDiagnosticReport | WorkspaceUnchangedDocumentDiagnosticReport*/
+type WorkspaceDocumentDiagnosticReport = interface{} /*WorkspaceFullDocumentDiagnosticReport | WorkspaceUnchangedDocumentDiagnosticReport*/
 
 /**
  * A workspace edit represents changes to many resources managed in the workspace. The edit
