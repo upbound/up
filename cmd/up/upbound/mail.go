@@ -104,10 +104,11 @@ type mailCmd struct {
 // Run executes the mail command.
 func (c *mailCmd) Run(kCtx *kong.Context) error {
 	s := &http.Server{
-		Handler:      http.HandlerFunc(c.handler),
-		Addr:         fmt.Sprintf("127.0.0.1:%d", c.Port),
-		ReadTimeout:  5 * time.Second,
-		WriteTimeout: 10 * time.Second,
+		Handler:           http.HandlerFunc(c.handler),
+		Addr:              fmt.Sprintf("127.0.0.1:%d", c.Port),
+		ReadTimeout:       5 * time.Second,
+		WriteTimeout:      10 * time.Second,
+		ReadHeaderTimeout: 5 * time.Second,
 	}
 	fmt.Printf("Running Mail Portal on port: %d\n", c.Port)
 	go func() {
