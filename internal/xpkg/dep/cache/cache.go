@@ -268,7 +268,7 @@ func (c *Local) Close() {
 }
 
 // Event contains change information about the cache.
-type Event interface{}
+type Event any
 
 // add the given entry to the supplied path (to)
 func (c *Local) add(e *entry, to string) error {

@@ -173,13 +173,13 @@ func cleanNullTs(p runtime.Object) ([]byte, error) {
 	if err != nil {
 		return nil, err
 	}
-	var m map[string]interface{}
+	var m map[string]any
 	err = json.Unmarshal(ob, &m)
 	if err != nil {
 		return nil, err
 	}
 	// remove the erroneous creationTimestamp: null entry
-	delete(m["metadata"].(map[string]interface{}), "creationTimestamp")
+	delete(m["metadata"].(map[string]any), "creationTimestamp")
 
 	return sigsyaml.Marshal(m)
 }

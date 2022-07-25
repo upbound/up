@@ -10,9 +10,9 @@ on:
 
 env:
   # Common versions
-  GO_VERSION: '1.17'
+  GO_VERSION: '1.18'
   GOLANGCI_VERSION: 'v1.39'
-  DOCKER_BUILDX_VERSION: 'v0.4.2'
+  DOCKER_BUILDX_VERSION: 'v0.8.2'
 
   # Common users. We can't run a step 'if secrets.AWS_USR != ""' but we can run
   # a step 'if env.AWS_USR' != ""', so we copy these to succinctly test whether
@@ -22,7 +22,7 @@ env:
 
 jobs:
   detect-noop:
-    runs-on: ubuntu-18.04
+    runs-on: ubuntu-20.04
     outputs:
       noop: ${{ steps.noop.outputs.should_skip }}
     steps:
@@ -37,7 +37,7 @@ jobs:
 
 
   lint:
-    runs-on: ubuntu-18.04
+    runs-on: ubuntu-20.04
     needs: detect-noop
     if: needs.detect-noop.outputs.noop != 'true'
 
@@ -46,12 +46,12 @@ jobs:
         uses: actions/checkout@v2
         with:
           submodules: true
-      
+
       # TODO(hasheddan): temporary to allow access to up-sdk-go
       - name: Granting private modules access
         run: |
           git config --global url."https://${{ secrets.UPBOUND_BOT_GITHUB_TOKEN }}:x-oauth-basic@github.com/upbound".insteadOf "https://github.com/upbound"
-      
+
       - name: Setup Go
         uses: actions/setup-go@v2
         with:
@@ -88,7 +88,7 @@ jobs:
           skip-go-installation: true
 
   check-diff:
-    runs-on: ubuntu-18.04
+    runs-on: ubuntu-20.04
     needs: detect-noop
     if: needs.detect-noop.outputs.noop != 'true'
 
@@ -97,7 +97,7 @@ jobs:
         uses: actions/checkout@v2
         with:
           submodules: true
-      
+
       # TODO(hasheddan): temporary to allow access to up-sdk-go
       - name: Granting private modules access
         run: |
@@ -133,7 +133,7 @@ jobs:
         run: make check-diff
 
   unit-tests:
-    runs-on: ubuntu-18.04
+    runs-on: ubuntu-20.04
     needs: detect-noop
     if: needs.detect-noop.outputs.noop != 'true'
 
@@ -187,7 +187,7 @@ jobs:
           file: _output/tests/linux_amd64/coverage.txt
 
   publish-artifacts:
-    runs-on: ubuntu-18.04
+    runs-on: ubuntu-20.04
     needs: detect-noop
     if: needs.detect-noop.outputs.noop != 'true'
 
