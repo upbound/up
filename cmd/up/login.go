@@ -72,6 +72,9 @@ func (c *loginCmd) AfterApply(kongCtx *kong.Context) error {
 		},
 	}
 	kongCtx.Bind(upCtx)
+	if c.Token != "" {
+		return nil
+	}
 	if c.Username == "" {
 		username, err := c.prompter.Prompt("Username", false)
 		if err != nil {
