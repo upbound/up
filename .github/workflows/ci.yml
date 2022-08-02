@@ -26,7 +26,7 @@ env:
 
 jobs:
   detect-noop:
-    runs-on: ubuntu-18.04
+    runs-on: ubuntu-20.04
     outputs:
       noop: ${{ steps.noop.outputs.should_skip }}
     steps:
@@ -41,7 +41,7 @@ jobs:
 
 
   lint:
-    runs-on: ubuntu-18.04
+    runs-on: ubuntu-20.04
     needs: detect-noop
     if: needs.detect-noop.outputs.noop != 'true'
 
@@ -94,7 +94,7 @@ jobs:
           skip-build-cache: true
 
   check-diff:
-    runs-on: ubuntu-18.04
+    runs-on: ubuntu-20.04
     needs: detect-noop
     if: needs.detect-noop.outputs.noop != 'true'
 
@@ -139,7 +139,7 @@ jobs:
         run: make check-diff
 
   unit-tests:
-    runs-on: ubuntu-18.04
+    runs-on: ubuntu-20.04
     needs: detect-noop
     if: needs.detect-noop.outputs.noop != 'true'
 
@@ -193,7 +193,7 @@ jobs:
           file: _output/tests/linux_amd64/coverage.txt
 
   publish-artifacts:
-    runs-on: ubuntu-18.04
+    runs-on: ubuntu-20.04
     needs: detect-noop
     if: needs.detect-noop.outputs.noop != 'true'
 
