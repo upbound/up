@@ -135,7 +135,7 @@ func (s *Server) Initialize(ctx context.Context, conn *jsonrpc2.Conn, id jsonrpc
 
 	s.snap = snap
 
-	s.watchSnapshot(ctx)
+	s.watchSnapshot(context.Background()) //nolint:contextcheck  // TODO(epk) thread through top level context
 
 	// TODO (@tnthornton) move to using protocol.InitializeResult
 	reply := &lsp.InitializeResult{
@@ -152,9 +152,9 @@ func (s *Server) Initialize(ctx context.Context, conn *jsonrpc2.Conn, id jsonrpc
 		panic(err)
 	}
 
-	s.registerWatchFilesCapability(ctx)
-	s.checkMetaFile(ctx)
-	s.checkForUpdates(ctx)
+	s.registerWatchFilesCapability(context.Background()) //nolint:contextcheck // TODO(epk) thread through top level context
+	s.checkMetaFile(context.Background())                //nolint:contextcheck // TODO(epk) thread through top level context
+	s.checkForUpdates(context.Background())              //nolint:contextcheck // TODO(epk) thread through top level context
 }
 
 // DidChange handles calls to DidChange.

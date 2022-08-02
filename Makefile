@@ -75,8 +75,6 @@ build.artifacts.pkg.platform:
 	@mkdir -p $(CACHE_DIR)
 	@mkdir -p $(OUTPUT_DIR)/deb/$(PLATFORM)
 	@mkdir -p $(OUTPUT_DIR)/rpm/$(PLATFORM)
-	@touch $(CACHE_DIR)/nfpm_up.yaml
-	@touch $(CACHE_DIR)/nfpm_docker-credential-up.yaml
 	@cat $(ROOT_DIR)/nfpm_up.yaml | GO_BIN_DIR=$(GO_BIN_DIR) envsubst > $(CACHE_DIR)/nfpm_up.yaml
 	@cat $(ROOT_DIR)/nfpm_docker-credential-up.yaml | GO_BIN_DIR=$(GO_BIN_DIR) envsubst > $(CACHE_DIR)/nfpm_docker-credential-up.yaml
 	@CACHE_DIR=$(CACHE_DIR) OUTPUT_DIR=$(OUTPUT_DIR) PLATFORM=$(PLATFORM) PACKAGER=deb $(GO) generate -tags packaging ./...
