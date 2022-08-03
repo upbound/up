@@ -63,7 +63,7 @@ func DefaultCompositionValidators(s *Snapshot) (validator.Validator, error) {
 
 // Validate performs validation rules on the given data input per the rules
 // defined for the Validator.
-func (c *CompositionValidator) Validate(data interface{}) *validate.Result {
+func (c *CompositionValidator) Validate(data any) *validate.Result {
 	errs := []error{}
 
 	comp, err := c.marshal(data)
@@ -102,7 +102,7 @@ func (c *CompositionValidator) Validate(data interface{}) *validate.Result {
 	}
 }
 
-func (c *CompositionValidator) marshal(data interface{}) (*xpextv1.Composition, error) {
+func (c *CompositionValidator) marshal(data any) (*xpextv1.Composition, error) {
 	u, ok := data.(*unstructured.Unstructured)
 	if !ok {
 		return nil, errors.New(errInvalidType)

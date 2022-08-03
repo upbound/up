@@ -84,11 +84,11 @@ type helmGetter interface {
 }
 
 type helmInstaller interface {
-	Run(*chart.Chart, map[string]interface{}) (*release.Release, error)
+	Run(*chart.Chart, map[string]any) (*release.Release, error)
 }
 
 type helmUpgrader interface {
-	Run(string, *chart.Chart, map[string]interface{}) (*release.Release, error)
+	Run(string, *chart.Chart, map[string]any) (*release.Release, error)
 }
 
 type helmRollbacker interface {
@@ -232,7 +232,7 @@ func NewManager(config *rest.Config, chartName string, repoURL *url.URL, modifie
 		h.cacheDir = filepath.Join(home, defaultCacheDir)
 	}
 	actionConfig := new(action.Configuration)
-	if err := actionConfig.Init(newRESTClientGetter(config, h.namespace), h.namespace, helmDriverSecret, func(format string, v ...interface{}) {
+	if err := actionConfig.Init(newRESTClientGetter(config, h.namespace), h.namespace, helmDriverSecret, func(format string, v ...any) {
 		h.log.Debug(fmt.Sprintf(format, v))
 	}); err != nil {
 		return nil, err
@@ -319,7 +319,7 @@ func (h *installer) GetCurrentVersion() (string, error) {
 }
 
 // Install installs in the cluster.
-func (h *installer) Install(version string, parameters map[string]interface{}) error {
+func (h *installer) Install(version string, parameters map[string]any) error {
 	// make sure no version is already installed
 	current, err := h.GetCurrentVersion()
 	if err == nil {
@@ -349,7 +349,7 @@ func (h *installer) Install(version string, parameters map[string]interface{}) e
 }
 
 // Upgrade upgrades an existing installation to a new version.
-func (h *installer) Upgrade(version string, parameters map[string]interface{}) error {
+func (h *installer) Upgrade(version string, parameters map[string]any) error {
 	// check if version exists
 	current, err := h.GetCurrentVersion()
 	if err != nil {

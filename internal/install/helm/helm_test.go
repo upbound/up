@@ -52,20 +52,20 @@ func (m *mockPullClient) SetDestDir(string) {}
 func (m *mockPullClient) SetVersion(string) {}
 
 type mockInstallClient struct {
-	runFn func(*chart.Chart, map[string]interface{}) (*release.Release, error)
+	runFn func(*chart.Chart, map[string]any) (*release.Release, error)
 }
 
 // Run calls the underlying run function.
-func (m *mockInstallClient) Run(c *chart.Chart, v map[string]interface{}) (*release.Release, error) {
+func (m *mockInstallClient) Run(c *chart.Chart, v map[string]any) (*release.Release, error) {
 	return m.runFn(c, v)
 }
 
 type mockUpgradeClient struct {
-	runFn func(string, *chart.Chart, map[string]interface{}) (*release.Release, error)
+	runFn func(string, *chart.Chart, map[string]any) (*release.Release, error)
 }
 
 // Run calls the underlying run function.
-func (m *mockUpgradeClient) Run(r string, c *chart.Chart, v map[string]interface{}) (*release.Release, error) {
+func (m *mockUpgradeClient) Run(r string, c *chart.Chart, v map[string]any) (*release.Release, error) {
 	return m.runFn(r, c, v)
 }
 
@@ -251,7 +251,7 @@ func TestInstall(t *testing.T) {
 					},
 				},
 				installClient: &mockInstallClient{
-					runFn: func(*chart.Chart, map[string]interface{}) (*release.Release, error) {
+					runFn: func(*chart.Chart, map[string]any) (*release.Release, error) {
 						return nil, errBoom
 					},
 				},
@@ -284,7 +284,7 @@ func TestInstall(t *testing.T) {
 					},
 				},
 				installClient: &mockInstallClient{
-					runFn: func(*chart.Chart, map[string]interface{}) (*release.Release, error) {
+					runFn: func(*chart.Chart, map[string]any) (*release.Release, error) {
 						return nil, nil
 					},
 				},
@@ -394,7 +394,7 @@ func TestUpgrade(t *testing.T) {
 					},
 				},
 				upgradeClient: &mockUpgradeClient{
-					runFn: func(string, *chart.Chart, map[string]interface{}) (*release.Release, error) {
+					runFn: func(string, *chart.Chart, map[string]any) (*release.Release, error) {
 						return nil, nil
 					},
 				},
@@ -464,7 +464,7 @@ func TestUpgrade(t *testing.T) {
 					},
 				},
 				upgradeClient: &mockUpgradeClient{
-					runFn: func(string, *chart.Chart, map[string]interface{}) (*release.Release, error) {
+					runFn: func(string, *chart.Chart, map[string]any) (*release.Release, error) {
 						return nil, errBoom
 					},
 				},
@@ -509,7 +509,7 @@ func TestUpgrade(t *testing.T) {
 					},
 				},
 				upgradeClient: &mockUpgradeClient{
-					runFn: func(string, *chart.Chart, map[string]interface{}) (*release.Release, error) {
+					runFn: func(string, *chart.Chart, map[string]any) (*release.Release, error) {
 						return nil, errBoom
 					},
 				},
@@ -555,7 +555,7 @@ func TestUpgrade(t *testing.T) {
 					},
 				},
 				upgradeClient: &mockUpgradeClient{
-					runFn: func(string, *chart.Chart, map[string]interface{}) (*release.Release, error) {
+					runFn: func(string, *chart.Chart, map[string]any) (*release.Release, error) {
 						return nil, errBoom
 					},
 				},
@@ -601,7 +601,7 @@ func TestUpgrade(t *testing.T) {
 					},
 				},
 				upgradeClient: &mockUpgradeClient{
-					runFn: func(string, *chart.Chart, map[string]interface{}) (*release.Release, error) {
+					runFn: func(string, *chart.Chart, map[string]any) (*release.Release, error) {
 						return nil, errBoom
 					},
 				},
@@ -640,7 +640,7 @@ func TestUpgrade(t *testing.T) {
 					},
 				},
 				upgradeClient: &mockUpgradeClient{
-					runFn: func(string, *chart.Chart, map[string]interface{}) (*release.Release, error) {
+					runFn: func(string, *chart.Chart, map[string]any) (*release.Release, error) {
 						return nil, nil
 					},
 				},

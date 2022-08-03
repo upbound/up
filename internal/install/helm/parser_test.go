@@ -25,26 +25,26 @@ func TestParse(t *testing.T) {
 	cases := map[string]struct {
 		reason string
 		parser *Parser
-		params map[string]interface{}
+		params map[string]any
 		err    error
 	}{
 		"SuccessfulBaseNoOverrides": {
 			reason: "If no overrides are provided the base should be returned.",
 			parser: &Parser{
-				values: map[string]interface{}{
+				values: map[string]any{
 					"test": "value",
 				},
 			},
-			params: map[string]interface{}{
+			params: map[string]any{
 				"test": "value",
 			},
 		},
 		"SuccessfulBaseWithOverrides": {
 			reason: "If base and overrides are provided then overrides should take precedence.",
 			parser: &Parser{
-				values: map[string]interface{}{
+				values: map[string]any{
 					"test": "value",
-					"other": map[string]interface{}{
+					"other": map[string]any{
 						"nested": "something",
 					},
 				},
@@ -52,9 +52,9 @@ func TestParse(t *testing.T) {
 					"other.nested": "somethingElse",
 				},
 			},
-			params: map[string]interface{}{
+			params: map[string]any{
 				"test": "value",
-				"other": map[string]interface{}{
+				"other": map[string]any{
 					"nested": "somethingElse",
 				},
 			},
@@ -62,13 +62,13 @@ func TestParse(t *testing.T) {
 		"SuccessfulOverrides": {
 			reason: "If no base is provided just overrides should be returned.",
 			parser: &Parser{
-				values: map[string]interface{}{},
+				values: map[string]any{},
 				overrides: map[string]string{
 					"other.nested": "somethingElse",
 				},
 			},
-			params: map[string]interface{}{
-				"other": map[string]interface{}{
+			params: map[string]any{
+				"other": map[string]any{
 					"nested": "somethingElse",
 				},
 			},

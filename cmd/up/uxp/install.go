@@ -55,7 +55,7 @@ func (c *installCmd) AfterApply(insCtx *install.Context) error {
 		return err
 	}
 	c.kClient = client
-	base := map[string]interface{}{}
+	base := map[string]any{}
 	if c.File != nil {
 		defer c.File.Close() //nolint:errcheck,gosec
 		b, err := io.ReadAll(c.File)

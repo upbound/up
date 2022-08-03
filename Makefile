@@ -72,11 +72,12 @@ build.artifacts.bundle.platform:
 	@tar -czvf $(abspath $(OUTPUT_DIR)/bundle/docker-credential-up/$(PLATFORM)).tar.gz -C $(GO_BIN_DIR) $(PLATFORM)/docker-credential-up$(GO_OUT_EXT) $(PLATFORM)/docker-credential-up.sha256
 
 build.artifacts.pkg.platform:
-	@cat nfpm_up.yaml | GO_BIN_DIR=$(GO_BIN_DIR) envsubst > $(CACHE_DIR)/nfpm_up.yaml
-	@cat nfpm_docker-credential-up.yaml | GO_BIN_DIR=$(GO_BIN_DIR) envsubst > $(CACHE_DIR)/nfpm_docker-credential-up.yaml
+	@mkdir -p $(CACHE_DIR)
 	@mkdir -p $(OUTPUT_DIR)/deb/$(PLATFORM)
-	@CACHE_DIR=$(CACHE_DIR) OUTPUT_DIR=$(OUTPUT_DIR) PLATFORM=$(PLATFORM) PACKAGER=deb $(GO) generate -tags packaging ./...
 	@mkdir -p $(OUTPUT_DIR)/rpm/$(PLATFORM)
+	@cat $(ROOT_DIR)/nfpm_up.yaml | GO_BIN_DIR=$(GO_BIN_DIR) envsubst > $(CACHE_DIR)/nfpm_up.yaml
+	@cat $(ROOT_DIR)/nfpm_docker-credential-up.yaml | GO_BIN_DIR=$(GO_BIN_DIR) envsubst > $(CACHE_DIR)/nfpm_docker-credential-up.yaml
+	@CACHE_DIR=$(CACHE_DIR) OUTPUT_DIR=$(OUTPUT_DIR) PLATFORM=$(PLATFORM) PACKAGER=deb $(GO) generate -tags packaging ./...
 	@CACHE_DIR=$(CACHE_DIR) OUTPUT_DIR=$(OUTPUT_DIR) PLATFORM=$(PLATFORM) PACKAGER=rpm $(GO) generate -tags packaging ./...
 
 # Update the submodules, such as the common build scripts.
@@ -89,3 +90,15 @@ submodules:
 install:
 	@$(MAKE) go.install
 	@echo "New 'up' binary located at $(GOPATH)/bin/up, please ensure $(GOPATH)/bin is prepended to your 'PATH'"
+
+# NOTE(epk): the build submodule currently overrides XDG_CACHE_HOME in
+# order to force the Helm 3 to use the .work/helm directory. This causes Go on
+# Linux machines to use that directory as the build cache as well. We should
+# adjust this behavior in the build submodule because it is also causing Linux
+# users to duplicate their build cache, but for now we just make it easier to
+# identify its location in CI so that we cache between builds.
+go.cachedir:
+	@go env GOCACHE
+
+go.mod.cachedir:
+	@go env GOMODCACHE

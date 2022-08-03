@@ -500,7 +500,7 @@ func newPackageImage(objs ...runtime.Object) v1.Image {
 		b, _ := yaml.Marshal(o)
 
 		rbuf.Write(b)
-		rbuf.Write([]byte("\n---\n"))
+		rbuf.WriteString("\n---\n")
 	}
 
 	wbuf := new(bytes.Buffer)

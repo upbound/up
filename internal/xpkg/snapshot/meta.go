@@ -79,7 +79,7 @@ func DefaultMetaValidators(s *Snapshot) (*MetaValidator, error) {
 
 // Validate performs validation rules on the given data input per the rules
 // defined for the Validator.
-func (m *MetaValidator) Validate(data interface{}) *validate.Result {
+func (m *MetaValidator) Validate(data any) *validate.Result {
 	pkg, o, err := m.Marshal(data)
 	if err != nil {
 		// TODO(@tnthornton) add debug logging
@@ -104,7 +104,7 @@ func (m *MetaValidator) Validate(data interface{}) *validate.Result {
 }
 
 // Marshal marshals the given data object into a Pkg, errors otherwise.
-func (m *MetaValidator) Marshal(data interface{}) (metav1.Pkg, runtime.Object, error) {
+func (m *MetaValidator) Marshal(data any) (metav1.Pkg, runtime.Object, error) {
 	b, err := yaml.Marshal(data)
 	if err != nil {
 		return nil, nil, err

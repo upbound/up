@@ -57,7 +57,7 @@ func DefaultXRDValidators() (validator.Validator, error) {
 
 // Validate performs validation rules on the given data input per the rules
 // defined for the Validator.
-func (x *XRDValidator) Validate(data interface{}) *validate.Result {
+func (x *XRDValidator) Validate(data any) *validate.Result {
 	xrd, err := x.Marshal(data)
 	if err != nil {
 		// TODO(@tnthornton) add debug logging
@@ -76,7 +76,7 @@ func (x *XRDValidator) Validate(data interface{}) *validate.Result {
 }
 
 // Marshal marshals the given data object into a Pkg, errors otherwise.
-func (x *XRDValidator) Marshal(data interface{}) (*xpextv1.CompositeResourceDefinition, error) {
+func (x *XRDValidator) Marshal(data any) (*xpextv1.CompositeResourceDefinition, error) {
 	u, ok := data.(*unstructured.Unstructured)
 	if !ok {
 		return nil, errors.New("invalid type passed in, expected Unstructured")

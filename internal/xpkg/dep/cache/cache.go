@@ -268,7 +268,7 @@ func (c *Local) Close() {
 }
 
 // Event contains change information about the cache.
-type Event interface{}
+type Event any
 
 // add the given entry to the supplied path (to)
 func (c *Local) add(e *entry, to string) error {
@@ -293,8 +293,9 @@ func (c *Local) ensureDirExists(path string) error {
 // calculatePath calculates the directory path from the given name.Tag following
 // our convention.
 // example:
-//   tag: crossplane/provider-aws:v0.20.1-alpha
-//   path: index.docker.io/crossplane/provider-aws@v0.20.1-alpha
+//
+//	tag: crossplane/provider-aws:v0.20.1-alpha
+//	path: index.docker.io/crossplane/provider-aws@v0.20.1-alpha
 func calculatePath(tag *name.Tag) string {
 	return filepath.Join(
 		tag.RegistryStr(),

@@ -52,7 +52,7 @@ func NewWithType(pkg string, t string) v1beta1.Dependency {
 	d := New(pkg)
 
 	d.Type = v1beta1.ProviderPackageType
-	if strings.Title(strings.ToLower(t)) == string(v1beta1.ConfigurationPackageType) {
+	if strings.Title(strings.ToLower(t)) == string(v1beta1.ConfigurationPackageType) { //nolint:staticcheck // ignore staticcheck for now
 		d.Type = v1beta1.ConfigurationPackageType
 	}
 

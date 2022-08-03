@@ -37,7 +37,7 @@ var Nop = &validate.Result{}
 
 // A Validator validates data and returns a validation result.
 type Validator interface {
-	Validate(data interface{}) *validate.Result
+	Validate(data any) *validate.Result
 }
 
 // Validation represents a failure of a file condition.
@@ -73,7 +73,7 @@ func New(validators ...Validator) *ObjectValidator {
 
 // Validate implements the validator.Validator interface, providing a way to
 // validate more than just the strict schema for a given runtime.Object.
-func (o *ObjectValidator) Validate(data interface{}) *validate.Result {
+func (o *ObjectValidator) Validate(data any) *validate.Result {
 	errs := []error{}
 
 	for _, v := range o.chain {
