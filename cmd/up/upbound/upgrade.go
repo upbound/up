@@ -82,7 +82,7 @@ func (c *upgradeCmd) AfterApply(insCtx *install.Context) error {
 		return err
 	}
 	c.mgr = ins
-	base := map[string]interface{}{}
+	base := map[string]any{}
 	if c.File != nil {
 		defer c.File.Close() //nolint:errcheck,gosec
 		b, err := io.ReadAll(c.File)

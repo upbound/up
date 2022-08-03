@@ -135,7 +135,7 @@ func (s *Server) Initialize(ctx context.Context, conn *jsonrpc2.Conn, id jsonrpc
 
 	s.snap = snap
 
-	s.watchSnapshot()
+	s.watchSnapshot(context.Background()) //nolint:contextcheck  // TODO(epk) thread through top level context
 
 	// TODO (@tnthornton) move to using protocol.InitializeResult
 	reply := &lsp.InitializeResult{
@@ -152,9 +152,9 @@ func (s *Server) Initialize(ctx context.Context, conn *jsonrpc2.Conn, id jsonrpc
 		panic(err)
 	}
 
-	s.registerWatchFilesCapability()
-	s.checkMetaFile()
-	s.checkForUpdates()
+	s.registerWatchFilesCapability(context.Background()) //nolint:contextcheck // TODO(epk) thread through top level context
+	s.checkMetaFile(context.Background())                //nolint:contextcheck // TODO(epk) thread through top level context
+	s.checkForUpdates(context.Background())              //nolint:contextcheck // TODO(epk) thread through top level context
 }
 
 // DidChange handles calls to DidChange.
@@ -272,9 +272,9 @@ func (s *Server) showMessage(ctx context.Context, params *protocol.ShowMessagePa
 	}
 }
 
-func (s *Server) registerWatchFilesCapability() {
+func (s *Server) registerWatchFilesCapability(ctx context.Context) {
 	go func() {
-		if err := s.conn.Call(context.Background(), "client/registerCapability", &protocol.RegistrationParams{
+		if err := s.conn.Call(ctx, "client/registerCapability", &protocol.RegistrationParams{
 			Registrations: []protocol.Registration{
 				{
 					ID:     "workspace/didChangeWatchedFiles-1",
@@ -295,7 +295,7 @@ func (s *Server) registerWatchFilesCapability() {
 	}()
 }
 
-func (s *Server) checkForUpdates() {
+func (s *Server) checkForUpdates(ctx context.Context) {
 	go func() {
 		local, remote, ok := s.i.CanUpgrade()
 		if !ok {
@@ -303,21 +303,21 @@ func (s *Server) checkForUpdates() {
 			return
 		}
 
-		s.showMessage(context.Background(), &protocol.ShowMessageParams{
+		s.showMessage(ctx, &protocol.ShowMessageParams{
 			Type:    protocol.Info,
 			Message: fmt.Sprintf(newVersionMsgFmt, remote, local),
 		})
 	}()
 }
 
-func (s *Server) checkMetaFile() {
+func (s *Server) checkMetaFile(ctx context.Context) {
 	go func() {
 		uri, diags, err := s.snap.ValidateMeta()
 		if err != nil {
 			s.log.Debug(errValidateMeta, "error", err)
 			return
 		}
-		s.publishDiagnostics(context.Background(), &protocol.PublishDiagnosticsParams{
+		s.publishDiagnostics(ctx, &protocol.PublishDiagnosticsParams{
 			URI:         protocol.URIFromSpanURI(uri),
 			Diagnostics: diags,
 		})
@@ -325,7 +325,7 @@ func (s *Server) checkMetaFile() {
 }
 
 // // watchSnapshot watches the cache for changes.
-func (s *Server) watchSnapshot() { // nolint:gocyclo
+func (s *Server) watchSnapshot(ctx context.Context) { // nolint:gocyclo
 	watch := s.snapFactory.WatchExt()
 
 	go func() {
@@ -360,7 +360,7 @@ func (s *Server) watchSnapshot() { // nolint:gocyclo
 				// TODO(@tnthornton) do we really need to iterate through
 				// this separately from the above loop?
 				for _, p := range params {
-					s.publishDiagnostics(context.Background(), p)
+					s.publishDiagnostics(ctx, p)
 				}
 			}()
 		}

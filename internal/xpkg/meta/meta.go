@@ -109,13 +109,13 @@ func NewProviderXPkg(c xpkg.InitContext) ([]byte, error) {
 // `creationTimestamp: null` from the marshaled data that we're
 // going to write to the meta file.
 func cleanNullTs(b []byte) ([]byte, error) {
-	var m map[string]interface{}
+	var m map[string]any
 	err := json.Unmarshal(b, &m)
 	if err != nil {
 		return nil, err
 	}
 	// remove the erroneous creationTimestamp: null entry
-	delete(m["metadata"].(map[string]interface{}), "creationTimestamp")
+	delete(m["metadata"].(map[string]any), "creationTimestamp")
 
 	return yaml.Marshal(m)
 }
