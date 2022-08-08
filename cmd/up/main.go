@@ -27,7 +27,8 @@ import (
 	"github.com/upbound/up/cmd/up/xpls"
 	"github.com/upbound/up/internal/version"
 
-	// TODO(epk): Remove this once we upgrade to Kuberentes 1.25
+	// TODO(epk): Remove this once we upgrade kubernetes deps to 1.25
+	// TODO(epk): Specifically, get rid of the k8s.io/client-go/client/auth/azure and k8s.io/client-go/client/auth/gcp packages
 	// Embed Kubernetes client auth plugins.
 	_ "k8s.io/client-go/plugin/pkg/client/auth"
 )
