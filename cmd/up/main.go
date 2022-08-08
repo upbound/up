@@ -26,6 +26,9 @@ import (
 	"github.com/upbound/up/cmd/up/xpkg"
 	"github.com/upbound/up/cmd/up/xpls"
 	"github.com/upbound/up/internal/version"
+
+	// Embed Kubernetes client auth plugins.
+	_ "k8s.io/client-go/plugin/pkg/client/auth"
 )
 
 var _ = kong.Must(&cli)
