@@ -83,7 +83,7 @@ func (d *defaultPrompter) Prompt(label string, sensitive bool) (string, error) {
 	if !d.tty.IsTerminal(int(d.in.Fd())) {
 		return "", errors.New(errNotTTY)
 	}
-	if _, err := fmt.Fprintf(d.out, "%s: ", label); err != nil {
+	if _, err := fmt.Fprintf(d.out, "\033[1;36m%s\033[0m: ", label); err != nil {
 		return "", err
 	}
 	reader := bufio.NewReader(d.in)
