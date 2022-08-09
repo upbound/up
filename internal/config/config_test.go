@@ -234,3 +234,71 @@ func TestSetDefaultUpboundProfile(t *testing.T) {
 		})
 	}
 }
+
+func TestGetUpboundProfiles(t *testing.T) {
+	nameOne := "cool-user"
+	profOne := Profile{
+		Type:    UserProfileType,
+		Account: "cool-org",
+	}
+	nameTwo := "cool-user2"
+	profTwo := Profile{
+		Type:    UserProfileType,
+		Account: "cool-org2",
+	}
+
+	type args struct {
+		cfg *Config
+	}
+	type want struct {
+		err      error
+		profiles []Profile
+	}
+
+	cases := map[string]struct {
+		reason string
+		args   args
+		want   want
+	}{
+		"ErrorNoProfilesExist": {
+			reason: "If no profiles exist an error should be returned.",
+			args: args{
+				cfg: &Config{},
+			},
+			want: want{
+				err: errors.New(errNoProfilesFound),
+			},
+		},
+		"Successful": {
+			reason: "If profile exists it should be set as default.",
+			args: args{
+				cfg: &Config{
+					Upbound: Upbound{
+						Profiles: map[string]Profile{
+							nameOne: profOne,
+							nameTwo: profTwo,
+						},
+					},
+				},
+			},
+			want: want{
+				profiles: []Profile{
+					profOne,
+					profTwo,
+				},
+			},
+		},
+	}
+	for name, tc := range cases {
+		t.Run(name, func(t *testing.T) {
+			profiles, err := tc.args.cfg.GetUpboundProfiles()
+
+			if diff := cmp.Diff(tc.want.profiles, profiles); diff != "" {
+				t.Errorf("\n%s\nGetUpboundProfiles(...): -want, +got:\n%s", tc.reason, diff)
+			}
+			if diff := cmp.Diff(tc.want.err, err, test.EquateErrors()); diff != "" {
+				t.Errorf("\n%s\nGetUpboundProfiles(...): -want error, +got error:\n%s", tc.reason, diff)
+			}
+		})
+	}
+}

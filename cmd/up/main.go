@@ -23,6 +23,7 @@ import (
 	"github.com/alecthomas/kong"
 	"github.com/pterm/pterm"
 
+	"github.com/upbound/up/cmd/up/config"
 	"github.com/upbound/up/cmd/up/controlplane"
 	"github.com/upbound/up/cmd/up/repository"
 	"github.com/upbound/up/cmd/up/upbound"
@@ -70,8 +71,10 @@ type cli struct {
 
 	License licenseCmd `cmd:"" help:"Print Up license information."`
 
-	Login  loginCmd  `cmd:"" help:"Login to Upbound."`
-	Logout logoutCmd `cmd:"" help:"Logout of Upbound."`
+	Login        loginCmd        `cmd:"" help:"Login to Upbound."`
+	Logout       logoutCmd       `cmd:"" help:"Logout of Upbound."`
+	Config       config.Cmd      `cmd:"" help:"Interact with Upbound Profiles"`
+	ControlPlane controlPlaneCmd `cmd:"" name:"controlplane" aliases:"ctp" group:"controlplane" help:"Interact with control planes."`
 
 	ControlPlane controlplane.Cmd `cmd:"" name:"controlplane" aliases:"ctp" help:"Interact with control planes."`
 	Repository   repository.Cmd   `cmd:"" name:"repository" aliases:"repo" help:"Interact with repositories."`

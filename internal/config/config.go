@@ -33,6 +33,7 @@ const (
 	errInvalidProfile     = "profile is not valid"
 
 	errProfileNotFoundFmt = "profile not found with identifier: %s"
+	errNoProfilesFound    = "no profiles found"
 )
 
 // Config is format for the up configuration file.
@@ -135,6 +136,21 @@ func (c *Config) GetUpboundProfile(name string) (Profile, error) {
 		return Profile{}, errors.Errorf(errProfileNotFoundFmt, name)
 	}
 	return p, nil
+}
+
+// GetUpboundProfiles returns the list of existing profiles. If no profiles
+// exist, then an error will be returned.
+func (c *Config) GetUpboundProfiles() ([]Profile, error) {
+	if c.Upbound.Profiles == nil {
+		return nil, errors.New(errNoProfilesFound)
+	}
+
+	profiles := make([]Profile, 0)
+	for _, p := range c.Upbound.Profiles {
+		profiles = append(profiles, p)
+	}
+
+	return profiles, nil
 }
 
 // SetDefaultUpboundProfile sets the default profile for communicating with
