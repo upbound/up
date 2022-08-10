@@ -91,6 +91,12 @@ type Profile struct {
 
 	// Account is the default account to use when this profile is selected.
 	Account string `json:"account,omitempty"`
+
+	// BaseConfig represent persisted settings for this profile.
+	// For example:
+	// * flags
+	// * environment variables
+	BaseConfig map[string]string `json:"base,omitempty"`
 }
 
 // checkProfile ensures a profile does not violate constraints.
@@ -140,17 +146,12 @@ func (c *Config) GetUpboundProfile(name string) (Profile, error) {
 
 // GetUpboundProfiles returns the list of existing profiles. If no profiles
 // exist, then an error will be returned.
-func (c *Config) GetUpboundProfiles() ([]Profile, error) {
+func (c *Config) GetUpboundProfiles() (map[string]Profile, error) {
 	if c.Upbound.Profiles == nil {
 		return nil, errors.New(errNoProfilesFound)
 	}
 
-	profiles := make([]Profile, 0)
-	for _, p := range c.Upbound.Profiles {
-		profiles = append(profiles, p)
-	}
-
-	return profiles, nil
+	return c.Upbound.Profiles, nil
 }
 
 // SetDefaultUpboundProfile sets the default profile for communicating with
@@ -161,5 +162,35 @@ func (c *Config) SetDefaultUpboundProfile(name string) error {
 		return errors.Errorf(errProfileNotFoundFmt, name)
 	}
 	c.Upbound.Default = name
+	return nil
+}
+
+// GetBaseConfig returns the persisted base configuration associated with the
+// provided Profile. If the supplied name does not match an existing Profile
+// an error is returned.
+func (c *Config) GetBaseConfig(name string) (map[string]string, error) {
+	profile, ok := c.Upbound.Profiles[name]
+	if !ok {
+		return nil, errors.Errorf(errProfileNotFoundFmt, name)
+	}
+	return profile.BaseConfig, nil
+}
+
+// AddToBaseConfig adds the supplied key, value pair to the overrides map of the
+// profile that corresponds to the given name. If the supplied name does not
+// match an existing Profile an error is returned. If the overrides map does
+// not currently exist on the corresponding profile, a map is initialized.
+func (c *Config) AddToBaseConfig(name, key, value string) error {
+	profile, ok := c.Upbound.Profiles[name]
+	if !ok {
+		return errors.Errorf(errProfileNotFoundFmt, name)
+	}
+
+	if profile.BaseConfig == nil {
+		profile.BaseConfig = make(map[string]string)
+	}
+
+	profile.BaseConfig[key] = value
+	c.Upbound.Profiles[name] = profile
 	return nil
 }

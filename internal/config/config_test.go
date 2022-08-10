@@ -252,7 +252,7 @@ func TestGetUpboundProfiles(t *testing.T) {
 	}
 	type want struct {
 		err      error
-		profiles []Profile
+		profiles map[string]Profile
 	}
 
 	cases := map[string]struct {
@@ -282,9 +282,9 @@ func TestGetUpboundProfiles(t *testing.T) {
 				},
 			},
 			want: want{
-				profiles: []Profile{
-					profOne,
-					profTwo,
+				profiles: map[string]Profile{
+					nameOne: profOne,
+					nameTwo: profTwo,
 				},
 			},
 		},
@@ -298,6 +298,152 @@ func TestGetUpboundProfiles(t *testing.T) {
 			}
 			if diff := cmp.Diff(tc.want.err, err, test.EquateErrors()); diff != "" {
 				t.Errorf("\n%s\nGetUpboundProfiles(...): -want error, +got error:\n%s", tc.reason, diff)
+			}
+		})
+	}
+}
+
+func TestGetBaseConfig(t *testing.T) {
+	nameOne := "cool-user"
+	profOne := Profile{
+		Type:    UserProfileType,
+		Account: "cool-org",
+		BaseConfig: map[string]string{
+			"key": "value",
+		},
+	}
+	nameTwo := "cool-user2"
+	profTwo := Profile{
+		Type:    UserProfileType,
+		Account: "cool-org2",
+	}
+
+	type args struct {
+		profile string
+		cfg     *Config
+	}
+	type want struct {
+		err  error
+		base map[string]string
+	}
+
+	cases := map[string]struct {
+		reason string
+		args   args
+		want   want
+	}{
+		"ErrorNoProfilesExist": {
+			reason: "If no profiles exist an error should be returned.",
+			args: args{
+				profile: nameTwo,
+				cfg:     &Config{},
+			},
+			want: want{
+				err: errors.Errorf(errProfileNotFoundFmt, nameTwo),
+			},
+		},
+		"Successful": {
+			reason: "If profile exists, its base config should be returned.",
+			args: args{
+				profile: nameOne,
+				cfg: &Config{
+					Upbound: Upbound{
+						Profiles: map[string]Profile{
+							nameOne: profOne,
+							nameTwo: profTwo,
+						},
+					},
+				},
+			},
+			want: want{
+				base: profOne.BaseConfig,
+			},
+		},
+	}
+	for name, tc := range cases {
+		t.Run(name, func(t *testing.T) {
+			base, err := tc.args.cfg.GetBaseConfig(tc.args.profile)
+
+			if diff := cmp.Diff(tc.want.base, base); diff != "" {
+				t.Errorf("\n%s\nGetBaseConfig(...): -want, +got:\n%s", tc.reason, diff)
+			}
+			if diff := cmp.Diff(tc.want.err, err, test.EquateErrors()); diff != "" {
+				t.Errorf("\n%s\nGetBaseConfig(...): -want error, +got error:\n%s", tc.reason, diff)
+			}
+		})
+	}
+}
+
+func TestAddToBaseConfig(t *testing.T) {
+	nameOne := "cool-user"
+	profOne := Profile{
+		Type:    UserProfileType,
+		Account: "cool-org",
+	}
+	nameTwo := "cool-user2"
+	profTwo := Profile{
+		Type:    UserProfileType,
+		Account: "cool-org2",
+	}
+
+	type args struct {
+		profile string
+		key     string
+		value   string
+		cfg     *Config
+	}
+	type want struct {
+		err  error
+		base map[string]string
+	}
+
+	cases := map[string]struct {
+		reason string
+		args   args
+		want   want
+	}{
+		"ErrorNoProfilesExist": {
+			reason: "If no profiles exist an error should be returned.",
+			args: args{
+				profile: nameTwo,
+				cfg:     &Config{},
+			},
+			want: want{
+				err: errors.Errorf(errProfileNotFoundFmt, nameTwo),
+			},
+		},
+		"Successful": {
+			reason: "If profile exists, we should add the k,v pair to the base config.",
+			args: args{
+				profile: nameOne,
+				key:     "k",
+				value:   "v",
+				cfg: &Config{
+					Upbound: Upbound{
+						Profiles: map[string]Profile{
+							nameOne: profOne,
+							nameTwo: profTwo,
+						},
+					},
+				},
+			},
+			want: want{
+				base: map[string]string{
+					"k": "v",
+				},
+			},
+		},
+	}
+	for name, tc := range cases {
+		t.Run(name, func(t *testing.T) {
+			err := tc.args.cfg.AddToBaseConfig(tc.args.profile, tc.args.key, tc.args.value)
+			base, _ := tc.args.cfg.GetBaseConfig(tc.args.profile)
+
+			if diff := cmp.Diff(tc.want.base, base); diff != "" {
+				t.Errorf("\n%s\nAddToBaseConfig(...): -want, +got:\n%s", tc.reason, diff)
+			}
+			if diff := cmp.Diff(tc.want.err, err, test.EquateErrors()); diff != "" {
+				t.Errorf("\n%s\nAddToBaseConfig(...): -want error, +got error:\n%s", tc.reason, diff)
 			}
 		})
 	}
