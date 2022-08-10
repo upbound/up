@@ -173,7 +173,7 @@ commands may choose not to utilize the group flags when not relevant.
 Format: `up uxp <cmd> ...`
 
 Commands in the **UXP** group are used to install and manage Upbound Universal
-Crossplane, as well as connect it to Upbound.
+Crossplane.
 
 - `install [version]`
     - Flags:
@@ -191,15 +191,6 @@ Crossplane, as well as connect it to Upbound.
       behavior of `helm install`. If `[version]` is not provided, the latest
       chart version will be used from the either the stable or unstable
       repository.
-- `connect <control-plane-token>`
-    - Flags:
-      - `--token-secret-name` (Default: `upbound-control-plane-token`): Sets the
-        name of the secret that will be used to store the control plane token in
-        the configured Kubernetes cluster.
-    - Behavior: Connects the UXP instance in cluster specified by currently
-      configured `kubeconfig` to the existing self-hosted control plane
-      specified by `<control-plane-token>`. If `-` is given for
-      `<control-plane-token>` the value will be read from stdin.
 - `upgrade [version]` 
     - Flags:
         - `--rollback = BOOL`: Indicates that the upgrade should be rolled back
