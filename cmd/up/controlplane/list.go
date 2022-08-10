@@ -22,6 +22,7 @@ import (
 	"k8s.io/cli-runtime/pkg/printers"
 
 	"github.com/upbound/up-sdk-go/service/accounts"
+	"github.com/upbound/up-sdk-go/service/common"
 	cp "github.com/upbound/up-sdk-go/service/controlplanes"
 
 	"github.com/upbound/up/internal/upbound"
@@ -29,6 +30,8 @@ import (
 
 const (
 	listRowFormat = "%v\t%v\t%v\n"
+
+	maxItems = 100
 )
 
 // ListCmd list control planes in an account on Upbound.
@@ -39,13 +42,17 @@ func (c *ListCmd) Run(experimental bool, kongCtx *kong.Context, ac *accounts.Cli
 	var cps []cp.ControlPlaneResponse
 	var err error
 	if experimental {
-		cps, err = cc.List(context.Background(), upCtx.Account)
+		// TODO(hasheddan): we currently just max out single page size, but we
+		// may opt to support limiting page size and iterating through pages via
+		// flags in the future.
+		cpList, err := cc.List(context.Background(), upCtx.Account, common.WithSize(maxItems))
 		if err != nil {
 			return err
 		}
-		if len(cps) == 0 {
+		if len(cpList.ControlPlanes) == 0 {
 			return nil
 		}
+		cps = cpList.ControlPlanes
 	} else {
 		cps, err = ac.ListControlPlanes(context.Background(), upCtx.Account)
 		if err != nil {
