@@ -32,6 +32,7 @@ import (
 	"github.com/google/go-containerregistry/pkg/v1/tarball"
 	"github.com/google/go-containerregistry/pkg/v1/types"
 	"github.com/pkg/errors"
+	"github.com/pterm/pterm"
 	"github.com/spf13/afero"
 
 	"github.com/upbound/up/internal/xpkg"
@@ -122,7 +123,7 @@ func TestXPExtractRun(t *testing.T) {
 				fetch:  tc.fetch,
 				name:   tc.name,
 				Output: tc.out,
-			}).Run()
+			}).Run(pterm.DefaultBasicText.WithWriter(io.Discard))
 			if diff := cmp.Diff(tc.want, err, test.EquateErrors()); diff != "" {
 				t.Errorf("\n%s\nRun(...): -want error, +got error:\n%s", tc.reason, diff)
 			}

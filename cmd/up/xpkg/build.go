@@ -22,6 +22,7 @@ import (
 	"github.com/google/go-containerregistry/pkg/name"
 	"github.com/google/go-containerregistry/pkg/v1/tarball"
 	"github.com/pkg/errors"
+	"github.com/pterm/pterm"
 	"github.com/spf13/afero"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 
@@ -102,7 +103,7 @@ type buildCmd struct {
 }
 
 // Run executes the build command.
-func (c *buildCmd) Run() error { //nolint:gocyclo
+func (c *buildCmd) Run(p pterm.TextPrinter) error { //nolint:gocyclo
 	var buildOpts []xpkg.BuildOpt
 	if c.Controller != "" {
 		ref, err := name.ParseReference(c.Controller)
@@ -147,6 +148,7 @@ func (c *buildCmd) Run() error { //nolint:gocyclo
 	if err := tarball.Write(nil, img, f); err != nil {
 		return err
 	}
+	p.Printfln("xpkg saved to %s", output)
 	return nil
 }
 

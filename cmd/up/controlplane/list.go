@@ -16,10 +16,8 @@ package controlplane
 
 import (
 	"context"
-	"fmt"
 
-	"github.com/alecthomas/kong"
-	"k8s.io/cli-runtime/pkg/printers"
+	"github.com/pterm/pterm"
 
 	"github.com/upbound/up-sdk-go/service/accounts"
 	"github.com/upbound/up-sdk-go/service/common"
@@ -29,8 +27,6 @@ import (
 )
 
 const (
-	listRowFormat = "%v\t%v\t%v\n"
-
 	maxItems = 100
 )
 
@@ -38,7 +34,7 @@ const (
 type ListCmd struct{}
 
 // Run executes the list command.
-func (c *ListCmd) Run(experimental bool, kongCtx *kong.Context, ac *accounts.Client, cc *cp.Client, upCtx *upbound.Context) error {
+func (c *ListCmd) Run(experimental bool, p pterm.TextPrinter, pt *pterm.TablePrinter, ac *accounts.Client, cc *cp.Client, upCtx *upbound.Context) error {
 	var cps []cp.ControlPlaneResponse
 	var err error
 	if experimental {
@@ -49,23 +45,21 @@ func (c *ListCmd) Run(experimental bool, kongCtx *kong.Context, ac *accounts.Cli
 		if err != nil {
 			return err
 		}
-		if len(cpList.ControlPlanes) == 0 {
-			return nil
-		}
 		cps = cpList.ControlPlanes
 	} else {
 		cps, err = ac.ListControlPlanes(context.Background(), upCtx.Account)
 		if err != nil {
 			return err
 		}
-		if len(cps) == 0 {
-			return nil
-		}
 	}
-	w := printers.GetNewTabWriter(kongCtx.Stdout)
-	fmt.Fprintf(w, listRowFormat, "NAME", "ID", "STATUS")
-	for _, cp := range cps {
-		fmt.Fprintf(w, listRowFormat, cp.ControlPlane.Name, cp.ControlPlane.ID, cp.Status)
+	if len(cps) == 0 {
+		p.Printfln("No control planes found in %s.", upCtx.Account)
+		return nil
 	}
-	return w.Flush()
+	data := make([][]string, len(cps)+1)
+	data[0] = []string{"NAME", "ID", "STATUS"}
+	for i, cp := range cps {
+		data[i+1] = []string{cp.ControlPlane.Name, cp.ControlPlane.ID.String(), string(cp.Status)}
+	}
+	return pt.WithHasHeader().WithHeaderStyle(&pterm.Style{}).WithData(data).Render()
 }

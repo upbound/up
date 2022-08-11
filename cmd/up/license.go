@@ -15,16 +15,14 @@
 package main
 
 import (
-	"fmt"
-
-	"github.com/alecthomas/kong"
+	"github.com/pterm/pterm"
 )
 
 // licenseCmd prints license information for using Up.
 type licenseCmd struct{}
 
 // Run executes the license command.
-func (c *licenseCmd) Run(kongCtx *kong.Context) error {
-	_, err := fmt.Fprintln(kongCtx.Stdout, "By using Up, you are accepting to comply with terms and conditions in https://licenses.upbound.io/upbound-software-license.html")
-	return err
+func (c *licenseCmd) Run(p pterm.TextPrinter) error {
+	p.Println("By using Up, you are accepting to comply with terms and conditions in https://licenses.upbound.io/upbound-software-license.html")
+	return nil
 }

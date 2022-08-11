@@ -22,6 +22,7 @@ import (
 
 	"github.com/google/uuid"
 	"github.com/pkg/errors"
+	"github.com/pterm/pterm"
 
 	"github.com/upbound/up/internal/kube"
 	"github.com/upbound/up/internal/upbound"
@@ -63,7 +64,7 @@ type getCmd struct {
 }
 
 // Run executes the get command.
-func (c *getCmd) Run(experimental bool, upCtx *upbound.Context) error {
+func (c *getCmd) Run(experimental bool, p pterm.TextPrinter, upCtx *upbound.Context) error {
 	// TODO(hasheddan): consider implementing a custom decoder
 	if c.Token == "-" {
 		b, err := io.ReadAll(c.stdin)
@@ -73,11 +74,22 @@ func (c *getCmd) Run(experimental bool, upCtx *upbound.Context) error {
 		c.Token = strings.TrimSpace(string(b))
 	}
 
+	var err error
+	var kubeCurCtx string
 	if experimental {
 		upCtx.ProxyEndpoint.Path = "/v1/controlPlanes"
-		return kube.BuildControlPlaneKubeconfig(upCtx.ProxyEndpoint, path.Join(upCtx.Account, c.ID), c.Token, c.File, true)
+		kubeCurCtx, err = kube.BuildControlPlaneKubeconfig(upCtx.ProxyEndpoint, path.Join(upCtx.Account, c.ID), c.Token, c.File, true)
+		if err != nil {
+			return err
+		}
+	} else {
+		upCtx.ProxyEndpoint.Path = "/controlPlanes"
+		kubeCurCtx, err = kube.BuildControlPlaneKubeconfig(upCtx.ProxyEndpoint, c.id.String(), c.Token, c.File, false)
+		if err != nil {
+			return err
+		}
 	}
 
-	upCtx.ProxyEndpoint.Path = "/controlPlanes"
-	return kube.BuildControlPlaneKubeconfig(upCtx.ProxyEndpoint, c.id.String(), c.Token, c.File, false)
+	p.Printfln("Current context set to %s", kubeCurCtx)
+	return nil
 }

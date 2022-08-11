@@ -17,6 +17,7 @@ package controlplane
 import (
 	"context"
 
+	"github.com/pterm/pterm"
 	cp "github.com/upbound/up-sdk-go/service/controlplanes"
 	op "github.com/upbound/up-sdk-go/service/oldplanes"
 	"github.com/upbound/up/internal/upbound"
@@ -30,18 +31,24 @@ type CreateCmd struct {
 }
 
 // Run executes the create command.
-func (c *CreateCmd) Run(experimental bool, cc *cp.Client, oc *op.Client, upCtx *upbound.Context) error {
+func (c *CreateCmd) Run(experimental bool, p pterm.TextPrinter, cc *cp.Client, oc *op.Client, upCtx *upbound.Context) error {
 	if experimental {
-		_, err := cc.Create(context.Background(), upCtx.Account, &cp.ControlPlaneCreateParameters{
+		if _, err := cc.Create(context.Background(), upCtx.Account, &cp.ControlPlaneCreateParameters{
 			Name:        c.Name,
 			Description: c.Description,
-		})
-		return err
+		}); err != nil {
+			return err
+		}
+	} else {
+		if _, err := oc.Create(context.Background(), &op.ControlPlaneCreateParameters{
+			Account:     upCtx.Account,
+			Name:        c.Name,
+			Description: c.Description,
+		}); err != nil {
+			return err
+		}
 	}
-	_, err := oc.Create(context.Background(), &op.ControlPlaneCreateParameters{
-		Account:     upCtx.Account,
-		Name:        c.Name,
-		Description: c.Description,
-	})
-	return err
+
+	p.Printfln("%s created.", c.Name)
+	return nil
 }

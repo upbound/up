@@ -18,6 +18,7 @@ import (
 	"io"
 
 	"github.com/pkg/errors"
+	"github.com/pterm/pterm"
 	"sigs.k8s.io/yaml"
 
 	"github.com/upbound/up/internal/install"
@@ -79,10 +80,18 @@ type upgradeCmd struct {
 }
 
 // Run executes the upgrade command.
-func (c *upgradeCmd) Run(insCtx *install.Context) error {
+func (c *upgradeCmd) Run(p pterm.TextPrinter, insCtx *install.Context) error {
 	params, err := c.parser.Parse()
 	if err != nil {
 		return errors.Wrap(err, errParseUpgradeParameters)
 	}
-	return c.mgr.Upgrade(c.Version, params)
+	if err := c.mgr.Upgrade(c.Version, params); err != nil {
+		return err
+	}
+	curVer, err := c.mgr.GetCurrentVersion()
+	if err != nil {
+		return err
+	}
+	p.Printfln("UXP upgraded to %s.", curVer)
+	return nil
 }

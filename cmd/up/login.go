@@ -28,6 +28,7 @@ import (
 	"github.com/alecthomas/kong"
 	"github.com/golang-jwt/jwt"
 	"github.com/pkg/errors"
+	"github.com/pterm/pterm"
 
 	"github.com/upbound/up/internal/config"
 	uphttp "github.com/upbound/up/internal/http"
@@ -108,7 +109,7 @@ type loginCmd struct {
 }
 
 // Run executes the login command.
-func (c *loginCmd) Run(upCtx *upbound.Context) error { // nolint:gocyclo
+func (c *loginCmd) Run(p pterm.TextPrinter, upCtx *upbound.Context) error { // nolint:gocyclo
 	if c.Token == "-" {
 		b, err := io.ReadAll(c.stdin)
 		if err != nil {
@@ -172,7 +173,11 @@ func (c *loginCmd) Run(upCtx *upbound.Context) error { // nolint:gocyclo
 			return errors.Wrap(err, errLoginFailed)
 		}
 	}
-	return errors.Wrap(upCtx.CfgSrc.UpdateConfig(upCtx.Cfg), errUpdateConfig)
+	if err := upCtx.CfgSrc.UpdateConfig(upCtx.Cfg); err != nil {
+		return errors.Wrap(err, errUpdateConfig)
+	}
+	p.Printfln("%s logged in.", auth.ID)
+	return nil
 }
 
 // auth is the request body sent to authenticate a user or token.

@@ -20,6 +20,7 @@ import (
 
 	"github.com/alecthomas/kong"
 	"github.com/pkg/errors"
+	"github.com/pterm/pterm"
 
 	"github.com/upbound/up-sdk-go"
 
@@ -58,7 +59,7 @@ type logoutCmd struct {
 }
 
 // Run executes the logout command.
-func (c *logoutCmd) Run(upCtx *upbound.Context) error {
+func (c *logoutCmd) Run(p pterm.TextPrinter, upCtx *upbound.Context) error {
 	ctx, cancel := context.WithTimeout(context.Background(), defaultTimeout)
 	defer cancel()
 	req, err := c.client.NewRequest(ctx, http.MethodPost, logoutPath, "", nil)
@@ -70,7 +71,7 @@ func (c *logoutCmd) Run(upCtx *upbound.Context) error {
 	}
 
 	// Logout is successful, remove token from config and update.
-	profile, err := upCtx.Cfg.GetUpboundProfile(upCtx.Profile.ID)
+	profile, err := upCtx.Cfg.GetUpboundProfile(c.Flags.Profile)
 	if err != nil {
 		return errors.Wrap(err, errGetProfile)
 	}
@@ -78,5 +79,10 @@ func (c *logoutCmd) Run(upCtx *upbound.Context) error {
 	if err := upCtx.Cfg.AddOrUpdateUpboundProfile(upCtx.Profile.ID, profile); err != nil {
 		return errors.Wrap(err, errRemoveTokenFailed)
 	}
-	return errors.Wrap(upCtx.CfgSrc.UpdateConfig(upCtx.Cfg), errUpdateConfig)
+	if err := upCtx.CfgSrc.UpdateConfig(upCtx.Cfg); err != nil {
+		return errors.Wrap(err, errUpdateConfig)
+	}
+
+	p.Printfln("%s logged out.", profile.ID)
+	return nil
 }

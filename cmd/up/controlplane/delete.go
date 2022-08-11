@@ -18,6 +18,7 @@ import (
 	"context"
 
 	"github.com/google/uuid"
+	"github.com/pterm/pterm"
 
 	cp "github.com/upbound/up-sdk-go/service/controlplanes"
 	op "github.com/upbound/up-sdk-go/service/oldplanes"
@@ -44,9 +45,16 @@ type DeleteCmd struct {
 }
 
 // Run executes the delete command.
-func (c *DeleteCmd) Run(experimental bool, cc *cp.Client, oc *op.Client, upCtx *upbound.Context) error {
+func (c *DeleteCmd) Run(experimental bool, p pterm.TextPrinter, cc *cp.Client, oc *op.Client, upCtx *upbound.Context) error {
 	if experimental {
-		return cc.Delete(context.Background(), upCtx.Account, c.ID)
+		if err := cc.Delete(context.Background(), upCtx.Account, c.ID); err != nil {
+			return err
+		}
+	} else {
+		if err := oc.Delete(context.Background(), c.id); err != nil {
+			return err
+		}
 	}
-	return oc.Delete(context.Background(), c.id)
+	p.Printfln("%s deleted.", c.ID)
+	return nil
 }

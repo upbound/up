@@ -19,6 +19,7 @@ import (
 	"io"
 
 	"github.com/pkg/errors"
+	"github.com/pterm/pterm"
 	corev1 "k8s.io/api/core/v1"
 	kerrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -86,7 +87,7 @@ type installCmd struct {
 }
 
 // Run executes the install command.
-func (c *installCmd) Run(insCtx *install.Context) error {
+func (c *installCmd) Run(p pterm.TextPrinter, insCtx *install.Context) error {
 	// Create namespace if it does not exist.
 	_, err := c.kClient.CoreV1().Namespaces().Create(context.Background(), &corev1.Namespace{
 		ObjectMeta: metav1.ObjectMeta{
@@ -100,9 +101,14 @@ func (c *installCmd) Run(insCtx *install.Context) error {
 	if err != nil {
 		return errors.Wrap(err, errParseInstallParameters)
 	}
-	err = c.mgr.Install(c.Version, params)
+	if err = c.mgr.Install(c.Version, params); err != nil {
+		return err
+	}
+
+	curVer, err := c.mgr.GetCurrentVersion()
 	if err != nil {
 		return err
 	}
+	p.Printfln("UXP %s installed.", curVer)
 	return nil
 }

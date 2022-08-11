@@ -29,6 +29,7 @@ import (
 	"github.com/google/go-containerregistry/pkg/v1/remote"
 	"github.com/google/go-containerregistry/pkg/v1/tarball"
 	"github.com/pkg/errors"
+	"github.com/pterm/pterm"
 	"github.com/spf13/afero"
 	"golang.org/x/sync/errgroup"
 
@@ -62,7 +63,7 @@ type pushCmd struct {
 }
 
 // Run runs the push cmd.
-func (c *pushCmd) Run() error { //nolint:gocyclo
+func (c *pushCmd) Run(p pterm.TextPrinter) error { //nolint:gocyclo
 	tag, err := name.NewTag(c.Tag, name.WithDefaultRegistry(upboundRegistry))
 	if err != nil {
 		return err
@@ -163,6 +164,8 @@ func (c *pushCmd) Run() error { //nolint:gocyclo
 			return err
 		}
 	}
+
+	p.Printfln("xpkg pushed to %s", tag.String())
 	return nil
 }
 
