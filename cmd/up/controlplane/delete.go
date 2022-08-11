@@ -18,6 +18,7 @@ import (
 	"context"
 
 	"github.com/google/uuid"
+	"github.com/pterm/pterm"
 
 	cp "github.com/upbound/up-sdk-go/service/controlplanes"
 	op "github.com/upbound/up-sdk-go/service/oldplanes"
@@ -25,7 +26,7 @@ import (
 )
 
 // AfterApply sets values in command after assignment and validation.
-func (c *DeleteCmd) AfterApply(experimental bool) error {
+func (c *deleteCmd) AfterApply(experimental bool) error {
 	if !experimental {
 		u, err := uuid.Parse(c.ID)
 		if err != nil {
@@ -36,17 +37,24 @@ func (c *DeleteCmd) AfterApply(experimental bool) error {
 	return nil
 }
 
-// DeleteCmd deletes a control plane on Upbound.
-type DeleteCmd struct {
+// deleteCmd deletes a control plane on Upbound.
+type deleteCmd struct {
 	id uuid.UUID
 
 	ID string `arg:"" help:"ID of control plane. ID is name if using experimental MCP API."`
 }
 
 // Run executes the delete command.
-func (c *DeleteCmd) Run(experimental bool, cc *cp.Client, oc *op.Client, upCtx *upbound.Context) error {
+func (c *deleteCmd) Run(experimental bool, p pterm.TextPrinter, cc *cp.Client, oc *op.Client, upCtx *upbound.Context) error {
 	if experimental {
-		return cc.Delete(context.Background(), upCtx.Account, c.ID)
+		if err := cc.Delete(context.Background(), upCtx.Account, c.ID); err != nil {
+			return err
+		}
+	} else {
+		if err := oc.Delete(context.Background(), c.id); err != nil {
+			return err
+		}
 	}
-	return oc.Delete(context.Background(), c.id)
+	p.Printfln("%s deleted", c.ID)
+	return nil
 }

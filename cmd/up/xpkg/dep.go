@@ -16,10 +16,13 @@ package xpkg
 
 import (
 	"context"
+	"fmt"
 	"os"
 
 	"github.com/alecthomas/kong"
+	"github.com/crossplane/crossplane/apis/pkg/v1beta1"
 	"github.com/pkg/errors"
+	"github.com/pterm/pterm"
 	"github.com/spf13/afero"
 
 	"github.com/upbound/up/internal/xpkg"
@@ -37,6 +40,7 @@ const (
 // AfterApply constructs and binds Upbound-specific context to any subcommands
 // that have Run() methods that receive it.
 func (c *depCmd) AfterApply(kongCtx *kong.Context) error {
+	kongCtx.Bind(pterm.DefaultBulletList.WithWriter(kongCtx.Stdout))
 	ctx := context.Background()
 	fs := afero.NewOsFs()
 
@@ -100,20 +104,47 @@ type depCmd struct {
 }
 
 // Run executes the dep command.
-func (c *depCmd) Run(ctx context.Context) error {
+func (c *depCmd) Run(ctx context.Context, p pterm.TextPrinter, pb *pterm.BulletListPrinter) error {
 	// no need to do anything else if clean cache was called.
 
 	// TODO (@tnthornton) this feels a little out of place here. We should
 	// consider adding a separate command for doing this.
 	if c.CleanCache {
-		return c.c.Clean()
+		if err := c.c.Clean(); err != nil {
+			return err
+		}
+		p.Printfln("xpkg cache cleaned")
+		return nil
 	}
 
 	if c.Package != "" {
-		return c.userSuppliedDep(ctx)
+		if err := c.userSuppliedDep(ctx); err != nil {
+			return err
+		}
+		p.Printfln("%s added to xpkg cache", c.Package)
+		return nil
 	}
 
-	return c.metaSuppliedDeps(ctx)
+	deps, err := c.metaSuppliedDeps(ctx)
+	if err != nil {
+		return err
+	}
+	if len(deps) == 0 {
+		p.Printfln("No dependencies specified")
+		return nil
+	}
+	p.Printfln("Dependencies added to xpkg cache:")
+	li := make([]pterm.BulletListItem, len(deps))
+	for i, d := range deps {
+		li[i] = pterm.BulletListItem{
+			Level:  0,
+			Text:   fmt.Sprintf("%s (%s)", d.Package, d.Constraints),
+			Bullet: "-",
+		}
+	}
+	// TODO(hasheddan): bullet list printer incorrectly appends an extra
+	// trailing newline. Update when fixed upstream.
+	return pb.WithItems(li).Render()
 }
 
 func (c *depCmd) userSuppliedDep(ctx context.Context) error {
@@ -146,23 +177,26 @@ func (c *depCmd) userSuppliedDep(ctx context.Context) error {
 	return nil
 }
 
-func (c *depCmd) metaSuppliedDeps(ctx context.Context) error {
+func (c *depCmd) metaSuppliedDeps(ctx context.Context) ([]v1beta1.Dependency, error) {
 	meta := c.ws.View().Meta()
 
 	if meta == nil {
-		return errors.New(errMetaFileNotFound)
+		return nil, errors.New(errMetaFileNotFound)
 	}
 
 	deps, err := meta.DependsOn()
 	if err != nil {
-		return err
+		return nil, err
 	}
 
-	for _, d := range deps {
-		if _, _, err := c.m.AddAll(ctx, d); err != nil {
-			return err
+	resolvedDeps := make([]v1beta1.Dependency, len(deps))
+	for i, d := range deps {
+		ud, _, err := c.m.AddAll(ctx, d)
+		if err != nil {
+			return nil, err
 		}
+		resolvedDeps[i] = ud
 	}
 
-	return nil
+	return resolvedDeps, nil
 }

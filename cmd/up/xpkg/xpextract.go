@@ -29,6 +29,7 @@ import (
 	"github.com/google/go-containerregistry/pkg/v1/remote"
 	"github.com/google/go-containerregistry/pkg/v1/tarball"
 	"github.com/pkg/errors"
+	"github.com/pterm/pterm"
 	"github.com/spf13/afero"
 
 	"github.com/upbound/up/internal/xpkg"
@@ -124,7 +125,7 @@ type xpExtractCmd struct {
 }
 
 // Run runs the xp extract cmd.
-func (c *xpExtractCmd) Run() error { //nolint:gocyclo
+func (c *xpExtractCmd) Run(p pterm.TextPrinter) error { //nolint:gocyclo
 	// NOTE(hasheddan): most of the logic in this method is from the machinery
 	// used in Crossplane's package cache and should be updated to use shared
 	// libraries if moved to crossplane-runtime.
@@ -193,8 +194,6 @@ func (c *xpExtractCmd) Run() error { //nolint:gocyclo
 	if err != nil {
 		return errors.Wrap(err, errCreateOutputFile)
 	}
-	// NOTE(hasheddan): we don't check error on deferred file close as Close()
-	// is explicitly called in the happy path.
 	defer cf.Close() //nolint:errcheck
 	w, err := gzip.NewWriterLevel(cf, gzip.BestSpeed)
 	if err != nil {
@@ -208,5 +207,7 @@ func (c *xpExtractCmd) Run() error { //nolint:gocyclo
 	if err := w.Close(); err != nil {
 		return errors.Wrap(err, errExtractPackageContents)
 	}
-	return cf.Close()
+
+	p.Printfln("xpkg contents extracted to %s", out)
+	return nil
 }

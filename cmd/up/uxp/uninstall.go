@@ -17,6 +17,8 @@ package uxp
 import (
 	"net/url"
 
+	"github.com/pterm/pterm"
+
 	"github.com/upbound/up/internal/install"
 	"github.com/upbound/up/internal/install/helm"
 )
@@ -42,6 +44,10 @@ type uninstallCmd struct {
 }
 
 // Run executes the uninstall command.
-func (c *uninstallCmd) Run(insCtx *install.Context) error {
-	return c.mgr.Uninstall()
+func (c *uninstallCmd) Run(p pterm.TextPrinter, insCtx *install.Context) error {
+	if err := c.mgr.Uninstall(); err != nil {
+		return err
+	}
+	p.Printfln("UXP uninstalled")
+	return nil
 }

@@ -15,12 +15,14 @@
 package xpkg
 
 import (
+	"path"
 	"path/filepath"
 	"strings"
 
 	"github.com/Masterminds/semver/v3"
 	v1 "github.com/crossplane/crossplane/apis/pkg/meta/v1"
 	"github.com/pkg/errors"
+	"github.com/pterm/pterm"
 	"github.com/spf13/afero"
 
 	"github.com/upbound/up/internal/input"
@@ -90,7 +92,7 @@ type initCmd struct {
 }
 
 // Run executes the init command.
-func (c *initCmd) Run() error {
+func (c *initCmd) Run(p pterm.TextPrinter) error {
 	fileBody := []byte{}
 	var err error
 
@@ -114,7 +116,12 @@ func (c *initCmd) Run() error {
 	)
 
 	// write out file named crossplane.yaml to the configured location
-	return writer.NewMetaFile()
+	if err := writer.NewMetaFile(); err != nil {
+		return err
+	}
+
+	p.Printfln("xpkg initialized at %s", path.Join(c.root, xpkg.MetaFile))
+	return nil
 }
 
 func (c *initCmd) initCommon() error {

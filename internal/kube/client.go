@@ -49,12 +49,12 @@ func GetKubeConfig(path string) (*rest.Config, error) {
 // BuildControlPlaneKubeconfig builds a kubeconfig entry for a control plane.
 // TODO(hasheddan): consider refactoring this function to be less specific to
 // the one command that consumes it.
-func BuildControlPlaneKubeconfig(proxy *url.URL, id string, token, kube string, experimental bool) error { //nolint:interfacer
+func BuildControlPlaneKubeconfig(proxy *url.URL, id string, token, kube string, experimental bool) (string, error) { //nolint:interfacer
 	po := clientcmd.NewDefaultPathOptions()
 	po.LoadingRules.ExplicitPath = kube
 	conf, err := po.GetStartingConfig()
 	if err != nil {
-		return err
+		return "", err
 	}
 	key := fmt.Sprintf(UpboundKubeconfigKeyFmt, strings.ReplaceAll(id, "/", "-"))
 	proxy.Path = path.Join(proxy.Path, id)
@@ -72,5 +72,5 @@ func BuildControlPlaneKubeconfig(proxy *url.URL, id string, token, kube string, 
 		AuthInfo: key,
 	}
 	conf.CurrentContext = key
-	return clientcmd.ModifyConfig(po, *conf, true)
+	return key, clientcmd.ModifyConfig(po, *conf, true)
 }

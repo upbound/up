@@ -16,11 +16,14 @@ package main
 
 import (
 	"fmt"
+	"io"
 	"math/rand"
 	"time"
 
 	"github.com/alecthomas/kong"
+	"github.com/pterm/pterm"
 
+	"github.com/upbound/up/cmd/up/controlplane"
 	"github.com/upbound/up/cmd/up/upbound"
 	"github.com/upbound/up/cmd/up/uxp"
 	"github.com/upbound/up/cmd/up/xpkg"
@@ -33,8 +36,6 @@ import (
 	_ "k8s.io/client-go/plugin/pkg/client/auth"
 )
 
-var _ = kong.Must(&cli)
-
 type versionFlag bool
 
 // BeforeApply indicates that we want to execute the logic before running any
@@ -45,24 +46,43 @@ func (v versionFlag) BeforeApply(ctx *kong.Context) error { // nolint:unparam
 	return nil
 }
 
-var cli struct {
+// AfterApply configures global settings before executing commands.
+func (c *cli) AfterApply(ctx *kong.Context) error { //nolint:unparam
+	if c.Quiet {
+		ctx.Stdout, ctx.Stderr = io.Discard, io.Discard
+	}
+	ctx.BindTo(pterm.DefaultBasicText.WithWriter(ctx.Stdout), (*pterm.TextPrinter)(nil))
+	// TODO(hasheddan): configure pretty print styling to match Upbound
+	// branding.
+	if !c.Pretty {
+		// NOTE(hasheddan): enabling styling can make processing output with
+		// other tooling difficult.
+		pterm.DisableStyling()
+	}
+	return nil
+}
+
+type cli struct {
 	Version versionFlag `short:"v" name:"version" help:"Print version and exit."`
+	Quiet   bool        `short:"q" name:"quiet" help:"Suppress all output."`
+	Pretty  bool        `name:"pretty" help:"Pretty print output."`
 
 	License licenseCmd `cmd:"" help:"Print Up license information."`
 
-	Login        loginCmd        `cmd:"" help:"Login to Upbound."`
-	Logout       logoutCmd       `cmd:"" help:"Logout of Upbound."`
-	ControlPlane controlPlaneCmd `cmd:"" name:"controlplane" aliases:"ctp" group:"controlplane" help:"Interact with control planes."`
+	Login  loginCmd  `cmd:"" help:"Login to Upbound."`
+	Logout logoutCmd `cmd:"" help:"Logout of Upbound."`
 
-	Upbound upbound.Cmd `cmd:"" help:"Interact with Upbound."`
-	UXP     uxp.Cmd     `cmd:"" help:"Interact with UXP."`
-	XPKG    xpkg.Cmd    `cmd:"" help:"Interact with UXP packages."`
-	XPLS    xpls.Cmd    `cmd:"" help:"Start xpls language server."`
+	ControlPlane controlplane.Cmd `cmd:"" name:"controlplane" aliases:"ctp" help:"Interact with control planes."`
+	Upbound      upbound.Cmd      `cmd:"" help:"Interact with Upbound."`
+	UXP          uxp.Cmd          `cmd:"" help:"Interact with UXP."`
+	XPKG         xpkg.Cmd         `cmd:"" help:"Interact with UXP packages."`
+	XPLS         xpls.Cmd         `cmd:"" help:"Start xpls language server."`
 }
 
 func main() {
 	rand.Seed(time.Now().UTC().UnixNano())
-	ctx := kong.Parse(&cli,
+	c := cli{}
+	ctx := kong.Parse(&c,
 		kong.Name("up"),
 		kong.Description("The Upbound CLI"),
 		kong.UsageOnError())
