@@ -32,7 +32,6 @@ func (c *Cmd) AfterApply(kongCtx *kong.Context) error {
 	if err != nil {
 		return err
 	}
-	kongCtx.Bind(upCtx)
 	cfg, err := upCtx.BuildSDKConfig(upCtx.Profile.Session)
 	if err != nil {
 		return err
