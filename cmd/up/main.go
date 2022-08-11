@@ -23,6 +23,7 @@ import (
 	"github.com/alecthomas/kong"
 	"github.com/pterm/pterm"
 
+	"github.com/upbound/up/cmd/up/controlplane"
 	"github.com/upbound/up/cmd/up/upbound"
 	"github.com/upbound/up/cmd/up/uxp"
 	"github.com/upbound/up/cmd/up/xpkg"
@@ -51,7 +52,6 @@ func (c *cli) AfterApply(ctx *kong.Context) error { //nolint:unparam
 		ctx.Stdout, ctx.Stderr = io.Discard, io.Discard
 	}
 	ctx.BindTo(pterm.DefaultBasicText.WithWriter(ctx.Stdout), (*pterm.TextPrinter)(nil))
-	ctx.Bind(pterm.DefaultTable.WithWriter(ctx.Stdout).WithSeparator("   "))
 	// TODO(hasheddan): configure pretty print styling to match Upbound
 	// branding.
 	if !c.Pretty {
@@ -69,14 +69,14 @@ type cli struct {
 
 	License licenseCmd `cmd:"" help:"Print Up license information."`
 
-	Login        loginCmd        `cmd:"" help:"Login to Upbound."`
-	Logout       logoutCmd       `cmd:"" help:"Logout of Upbound."`
-	ControlPlane controlPlaneCmd `cmd:"" name:"controlplane" aliases:"ctp" group:"controlplane" help:"Interact with control planes."`
+	Login  loginCmd  `cmd:"" help:"Login to Upbound."`
+	Logout logoutCmd `cmd:"" help:"Logout of Upbound."`
 
-	Upbound upbound.Cmd `cmd:"" help:"Interact with Upbound."`
-	UXP     uxp.Cmd     `cmd:"" help:"Interact with UXP."`
-	XPKG    xpkg.Cmd    `cmd:"" help:"Interact with UXP packages."`
-	XPLS    xpls.Cmd    `cmd:"" help:"Start xpls language server."`
+	ControlPlane controlplane.Cmd `cmd:"" name:"controlplane" aliases:"ctp" help:"Interact with control planes."`
+	Upbound      upbound.Cmd      `cmd:"" help:"Interact with Upbound."`
+	UXP          uxp.Cmd          `cmd:"" help:"Interact with UXP."`
+	XPKG         xpkg.Cmd         `cmd:"" help:"Interact with UXP packages."`
+	XPLS         xpls.Cmd         `cmd:"" help:"Start xpls language server."`
 }
 
 func main() {

@@ -16,6 +16,7 @@ package xpkg
 
 import (
 	"context"
+	"fmt"
 	"os"
 
 	"github.com/alecthomas/kong"
@@ -39,6 +40,7 @@ const (
 // AfterApply constructs and binds Upbound-specific context to any subcommands
 // that have Run() methods that receive it.
 func (c *depCmd) AfterApply(kongCtx *kong.Context) error {
+	kongCtx.Bind(pterm.DefaultBulletList.WithWriter(kongCtx.Stdout))
 	ctx := context.Background()
 	fs := afero.NewOsFs()
 
@@ -102,7 +104,7 @@ type depCmd struct {
 }
 
 // Run executes the dep command.
-func (c *depCmd) Run(ctx context.Context, p pterm.TextPrinter) error {
+func (c *depCmd) Run(ctx context.Context, p pterm.TextPrinter, pb *pterm.BulletListPrinter) error {
 	// no need to do anything else if clean cache was called.
 
 	// TODO (@tnthornton) this feels a little out of place here. We should
@@ -111,7 +113,7 @@ func (c *depCmd) Run(ctx context.Context, p pterm.TextPrinter) error {
 		if err := c.c.Clean(); err != nil {
 			return err
 		}
-		p.Println("xpkg cache cleaned.")
+		p.Printfln("xpkg cache cleaned")
 		return nil
 	}
 
@@ -128,14 +130,21 @@ func (c *depCmd) Run(ctx context.Context, p pterm.TextPrinter) error {
 		return err
 	}
 	if len(deps) == 0 {
-		p.Println("xpkg cache up to date")
+		p.Printfln("No dependencies specified")
 		return nil
 	}
-	p.Println("Dependencies added to xpkg cache:")
-	for _, d := range deps {
-		p.Printfln("%s (%s)", d.Package, d.Constraints)
+	p.Printfln("Dependencies added to xpkg cache:")
+	li := make([]pterm.BulletListItem, len(deps))
+	for i, d := range deps {
+		li[i] = pterm.BulletListItem{
+			Level:  0,
+			Text:   fmt.Sprintf("%s (%s)", d.Package, d.Constraints),
+			Bullet: "-",
+		}
 	}
-	return nil
+	// TODO(hasheddan): bullet list printer incorrectly appends an extra
+	// trailing newline. Update when fixed upstream.
+	return pb.WithItems(li).Render()
 }
 
 func (c *depCmd) userSuppliedDep(ctx context.Context) error {

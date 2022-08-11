@@ -24,15 +24,15 @@ import (
 	"github.com/upbound/up/internal/upbound"
 )
 
-// CreateCmd creates a control plane on Upbound.
-type CreateCmd struct {
+// createCmd creates a control plane on Upbound.
+type createCmd struct {
 	Name string `arg:"" required:"" help:"Name of control plane."`
 
 	Description string `short:"d" help:"Description for control plane."`
 }
 
 // Run executes the create command.
-func (c *CreateCmd) Run(experimental bool, p pterm.TextPrinter, cc *cp.Client, oc *op.Client, upCtx *upbound.Context) error {
+func (c *createCmd) Run(experimental bool, p pterm.TextPrinter, cc *cp.Client, oc *op.Client, upCtx *upbound.Context) error {
 	if experimental {
 		if _, err := cc.Create(context.Background(), upCtx.Account, &cp.ControlPlaneCreateParameters{
 			Name:        c.Name,

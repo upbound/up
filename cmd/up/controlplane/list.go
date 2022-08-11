@@ -17,6 +17,7 @@ package controlplane
 import (
 	"context"
 
+	"github.com/alecthomas/kong"
 	"github.com/pterm/pterm"
 
 	"github.com/upbound/up-sdk-go/service/accounts"
@@ -30,11 +31,17 @@ const (
 	maxItems = 100
 )
 
-// ListCmd list control planes in an account on Upbound.
-type ListCmd struct{}
+// AfterApply sets default values in command after assignment and validation.
+func (c *listCmd) AfterApply(experimental bool, kongCtx *kong.Context, upCtx *upbound.Context) error {
+	kongCtx.Bind(pterm.DefaultTable.WithWriter(kongCtx.Stdout).WithSeparator("   "))
+	return nil
+}
+
+// listCmd list control planes in an account on Upbound.
+type listCmd struct{}
 
 // Run executes the list command.
-func (c *ListCmd) Run(experimental bool, p pterm.TextPrinter, pt *pterm.TablePrinter, ac *accounts.Client, cc *cp.Client, upCtx *upbound.Context) error {
+func (c *listCmd) Run(experimental bool, p pterm.TextPrinter, pt *pterm.TablePrinter, ac *accounts.Client, cc *cp.Client, upCtx *upbound.Context) error {
 	var cps []cp.ControlPlaneResponse
 	var err error
 	if experimental {

@@ -12,7 +12,7 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-package main
+package controlplane
 
 import (
 	"github.com/alecthomas/kong"
@@ -21,14 +21,13 @@ import (
 	cp "github.com/upbound/up-sdk-go/service/controlplanes"
 	op "github.com/upbound/up-sdk-go/service/oldplanes"
 
-	"github.com/upbound/up/cmd/up/controlplane"
 	"github.com/upbound/up/cmd/up/controlplane/kubeconfig"
 	"github.com/upbound/up/internal/upbound"
 )
 
 // AfterApply constructs and binds a control plane client to any subcommands
 // that have Run() methods that receive it.
-func (c *controlPlaneCmd) AfterApply(kongCtx *kong.Context) error {
+func (c *Cmd) AfterApply(kongCtx *kong.Context) error {
 	upCtx, err := upbound.NewFromFlags(c.Flags)
 	if err != nil {
 		return err
@@ -46,11 +45,11 @@ func (c *controlPlaneCmd) AfterApply(kongCtx *kong.Context) error {
 	return nil
 }
 
-// controlPlaneCmd contains commands for interacting with control planes.
-type controlPlaneCmd struct {
-	Create controlplane.CreateCmd `cmd:"" help:"Create a hosted control plane."`
-	Delete controlplane.DeleteCmd `cmd:"" help:"Delete a control plane."`
-	List   controlplane.ListCmd   `cmd:"" help:"List control planes for the account."`
+// Cmd contains commands for interacting with control planes.
+type Cmd struct {
+	Create createCmd `cmd:"" group:"controlplane" help:"Create a hosted control plane."`
+	Delete deleteCmd `cmd:"" group:"controlplane" help:"Delete a control plane."`
+	List   listCmd   `cmd:"" group:"controlplane" help:"List control planes for the account."`
 
 	Kubeconfig kubeconfig.Cmd `cmd:"" name:"kubeconfig" help:"Manage control plane kubeconfig data."`
 

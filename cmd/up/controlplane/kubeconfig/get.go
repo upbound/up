@@ -90,6 +90,6 @@ func (c *getCmd) Run(experimental bool, p pterm.TextPrinter, upCtx *upbound.Cont
 		}
 	}
 
-	p.Printfln("Current context set to %s.", kubeCurCtx)
+	p.Printfln("Current context set to %s", kubeCurCtx)
 	return nil
 }

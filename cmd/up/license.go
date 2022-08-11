@@ -23,6 +23,6 @@ type licenseCmd struct{}
 
 // Run executes the license command.
 func (c *licenseCmd) Run(p pterm.TextPrinter) error { //nolint:unparam
-	p.Println("By using Up, you are accepting to comply with terms and conditions in https://licenses.upbound.io/upbound-software-license.html")
+	p.Printfln("By using Up, you are accepting to comply with terms and conditions in https://licenses.upbound.io/upbound-software-license.html")
 	return nil
 }
