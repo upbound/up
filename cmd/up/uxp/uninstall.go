@@ -18,6 +18,7 @@ import (
 	"net/url"
 
 	"github.com/pterm/pterm"
+
 	"github.com/upbound/up/internal/install"
 	"github.com/upbound/up/internal/install/helm"
 )

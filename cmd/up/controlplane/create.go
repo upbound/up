@@ -18,6 +18,7 @@ import (
 	"context"
 
 	"github.com/pterm/pterm"
+
 	cp "github.com/upbound/up-sdk-go/service/controlplanes"
 	op "github.com/upbound/up-sdk-go/service/oldplanes"
 	"github.com/upbound/up/internal/upbound"

@@ -46,7 +46,7 @@ func (v versionFlag) BeforeApply(ctx *kong.Context) error { // nolint:unparam
 }
 
 // AfterApply configures global settings before executing commands.
-func (c *cli) AfterApply(ctx *kong.Context) error {
+func (c *cli) AfterApply(ctx *kong.Context) error { //nolint:unparam
 	if c.Quiet {
 		ctx.Stdout, ctx.Stderr = io.Discard, io.Discard
 	}
