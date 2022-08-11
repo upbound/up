@@ -119,7 +119,7 @@ func (c *depCmd) Run(ctx context.Context, p pterm.TextPrinter) error {
 		if err := c.userSuppliedDep(ctx); err != nil {
 			return err
 		}
-		p.Printfln("%s added to xpkg cache.", c.Package)
+		p.Printfln("%s added to xpkg cache", c.Package)
 		return nil
 	}
 
@@ -128,7 +128,7 @@ func (c *depCmd) Run(ctx context.Context, p pterm.TextPrinter) error {
 		return err
 	}
 	if len(deps) == 0 {
-		p.Println("xpkg cache up to date.")
+		p.Println("xpkg cache up to date")
 		return nil
 	}
 	p.Println("Dependencies added to xpkg cache:")

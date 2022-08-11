@@ -55,6 +55,6 @@ func (c *DeleteCmd) Run(experimental bool, p pterm.TextPrinter, cc *cp.Client, o
 			return err
 		}
 	}
-	p.Printfln("%s deleted.", c.ID)
+	p.Printfln("%s deleted", c.ID)
 	return nil
 }

@@ -83,6 +83,6 @@ func (c *logoutCmd) Run(p pterm.TextPrinter, upCtx *upbound.Context) error {
 		return errors.Wrap(err, errUpdateConfig)
 	}
 
-	p.Printfln("%s logged out.", profile.ID)
+	p.Printfln("%s logged out", profile.ID)
 	return nil
 }

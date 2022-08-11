@@ -176,7 +176,7 @@ func (c *loginCmd) Run(p pterm.TextPrinter, upCtx *upbound.Context) error { // n
 	if err := upCtx.CfgSrc.UpdateConfig(upCtx.Cfg); err != nil {
 		return errors.Wrap(err, errUpdateConfig)
 	}
-	p.Printfln("%s logged in.", auth.ID)
+	p.Printfln("%s logged in", auth.ID)
 	return nil
 }
 

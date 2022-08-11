@@ -48,6 +48,6 @@ func (c *uninstallCmd) Run(p pterm.TextPrinter, insCtx *install.Context) error {
 	if err := c.mgr.Uninstall(); err != nil {
 		return err
 	}
-	p.Println("UXP uninstalled.")
+	p.Println("UXP uninstalled")
 	return nil
 }

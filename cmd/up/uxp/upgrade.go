@@ -92,6 +92,6 @@ func (c *upgradeCmd) Run(p pterm.TextPrinter, insCtx *install.Context) error {
 	if err != nil {
 		return err
 	}
-	p.Printfln("UXP upgraded to %s.", curVer)
+	p.Printfln("UXP upgraded to %s", curVer)
 	return nil
 }

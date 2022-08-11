@@ -109,6 +109,6 @@ func (c *installCmd) Run(p pterm.TextPrinter, insCtx *install.Context) error {
 	if err != nil {
 		return err
 	}
-	p.Printfln("UXP %s installed.", curVer)
+	p.Printfln("UXP %s installed", curVer)
 	return nil
 }

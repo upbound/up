@@ -53,7 +53,7 @@ func (c *ListCmd) Run(experimental bool, p pterm.TextPrinter, pt *pterm.TablePri
 		}
 	}
 	if len(cps) == 0 {
-		p.Printfln("No control planes found in %s.", upCtx.Account)
+		p.Printfln("No control planes found in %s", upCtx.Account)
 		return nil
 	}
 	data := make([][]string, len(cps)+1)
@@ -61,5 +61,5 @@ func (c *ListCmd) Run(experimental bool, p pterm.TextPrinter, pt *pterm.TablePri
 	for i, cp := range cps {
 		data[i+1] = []string{cp.ControlPlane.Name, cp.ControlPlane.ID.String(), string(cp.Status)}
 	}
-	return pt.WithHasHeader().WithHeaderStyle(&pterm.Style{}).WithData(data).Render()
+	return pt.WithHasHeader().WithData(data).Render()
 }

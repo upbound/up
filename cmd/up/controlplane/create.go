@@ -50,6 +50,6 @@ func (c *CreateCmd) Run(experimental bool, p pterm.TextPrinter, cc *cp.Client, o
 		}
 	}
 
-	p.Printfln("%s created.", c.Name)
+	p.Printfln("%s created", c.Name)
 	return nil
 }
