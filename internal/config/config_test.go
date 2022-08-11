@@ -15,6 +15,7 @@
 package config
 
 import (
+	"io/ioutil"
 	"testing"
 
 	"github.com/crossplane/crossplane-runtime/pkg/test"
@@ -444,6 +445,73 @@ func TestAddToBaseConfig(t *testing.T) {
 			}
 			if diff := cmp.Diff(tc.want.err, err, test.EquateErrors()); diff != "" {
 				t.Errorf("\n%s\nAddToBaseConfig(...): -want error, +got error:\n%s", tc.reason, diff)
+			}
+		})
+	}
+}
+
+func TestBaseToJSON(t *testing.T) {
+	dneName := "does not exist"
+	exists := "exists"
+
+	type args struct {
+		profile string
+		cfg     *Config
+	}
+	type want struct {
+		err  error
+		base string
+	}
+
+	cases := map[string]struct {
+		reason string
+		args   args
+		want   want
+	}{
+		"ErrorNoProfilesExist": {
+			reason: "If no profiles exist an error should be returned.",
+			args: args{
+				profile: dneName,
+				cfg:     &Config{},
+			},
+			want: want{
+				err: errors.Errorf(errProfileNotFoundFmt, dneName),
+			},
+		},
+		"Successful": {
+			reason: "If profile exists, we should add the k,v pair to the base config.",
+			args: args{
+				profile: exists,
+				cfg: &Config{
+					Upbound: Upbound{
+						Profiles: map[string]Profile{
+							exists: {
+								Type:    UserProfileType,
+								Account: "account",
+								BaseConfig: map[string]string{
+									"k": "v",
+								},
+							},
+						},
+					},
+				},
+			},
+			want: want{
+				base: "{\"k\":\"v\"}\n",
+			},
+		},
+	}
+	for name, tc := range cases {
+		t.Run(name, func(t *testing.T) {
+			r, err := tc.args.cfg.BaseToJSON(tc.args.profile)
+			if r != nil {
+				base, _ := ioutil.ReadAll(r)
+				if diff := cmp.Diff(tc.want.base, string(base)); diff != "" {
+					t.Errorf("\n%s\nBaseToJSON(...): -want, +got:\n%s", tc.reason, diff)
+				}
+			}
+			if diff := cmp.Diff(tc.want.err, err, test.EquateErrors()); diff != "" {
+				t.Errorf("\n%s\nBaseToJSON(...): -want error, +got error:\n%s", tc.reason, diff)
 			}
 		})
 	}
