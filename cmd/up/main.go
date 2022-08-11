@@ -16,10 +16,12 @@ package main
 
 import (
 	"fmt"
+	"io"
 	"math/rand"
 	"time"
 
 	"github.com/alecthomas/kong"
+	"github.com/pterm/pterm"
 
 	"github.com/upbound/up/cmd/up/upbound"
 	"github.com/upbound/up/cmd/up/uxp"
@@ -33,8 +35,6 @@ import (
 	_ "k8s.io/client-go/plugin/pkg/client/auth"
 )
 
-var _ = kong.Must(&cli)
-
 type versionFlag bool
 
 // BeforeApply indicates that we want to execute the logic before running any
@@ -45,8 +45,27 @@ func (v versionFlag) BeforeApply(ctx *kong.Context) error { // nolint:unparam
 	return nil
 }
 
-var cli struct {
+// AfterApply configures global settings before executing commands.
+func (c *cli) AfterApply(ctx *kong.Context) error {
+	if c.Quiet {
+		ctx.Stdout, ctx.Stderr = io.Discard, io.Discard
+	}
+	ctx.BindTo(pterm.DefaultBasicText.WithWriter(ctx.Stdout), (*pterm.TextPrinter)(nil))
+	ctx.Bind(pterm.DefaultTable.WithWriter(ctx.Stdout).WithSeparator("   "))
+	// TODO(hasheddan): configure pretty print styling to match Upbound
+	// branding.
+	if !c.Pretty {
+		// NOTE(hasheddan): enabling styling can make processing output with
+		// other tooling difficult.
+		pterm.DisableStyling()
+	}
+	return nil
+}
+
+type cli struct {
 	Version versionFlag `short:"v" name:"version" help:"Print version and exit."`
+	Quiet   bool        `short:"q" name:"quiet" help:"Suppress all output."`
+	Pretty  bool        `name:"pretty" help:"Pretty print output."`
 
 	License licenseCmd `cmd:"" help:"Print Up license information."`
 
@@ -62,7 +81,8 @@ var cli struct {
 
 func main() {
 	rand.Seed(time.Now().UTC().UnixNano())
-	ctx := kong.Parse(&cli,
+	c := cli{}
+	ctx := kong.Parse(&c,
 		kong.Name("up"),
 		kong.Description("The Upbound CLI"),
 		kong.UsageOnError())
