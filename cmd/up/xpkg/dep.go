@@ -129,6 +129,7 @@ func (c *depCmd) Run(ctx context.Context, p pterm.TextPrinter) error {
 	}
 	if len(deps) == 0 {
 		p.Println("xpkg cache up to date.")
+		return nil
 	}
 	p.Println("Dependencies added to xpkg cache:")
 	for _, d := range deps {
