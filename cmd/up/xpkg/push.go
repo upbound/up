@@ -17,10 +17,11 @@ package xpkg
 import (
 	"context"
 	"fmt"
-	"net/url"
 	"os"
 	"path/filepath"
+	"strings"
 
+	"github.com/alecthomas/kong"
 	"github.com/google/go-containerregistry/pkg/authn"
 	"github.com/google/go-containerregistry/pkg/name"
 	v1 "github.com/google/go-containerregistry/pkg/v1"
@@ -33,22 +34,30 @@ import (
 	"github.com/spf13/afero"
 	"golang.org/x/sync/errgroup"
 
+	"github.com/upbound/up-sdk-go/service/repositories"
 	"github.com/upbound/up/internal/credhelper"
+	"github.com/upbound/up/internal/upbound"
 	"github.com/upbound/up/internal/xpkg"
 )
 
 const (
-	errGetwd           = "failed to get working directory while searching for package"
-	errFindPackageinWd = "failed to find a package in current working directory"
-	errBuildImage      = "failed to build image from layers"
+	errCreateNotUpbound  = "cannot create repository for non-Upbound registry"
+	errCreateAccountRepo = "cannot create repository without account and repository names"
+	errCreateRepo        = "failed to create repository"
+	errGetwd             = "failed to get working directory while searching for package"
+	errFindPackageinWd   = "failed to find a package in current working directory"
+	errBuildImage        = "failed to build image from layers"
 )
-
-const upboundRegistry = "registry.upbound.io"
 
 // AfterApply constructs and binds Upbound-specific context to any subcommands
 // that have Run() methods that receive it.
-func (c *pushCmd) AfterApply() error {
+func (c *pushCmd) AfterApply(kongCtx *kong.Context) error {
 	c.fs = afero.NewOsFs()
+	upCtx, err := upbound.NewFromFlags(c.Flags)
+	if err != nil {
+		return err
+	}
+	kongCtx.Bind(upCtx)
 	return nil
 }
 
@@ -58,15 +67,34 @@ type pushCmd struct {
 
 	Tag     string   `arg:"" help:"Tag of the package to be pushed. Must be a valid OCI image tag."`
 	Package []string `short:"f" help:"Path to packages. If not specified and only one package exists in current directory it will be used."`
-	Domain  *url.URL `env:"UP_DOMAIN" default:"https://upbound.io" help:"Root Upbound domain."`
-	Profile string   `env:"UP_PROFILE" help:"Profile used to execute command."`
+	Create  bool     `help:"Create repository on push if it does not exist."`
+
+	// Common Upbound API configuration
+	Flags upbound.Flags `embed:""`
 }
 
 // Run runs the push cmd.
-func (c *pushCmd) Run(p pterm.TextPrinter) error { //nolint:gocyclo
-	tag, err := name.NewTag(c.Tag, name.WithDefaultRegistry(upboundRegistry))
+func (c *pushCmd) Run(p pterm.TextPrinter, upCtx *upbound.Context) error { //nolint:gocyclo
+	tag, err := name.NewTag(c.Tag, name.WithDefaultRegistry(upCtx.RegistryEndpoint.Hostname()))
 	if err != nil {
 		return err
+	}
+
+	if c.Create {
+		if !strings.Contains(tag.RegistryStr(), upCtx.RegistryEndpoint.Hostname()) {
+			return errors.New(errCreateNotUpbound)
+		}
+		parts := strings.Split(tag.RepositoryStr(), "/")
+		if len(parts) != 2 {
+			return errors.New(errCreateAccountRepo)
+		}
+		cfg, err := upCtx.BuildSDKConfig(upCtx.Profile.Session)
+		if err != nil {
+			return err
+		}
+		if err := repositories.NewClient(cfg).CreateOrUpdate(context.Background(), parts[0], parts[1]); err != nil {
+			return errors.Wrap(err, errCreateRepo)
+		}
 	}
 
 	// If package is not defined, attempt to find single package in current
@@ -86,8 +114,8 @@ func (c *pushCmd) Run(p pterm.TextPrinter) error { //nolint:gocyclo
 	kc := authn.NewMultiKeychain(
 		authn.NewKeychainFromHelper(
 			credhelper.New(
-				credhelper.WithDomain(c.Domain.Hostname()),
-				credhelper.WithProfile(c.Profile),
+				credhelper.WithDomain(upCtx.Domain.Hostname()),
+				credhelper.WithProfile(c.Flags.Profile),
 			),
 		),
 		authn.DefaultKeychain,
@@ -119,7 +147,7 @@ func (c *pushCmd) Run(p pterm.TextPrinter) error { //nolint:gocyclo
 				if err != nil {
 					return err
 				}
-				t, err = name.NewDigest(fmt.Sprintf("%s@%s", tag.Repository.Name(), d.String()), name.WithDefaultRegistry(upboundRegistry))
+				t, err = name.NewDigest(fmt.Sprintf("%s@%s", tag.Repository.Name(), d.String()), name.WithDefaultRegistry(upCtx.RegistryEndpoint.Hostname()))
 				if err != nil {
 					return err
 				}
