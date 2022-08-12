@@ -16,15 +16,25 @@ package upbound
 
 import (
 	"context"
+	"fmt"
 	"io"
 	"time"
 
 	"github.com/pkg/errors"
+	appsv1 "k8s.io/api/apps/v1"
 	corev1 "k8s.io/api/core/v1"
 	kerrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
+	"k8s.io/apimachinery/pkg/runtime/schema"
+	"k8s.io/apimachinery/pkg/watch"
+	"k8s.io/client-go/dynamic"
 	"k8s.io/client-go/kubernetes"
 	"sigs.k8s.io/yaml"
+
+	xpv1 "github.com/crossplane/crossplane-runtime/apis/common/v1"
+	"github.com/crossplane/crossplane-runtime/pkg/fieldpath"
+	"github.com/crossplane/crossplane-runtime/pkg/resource"
 
 	"github.com/upbound/up/internal/auth"
 	"github.com/upbound/up/internal/input"
@@ -34,8 +44,13 @@ import (
 	"github.com/upbound/up/internal/license"
 )
 
+var (
+	watcherTimeout int64 = 600
+)
+
 const (
-	defaultTimeout         = 30 * time.Second
+	defaultTimeout = 30 * time.Second
+
 	defaultSecretAccessKey = "access_key"
 	defaultSecretSignature = "signature"
 	defaultImagePullSecret = "upbound-pull-secret"
@@ -144,6 +159,7 @@ func (c *installCmd) Run(insCtx *install.Context) error {
 	}
 
 	// Create namespace if it does not exist.
+	fmt.Printf("[%d/%d]: creating namespace: %s\n", 1, 6, insCtx.Namespace)
 	_, err = c.kClient.CoreV1().Namespaces().Create(ctx, &corev1.Namespace{
 		ObjectMeta: metav1.ObjectMeta{
 			Name: insCtx.Namespace,
@@ -154,6 +170,7 @@ func (c *installCmd) Run(insCtx *install.Context) error {
 	}
 
 	// Create or update image pull secret.
+	fmt.Printf("[%d/%d]: creating secret: %s\n", 2, 6, defaultImagePullSecret)
 	if err := c.pullSecret.apply(ctx, defaultImagePullSecret, insCtx.Namespace, c.id, c.token, c.Registry.String()); err != nil {
 		return errors.Wrap(err, errCreateImagePullSecret)
 	}
@@ -169,9 +186,142 @@ func (c *installCmd) Run(insCtx *install.Context) error {
 		}
 	}
 
+	fmt.Printf("[%d/%d]: initializing upbound\n", 3, 6)
 	err = c.mgr.Install(c.Version, params)
 	if err != nil {
 		return err
 	}
+	fmt.Printf("[%d/%d]: starting upbound\n", 4, 6)
+
+	watchCtx := context.Background()
+
+	// change this to:
+	// * watch the upbound CR
+	// * output watches from across cluster
+	// * add comic flag
+
+	crdClient, err := dynamic.NewForConfig(insCtx.Kubeconfig)
+	if err != nil {
+		return err
+	}
+
+	crdWatcher, err := crdClient.Resource(schema.GroupVersionResource{
+		Group:    upboundGroup,
+		Version:  upboundVersion,
+		Resource: upboundResourcePlural,
+	}).Watch(watchCtx, metav1.ListOptions{TimeoutSeconds: &watcherTimeout})
+	if err != nil {
+		return err
+	}
+
+	for {
+		event, ok := <-crdWatcher.ResultChan()
+		if !ok {
+			break
+		}
+
+		uu, ok := event.Object.(*unstructured.Unstructured)
+		if !ok {
+			continue
+		}
+
+		u := Upbound{*uu}
+
+		switch event.Type {
+		case watch.Added:
+			// fmt.Printf("Upbound add: %s\n", u.GetObjectKind().GroupVersionKind())
+		case watch.Modified:
+			// fmt.Printf("Upbound modified: %s\n", u.GetObjectKind().GroupVersionKind())
+			if resource.IsConditionTrue(u.GetCondition(xpv1.TypeReady)) {
+				crdWatcher.Stop()
+			}
+		}
+	}
+
+	watcher, err := c.kClient.
+		AppsV1().
+		Deployments("").
+		Watch(watchCtx, metav1.ListOptions{TimeoutSeconds: &watcherTimeout})
+	if err != nil {
+		return err
+	}
+
+	dstack := make(map[schema.GroupVersionKind]struct{})
+
+	for {
+		event, ok := <-watcher.ResultChan()
+		if !ok {
+			break
+		}
+
+		o, ok := event.Object.(*appsv1.Deployment)
+		if !ok {
+			continue
+		}
+		d := Deployment{*o}
+
+		switch event.Type {
+		case watch.Added:
+			fmt.Printf("Deployment %s/%s added\n", d.Namespace, d.Name)
+			dstack[d.GroupVersionKind()] = struct{}{}
+		case watch.Modified:
+			fmt.Printf("Deployment %s/%s modified\n", d.Namespace, d.Name)
+
+			if resource.IsConditionTrue(d.GetCondition(appsv1.DeploymentAvailable)) {
+				fmt.Printf("deployment available: %s\n", d.Name)
+				fmt.Printf("stack before%+d\n", len(dstack))
+				delete(dstack, d.GroupVersionKind())
+				fmt.Printf("stack after%+d\n", len(dstack))
+			}
+		}
+
+		if len(dstack) == 0 {
+			watcher.Stop()
+		}
+	}
+
+	fmt.Printf("[%d/%d]: gathering ingress information\n", 5, 6)
+
+	fmt.Printf("[%d/%d]: upbound ready\n", 6, 6)
 	return err
+}
+
+// Upbound represents the Upbound CustomResource and extends an
+// unstructured.Unstructured.
+type Upbound struct {
+	unstructured.Unstructured
+}
+
+// GetCondition returns the condition for the given xpv1.ConditionType if it
+// exists, otherwise returns nil.
+func (s *Upbound) GetCondition(ct xpv1.ConditionType) xpv1.Condition {
+	conditioned := xpv1.ConditionedStatus{}
+	// The path is directly `status` because conditions are inline.
+	if err := fieldpath.Pave(s.Object).GetValueInto("status", &conditioned); err != nil {
+		return xpv1.Condition{}
+	}
+	return conditioned.GetCondition(ct)
+}
+
+// Deployment extends an appsv1.Deployment.
+type Deployment struct {
+	appsv1.Deployment
+}
+
+// GetCondition returns the condition for the given DeploymentConditionType if it
+// exists, otherwise returns nil.
+func (s *Deployment) GetCondition(ct appsv1.DeploymentConditionType) xpv1.Condition {
+	for _, c := range s.Status.Conditions {
+		if c.Type == ct {
+			return xpv1.Condition{
+				Type:               xpv1.ConditionType(c.Type),
+				Status:             c.Status,
+				LastTransitionTime: c.LastTransitionTime,
+				Reason:             xpv1.ConditionReason(c.Reason),
+				Message:            c.Message,
+			}
+		}
+	}
+
+	return xpv1.Condition{Type: xpv1.ConditionType(ct), Status: corev1.ConditionUnknown}
 }
