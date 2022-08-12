@@ -74,7 +74,7 @@ type cli struct {
 	Logout logoutCmd `cmd:"" help:"Logout of Upbound."`
 
 	ControlPlane controlplane.Cmd `cmd:"" name:"controlplane" aliases:"ctp" help:"Interact with control planes."`
-	Repository   repository.Cmd   `cmd:"" name:"repository" aliases:"r" help:"Interact with repositories."`
+	Repository   repository.Cmd   `cmd:"" name:"repository" aliases:"repo" help:"Interact with repositories."`
 	Upbound      upbound.Cmd      `cmd:"" help:"Interact with Upbound."`
 	UXP          uxp.Cmd          `cmd:"" help:"Interact with UXP."`
 	XPKG         xpkg.Cmd         `cmd:"" help:"Interact with UXP packages."`
