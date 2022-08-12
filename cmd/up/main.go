@@ -24,6 +24,7 @@ import (
 	"github.com/pterm/pterm"
 
 	"github.com/upbound/up/cmd/up/controlplane"
+	"github.com/upbound/up/cmd/up/repository"
 	"github.com/upbound/up/cmd/up/upbound"
 	"github.com/upbound/up/cmd/up/uxp"
 	"github.com/upbound/up/cmd/up/xpkg"
@@ -73,6 +74,7 @@ type cli struct {
 	Logout logoutCmd `cmd:"" help:"Logout of Upbound."`
 
 	ControlPlane controlplane.Cmd `cmd:"" name:"controlplane" aliases:"ctp" help:"Interact with control planes."`
+	Repository   repository.Cmd   `cmd:"" name:"repository" aliases:"repo" help:"Interact with repositories."`
 	Upbound      upbound.Cmd      `cmd:"" help:"Interact with Upbound."`
 	UXP          uxp.Cmd          `cmd:"" help:"Interact with UXP."`
 	XPKG         xpkg.Cmd         `cmd:"" help:"Interact with UXP packages."`

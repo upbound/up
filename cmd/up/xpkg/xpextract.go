@@ -32,6 +32,7 @@ import (
 	"github.com/pterm/pterm"
 	"github.com/spf13/afero"
 
+	"github.com/upbound/up/internal/upbound"
 	"github.com/upbound/up/internal/xpkg"
 )
 
@@ -102,7 +103,11 @@ func (c *xpExtractCmd) AfterApply() error {
 		if c.Package == "" {
 			return errors.New(errMustProvideTag)
 		}
-		name, err := name.ParseReference(c.Package, name.WithDefaultRegistry(upboundRegistry))
+		upCtx, err := upbound.NewFromFlags(c.Flags)
+		if err != nil {
+			return err
+		}
+		name, err := name.ParseReference(c.Package, name.WithDefaultRegistry(upCtx.RegistryEndpoint.Hostname()))
 		if err != nil {
 			return errors.Wrap(err, errInvalidTag)
 		}
@@ -122,6 +127,9 @@ type xpExtractCmd struct {
 	FromDaemon bool   `xor:"xp-extract-from" help:"Indicates that the image should be fetched from the Docker daemon."`
 	FromXpkg   bool   `xor:"xp-extract-from" help:"Indicates that the image should be fetched from a local xpkg. If package is not specified and only one exists in current directory it will be used."`
 	Output     string `short:"o" help:"Package output file path. Extension must be .gz or will be replaced." default:"out.gz"`
+
+	// Common Upbound API configuration
+	Flags upbound.Flags `embed:""`
 }
 
 // Run runs the xp extract cmd.
