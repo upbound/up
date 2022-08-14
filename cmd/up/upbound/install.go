@@ -18,6 +18,7 @@ import (
 	"context"
 	"fmt"
 	"io"
+	"net"
 	"time"
 
 	"github.com/pkg/errors"
@@ -62,6 +63,7 @@ const (
 	errCreateImagePullSecret  = "failed to create image pull secret"
 	errCreateLicenseSecret    = "failed to create license secret"
 	errCreateNamespace        = "failed to create namespace"
+	errTimoutExternalIP       = "timed out waiting for externalIP to resolve"
 )
 
 // BeforeApply sets default values in login before assignment and validation.
@@ -167,6 +169,10 @@ func (c *installCmd) Run(insCtx *install.Context) error {
 	}
 
 	spinnerIngress, _ := checkmarkSuccessSpinner.Start("Gathering ingress information")
+	ipAddress, err := c.getExternalIP(params)
+	if err != nil {
+		return err
+	}
 	spinnerIngress.Success()
 	time.Sleep(time.Second * 1)
 
@@ -264,4 +270,62 @@ func (c *installCmd) installUpbound(_ context.Context, kubeconfig *rest.Config, 
 	close(ccancel)
 	<-stopped
 	return nil
+}
+
+// getExternalIP returns the externalIP of the Upbound installation. At its
+// core its doing two things:
+//  1. If the provider is not specified, the kind install is assumed which means
+//     localhost is assumed.
+//  2. If the provider is specified, the externalIP is derived from the
+//     ingress-nginx-controller.
+//
+// NOTE(tnthornton) this function is a temporary measure to calculate the
+// externalIP for the Upbound install until the Upbound Custom Resource exposes
+// this information on its status.externalIP field.
+func (c *installCmd) getExternalIP(params map[string]any) (string, error) { //nolint:gocyclo
+	provider, ok := params["provider"]
+	if !ok {
+		// default provider (kind) is used, return localhost
+		return "127.0.0.1", nil
+	}
+
+	// retry until we have an externalIP or timeout
+	timeout := time.After(120 * time.Second)
+	ticker := time.NewTicker(500 * time.Millisecond)
+
+	for {
+		select {
+		case <-timeout:
+			return "", errors.New(errTimoutExternalIP)
+		case <-ticker.C:
+			svc, err := c.kClient.
+				CoreV1().
+				Services("ingress-nginx").
+				Get(context.Background(), "ingress-nginx-controller", metav1.GetOptions{})
+			if err != nil {
+				return "", nil
+			}
+
+			switch provider {
+			case "aws":
+				record := svc.Spec.ExternalIPs[0]
+				if record == "" {
+					continue
+				}
+
+				ips, err := net.LookupIP(record)
+				if err != nil {
+					return "", nil
+				}
+				if len(ips) >= 1 {
+					return ips[0].String(), nil
+				}
+			default:
+				ip := svc.Spec.ExternalIPs[0]
+				if ip != "" {
+					return ip, nil
+				}
+			}
+		}
+	}
 }

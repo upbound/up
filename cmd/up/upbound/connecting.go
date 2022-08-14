@@ -1,12 +1,17 @@
 package upbound
 
-import "github.com/pterm/pterm"
+import (
+	"fmt"
+
+	"github.com/pterm/pterm"
+
+	"github.com/upbound/up/internal/resources"
+)
 
 const (
-	ipAddress = "127.0.0.1"
 	// TODO(tnthornton) replace these hardcode values with a query to Upbound
 	// status field to derive the hostnames.
-	hostNames = `upbound.local.upbound.io accounts.local.upbound.io static.local.upbound.io api.local.upbound.io static.local.upbound.io api.local.upbound.io proxy.local.upbound.io icons.local.upbound.io`
+	hostNames = `upbound.%[1]s accounts.%[1]s static.%[1]s api.%[1]s proxy.%[1]s icons.%[1]s`
 )
 
 func outputConnectingInfo(ipAddress, hostNames string) {
@@ -15,8 +20,8 @@ func outputConnectingInfo(ipAddress, hostNames string) {
 	pterm.Println()
 	pterm.Println("👉 (1): Add the following entry to your /etc/hosts file:")
 	pterm.Println()
-	pterm.Printf("%s\t%s", ipAddress, hostNames)
+	pterm.Printf("%s\t%s", ipAddress, fmt.Sprintf(hostNames, resources.Domain))
 	pterm.Println()
 	pterm.Println()
-	pterm.Println("👉 (2): Go to http://upbound.local.upbound.io in your browser.")
+	pterm.Printfln("👉 (2): Go to http://upbound.%s in your browser.", resources.Domain)
 }
