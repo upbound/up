@@ -18,6 +18,7 @@ import (
 	"os"
 
 	"github.com/pkg/errors"
+
 	"github.com/upbound/up/internal/upbound"
 )
 

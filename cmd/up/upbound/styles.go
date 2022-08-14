@@ -51,17 +51,3 @@ func wrapWithSuccessSpinner(msg string, spinner *pterm.SpinnerPrinter, f func() 
 	s.Success()
 	return nil
 }
-
-func wrapWithInfoSpinner(msg string, spinner *pterm.SpinnerPrinter, f func() error) error {
-	s, err := spinner.Start(msg)
-	if err != nil {
-		return err
-	}
-
-	if err := f(); err != nil {
-		return err
-	}
-
-	s.Info()
-	return nil
-}

@@ -48,8 +48,7 @@ func watchCustomResource(ctx context.Context, gvr schema.GroupVersionResource, k
 
 		u := resources.Upbound{Unstructured: *uu}
 
-		switch event.Type {
-		case watch.Modified:
+		if event.Type == watch.Modified {
 			if resource.IsConditionTrue(u.GetCondition(xpv1.TypeReady)) {
 				crdWatcher.Stop()
 			}
@@ -89,8 +88,9 @@ func watchDeployments(ctx context.Context, kclient kubernetes.Interface, cancel,
 		case <-cancel:
 			watcher.Stop()
 		default:
-			switch event.Type {
-			case watch.Added, watch.Modified: // we're only interested in adds/updates at this point
+			switch event.Type { // nolint: exhaustive
+			// we're only interested in adds/updates at this point
+			case watch.Added, watch.Modified:
 				spinnerComponents.UpdateText(componentText.Sprint(text))
 			}
 		}

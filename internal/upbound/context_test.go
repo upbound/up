@@ -25,6 +25,7 @@ import (
 	"github.com/google/go-cmp/cmp"
 	"github.com/google/go-cmp/cmp/cmpopts"
 	"github.com/spf13/afero"
+
 	"github.com/upbound/up/internal/config"
 )
 
@@ -70,7 +71,7 @@ func withConfig(config string) Option {
 		fs.MkdirAll(filepath.Dir("/.up/"), 0755)
 		f, _ := fs.Create("/.up/config.json")
 
-		f.Write([]byte(config))
+		f.WriteString(config)
 
 		ctx.fs = fs
 	}
@@ -109,7 +110,7 @@ func TestNewFromFlags(t *testing.T) {
 		want   want
 	}{
 		"NoPreExistingProfile": {
-			reason: "We should succesfully return a Context if a pre-existing profile does not exist.",
+			reason: "We should successfully return a Context if a pre-existing profile does not exist.",
 			args: args{
 				flags: []string{},
 				opts: []Option{

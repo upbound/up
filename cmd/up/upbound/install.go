@@ -27,6 +27,7 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/client-go/kubernetes"
+	"k8s.io/client-go/rest"
 	"sigs.k8s.io/yaml"
 
 	"github.com/upbound/up/internal/auth"
@@ -157,101 +158,110 @@ func (c *installCmd) Run(insCtx *install.Context) error {
 		return errors.Wrap(err, errParseInstallParameters)
 	}
 
-	render := true
-	if render {
-
-		if err := wrapWithSuccessSpinner(
-			fmt.Sprintf("Creating namespace %s", insCtx.Namespace),
-			checkmarkSuccessSpinner,
-			func() error {
-				_, err = c.kClient.CoreV1().Namespaces().Create(ctx, &corev1.Namespace{
-					ObjectMeta: metav1.ObjectMeta{
-						Name: insCtx.Namespace,
-					},
-				}, metav1.CreateOptions{})
-				if err != nil && !kerrors.IsAlreadyExists(err) {
-					return errors.Wrap(err, errCreateNamespace)
-				}
-				return nil
-			},
-		); err != nil {
-			return err
-		}
-
-		if err := wrapWithSuccessSpinner(
-			fmt.Sprintf("Creating secret %s", defaultImagePullSecret),
-			checkmarkSuccessSpinner,
-			func() error {
-				if err := c.pullSecret.apply(
-					ctx,
-					defaultImagePullSecret,
-					insCtx.Namespace,
-					c.id,
-					c.token,
-					c.Registry.String(),
-				); err != nil {
-					return errors.Wrap(err, errCreateImagePullSecret)
-				}
-				return nil
-			},
-		); err != nil {
-			return err
-		}
-
-		// Create or update access key secret unless skip license is specified.
-		if !c.SkipLicense {
-			keyVersion := c.Version
-			if c.KeyVersionOverride != "" {
-				keyVersion = c.KeyVersionOverride
-			}
-			if err := c.access.apply(ctx, c.LicenseSecretName, insCtx.Namespace, keyVersion); err != nil {
-				return errors.Wrap(err, errCreateLicenseSecret)
-			}
-		}
-
-		if err := wrapWithSuccessSpinner(
-			"Initializing Upbound",
-			checkmarkSuccessSpinner,
-			func() error {
-				if err = c.mgr.Install(c.Version, params); err != nil {
-					return err
-				}
-				return nil
-			},
-		); err != nil {
-			return err
-		}
-
-		// Print Info message to indicate next large step
-		spinnerStart, _ := eyesInfoSpinner.Start("Starting Upbound")
-		spinnerStart.Info()
-
-		watchCtx := context.Background()
-		ccancel := make(chan bool)
-		stopped := make(chan bool)
-		// NOTE(tnthornton) we spin off the deployment watching so that we can
-		// watch both the custom resource as well as the deployment events at
-		// the same time.
-		go watchDeployments(context.Background(), c.kClient, ccancel, stopped)
-
-		if err := watchCustomResource(watchCtx, upboundGVR, insCtx.Kubeconfig); err != nil {
-			return err
-		}
-
-		ccancel <- true
-		close(ccancel)
-		<-stopped
-
-		spinnerIngress, _ := checkmarkSuccessSpinner.Start("Gathering ingress information")
-		spinnerIngress.Success()
-		time.Sleep(time.Second * 1)
-
-		pterm.Info.WithPrefix(raisedPrefix).Println("Upbound ready")
-		time.Sleep(2 * time.Second)
-
+	if err := c.applySecrets(ctx, insCtx.Namespace); err != nil {
+		return err
 	}
+
+	if err := c.installUpbound(ctx, insCtx.Kubeconfig, params); err != nil {
+		return err
+	}
+
+	spinnerIngress, _ := checkmarkSuccessSpinner.Start("Gathering ingress information")
+	spinnerIngress.Success()
+	time.Sleep(time.Second * 1)
+
+	pterm.Info.WithPrefix(raisedPrefix).Println("Upbound ready")
+	time.Sleep(2 * time.Second)
 
 	outputConnectingInfo(ipAddress, hostNames)
 
 	return err
+}
+
+func (c *installCmd) applySecrets(ctx context.Context, namespace string) error {
+	if err := wrapWithSuccessSpinner(
+		fmt.Sprintf("Creating namespace %s", namespace),
+		checkmarkSuccessSpinner,
+		func() error {
+			_, err := c.kClient.CoreV1().Namespaces().Create(ctx, &corev1.Namespace{
+				ObjectMeta: metav1.ObjectMeta{
+					Name: namespace,
+				},
+			}, metav1.CreateOptions{})
+			if err != nil && !kerrors.IsAlreadyExists(err) {
+				return errors.Wrap(err, errCreateNamespace)
+			}
+			return nil
+		},
+	); err != nil {
+		return err
+	}
+
+	if err := wrapWithSuccessSpinner(
+		fmt.Sprintf("Creating secret %s", defaultImagePullSecret),
+		checkmarkSuccessSpinner,
+		func() error {
+			if err := c.pullSecret.apply(
+				ctx,
+				defaultImagePullSecret,
+				namespace,
+				c.id,
+				c.token,
+				c.Registry.String(),
+			); err != nil {
+				return errors.Wrap(err, errCreateImagePullSecret)
+			}
+			return nil
+		},
+	); err != nil {
+		return err
+	}
+
+	// Create or update access key secret unless skip license is specified.
+	if !c.SkipLicense {
+		keyVersion := c.Version
+		if c.KeyVersionOverride != "" {
+			keyVersion = c.KeyVersionOverride
+		}
+		if err := c.access.apply(ctx, c.LicenseSecretName, namespace, keyVersion); err != nil {
+			return errors.Wrap(err, errCreateLicenseSecret)
+		}
+	}
+	return nil
+}
+
+func (c *installCmd) installUpbound(_ context.Context, kubeconfig *rest.Config, params map[string]any) error {
+	if err := wrapWithSuccessSpinner(
+		"Initializing Upbound",
+		checkmarkSuccessSpinner,
+		func() error {
+			if err := c.mgr.Install(c.Version, params); err != nil {
+				return err
+			}
+			return nil
+		},
+	); err != nil {
+		return err
+	}
+
+	// Print Info message to indicate next large step
+	spinnerStart, _ := eyesInfoSpinner.Start("Starting Upbound")
+	spinnerStart.Info()
+
+	watchCtx := context.Background()
+	ccancel := make(chan bool)
+	stopped := make(chan bool)
+	// NOTE(tnthornton) we spin off the deployment watching so that we can
+	// watch both the custom resource as well as the deployment events at
+	// the same time.
+	go watchDeployments(context.Background(), c.kClient, ccancel, stopped) //nolint:errcheck
+
+	if err := watchCustomResource(watchCtx, upboundGVR, kubeconfig); err != nil {
+		return err
+	}
+
+	ccancel <- true
+	close(ccancel)
+	<-stopped
+	return nil
 }

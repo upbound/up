@@ -24,6 +24,7 @@ import (
 
 	"github.com/alecthomas/kong"
 	"github.com/spf13/afero"
+
 	"github.com/upbound/up-sdk-go"
 	"github.com/upbound/up/internal/config"
 )
@@ -86,7 +87,7 @@ type Context struct {
 type Option func(*Context)
 
 // NewFromFlags constructs a new context from flags.
-func NewFromFlags(f Flags, opts ...Option) (*Context, error) {
+func NewFromFlags(f Flags, opts ...Option) (*Context, error) { //nolint:gocyclo
 	p, err := config.GetDefaultPath()
 	if err != nil {
 		return nil, err
