@@ -77,7 +77,7 @@ func (c *installCmd) BeforeApply() error {
 }
 
 // AfterApply sets default values in command after assignment and validation.
-func (c *installCmd) AfterApply(insCtx *install.Context, kongCtx *kong.Context) error {
+func (c *installCmd) AfterApply(insCtx *install.Context, kongCtx *kong.Context, quiet bool) error {
 	upCtx, err := upbound.NewFromFlags(c.Flags)
 	if err != nil {
 		return err
@@ -139,6 +139,7 @@ func (c *installCmd) AfterApply(insCtx *install.Context, kongCtx *kong.Context) 
 		}
 	}
 	c.parser = helm.NewParser(base, c.Set)
+	c.quiet = quiet
 	return nil
 }
 
@@ -152,6 +153,7 @@ type installCmd struct {
 	pullSecret *imagePullApplicator
 	id         string
 	token      string
+	quiet      bool
 
 	Version string `arg:"" help:"Upbound version to install."`
 
@@ -180,112 +182,128 @@ func (c *installCmd) Run(insCtx *install.Context, upCtx *upbound.Context) error 
 		return err
 	}
 
-	spinnerIngress, _ := checkmarkSuccessSpinner.Start("Gathering ingress information")
-	// Sleep for 1s to ensure pterm has enough time for 1 spin. Without this
-	// line, the operation can complete too quick resulting in two lines
-	// written for the "Gathering" spinner.
-	time.Sleep(1 * time.Second)
-	ipAddress, err := c.getExternalIP(params)
-	if err != nil {
-		return err
+	if !c.quiet {
+		spinnerIngress, _ := checkmarkSuccessSpinner.Start("Gathering ingress information")
+		// Sleep for 1s to ensure pterm has enough time for 1 spin. Without this
+		// line, the operation can complete too quick resulting in two lines
+		// written for the "Gathering" spinner.
+		time.Sleep(1 * time.Second)
+		ipAddress, err := c.getExternalIP(params)
+		if err != nil {
+			return err
+		}
+		spinnerIngress.Success()
+
+		pterm.Info.WithPrefix(raisedPrefix).Println("Upbound ready")
+		time.Sleep(2 * time.Second)
+
+		outputConnectingInfo(ipAddress, hostNames)
 	}
-	spinnerIngress.Success()
-
-	pterm.Info.WithPrefix(raisedPrefix).Println("Upbound ready")
-	time.Sleep(2 * time.Second)
-
-	outputConnectingInfo(ipAddress, hostNames)
 
 	return updateProfile(upCtx)
 }
 
-func (c *installCmd) applySecrets(ctx context.Context, namespace string) error {
-	if err := wrapWithSuccessSpinner(
-		fmt.Sprintf("Creating namespace %s", namespace),
-		checkmarkSuccessSpinner,
-		func() error {
-			_, err := c.kClient.CoreV1().Namespaces().Create(ctx, &corev1.Namespace{
-				ObjectMeta: metav1.ObjectMeta{
-					Name: namespace,
-				},
-			}, metav1.CreateOptions{})
-			if err != nil && !kerrors.IsAlreadyExists(err) {
-				return errors.Wrap(err, errCreateNamespace)
-			}
-			return nil
-		},
-	); err != nil {
-		return err
+func (c *installCmd) applySecrets(ctx context.Context, namespace string) error { //nolint:gocyclo
+	createNs := func() error {
+		_, err := c.kClient.CoreV1().Namespaces().Create(ctx, &corev1.Namespace{
+			ObjectMeta: metav1.ObjectMeta{
+				Name: namespace,
+			},
+		}, metav1.CreateOptions{})
+		if err != nil && !kerrors.IsAlreadyExists(err) {
+			return errors.Wrap(err, errCreateNamespace)
+		}
+		return nil
+	}
+	creatPullSecret := func() error {
+		if err := c.pullSecret.apply(
+			ctx,
+			defaultImagePullSecret,
+			namespace,
+			c.id,
+			c.token,
+			c.Registry.String(),
+		); err != nil {
+			return errors.Wrap(err, errCreateImagePullSecret)
+		}
+		return nil
 	}
 
-	if err := wrapWithSuccessSpinner(
-		fmt.Sprintf("Creating secret %s", defaultImagePullSecret),
-		checkmarkSuccessSpinner,
-		func() error {
-			if err := c.pullSecret.apply(
-				ctx,
-				defaultImagePullSecret,
-				namespace,
-				c.id,
-				c.token,
-				c.Registry.String(),
-			); err != nil {
-				return errors.Wrap(err, errCreateImagePullSecret)
+	if !c.quiet {
+		if err := wrapWithSuccessSpinner(
+			fmt.Sprintf("Creating namespace %s", namespace),
+			checkmarkSuccessSpinner,
+			createNs,
+		); err != nil {
+			return err
+		}
+
+		if err := wrapWithSuccessSpinner(
+			fmt.Sprintf("Creating secret %s", defaultImagePullSecret),
+			checkmarkSuccessSpinner,
+			creatPullSecret,
+		); err != nil {
+			return err
+		}
+
+		// Create or update access key secret unless skip license is specified.
+		if !c.SkipLicense {
+			keyVersion := c.Version
+			if c.KeyVersionOverride != "" {
+				keyVersion = c.KeyVersionOverride
 			}
-			return nil
-		},
-	); err != nil {
+			if err := c.access.apply(ctx, c.LicenseSecretName, namespace, keyVersion); err != nil {
+				return errors.Wrap(err, errCreateLicenseSecret)
+			}
+		}
+		return nil
+	}
+	if err := createNs(); err != nil {
 		return err
 	}
-
-	// Create or update access key secret unless skip license is specified.
-	if !c.SkipLicense {
-		keyVersion := c.Version
-		if c.KeyVersionOverride != "" {
-			keyVersion = c.KeyVersionOverride
-		}
-		if err := c.access.apply(ctx, c.LicenseSecretName, namespace, keyVersion); err != nil {
-			return errors.Wrap(err, errCreateLicenseSecret)
-		}
-	}
-	return nil
+	return creatPullSecret()
 }
 
 func (c *installCmd) installUpbound(ctx context.Context, kubeconfig *rest.Config, params map[string]any) error {
-	if err := wrapWithSuccessSpinner(
-		"Initializing Upbound",
-		checkmarkSuccessSpinner,
-		func() error {
-			if err := c.mgr.Install(c.Version, params); err != nil {
-				return err
-			}
-			return nil
-		},
-	); err != nil {
-		return err
+	install := func() error {
+		if err := c.mgr.Install(c.Version, params); err != nil {
+			return err
+		}
+		return nil
 	}
 
-	// Print Info message to indicate next large step
-	spinnerStart, _ := eyesInfoSpinner.Start("Starting Upbound")
-	spinnerStart.Info()
+	if !c.quiet {
+		if err := wrapWithSuccessSpinner(
+			"Initializing Upbound",
+			checkmarkSuccessSpinner,
+			install,
+		); err != nil {
+			return err
+		}
 
-	watchCtx, cancel := context.WithTimeout(ctx, time.Duration(watcherTimeout))
-	defer cancel()
-	ccancel := make(chan bool)
-	stopped := make(chan bool)
-	// NOTE(tnthornton) we spin off the deployment watching so that we can
-	// watch both the custom resource as well as the deployment events at
-	// the same time.
-	go watchDeployments(watchCtx, c.kClient, ccancel, stopped) //nolint:errcheck
+		// Print Info message to indicate next large step
+		spinnerStart, _ := eyesInfoSpinner.Start("Starting Upbound")
+		spinnerStart.Info()
 
-	if err := watchCustomResource(watchCtx, upboundGVR, kubeconfig); err != nil {
-		return err
+		watchCtx, cancel := context.WithTimeout(ctx, time.Duration(watcherTimeout*int64(time.Second)))
+		defer cancel()
+		ccancel := make(chan bool)
+		stopped := make(chan bool)
+		// NOTE(tnthornton) we spin off the deployment watching so that we can
+		// watch both the custom resource as well as the deployment events at
+		// the same time.
+		go watchDeployments(watchCtx, c.kClient, ccancel, stopped) //nolint:errcheck
+
+		if err := watchCustomResource(watchCtx, upboundGVR, kubeconfig); err != nil {
+			return err
+		}
+
+		ccancel <- true
+		close(ccancel)
+		<-stopped
+		return nil
 	}
-
-	ccancel <- true
-	close(ccancel)
-	<-stopped
-	return nil
+	return install()
 }
 
 // getExternalIP returns the externalIP of the Upbound installation. At its

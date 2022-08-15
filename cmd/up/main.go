@@ -61,6 +61,7 @@ func (c *cli) AfterApply(ctx *kong.Context) error { //nolint:unparam
 		// other tooling difficult.
 		pterm.DisableStyling()
 	}
+	ctx.Bind(c.Quiet)
 	return nil
 }
 
