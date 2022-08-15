@@ -12,23 +12,29 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-package config
+package profile
 
 import (
-	"github.com/pkg/errors"
+	"encoding/json"
+	"fmt"
 
+	"github.com/alecthomas/kong"
 	"github.com/upbound/up/internal/upbound"
 )
 
-type useCmd struct {
-	Name string `arg:"" required:"" help:"Name of the Profile to use."`
-}
+type listCmd struct{}
 
-// Run executes the Use command.
-func (c *useCmd) Run(upCtx *upbound.Context) error {
-	if err := upCtx.Cfg.SetDefaultUpboundProfile(c.Name); err != nil {
+// Run executes the list command.
+func (c *listCmd) Run(ctx *kong.Context, upCtx *upbound.Context) error {
+	profiles, err := upCtx.Cfg.GetUpboundProfiles()
+	if err != nil {
 		return err
 	}
 
-	return errors.Wrap(upCtx.CfgSrc.UpdateConfig(upCtx.Cfg), errUpdateConfig)
+	b, err := json.MarshalIndent(profiles, "", "    ")
+	if err != nil {
+		return err
+	}
+	fmt.Fprintln(ctx.Stdout, string(b))
+	return nil
 }

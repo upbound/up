@@ -102,6 +102,17 @@ type Profile struct {
 	BaseConfig map[string]string `json:"base,omitempty"`
 }
 
+// MarshalJSON overrides the session field with `REDACTED` so as not to leak
+// sensitive information. We're using an explicit copy here instead of updating
+// the underlying Profile struct so as to not modifying the internal state of
+// the struct by accident.
+func (p Profile) MarshalJSON() ([]byte, error) {
+	type profile Profile
+	pc := profile(p)
+	pc.Session = "REDACTED"
+	return json.Marshal(&pc)
+}
+
 // checkProfile ensures a profile does not violate constraints.
 func checkProfile(p Profile) error {
 	if p.ID == "" || p.Type == "" {

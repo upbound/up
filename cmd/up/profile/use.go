@@ -12,28 +12,27 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-package config
+package profile
 
 import (
-	"encoding/json"
-	"fmt"
+	"github.com/pkg/errors"
 
 	"github.com/upbound/up/internal/upbound"
 )
 
-type listCmd struct{}
+const (
+	errUpdateProfile = "unable to update profile"
+)
 
-// Run executes the list command.
-func (c *listCmd) Run(upCtx *upbound.Context) error {
-	profiles, err := upCtx.Cfg.GetUpboundProfiles()
-	if err != nil {
+type useCmd struct {
+	Name string `arg:"" required:"" help:"Name of the Profile to use."`
+}
+
+// Run executes the Use command.
+func (c *useCmd) Run(upCtx *upbound.Context) error {
+	if err := upCtx.Cfg.SetDefaultUpboundProfile(c.Name); err != nil {
 		return err
 	}
 
-	b, err := json.MarshalIndent(profiles, "", "    ")
-	if err != nil {
-		return err
-	}
-	fmt.Println(string(b))
-	return nil
+	return errors.Wrap(upCtx.CfgSrc.UpdateConfig(upCtx.Cfg), errUpdateProfile)
 }

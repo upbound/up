@@ -12,12 +12,13 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-package config
+package profile
 
 import (
 	"encoding/json"
 	"fmt"
 
+	"github.com/alecthomas/kong"
 	"github.com/upbound/up/internal/config"
 	"github.com/upbound/up/internal/upbound"
 )
@@ -30,7 +31,7 @@ type output struct {
 }
 
 // Run executes the current command.
-func (c *currentCmd) Run(upCtx *upbound.Context) error {
+func (c *currentCmd) Run(ctx *kong.Context, upCtx *upbound.Context) error {
 	name, profile, err := upCtx.Cfg.GetDefaultUpboundProfile()
 	if err != nil {
 		return err
@@ -43,6 +44,6 @@ func (c *currentCmd) Run(upCtx *upbound.Context) error {
 	if err != nil {
 		return err
 	}
-	fmt.Println(string(b))
+	fmt.Fprintln(ctx.Stdout, string(b))
 	return nil
 }

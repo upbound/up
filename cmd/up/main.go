@@ -23,8 +23,8 @@ import (
 	"github.com/alecthomas/kong"
 	"github.com/pterm/pterm"
 
-	"github.com/upbound/up/cmd/up/config"
 	"github.com/upbound/up/cmd/up/controlplane"
+	"github.com/upbound/up/cmd/up/profile"
 	"github.com/upbound/up/cmd/up/repository"
 	"github.com/upbound/up/cmd/up/upbound"
 	"github.com/upbound/up/cmd/up/uxp"
@@ -73,8 +73,8 @@ type cli struct {
 
 	Login        loginCmd         `cmd:"" help:"Login to Upbound."`
 	Logout       logoutCmd        `cmd:"" help:"Logout of Upbound."`
-	Config       config.Cmd       `cmd:"" help:"Interact with Upbound Profiles"`
 	ControlPlane controlplane.Cmd `cmd:"" name:"controlplane" aliases:"ctp" help:"Interact with control planes."`
+	Profile      profile.Cmd      `cmd:"" help:"Interact with Upbound Profiles"`
 	Repository   repository.Cmd   `cmd:"" name:"repository" aliases:"repo" help:"Interact with repositories."`
 	Upbound      upbound.Cmd      `cmd:"" help:"Interact with Upbound."`
 	UXP          uxp.Cmd          `cmd:"" help:"Interact with UXP."`

@@ -22,11 +22,8 @@ import (
 
 // Cmd contains commands for Upbound Profiles.
 type Cmd struct {
-	Current currentCmd `cmd:"" group:"config" help:"Get current Upbound Profile."`
-	List    listCmd    `cmd:"" group:"config" help:"List Upbound Profiles."`
-	Set     setCmd     `cmd:"" group:"config" help:"Set base configuration key, value pair in the Upbound Profile."`
-	UnSet   unsetCmd   `cmd:"" group:"config" name:"unset" help:"Unset base configuration key, value pair in the Upbound Profile."`
-	Use     useCmd     `cmd:"" group:"config" help:"Set the default Upbound Profile to the given Profile."`
+	Set   setCmd   `cmd:"" group:"config" help:"Set base configuration key, value pair in the Upbound Profile."`
+	UnSet unsetCmd `cmd:"" group:"config" name:"unset" help:"Unset base configuration key, value pair in the Upbound Profile."`
 
 	Flags upbound.Flags `embed:""`
 }
