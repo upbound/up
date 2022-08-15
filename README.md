@@ -68,6 +68,23 @@ curl -sLo up.rpm https://cli.upbound.io/stable/${VERSION}/rpm/linux_${ARCH}/up.r
 curl -sLo up.rpm https://cli.upbound.io/stable/${VERSION}/rpm/linux_${ARCH}/docker-credential-up.rpm
 ```
 
+### Nix
+
+The `up` CLI is available via [Nixpkgs] via the `upbound` attribute. To install using
+`nix-env`:
+
+```
+nix-env -iA upbound
+```
+
+To install using the unified `nix` CLI:
+
+```
+nix profile install upbound
+```
+
+Both installation methods install both the `docker-credential-up` and `up` executables.
+
 ## Setup
 
 Users typically begin by either logging in to Upbound or installing [UXP].
@@ -150,3 +167,4 @@ information.
 [Crossplane]: https://crossplane.io
 [supported commands]: docs/commands.md
 [common workflows]: docs/workflows.md
+[nixpkgs]: https://github.com/NixOS/nixpkgs
