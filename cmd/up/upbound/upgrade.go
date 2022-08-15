@@ -174,7 +174,7 @@ func (c *upgradeCmd) upgradeUpbound(ctx context.Context, kubeconfig *rest.Config
 
 	if !c.quiet {
 		if err := wrapWithSuccessSpinner(
-			"Upgrading Upbound",
+			stepCounter("Upgrading Upbound", 1, 2),
 			checkmarkSuccessSpinner,
 			upgrade,
 		); err != nil {
@@ -182,7 +182,7 @@ func (c *upgradeCmd) upgradeUpbound(ctx context.Context, kubeconfig *rest.Config
 		}
 
 		// Print Info message to indicate next large step
-		spinnerStart, _ := eyesInfoSpinner.Start("Starting Upbound")
+		spinnerStart, _ := eyesInfoSpinner.Start(stepCounter("Starting Upbound", 2, 2))
 		spinnerStart.Info()
 
 		watchCtx, cancel := context.WithTimeout(ctx, time.Duration(watcherTimeout*int64(time.Second)))

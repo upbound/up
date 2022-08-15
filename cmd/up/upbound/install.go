@@ -183,7 +183,7 @@ func (c *installCmd) Run(insCtx *install.Context, upCtx *upbound.Context) error 
 	}
 
 	if !c.quiet {
-		spinnerIngress, _ := checkmarkSuccessSpinner.Start("Gathering ingress information")
+		spinnerIngress, _ := checkmarkSuccessSpinner.Start(stepCounter("Gathering ingress information", 5, 5))
 		// Sleep for 1s to ensure pterm has enough time for 1 spin. Without this
 		// line, the operation can complete too quick resulting in two lines
 		// written for the "Gathering" spinner.
@@ -231,7 +231,7 @@ func (c *installCmd) applySecrets(ctx context.Context, namespace string) error {
 
 	if !c.quiet {
 		if err := wrapWithSuccessSpinner(
-			fmt.Sprintf("Creating namespace %s", namespace),
+			stepCounter(fmt.Sprintf("Creating namespace %s", namespace), 1, 5),
 			checkmarkSuccessSpinner,
 			createNs,
 		); err != nil {
@@ -239,7 +239,7 @@ func (c *installCmd) applySecrets(ctx context.Context, namespace string) error {
 		}
 
 		if err := wrapWithSuccessSpinner(
-			fmt.Sprintf("Creating secret %s", defaultImagePullSecret),
+			stepCounter(fmt.Sprintf("Creating secret %s", defaultImagePullSecret), 2, 5),
 			checkmarkSuccessSpinner,
 			creatPullSecret,
 		); err != nil {
@@ -274,7 +274,7 @@ func (c *installCmd) installUpbound(ctx context.Context, kubeconfig *rest.Config
 
 	if !c.quiet {
 		if err := wrapWithSuccessSpinner(
-			"Initializing Upbound",
+			stepCounter("Initializing Upbound", 3, 5),
 			checkmarkSuccessSpinner,
 			install,
 		); err != nil {
@@ -282,7 +282,7 @@ func (c *installCmd) installUpbound(ctx context.Context, kubeconfig *rest.Config
 		}
 
 		// Print Info message to indicate next large step
-		spinnerStart, _ := eyesInfoSpinner.Start("Starting Upbound")
+		spinnerStart, _ := eyesInfoSpinner.Start(stepCounter("Starting Upbound", 4, 5))
 		spinnerStart.Info()
 
 		watchCtx, cancel := context.WithTimeout(ctx, time.Duration(watcherTimeout*int64(time.Second)))

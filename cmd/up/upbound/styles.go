@@ -14,7 +14,11 @@
 
 package upbound
 
-import "github.com/pterm/pterm"
+import (
+	"fmt"
+
+	"github.com/pterm/pterm"
+)
 
 var (
 	eyesPrefix = pterm.Prefix{
@@ -64,4 +68,8 @@ func wrapWithSuccessSpinner(msg string, spinner *pterm.SpinnerPrinter, f func() 
 
 	s.Success()
 	return nil
+}
+
+func stepCounter(msg string, index, total int) string {
+	return fmt.Sprintf("[%d/%d]: %s", index, total, msg)
 }
