@@ -19,7 +19,9 @@ import (
 	"io"
 
 	"github.com/pkg/errors"
+	"github.com/pterm/pterm"
 	"k8s.io/client-go/kubernetes"
+	"k8s.io/client-go/rest"
 	"sigs.k8s.io/yaml"
 
 	"github.com/upbound/up/internal/auth"
@@ -46,7 +48,7 @@ func (c *upgradeCmd) AfterApply(insCtx *install.Context) error {
 	if err != nil {
 		return err
 	}
-	token, err := c.prompter.Prompt("Token", true)
+	token, err := c.prompter.Prompt("License Key", true)
 	if err != nil {
 		return err
 	}
@@ -56,6 +58,7 @@ func (c *upgradeCmd) AfterApply(insCtx *install.Context) error {
 	if err != nil {
 		return err
 	}
+	c.kClient = client
 	secret := kube.NewSecretApplicator(client)
 	c.pullSecret = newImagePullApplicator(secret)
 	auth := auth.NewProvider(
@@ -109,6 +112,7 @@ type upgradeCmd struct {
 	pullSecret *imagePullApplicator
 	id         string
 	token      string
+	kClient    kubernetes.Interface
 
 	// NOTE(hasheddan): version is currently required for upgrade with OCI image
 	// as latest strategy is undetermined.
@@ -146,5 +150,47 @@ func (c *upgradeCmd) Run(insCtx *install.Context) error {
 		}
 	}
 
-	return c.mgr.Upgrade(c.Version, params)
+	if err := c.upgradeUpbound(ctx, insCtx.Kubeconfig, params); err != nil {
+		return err
+	}
+
+	pterm.Info.WithPrefix(raisedPrefix).Println("Upbound ready")
+
+	return nil
+}
+
+func (c *upgradeCmd) upgradeUpbound(_ context.Context, kubeconfig *rest.Config, params map[string]any) error {
+	if err := wrapWithSuccessSpinner(
+		"Upgrading Upbound",
+		checkmarkSuccessSpinner,
+		func() error {
+			if err := c.mgr.Upgrade(c.Version, params); err != nil {
+				return err
+			}
+			return nil
+		},
+	); err != nil {
+		return err
+	}
+
+	// Print Info message to indicate next large step
+	spinnerStart, _ := eyesInfoSpinner.Start("Starting Upbound")
+	spinnerStart.Info()
+
+	watchCtx := context.Background()
+	ccancel := make(chan bool)
+	stopped := make(chan bool)
+	// NOTE(tnthornton) we spin off the deployment watching so that we can
+	// watch both the custom resource as well as the deployment events at
+	// the same time.
+	go watchDeployments(context.Background(), c.kClient, ccancel, stopped) //nolint:errcheck
+
+	if err := watchCustomResource(watchCtx, upboundGVR, kubeconfig); err != nil {
+		return err
+	}
+
+	ccancel <- true
+	close(ccancel)
+	<-stopped
+	return nil
 }

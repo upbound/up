@@ -21,6 +21,7 @@ import (
 	"net"
 	"time"
 
+	"github.com/alecthomas/kong"
 	"github.com/pkg/errors"
 	"github.com/pterm/pterm"
 	corev1 "k8s.io/api/core/v1"
@@ -37,6 +38,8 @@ import (
 	"github.com/upbound/up/internal/install/helm"
 	"github.com/upbound/up/internal/kube"
 	"github.com/upbound/up/internal/license"
+	"github.com/upbound/up/internal/resources"
+	"github.com/upbound/up/internal/upbound"
 )
 
 var (
@@ -64,6 +67,7 @@ const (
 	errCreateLicenseSecret    = "failed to create license secret"
 	errCreateNamespace        = "failed to create namespace"
 	errTimoutExternalIP       = "timed out waiting for externalIP to resolve"
+	errUpdateConfig           = "unable to update config"
 )
 
 // BeforeApply sets default values in login before assignment and validation.
@@ -73,7 +77,13 @@ func (c *installCmd) BeforeApply() error {
 }
 
 // AfterApply sets default values in command after assignment and validation.
-func (c *installCmd) AfterApply(insCtx *install.Context) error {
+func (c *installCmd) AfterApply(insCtx *install.Context, kongCtx *kong.Context) error {
+	upCtx, err := upbound.NewFromFlags(c.Flags)
+	if err != nil {
+		return err
+	}
+	kongCtx.Bind(upCtx)
+
 	id, err := c.prompter.Prompt("License ID", false)
 	if err != nil {
 		return err
@@ -147,10 +157,12 @@ type installCmd struct {
 
 	commonParams
 	install.CommonParams
+
+	Flags upbound.Flags `embed:""`
 }
 
 // Run executes the install command.
-func (c *installCmd) Run(insCtx *install.Context) error {
+func (c *installCmd) Run(insCtx *install.Context, upCtx *upbound.Context) error {
 
 	ctx, cancel := context.WithTimeout(context.Background(), defaultTimeout)
 	defer cancel()
@@ -169,19 +181,22 @@ func (c *installCmd) Run(insCtx *install.Context) error {
 	}
 
 	spinnerIngress, _ := checkmarkSuccessSpinner.Start("Gathering ingress information")
+	// Sleep for 1s to ensure pterm has enough time for 1 spin. Without this
+	// line, the operation can complete too quick resulting in two lines
+	// written for the "Gathering" spinner.
+	time.Sleep(1 * time.Second)
 	ipAddress, err := c.getExternalIP(params)
 	if err != nil {
 		return err
 	}
 	spinnerIngress.Success()
-	time.Sleep(time.Second * 1)
 
 	pterm.Info.WithPrefix(raisedPrefix).Println("Upbound ready")
 	time.Sleep(2 * time.Second)
 
 	outputConnectingInfo(ipAddress, hostNames)
 
-	return err
+	return updateProfile(upCtx)
 }
 
 func (c *installCmd) applySecrets(ctx context.Context, namespace string) error {
@@ -273,7 +288,7 @@ func (c *installCmd) installUpbound(_ context.Context, kubeconfig *rest.Config, 
 }
 
 // getExternalIP returns the externalIP of the Upbound installation. At its
-// core its doing two things:
+// core it's doing two things:
 //  1. If the provider is not specified, the kind install is assumed which means
 //     localhost is assumed.
 //  2. If the provider is specified, the externalIP is derived from the
@@ -328,4 +343,19 @@ func (c *installCmd) getExternalIP(params map[string]any) (string, error) { //no
 			}
 		}
 	}
+}
+
+func updateProfile(upCtx *upbound.Context) error {
+	// apply selfhosted config
+	profileName, config := getSelfHostedProfile(resources.Domain)
+	if err := upCtx.Cfg.AddOrUpdateUpboundProfile(profileName, config); err != nil {
+		return err
+	}
+
+	// switch default profile to selfhosted
+	if err := upCtx.Cfg.SetDefaultUpboundProfile(profileName); err != nil {
+		return err
+	}
+
+	return errors.Wrap(upCtx.CfgSrc.UpdateConfig(upCtx.Cfg), errUpdateConfig)
 }

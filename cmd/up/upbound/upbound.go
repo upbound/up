@@ -72,7 +72,6 @@ type commonParams struct {
 	ProductID string   `hidden:"" env:"UPBOUND_PRODUCT_ID" default:"upbound" help:"Set productID for Upbound."`
 
 	KeyVersionOverride string `hidden:"" env:"UPBOUND_KEY_VERSION" help:"Set the key version to use for Upbound install."`
-	GetExcited         bool   `hidden:"" help:"Get excited!!!"`
 }
 
 // TODO(hasheddan): consider refactoring shared applicator's below into a common

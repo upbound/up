@@ -71,11 +71,9 @@ type cli struct {
 
 	License licenseCmd `cmd:"" help:"Print Up license information."`
 
-	Login        loginCmd        `cmd:"" help:"Login to Upbound."`
-	Logout       logoutCmd       `cmd:"" help:"Logout of Upbound."`
-	Config       config.Cmd      `cmd:"" help:"Interact with Upbound Profiles"`
-	ControlPlane controlPlaneCmd `cmd:"" name:"controlplane" aliases:"ctp" group:"controlplane" help:"Interact with control planes."`
-
+	Login        loginCmd         `cmd:"" help:"Login to Upbound."`
+	Logout       logoutCmd        `cmd:"" help:"Logout of Upbound."`
+	Config       config.Cmd       `cmd:"" help:"Interact with Upbound Profiles"`
 	ControlPlane controlplane.Cmd `cmd:"" name:"controlplane" aliases:"ctp" help:"Interact with control planes."`
 	Repository   repository.Cmd   `cmd:"" name:"repository" aliases:"repo" help:"Interact with repositories."`
 	Upbound      upbound.Cmd      `cmd:"" help:"Interact with Upbound."`
