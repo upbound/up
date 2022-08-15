@@ -17,6 +17,7 @@ package upbound
 import (
 	"context"
 	"io"
+	"time"
 
 	"github.com/pkg/errors"
 	"github.com/pterm/pterm"
@@ -150,7 +151,7 @@ func (c *upgradeCmd) Run(insCtx *install.Context) error {
 		}
 	}
 
-	if err := c.upgradeUpbound(ctx, insCtx.Kubeconfig, params); err != nil {
+	if err := c.upgradeUpbound(context.Background(), insCtx.Kubeconfig, params); err != nil {
 		return err
 	}
 
@@ -159,7 +160,7 @@ func (c *upgradeCmd) Run(insCtx *install.Context) error {
 	return nil
 }
 
-func (c *upgradeCmd) upgradeUpbound(_ context.Context, kubeconfig *rest.Config, params map[string]any) error {
+func (c *upgradeCmd) upgradeUpbound(ctx context.Context, kubeconfig *rest.Config, params map[string]any) error {
 	if err := wrapWithSuccessSpinner(
 		"Upgrading Upbound",
 		checkmarkSuccessSpinner,
@@ -177,13 +178,14 @@ func (c *upgradeCmd) upgradeUpbound(_ context.Context, kubeconfig *rest.Config, 
 	spinnerStart, _ := eyesInfoSpinner.Start("Starting Upbound")
 	spinnerStart.Info()
 
-	watchCtx := context.Background()
+	watchCtx, cancel := context.WithTimeout(ctx, time.Duration(watcherTimeout))
+	defer cancel()
 	ccancel := make(chan bool)
 	stopped := make(chan bool)
 	// NOTE(tnthornton) we spin off the deployment watching so that we can
 	// watch both the custom resource as well as the deployment events at
 	// the same time.
-	go watchDeployments(context.Background(), c.kClient, ccancel, stopped) //nolint:errcheck
+	go watchDeployments(ctx, c.kClient, ccancel, stopped) //nolint:errcheck
 
 	if err := watchCustomResource(watchCtx, upboundGVR, kubeconfig); err != nil {
 		return err

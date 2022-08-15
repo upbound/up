@@ -176,7 +176,7 @@ func (c *installCmd) Run(insCtx *install.Context, upCtx *upbound.Context) error 
 		return err
 	}
 
-	if err := c.installUpbound(ctx, insCtx.Kubeconfig, params); err != nil {
+	if err := c.installUpbound(context.Background(), insCtx.Kubeconfig, params); err != nil {
 		return err
 	}
 
@@ -251,7 +251,7 @@ func (c *installCmd) applySecrets(ctx context.Context, namespace string) error {
 	return nil
 }
 
-func (c *installCmd) installUpbound(_ context.Context, kubeconfig *rest.Config, params map[string]any) error {
+func (c *installCmd) installUpbound(ctx context.Context, kubeconfig *rest.Config, params map[string]any) error {
 	if err := wrapWithSuccessSpinner(
 		"Initializing Upbound",
 		checkmarkSuccessSpinner,
@@ -269,13 +269,14 @@ func (c *installCmd) installUpbound(_ context.Context, kubeconfig *rest.Config, 
 	spinnerStart, _ := eyesInfoSpinner.Start("Starting Upbound")
 	spinnerStart.Info()
 
-	watchCtx := context.Background()
+	watchCtx, cancel := context.WithTimeout(ctx, time.Duration(watcherTimeout))
+	defer cancel()
 	ccancel := make(chan bool)
 	stopped := make(chan bool)
 	// NOTE(tnthornton) we spin off the deployment watching so that we can
 	// watch both the custom resource as well as the deployment events at
 	// the same time.
-	go watchDeployments(context.Background(), c.kClient, ccancel, stopped) //nolint:errcheck
+	go watchDeployments(watchCtx, c.kClient, ccancel, stopped) //nolint:errcheck
 
 	if err := watchCustomResource(watchCtx, upboundGVR, kubeconfig); err != nil {
 		return err
@@ -318,7 +319,7 @@ func (c *installCmd) getExternalIP(params map[string]any) (string, error) { //no
 				Services("ingress-nginx").
 				Get(context.Background(), "ingress-nginx-controller", metav1.GetOptions{})
 			if err != nil {
-				return "", nil
+				return "", err
 			}
 
 			switch provider {
@@ -330,7 +331,7 @@ func (c *installCmd) getExternalIP(params map[string]any) (string, error) { //no
 
 				ips, err := net.LookupIP(record)
 				if err != nil {
-					return "", nil
+					return "", err
 				}
 				if len(ips) >= 1 {
 					return ips[0].String(), nil
