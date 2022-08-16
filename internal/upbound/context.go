@@ -233,8 +233,7 @@ func (c *Context) applyOverrides(f Flags, profileName string) (Flags, error) {
 		return of, err
 	}
 
-	_, err = parser.Parse([]string{})
-	if err != nil {
+	if _, err = parser.Parse([]string{}); err != nil {
 		return of, err
 	}
 

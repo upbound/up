@@ -30,10 +30,12 @@ import (
 	"github.com/upbound/up/cmd/up/uxp"
 	"github.com/upbound/up/cmd/up/xpkg"
 	"github.com/upbound/up/cmd/up/xpls"
+	"github.com/upbound/up/internal/config"
 	"github.com/upbound/up/internal/version"
 
 	// TODO(epk): Remove this once we upgrade kubernetes deps to 1.25
-	// TODO(epk): Specifically, get rid of the k8s.io/client-go/client/auth/azure and k8s.io/client-go/client/auth/gcp packages
+	// TODO(epk): Specifically, get rid of the k8s.io/client-go/client/auth/azure
+	// and k8s.io/client-go/client/auth/gcp packages.
 	// Embed Kubernetes client auth plugins.
 	_ "k8s.io/client-go/plugin/pkg/client/auth"
 )
@@ -66,9 +68,9 @@ func (c *cli) AfterApply(ctx *kong.Context) error { //nolint:unparam
 }
 
 type cli struct {
-	Version versionFlag `short:"v" name:"version" help:"Print version and exit."`
-	Quiet   bool        `short:"q" name:"quiet" help:"Suppress all output."`
-	Pretty  bool        `name:"pretty" help:"Pretty print output."`
+	Version versionFlag      `short:"v" name:"version" help:"Print version and exit."`
+	Quiet   config.QuietFlag `short:"q" name:"quiet" help:"Suppress all output."`
+	Pretty  bool             `name:"pretty" help:"Pretty print output."`
 
 	License licenseCmd `cmd:"" help:"Print Up license information."`
 

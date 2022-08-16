@@ -39,6 +39,9 @@ const (
 	errNoProfilesFound    = "no profiles found"
 )
 
+// QuietFlag provides a named boolean type for the QuietFlag.
+type QuietFlag bool
+
 // Config is format for the up configuration file.
 type Config struct {
 	Upbound Upbound `json:"upbound"`

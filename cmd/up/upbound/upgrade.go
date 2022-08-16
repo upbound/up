@@ -26,6 +26,7 @@ import (
 	"sigs.k8s.io/yaml"
 
 	"github.com/upbound/up/internal/auth"
+	"github.com/upbound/up/internal/config"
 	"github.com/upbound/up/internal/input"
 	"github.com/upbound/up/internal/install"
 	"github.com/upbound/up/internal/install/helm"
@@ -44,7 +45,7 @@ func (c *upgradeCmd) BeforeApply() error {
 }
 
 // AfterApply sets default values in command after assignment and validation.
-func (c *upgradeCmd) AfterApply(insCtx *install.Context, quiet bool) error {
+func (c *upgradeCmd) AfterApply(insCtx *install.Context, quiet config.QuietFlag) error {
 	id, err := c.prompter.Prompt("License ID", false)
 	if err != nil {
 		return err
@@ -115,7 +116,7 @@ type upgradeCmd struct {
 	id         string
 	token      string
 	kClient    kubernetes.Interface
-	quiet      bool
+	quiet      config.QuietFlag
 
 	// NOTE(hasheddan): version is currently required for upgrade with OCI image
 	// as latest strategy is undetermined.
@@ -172,36 +173,37 @@ func (c *upgradeCmd) upgradeUpbound(ctx context.Context, kubeconfig *rest.Config
 		return nil
 	}
 
-	if !c.quiet {
-		if err := wrapWithSuccessSpinner(
-			stepCounter("Upgrading Upbound", 1, 2),
-			checkmarkSuccessSpinner,
-			upgrade,
-		); err != nil {
-			return err
-		}
-
-		// Print Info message to indicate next large step
-		spinnerStart, _ := eyesInfoSpinner.Start(stepCounter("Starting Upbound", 2, 2))
-		spinnerStart.Info()
-
-		watchCtx, cancel := context.WithTimeout(ctx, time.Duration(watcherTimeout*int64(time.Second)))
-		defer cancel()
-		ccancel := make(chan bool)
-		stopped := make(chan bool)
-		// NOTE(tnthornton) we spin off the deployment watching so that we can
-		// watch both the custom resource as well as the deployment events at
-		// the same time.
-		go watchDeployments(ctx, c.kClient, ccancel, stopped) //nolint:errcheck
-
-		if err := watchCustomResource(watchCtx, upboundGVR, kubeconfig); err != nil {
-			return err
-		}
-
-		ccancel <- true
-		close(ccancel)
-		<-stopped
-		return nil
+	if c.quiet {
+		return upgrade()
 	}
-	return upgrade()
+
+	if err := wrapWithSuccessSpinner(
+		stepCounter("Upgrading Upbound", 1, 2),
+		checkmarkSuccessSpinner,
+		upgrade,
+	); err != nil {
+		return err
+	}
+
+	// Print Info message to indicate next large step
+	spinnerStart, _ := eyesInfoSpinner.Start(stepCounter("Starting Upbound", 2, 2))
+	spinnerStart.Info()
+
+	watchCtx, cancel := context.WithTimeout(ctx, time.Duration(watcherTimeout*int64(time.Second)))
+	defer cancel()
+	ccancel := make(chan bool)
+	stopped := make(chan bool)
+	// NOTE(tnthornton) we spin off the deployment watching so that we can
+	// watch both the custom resource as well as the deployment events at
+	// the same time.
+	go watchDeployments(ctx, c.kClient, ccancel, stopped) //nolint:errcheck
+
+	if err := watchCustomResource(watchCtx, upboundGVR, kubeconfig); err != nil {
+		return err
+	}
+
+	ccancel <- true
+	close(ccancel)
+	<-stopped
+	return nil
 }

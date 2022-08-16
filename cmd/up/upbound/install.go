@@ -33,6 +33,7 @@ import (
 	"sigs.k8s.io/yaml"
 
 	"github.com/upbound/up/internal/auth"
+	"github.com/upbound/up/internal/config"
 	"github.com/upbound/up/internal/input"
 	"github.com/upbound/up/internal/install"
 	"github.com/upbound/up/internal/install/helm"
@@ -58,6 +59,7 @@ const (
 	defaultSecretAccessKey = "access_key"
 	defaultSecretSignature = "signature"
 	defaultImagePullSecret = "upbound-pull-secret"
+	localhost              = "127.0.0.1"
 
 	errReadParametersFile     = "unable to read parameters file"
 	errParseInstallParameters = "unable to parse install parameters"
@@ -77,7 +79,7 @@ func (c *installCmd) BeforeApply() error {
 }
 
 // AfterApply sets default values in command after assignment and validation.
-func (c *installCmd) AfterApply(insCtx *install.Context, kongCtx *kong.Context, quiet bool) error {
+func (c *installCmd) AfterApply(insCtx *install.Context, kongCtx *kong.Context, quiet config.QuietFlag) error {
 	upCtx, err := upbound.NewFromFlags(c.Flags)
 	if err != nil {
 		return err
@@ -153,7 +155,7 @@ type installCmd struct {
 	pullSecret *imagePullApplicator
 	id         string
 	token      string
-	quiet      bool
+	quiet      config.QuietFlag
 
 	Version string `arg:"" help:"Upbound version to install."`
 
@@ -229,39 +231,40 @@ func (c *installCmd) applySecrets(ctx context.Context, namespace string) error {
 		return nil
 	}
 
-	if !c.quiet {
-		if err := wrapWithSuccessSpinner(
-			stepCounter(fmt.Sprintf("Creating namespace %s", namespace), 1, 5),
-			checkmarkSuccessSpinner,
-			createNs,
-		); err != nil {
+	if c.quiet {
+		if err := createNs(); err != nil {
 			return err
 		}
-
-		if err := wrapWithSuccessSpinner(
-			stepCounter(fmt.Sprintf("Creating secret %s", defaultImagePullSecret), 2, 5),
-			checkmarkSuccessSpinner,
-			creatPullSecret,
-		); err != nil {
-			return err
-		}
-
-		// Create or update access key secret unless skip license is specified.
-		if !c.SkipLicense {
-			keyVersion := c.Version
-			if c.KeyVersionOverride != "" {
-				keyVersion = c.KeyVersionOverride
-			}
-			if err := c.access.apply(ctx, c.LicenseSecretName, namespace, keyVersion); err != nil {
-				return errors.Wrap(err, errCreateLicenseSecret)
-			}
-		}
-		return nil
+		return creatPullSecret()
 	}
-	if err := createNs(); err != nil {
+
+	if err := wrapWithSuccessSpinner(
+		stepCounter(fmt.Sprintf("Creating namespace %s", namespace), 1, 5),
+		checkmarkSuccessSpinner,
+		createNs,
+	); err != nil {
 		return err
 	}
-	return creatPullSecret()
+
+	if err := wrapWithSuccessSpinner(
+		stepCounter(fmt.Sprintf("Creating secret %s", defaultImagePullSecret), 2, 5),
+		checkmarkSuccessSpinner,
+		creatPullSecret,
+	); err != nil {
+		return err
+	}
+
+	// Create or update access key secret unless skip license is specified.
+	if !c.SkipLicense {
+		keyVersion := c.Version
+		if c.KeyVersionOverride != "" {
+			keyVersion = c.KeyVersionOverride
+		}
+		if err := c.access.apply(ctx, c.LicenseSecretName, namespace, keyVersion); err != nil {
+			return errors.Wrap(err, errCreateLicenseSecret)
+		}
+	}
+	return nil
 }
 
 func (c *installCmd) installUpbound(ctx context.Context, kubeconfig *rest.Config, params map[string]any) error {
@@ -272,38 +275,39 @@ func (c *installCmd) installUpbound(ctx context.Context, kubeconfig *rest.Config
 		return nil
 	}
 
-	if !c.quiet {
-		if err := wrapWithSuccessSpinner(
-			stepCounter("Initializing Upbound", 3, 5),
-			checkmarkSuccessSpinner,
-			install,
-		); err != nil {
-			return err
-		}
-
-		// Print Info message to indicate next large step
-		spinnerStart, _ := eyesInfoSpinner.Start(stepCounter("Starting Upbound", 4, 5))
-		spinnerStart.Info()
-
-		watchCtx, cancel := context.WithTimeout(ctx, time.Duration(watcherTimeout*int64(time.Second)))
-		defer cancel()
-		ccancel := make(chan bool)
-		stopped := make(chan bool)
-		// NOTE(tnthornton) we spin off the deployment watching so that we can
-		// watch both the custom resource as well as the deployment events at
-		// the same time.
-		go watchDeployments(watchCtx, c.kClient, ccancel, stopped) //nolint:errcheck
-
-		if err := watchCustomResource(watchCtx, upboundGVR, kubeconfig); err != nil {
-			return err
-		}
-
-		ccancel <- true
-		close(ccancel)
-		<-stopped
-		return nil
+	if c.quiet {
+		return install()
 	}
-	return install()
+
+	if err := wrapWithSuccessSpinner(
+		stepCounter("Initializing Upbound", 3, 5),
+		checkmarkSuccessSpinner,
+		install,
+	); err != nil {
+		return err
+	}
+
+	// Print Info message to indicate next large step
+	spinnerStart, _ := eyesInfoSpinner.Start(stepCounter("Starting Upbound", 4, 5))
+	spinnerStart.Info()
+
+	watchCtx, cancel := context.WithTimeout(ctx, time.Duration(watcherTimeout*int64(time.Second)))
+	defer cancel()
+	ccancel := make(chan bool)
+	stopped := make(chan bool)
+	// NOTE(tnthornton) we spin off the deployment watching so that we can
+	// watch both the custom resource as well as the deployment events at
+	// the same time.
+	go watchDeployments(watchCtx, c.kClient, ccancel, stopped) //nolint:errcheck
+
+	if err := watchCustomResource(watchCtx, upboundGVR, kubeconfig); err != nil {
+		return err
+	}
+
+	ccancel <- true
+	close(ccancel)
+	<-stopped
+	return nil
 }
 
 // getExternalIP returns the externalIP of the Upbound installation. At its
@@ -320,7 +324,7 @@ func (c *installCmd) getExternalIP(params map[string]any) (string, error) { //no
 	provider, ok := params["provider"]
 	if !ok {
 		// default provider (kind) is used, return localhost
-		return "127.0.0.1", nil
+		return localhost, nil
 	}
 
 	// retry until we have an externalIP or timeout
