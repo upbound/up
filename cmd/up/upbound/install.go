@@ -340,22 +340,27 @@ func (c *installCmd) getExternalIP(params map[string]any) (string, error) { //no
 				return "", err
 			}
 
+			lbs := svc.Status.LoadBalancer.Ingress
+			// if ELB IP is still empty, skip and retry
+			if len(lbs) < 1 {
+				continue
+			}
+
 			switch provider {
 			case "aws":
-				record := svc.Spec.ExternalIPs[0]
-				if record == "" {
-					continue
-				}
-
+				record := lbs[0].Hostname
 				ips, err := net.LookupIP(record)
 				if err != nil {
-					return "", err
+					// NOTE(tnthornton) we explicitly ignore the error here to
+					// force a retry. Most commonly an error will occur when
+					// DNS has yet to propagate.
+					continue
 				}
 				if len(ips) >= 1 {
 					return ips[0].String(), nil
 				}
 			default:
-				ip := svc.Spec.ExternalIPs[0]
+				ip := lbs[0].IP
 				if ip != "" {
 					return ip, nil
 				}

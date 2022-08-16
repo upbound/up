@@ -37,7 +37,7 @@ func (c *Cmd) AfterApply(kongCtx *kong.Context) error {
 		return err
 	}
 	kongCtx.Bind(upCtx)
-	kongCtx.Bind(c.Flags.MCPExperimental)
+	kongCtx.Bind(upCtx.MCPExperimental)
 	kongCtx.Bind(cp.NewClient(cfg))
 	kongCtx.Bind(op.NewClient(cfg))
 	kongCtx.Bind(accounts.NewClient(cfg))

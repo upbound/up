@@ -150,7 +150,10 @@ func (c *loginCmd) Run(p pterm.TextPrinter, upCtx *upbound.Context) error { // n
 		return errors.Wrap(err, errLoginFailed)
 	}
 	// If no profile is specified, a new profile named `default` is used.
-	profileName := c.Flags.Profile
+	profileName, profile, err := upCtx.Cfg.GetDefaultUpboundProfile()
+	if err != nil {
+		return err
+	}
 	if profileName == "" {
 		profileName = defaultProfileName
 	}
@@ -160,12 +163,13 @@ func (c *loginCmd) Run(p pterm.TextPrinter, upCtx *upbound.Context) error { // n
 	if upCtx.Account == "" && profType == config.UserProfileType && !isEmail(auth.ID) {
 		upCtx.Account = auth.ID
 	}
-	if err := upCtx.Cfg.AddOrUpdateUpboundProfile(profileName, config.Profile{
-		ID:      auth.ID,
-		Type:    profType,
-		Session: session,
-		Account: upCtx.Account,
-	}); err != nil {
+
+	profile.ID = auth.ID
+	profile.Type = profType
+	profile.Session = session
+	profile.Account = upCtx.Account
+
+	if err := upCtx.Cfg.AddOrUpdateUpboundProfile(profileName, profile); err != nil {
 		return errors.Wrap(err, errLoginFailed)
 	}
 	if len(upCtx.Cfg.Upbound.Profiles) == 1 {

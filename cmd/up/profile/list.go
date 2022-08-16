@@ -20,6 +20,7 @@ import (
 
 	"github.com/alecthomas/kong"
 
+	"github.com/upbound/up/internal/config"
 	"github.com/upbound/up/internal/upbound"
 )
 
@@ -32,7 +33,12 @@ func (c *listCmd) Run(ctx *kong.Context, upCtx *upbound.Context) error {
 		return err
 	}
 
-	b, err := json.MarshalIndent(profiles, "", "    ")
+	redacted := make(map[string]config.RedactedProfile)
+	for k, v := range profiles {
+		redacted[k] = config.RedactedProfile{Profile: v}
+	}
+
+	b, err := json.MarshalIndent(redacted, "", "    ")
 	if err != nil {
 		return err
 	}

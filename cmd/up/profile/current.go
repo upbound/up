@@ -27,8 +27,8 @@ import (
 type currentCmd struct{}
 
 type output struct {
-	Name    string         `json:"name"`
-	Profile config.Profile `json:"profile"`
+	Name    string                 `json:"name"`
+	Profile config.RedactedProfile `json:"profile"`
 }
 
 // Run executes the current command.
@@ -38,9 +38,11 @@ func (c *currentCmd) Run(ctx *kong.Context, upCtx *upbound.Context) error {
 		return err
 	}
 
+	redacted := config.RedactedProfile{Profile: profile}
+
 	b, err := json.MarshalIndent(output{
 		Name:    name,
-		Profile: profile,
+		Profile: redacted,
 	}, "", "    ")
 	if err != nil {
 		return err
