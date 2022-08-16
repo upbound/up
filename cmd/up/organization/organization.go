@@ -35,7 +35,6 @@ func (c *Cmd) AfterApply(kongCtx *kong.Context) error {
 	}
 	kongCtx.Bind(upCtx)
 	kongCtx.Bind(organizations.NewClient(cfg))
-	kongCtx.Bind(organizations.NewClient(cfg))
 	return nil
 }
 
