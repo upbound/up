@@ -27,6 +27,7 @@ type Cmd struct {
 	Current currentCmd `cmd:"" group:"profile" help:"Get current Upbound Profile."`
 	List    listCmd    `cmd:"" group:"profile" help:"List Upbound Profiles."`
 	Use     useCmd     `cmd:"" group:"profile" help:"Set the default Upbound Profile to the given Profile."`
+	View    viewCmd    `cmd:"" group:"profile" help:"View the Upbound Profile settings across profiles."`
 
 	Flags upbound.Flags `embed:""`
 }
