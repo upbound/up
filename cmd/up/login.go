@@ -152,7 +152,10 @@ func (c *loginCmd) Run(p pterm.TextPrinter, upCtx *upbound.Context) error { // n
 	// If no profile is specified, a new profile named `default` is used.
 	profileName, profile, err := upCtx.Cfg.GetDefaultUpboundProfile()
 	if err != nil {
-		return err
+		// NOTE(tnthornton) err is returned if there is no default profile set
+		// or no profiles exist. In those cases, we don't want to error, rather
+		// we want to setup a profile and the default.
+		profile = config.Profile{}
 	}
 	if profileName == "" {
 		profileName = defaultProfileName
