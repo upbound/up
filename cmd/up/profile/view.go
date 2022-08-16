@@ -19,18 +19,24 @@ import (
 	"fmt"
 
 	"github.com/alecthomas/kong"
+	"github.com/pterm/pterm"
 
 	"github.com/upbound/up/internal/config"
 	"github.com/upbound/up/internal/upbound"
 )
 
+var (
+	errNoProfiles = "No profiles found"
+)
+
 type viewCmd struct{}
 
 // Run executes the list command.
-func (c *viewCmd) Run(ctx *kong.Context, upCtx *upbound.Context) error {
+func (c *viewCmd) Run(p pterm.TextPrinter, ctx *kong.Context, upCtx *upbound.Context) error {
 	profiles, err := upCtx.Cfg.GetUpboundProfiles()
 	if err != nil {
-		return err
+		p.Println(errNoProfiles)
+		return nil // nolint:nilerr
 	}
 
 	redacted := make(map[string]config.RedactedProfile)

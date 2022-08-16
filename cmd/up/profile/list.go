@@ -36,7 +36,8 @@ type listCmd struct{}
 func (c *listCmd) Run(p pterm.TextPrinter, pt *pterm.TablePrinter, ctx *kong.Context, upCtx *upbound.Context) error {
 	profiles, err := upCtx.Cfg.GetUpboundProfiles()
 	if err != nil {
-		return err
+		p.Println(errNoProfiles)
+		return nil // nolint:nilerr
 	}
 
 	redacted := make(map[string]config.RedactedProfile)
@@ -44,7 +45,7 @@ func (c *listCmd) Run(p pterm.TextPrinter, pt *pterm.TablePrinter, ctx *kong.Con
 		redacted[k] = config.RedactedProfile{Profile: v}
 	}
 	if len(redacted) == 0 {
-		p.Println("No profiles found")
+		p.Println(errNoProfiles)
 		return nil
 	}
 
