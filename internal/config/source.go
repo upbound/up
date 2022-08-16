@@ -59,6 +59,13 @@ func WithPath(p string) FSSourceModifier {
 	}
 }
 
+// WithFS overrides the FSSource filesystem with the given filesystem.
+func WithFS(fs afero.Fs) FSSourceModifier {
+	return func(f *FSSource) {
+		f.fs = fs
+	}
+}
+
 // FSSource provides a filesystem source for interacting with a Config.
 type FSSource struct {
 	fs   afero.Fs

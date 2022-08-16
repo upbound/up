@@ -15,6 +15,9 @@
 package config
 
 import (
+	"bytes"
+	"encoding/json"
+	"io"
 	"os"
 	"path/filepath"
 
@@ -33,7 +36,11 @@ const (
 	errInvalidProfile     = "profile is not valid"
 
 	errProfileNotFoundFmt = "profile not found with identifier: %s"
+	errNoProfilesFound    = "no profiles found"
 )
+
+// QuietFlag provides a named boolean type for the QuietFlag.
+type QuietFlag bool
 
 // Config is format for the up configuration file.
 type Config struct {
@@ -90,6 +97,29 @@ type Profile struct {
 
 	// Account is the default account to use when this profile is selected.
 	Account string `json:"account,omitempty"`
+
+	// BaseConfig represent persisted settings for this profile.
+	// For example:
+	// * flags
+	// * environment variables
+	BaseConfig map[string]string `json:"base,omitempty"`
+}
+
+// RedactedProfile embeds a Upbound Profile for the sole purpose of redacting
+// sensitive information.
+type RedactedProfile struct {
+	Profile
+}
+
+// MarshalJSON overrides the session field with `REDACTED` so as not to leak
+// sensitive information. We're using an explicit copy here instead of updating
+// the underlying Profile struct so as to not modifying the internal state of
+// the struct by accident.
+func (p RedactedProfile) MarshalJSON() ([]byte, error) {
+	type profile RedactedProfile
+	pc := profile(p)
+	pc.Session = "REDACTED"
+	return json.Marshal(&pc)
 }
 
 // checkProfile ensures a profile does not violate constraints.
@@ -137,6 +167,16 @@ func (c *Config) GetUpboundProfile(name string) (Profile, error) {
 	return p, nil
 }
 
+// GetUpboundProfiles returns the list of existing profiles. If no profiles
+// exist, then an error will be returned.
+func (c *Config) GetUpboundProfiles() (map[string]Profile, error) {
+	if c.Upbound.Profiles == nil {
+		return nil, errors.New(errNoProfilesFound)
+	}
+
+	return c.Upbound.Profiles, nil
+}
+
 // SetDefaultUpboundProfile sets the default profile for communicating with
 // Upbound. Setting a default profile that does not exist will return an
 // error.
@@ -146,4 +186,70 @@ func (c *Config) SetDefaultUpboundProfile(name string) error {
 	}
 	c.Upbound.Default = name
 	return nil
+}
+
+// GetBaseConfig returns the persisted base configuration associated with the
+// provided Profile. If the supplied name does not match an existing Profile
+// an error is returned.
+func (c *Config) GetBaseConfig(name string) (map[string]string, error) {
+	profile, ok := c.Upbound.Profiles[name]
+	if !ok {
+		return nil, errors.Errorf(errProfileNotFoundFmt, name)
+	}
+	return profile.BaseConfig, nil
+}
+
+// AddToBaseConfig adds the supplied key, value pair to the base config map of
+// the profile that corresponds to the given name. If the supplied name does
+// not match an existing Profile an error is returned. If the overrides map
+// does not currently exist on the corresponding profile, a map is initialized.
+func (c *Config) AddToBaseConfig(name, key, value string) error {
+	profile, ok := c.Upbound.Profiles[name]
+	if !ok {
+		return errors.Errorf(errProfileNotFoundFmt, name)
+	}
+
+	if profile.BaseConfig == nil {
+		profile.BaseConfig = make(map[string]string)
+	}
+
+	profile.BaseConfig[key] = value
+	c.Upbound.Profiles[name] = profile
+	return nil
+}
+
+// RemoveFromBaseConfig removes the supplied key from the base config map of
+// the Profile that corresponds to the given name. If the supplied name does
+// not match an existing Profile an error is returned. If the base config map
+// does not currently exist on the corresponding profile, a no-op occurs.
+func (c *Config) RemoveFromBaseConfig(name, key string) error {
+	profile, ok := c.Upbound.Profiles[name]
+	if !ok {
+		return errors.Errorf(errProfileNotFoundFmt, name)
+	}
+
+	if profile.BaseConfig == nil {
+		return nil
+	}
+
+	delete(profile.BaseConfig, key)
+	c.Upbound.Profiles[name] = profile
+	return nil
+}
+
+// BaseToJSON converts the base config of the given Profile to JSON. If the
+// config couldn't be converted or if the supplied name does not correspond
+// to an existing Profile, an error is returned.
+func (c *Config) BaseToJSON(name string) (io.Reader, error) {
+	profile, err := c.GetBaseConfig(name)
+	if err != nil {
+		return nil, err
+	}
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(profile); err != nil {
+		return nil, err
+	}
+
+	return &buf, nil
 }

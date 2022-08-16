@@ -5,7 +5,7 @@ go 1.18
 require (
 	github.com/Masterminds/semver v1.5.0
 	github.com/Masterminds/semver/v3 v3.1.1
-	github.com/alecthomas/kong v0.2.17
+	github.com/alecthomas/kong v0.6.1
 	github.com/crossplane/crossplane v1.5.0
 	github.com/crossplane/crossplane-runtime v0.15.1-0.20210930095326-d5661210733b
 	github.com/crossplane/crossplane/controller/apiextensions v0.0.0-00010101000000-000000000000
@@ -176,7 +176,7 @@ require (
 	github.com/spf13/cast v1.4.1 // indirect
 	github.com/spf13/pflag v1.0.5 // indirect
 	github.com/stoewer/go-strcase v1.2.0 // indirect
-	github.com/stretchr/testify v1.7.1 // indirect
+	github.com/stretchr/testify v1.7.2 // indirect
 	github.com/ulikunitz/xz v0.5.9 // indirect
 	github.com/vbatts/tar-split v0.11.2 // indirect
 	github.com/xanzy/ssh-agent v0.3.0 // indirect
@@ -214,7 +214,7 @@ require (
 	gopkg.in/inf.v0 v0.9.1 // indirect
 	gopkg.in/warnings.v0 v0.1.2 // indirect
 	gopkg.in/yaml.v2 v2.4.0 // indirect
-	gopkg.in/yaml.v3 v3.0.0-20210107192922-496545a6307b // indirect
+	gopkg.in/yaml.v3 v3.0.1 // indirect
 	k8s.io/apiserver v0.24.3 // indirect
 	k8s.io/cli-runtime v0.24.3 // indirect
 	k8s.io/component-base v0.24.3 // indirect

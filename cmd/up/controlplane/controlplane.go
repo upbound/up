@@ -37,7 +37,7 @@ func (c *Cmd) AfterApply(kongCtx *kong.Context) error {
 		return err
 	}
 	kongCtx.Bind(upCtx)
-	kongCtx.Bind(c.MCPExperimental)
+	kongCtx.Bind(upCtx.MCPExperimental)
 	kongCtx.Bind(cp.NewClient(cfg))
 	kongCtx.Bind(op.NewClient(cfg))
 	kongCtx.Bind(accounts.NewClient(cfg))
@@ -51,8 +51,6 @@ type Cmd struct {
 	List   listCmd   `cmd:"" group:"controlplane" help:"List control planes for the account."`
 
 	Kubeconfig kubeconfig.Cmd `cmd:"" name:"kubeconfig" help:"Manage control plane kubeconfig data."`
-
-	MCPExperimental bool `env:"UP_MCP_EXPERIMENTAL" help:"Use experimental managed control planes API."`
 
 	// Common Upbound API configuration
 	Flags upbound.Flags `embed:""`

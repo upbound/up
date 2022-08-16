@@ -24,15 +24,18 @@ import (
 	"github.com/pterm/pterm"
 
 	"github.com/upbound/up/cmd/up/controlplane"
+	"github.com/upbound/up/cmd/up/profile"
 	"github.com/upbound/up/cmd/up/repository"
 	"github.com/upbound/up/cmd/up/upbound"
 	"github.com/upbound/up/cmd/up/uxp"
 	"github.com/upbound/up/cmd/up/xpkg"
 	"github.com/upbound/up/cmd/up/xpls"
+	"github.com/upbound/up/internal/config"
 	"github.com/upbound/up/internal/version"
 
 	// TODO(epk): Remove this once we upgrade kubernetes deps to 1.25
-	// TODO(epk): Specifically, get rid of the k8s.io/client-go/client/auth/azure and k8s.io/client-go/client/auth/gcp packages
+	// TODO(epk): Specifically, get rid of the k8s.io/client-go/client/auth/azure
+	// and k8s.io/client-go/client/auth/gcp packages.
 	// Embed Kubernetes client auth plugins.
 	_ "k8s.io/client-go/plugin/pkg/client/auth"
 )
@@ -60,20 +63,21 @@ func (c *cli) AfterApply(ctx *kong.Context) error { //nolint:unparam
 		// other tooling difficult.
 		pterm.DisableStyling()
 	}
+	ctx.Bind(c.Quiet)
 	return nil
 }
 
 type cli struct {
-	Version versionFlag `short:"v" name:"version" help:"Print version and exit."`
-	Quiet   bool        `short:"q" name:"quiet" help:"Suppress all output."`
-	Pretty  bool        `name:"pretty" help:"Pretty print output."`
+	Version versionFlag      `short:"v" name:"version" help:"Print version and exit."`
+	Quiet   config.QuietFlag `short:"q" name:"quiet" help:"Suppress all output."`
+	Pretty  bool             `name:"pretty" help:"Pretty print output."`
 
 	License licenseCmd `cmd:"" help:"Print Up license information."`
 
-	Login  loginCmd  `cmd:"" help:"Login to Upbound."`
-	Logout logoutCmd `cmd:"" help:"Logout of Upbound."`
-
+	Login        loginCmd         `cmd:"" help:"Login to Upbound."`
+	Logout       logoutCmd        `cmd:"" help:"Logout of Upbound."`
 	ControlPlane controlplane.Cmd `cmd:"" name:"controlplane" aliases:"ctp" help:"Interact with control planes."`
+	Profile      profile.Cmd      `cmd:"" help:"Interact with Upbound Profiles"`
 	Repository   repository.Cmd   `cmd:"" name:"repository" aliases:"repo" help:"Interact with repositories."`
 	Upbound      upbound.Cmd      `cmd:"" help:"Interact with Upbound."`
 	UXP          uxp.Cmd          `cmd:"" help:"Interact with UXP."`

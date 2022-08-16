@@ -17,12 +17,16 @@ package upbound
 import (
 	"context"
 	"io"
+	"time"
 
 	"github.com/pkg/errors"
+	"github.com/pterm/pterm"
 	"k8s.io/client-go/kubernetes"
+	"k8s.io/client-go/rest"
 	"sigs.k8s.io/yaml"
 
 	"github.com/upbound/up/internal/auth"
+	"github.com/upbound/up/internal/config"
 	"github.com/upbound/up/internal/input"
 	"github.com/upbound/up/internal/install"
 	"github.com/upbound/up/internal/install/helm"
@@ -41,12 +45,12 @@ func (c *upgradeCmd) BeforeApply() error {
 }
 
 // AfterApply sets default values in command after assignment and validation.
-func (c *upgradeCmd) AfterApply(insCtx *install.Context) error {
+func (c *upgradeCmd) AfterApply(insCtx *install.Context, quiet config.QuietFlag) error {
 	id, err := c.prompter.Prompt("License ID", false)
 	if err != nil {
 		return err
 	}
-	token, err := c.prompter.Prompt("Token", true)
+	token, err := c.prompter.Prompt("License Key", true)
 	if err != nil {
 		return err
 	}
@@ -56,6 +60,7 @@ func (c *upgradeCmd) AfterApply(insCtx *install.Context) error {
 	if err != nil {
 		return err
 	}
+	c.kClient = client
 	secret := kube.NewSecretApplicator(client)
 	c.pullSecret = newImagePullApplicator(secret)
 	auth := auth.NewProvider(
@@ -97,6 +102,7 @@ func (c *upgradeCmd) AfterApply(insCtx *install.Context) error {
 		}
 	}
 	c.parser = helm.NewParser(base, c.Set)
+	c.quiet = quiet
 	return nil
 }
 
@@ -109,6 +115,8 @@ type upgradeCmd struct {
 	pullSecret *imagePullApplicator
 	id         string
 	token      string
+	kClient    kubernetes.Interface
+	quiet      config.QuietFlag
 
 	// NOTE(hasheddan): version is currently required for upgrade with OCI image
 	// as latest strategy is undetermined.
@@ -146,5 +154,56 @@ func (c *upgradeCmd) Run(insCtx *install.Context) error {
 		}
 	}
 
-	return c.mgr.Upgrade(c.Version, params)
+	if err := c.upgradeUpbound(context.Background(), insCtx.Kubeconfig, params); err != nil {
+		return err
+	}
+
+	if !c.quiet {
+		pterm.Info.WithPrefix(raisedPrefix).Println("Upbound ready")
+	}
+
+	return nil
+}
+
+func (c *upgradeCmd) upgradeUpbound(ctx context.Context, kubeconfig *rest.Config, params map[string]any) error {
+	upgrade := func() error {
+		if err := c.mgr.Upgrade(c.Version, params); err != nil {
+			return err
+		}
+		return nil
+	}
+
+	if c.quiet {
+		return upgrade()
+	}
+
+	if err := wrapWithSuccessSpinner(
+		stepCounter("Upgrading Upbound", 1, 2),
+		checkmarkSuccessSpinner,
+		upgrade,
+	); err != nil {
+		return err
+	}
+
+	// Print Info message to indicate next large step
+	spinnerStart, _ := eyesInfoSpinner.Start(stepCounter("Starting Upbound", 2, 2))
+	spinnerStart.Info()
+
+	watchCtx, cancel := context.WithTimeout(ctx, time.Duration(watcherTimeout*int64(time.Second)))
+	defer cancel()
+	ccancel := make(chan bool)
+	stopped := make(chan bool)
+	// NOTE(tnthornton) we spin off the deployment watching so that we can
+	// watch both the custom resource as well as the deployment events at
+	// the same time.
+	go watchDeployments(ctx, c.kClient, ccancel, stopped) //nolint:errcheck
+
+	if err := watchCustomResource(watchCtx, upboundGVR, kubeconfig); err != nil {
+		return err
+	}
+
+	ccancel <- true
+	close(ccancel)
+	<-stopped
+	return nil
 }
