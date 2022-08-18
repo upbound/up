@@ -16,6 +16,8 @@ package xpls
 
 import (
 	"context"
+	"os/signal"
+	"syscall"
 
 	"github.com/crossplane/crossplane-runtime/pkg/logging"
 	"github.com/sourcegraph/jsonrpc2"
@@ -37,6 +39,8 @@ type serveCmd struct {
 
 // Run runs the language server.
 func (c *serveCmd) Run() error {
+	ctx, stop := signal.NotifyContext(context.Background(), syscall.SIGINT, syscall.SIGTERM)
+	defer stop()
 
 	// cache directory resolution should occur at this level.
 
@@ -49,7 +53,18 @@ func (c *serveCmd) Run() error {
 		return err
 	}
 
-	// TODO(hasheddan): handle graceful shutdown.
-	<-jsonrpc2.NewConn(context.Background(), jsonrpc2.NewBufferedStream(xpls.StdRWC{}, jsonrpc2.VSCodeObjectCodec{}), h).DisconnectNotify()
+	conn := jsonrpc2.NewConn(ctx, jsonrpc2.NewBufferedStream(xpls.StdRWC{}, jsonrpc2.VSCodeObjectCodec{}), h)
+	go func() {
+		for {
+			select {
+			case <-ctx.Done():
+				_ = conn.Close()
+			case <-conn.DisconnectNotify():
+				stop()
+			}
+		}
+	}()
+
+	<-ctx.Done()
 	return nil
 }
