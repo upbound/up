@@ -27,6 +27,7 @@ import (
 	"github.com/upbound/up/cmd/up/organization"
 	"github.com/upbound/up/cmd/up/profile"
 	"github.com/upbound/up/cmd/up/repository"
+	"github.com/upbound/up/cmd/up/robot"
 	"github.com/upbound/up/cmd/up/upbound"
 	"github.com/upbound/up/cmd/up/uxp"
 	"github.com/upbound/up/cmd/up/xpkg"
@@ -81,6 +82,7 @@ type cli struct {
 	Profile      profile.Cmd      `cmd:"" help:"Interact with Upbound Profiles"`
 	Organization organization.Cmd `cmd:"" name:"organization" aliases:"org" help:"Interact with organizations."`
 	Repository   repository.Cmd   `cmd:"" name:"repository" aliases:"repo" help:"Interact with repositories."`
+	Robot        robot.Cmd        `cmd:"" name:"robot" help:"Interact with robots."`
 	Upbound      upbound.Cmd      `cmd:"" help:"Interact with Upbound."`
 	UXP          uxp.Cmd          `cmd:"" help:"Interact with UXP."`
 	XPKG         xpkg.Cmd         `cmd:"" help:"Interact with UXP packages."`
