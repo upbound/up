@@ -58,22 +58,22 @@ func (c *deleteCmd) Run(p pterm.TextPrinter, ac *accounts.Client, oc *organizati
 	// must guarantee that exactly one robot exists in the specified account
 	// with the provided name. Logic should be simplified when the API is
 	// updated.
-	var id uuid.UUID
-	found := false
+	var rid *uuid.UUID
 	for _, r := range rs {
 		if r.Name == c.RobotName {
-			if found {
+			if rid != nil {
 				return errors.Errorf(errMultipleRobotFmt, c.RobotName, upCtx.Account)
 			}
-			id = r.ID
-			found = true
+			// Pin range variable so that we can take address.
+			r := r
+			rid = &r.ID
 		}
 	}
-	if !found {
+	if rid == nil {
 		return errors.Errorf(errFindRobotFmt, c.RobotName, upCtx.Account)
 	}
 
-	ts, err := rc.ListTokens(context.Background(), id)
+	ts, err := rc.ListTokens(context.Background(), *rid)
 	if err != nil {
 		return err
 	}
@@ -85,21 +85,22 @@ func (c *deleteCmd) Run(p pterm.TextPrinter, ac *accounts.Client, oc *organizati
 	// must guarantee that exactly one token exists for the specified robot in
 	// the specified account with the provided name. Logic should be simplified
 	// when the API is updated.
-	found = false
+	var tid *uuid.UUID
 	for _, t := range ts.DataSet {
 		if fmt.Sprint(t.AttributeSet["name"]) == c.TokenName {
-			if found && !c.Force {
+			if tid != nil && !c.Force {
 				return errors.Errorf(errMultipleTokenFmt, c.TokenName, c.RobotName, upCtx.Account)
 			}
-			id = t.ID
-			found = true
+			// Pin range variable so that we can take address.
+			t := t
+			tid = &t.ID
 		}
 	}
-	if !found {
+	if tid == nil {
 		return errors.Errorf(errFindTokenFmt, c.TokenName, c.RobotName, upCtx.Account)
 	}
 
-	if err := tc.Delete(context.Background(), id); err != nil {
+	if err := tc.Delete(context.Background(), *tid); err != nil {
 		return err
 	}
 	p.Printfln("%s/%s/%s deleted", upCtx.Account, c.RobotName, c.TokenName)

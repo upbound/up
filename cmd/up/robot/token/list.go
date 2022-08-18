@@ -63,22 +63,22 @@ func (c *listCmd) Run(p pterm.TextPrinter, pt *pterm.TablePrinter, ac *accounts.
 	// must guarantee that exactly one robot exists in the specified account
 	// with the provided name. Logic should be simplified when the API is
 	// updated.
-	var id uuid.UUID
-	found := false
+	var rid *uuid.UUID
 	for _, r := range rs {
 		if r.Name == c.RobotName {
-			if found {
+			if rid != nil {
 				return errors.Errorf(errMultipleRobotFmt, c.RobotName, upCtx.Account)
 			}
-			id = r.ID
-			found = true
+			// Pin range variable so that we can take address.
+			r := r
+			rid = &r.ID
 		}
 	}
-	if !found {
+	if rid == nil {
 		return errors.Errorf(errFindRobotFmt, c.RobotName, upCtx.Account)
 	}
 
-	ts, err := rc.ListTokens(context.Background(), id)
+	ts, err := rc.ListTokens(context.Background(), *rid)
 	if err != nil {
 		return err
 	}

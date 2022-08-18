@@ -60,22 +60,23 @@ func (c *deleteCmd) Run(p pterm.TextPrinter, ac *accounts.Client, oc *organizati
 	// must guarantee that exactly one robot exists in the specified account
 	// with the provided name. Logic should be simplified when the API is
 	// updated.
-	var id uuid.UUID
-	found := false
+	var id *uuid.UUID
 	for _, r := range rs {
 		if r.Name == c.Name {
-			if found && !c.Force {
+			if id != nil && !c.Force {
 				return errors.Errorf(errMultipleRobotFmt, c.Name, upCtx.Account)
 			}
-			id = r.ID
-			found = true
+			// Pin range variable so that we can take address.
+			r := r
+			id = &r.ID
 		}
 	}
-	if !found {
+
+	if id == nil {
 		return errors.Errorf(errFindRobotFmt, c.Name, upCtx.Account)
 	}
 
-	if err := rc.Delete(context.Background(), id); err != nil {
+	if err := rc.Delete(context.Background(), *id); err != nil {
 		return err
 	}
 	p.Printfln("%s/%s deleted", upCtx.Account, c.Name)
