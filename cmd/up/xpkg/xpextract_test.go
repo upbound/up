@@ -118,7 +118,7 @@ func TestXPExtractRun(t *testing.T) {
 	}
 	for name, tc := range cases {
 		t.Run(name, func(t *testing.T) {
-			err := (&xpExtractCmd{
+			err := (&XPExtractCmd{
 				fs:     tc.fs,
 				fetch:  tc.fetch,
 				name:   tc.name,

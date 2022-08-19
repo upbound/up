@@ -77,7 +77,7 @@ func xpkgFetch(path string) fetchFn {
 
 // AfterApply constructs and binds Upbound-specific context to any subcommands
 // that have Run() methods that receive it.
-func (c *xpExtractCmd) AfterApply() error {
+func (c *XPExtractCmd) AfterApply() error {
 	c.fs = afero.NewOsFs()
 	c.fetch = registryFetch
 	if c.FromDaemon {
@@ -116,9 +116,9 @@ func (c *xpExtractCmd) AfterApply() error {
 	return nil
 }
 
-// xpExtractCmd extracts package contents into a Crossplane cache compatible
+// XPExtractCmd extracts package contents into a Crossplane cache compatible
 // format.
-type xpExtractCmd struct {
+type XPExtractCmd struct {
 	fs    afero.Fs
 	name  name.Reference
 	fetch fetchFn
@@ -133,7 +133,7 @@ type xpExtractCmd struct {
 }
 
 // Run runs the xp extract cmd.
-func (c *xpExtractCmd) Run(p pterm.TextPrinter) error { //nolint:gocyclo
+func (c *XPExtractCmd) Run(p pterm.TextPrinter) error { //nolint:gocyclo
 	// NOTE(hasheddan): most of the logic in this method is from the machinery
 	// used in Crossplane's package cache and should be updated to use shared
 	// libraries if moved to crossplane-runtime.
