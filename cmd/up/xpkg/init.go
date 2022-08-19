@@ -17,7 +17,6 @@ package xpkg
 import (
 	"path"
 	"path/filepath"
-	"strings"
 
 	"github.com/Masterminds/semver/v3"
 	v1 "github.com/crossplane/crossplane/apis/pkg/meta/v1"
@@ -152,7 +151,7 @@ func (c *initCmd) initConfigPkg() error {
 		return err
 	}
 
-	if inputYes(include) {
+	if input.InputYes(include) {
 		for {
 			provider, err := c.prompter.Prompt("Provider URI [e.g. crossplane/provider-aws]", false)
 			if err != nil {
@@ -179,7 +178,7 @@ func (c *initCmd) initConfigPkg() error {
 			if err != nil {
 				return err
 			}
-			if inputYes(done) {
+			if input.InputYes(done) {
 				break
 			}
 		}
@@ -208,14 +207,4 @@ func (c *initCmd) metaFileInRoot() error {
 		return errors.New(errAlreadyExists)
 	}
 	return nil
-}
-
-// TODO(@tnthornton) this seems like the kind of thing we could build into
-// and expand in the prompt package if we find it useful elsewhere.
-// for example: reprompt if not given y/n (yes/no)
-func inputYes(include string) bool {
-	if len(include) > 0 {
-		return strings.ToLower(include)[0:1] == "y"
-	}
-	return false
 }

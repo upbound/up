@@ -16,17 +16,46 @@ package repository
 
 import (
 	"context"
+	"fmt"
 
 	"github.com/pterm/pterm"
 
 	"github.com/upbound/up-sdk-go/service/repositories"
 
+	"github.com/upbound/up/internal/input"
 	"github.com/upbound/up/internal/upbound"
 )
 
+// BeforeApply sets default values for the delete command, before assignment and validation.
+func (c *deleteCmd) BeforeApply() error {
+	c.prompter = input.NewPrompter()
+	return nil
+}
+
+// AfterApply accepts user input by default to confirm the delete operation.
+func (c *deleteCmd) AfterApply(p pterm.TextPrinter, upCtx *upbound.Context) error {
+	if !c.Force {
+		confirm, err := c.prompter.Prompt("Are you sure you want to delete this repository? [y/n]", false)
+		if err != nil {
+			return err
+		}
+
+		if input.InputYes(confirm) {
+			p.Printfln("Deleting repository %s/%s. This cannot be undone.", upCtx.Account, c.Name)
+		} else {
+			return fmt.Errorf("operation canceled")
+		}
+	}
+	return nil
+}
+
 // deleteCmd deletes a repository on Upbound.
 type deleteCmd struct {
+	prompter input.Prompter
+
 	Name string `arg:"" required:"" help:"Name of repository."`
+
+	Force bool `help:"Force deletion of repository." default:"false" short:"f"`
 }
 
 // Run executes the delete command.

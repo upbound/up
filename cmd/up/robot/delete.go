@@ -16,6 +16,7 @@ package robot
 
 import (
 	"context"
+	"fmt"
 
 	"github.com/google/uuid"
 	"github.com/pkg/errors"
@@ -25,6 +26,7 @@ import (
 	"github.com/upbound/up-sdk-go/service/organizations"
 	"github.com/upbound/up-sdk-go/service/robots"
 
+	"github.com/upbound/up/internal/input"
 	"github.com/upbound/up/internal/upbound"
 )
 
@@ -33,11 +35,36 @@ const (
 	errFindRobotFmt     = "could not find robot %s in %s"
 )
 
+// BeforeApply sets default values for the delete command, before assignment and validation.
+func (c *deleteCmd) BeforeApply() error {
+	c.prompter = input.NewPrompter()
+	return nil
+}
+
+// AfterApply accepts user input by default to confirm the delete operation.
+func (c *deleteCmd) AfterApply(p pterm.TextPrinter, upCtx *upbound.Context) error {
+	if !c.Force {
+		confirm, err := c.prompter.Prompt("Are you sure you want to delete this robot? [y/n]", false)
+		if err != nil {
+			return err
+		}
+
+		if input.InputYes(confirm) {
+			p.Printfln("Deleting robot %s/%s. This cannot be undone.", upCtx.Account, c.Name)
+		} else {
+			return fmt.Errorf("operation canceled")
+		}
+	}
+	return nil
+}
+
 // deleteCmd deletes a robot on Upbound.
 type deleteCmd struct {
+	prompter input.Prompter
+
 	Name string `arg:"" required:"" help:"Name of robot."`
 
-	Force bool `hidden:"" help:"Force delete robot even if conflicts exist."`
+	Force bool `help:"Force delete robot even if conflicts exist." default:"false" short:"f"`
 }
 
 // Run executes the delete command.
