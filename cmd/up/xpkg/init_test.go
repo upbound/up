@@ -25,6 +25,7 @@ import (
 
 	"github.com/crossplane/crossplane-runtime/pkg/test"
 
+	"github.com/upbound/up/internal/input"
 	"github.com/upbound/up/internal/xpkg"
 )
 
@@ -83,7 +84,7 @@ func TestInputYes(t *testing.T) {
 
 	for name, tc := range cases {
 		t.Run(name, func(t *testing.T) {
-			y := inputYes(tc.args.input)
+			y := input.InputYes(tc.args.input)
 
 			if diff := cmp.Diff(tc.want.output, y); diff != "" {
 				t.Errorf("\n%s\nInputYes(...): -want, +got:\n%s", tc.reason, diff)
