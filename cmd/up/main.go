@@ -78,15 +78,19 @@ type cli struct {
 
 	Login        loginCmd         `cmd:"" help:"Login to Upbound."`
 	Logout       logoutCmd        `cmd:"" help:"Logout of Upbound."`
-	ControlPlane controlplane.Cmd `cmd:"" name:"controlplane" aliases:"ctp" help:"Interact with control planes."`
+	ControlPlane controlplane.Cmd `cmd:"" name:"controlplane" aliases:"ctp" hidden:"" help:"Interact with control planes."`
 	Profile      profile.Cmd      `cmd:"" help:"Interact with Upbound Profiles"`
 	Organization organization.Cmd `cmd:"" name:"organization" aliases:"org" help:"Interact with organizations."`
 	Repository   repository.Cmd   `cmd:"" name:"repository" aliases:"repo" help:"Interact with repositories."`
 	Robot        robot.Cmd        `cmd:"" name:"robot" help:"Interact with robots."`
-	Upbound      upbound.Cmd      `cmd:"" help:"Interact with Upbound."`
+	Upbound      upbound.Cmd      `cmd:"" hidden:"" help:"Interact with Upbound."`
 	UXP          uxp.Cmd          `cmd:"" help:"Interact with UXP."`
 	XPKG         xpkg.Cmd         `cmd:"" help:"Interact with UXP packages."`
 	XPLS         xpls.Cmd         `cmd:"" help:"Start xpls language server."`
+	Alpha        struct {
+		ControlPlane controlplane.Cmd `cmd:"" name:"controlplane" aliases:"ctp" group:"alpha" help:"Interact with control planes."`
+		Upbound      upbound.Cmd      `cmd:"" group:"alpha" help:"Interact with Upbound."`
+	} `cmd:"" help:"Alpha features. Commands may be removed in future releases."`
 }
 
 func main() {
