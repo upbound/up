@@ -52,7 +52,7 @@ type Flags struct {
 	Account string   `short:"a" env:"UP_ACCOUNT" help:"Account used to execute command."`
 
 	// Experimental
-	MCPExperimental bool `env:"UP_MCP_EXPERIMENTAL" help:"Use experimental managed control planes API."`
+	MCPExperimental bool `env:"UP_MCP_EXPERIMENTAL" hidden:"" help:"Use experimental managed control planes API."`
 
 	// Insecure
 	InsecureSkipTLSVerify bool `env:"UP_INSECURE_SKIP_TLS_VERIFY" help:"[INSECURE] Skip verifying TLS certificates."`
