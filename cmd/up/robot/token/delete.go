@@ -39,19 +39,21 @@ func (c *deleteCmd) BeforeApply() error {
 
 // AfterApply accepts user input by default to confirm the delete operation.
 func (c *deleteCmd) AfterApply(p pterm.TextPrinter, upCtx *upbound.Context) error {
-	if !c.Force {
-		confirm, err := c.prompter.Prompt("Are you sure you want to delete this robot token? [y/n]", false)
-		if err != nil {
-			return err
-		}
-
-		if input.InputYes(confirm) {
-			p.Printfln("Deleting robot token %s/%s/%s. This cannot be undone.", upCtx.Account, c.RobotName, c.TokenName)
-		} else {
-			return fmt.Errorf("operation canceled")
-		}
+	if c.Force {
+		return nil
 	}
-	return nil
+
+	confirm, err := c.prompter.Prompt("Are you sure you want to delete this robot token? [y/n]", false)
+	if err != nil {
+		return err
+	}
+
+	if input.InputYes(confirm) {
+		p.Printfln("Deleting robot token %s/%s/%s. This cannot be undone.", upCtx.Account, c.RobotName, c.TokenName)
+		return nil
+	}
+
+	return fmt.Errorf("operation canceled")
 }
 
 // deleteCmd deletes a robot token on Upbound.
@@ -61,7 +63,7 @@ type deleteCmd struct {
 	RobotName string `arg:"" required:"" help:"Name of robot."`
 	TokenName string `arg:"" required:"" help:"Name of token."`
 
-	Force bool `help:"Force delete token even if conflicts exist." default:"false" short:"f"`
+	Force bool `help:"Force delete token even if conflicts exist." default:"false"`
 }
 
 // Run executes the delete command.

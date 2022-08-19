@@ -33,19 +33,21 @@ func (c *deleteCmd) BeforeApply() error {
 
 // AfterApply accepts user input by default to confirm the delete operation.
 func (c *deleteCmd) AfterApply(p pterm.TextPrinter) error {
-	if !c.Force {
-		confirm, err := c.prompter.Prompt("Are you sure you want to delete this organization? [y/n]", false)
-		if err != nil {
-			return err
-		}
-
-		if input.InputYes(confirm) {
-			p.Printfln("Deleting organization %s. This cannot be undone.", c.Name)
-		} else {
-			return fmt.Errorf("operation canceled")
-		}
+	if c.Force {
+		return nil
 	}
-	return nil
+
+	confirm, err := c.prompter.Prompt("Are you sure you want to delete this organization? [y/n]", false)
+	if err != nil {
+		return err
+	}
+
+	if input.InputYes(confirm) {
+		p.Printfln("Deleting organization %s. This cannot be undone.", c.Name)
+		return nil
+	}
+
+	return fmt.Errorf("operation canceled")
 }
 
 // deleteCmd deletes an organization on Upbound.
@@ -54,7 +56,7 @@ type deleteCmd struct {
 
 	Name string `arg:"" required:"" help:"Name of organization."`
 
-	Force bool `help:"Force deletion of the organization." default:"false" short:"f"`
+	Force bool `help:"Force deletion of the organization." default:"false"`
 }
 
 // Run executes the delete command.
