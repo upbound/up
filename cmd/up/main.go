@@ -90,6 +90,9 @@ type cli struct {
 	Alpha        struct {
 		ControlPlane controlplane.Cmd `cmd:"" name:"controlplane" aliases:"ctp" group:"alpha" help:"Interact with control planes."`
 		Upbound      upbound.Cmd      `cmd:"" group:"alpha" help:"Interact with Upbound."`
+		XPKG         struct {
+			XPExtract xpkg.XPExtractCmd `cmd:"" group:"alpha" help:"Extract package contents into a Crossplane cache compatible format. Fetches from a remote registry by default."`
+		} `cmd:"" help:"Interact with UXP packages."`
 	} `cmd:"" help:"Alpha features. Commands may be removed in future releases."`
 }
 
