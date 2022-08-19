@@ -50,10 +50,10 @@ func (c *Cmd) AfterApply(kongCtx *kong.Context) error {
 
 // Cmd contains commands for managing Upbound.
 type Cmd struct {
-	Install   installCmd   `cmd:"" group:"upbound" help:"Install Upbound."`
-	Mail      mailCmd      `cmd:"" group:"upbound" help:"[EXPERIMENTAL] Run a local mail portal."`
-	Uninstall uninstallCmd `cmd:"" group:"upbound" help:"Uninstall Upbound."`
-	Upgrade   upgradeCmd   `cmd:"" group:"upbound" help:"Upgrade Upbound."`
+	Install   installCmd   `cmd:"" help:"Install Upbound."`
+	Mail      mailCmd      `cmd:"" help:"[EXPERIMENTAL] Run a local mail portal."`
+	Uninstall uninstallCmd `cmd:"" help:"Uninstall Upbound."`
+	Upgrade   upgradeCmd   `cmd:"" help:"Upgrade Upbound."`
 
 	Kubeconfig string `type:"existingfile" help:"Override default kubeconfig path."`
 	Namespace  string `short:"n" env:"UPBOUND_NAMESPACE" default:"upbound-system" help:"Kubernetes namespace for Upbound."`

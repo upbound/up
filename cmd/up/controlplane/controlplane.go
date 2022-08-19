@@ -46,9 +46,9 @@ func (c *Cmd) AfterApply(kongCtx *kong.Context) error {
 
 // Cmd contains commands for interacting with control planes.
 type Cmd struct {
-	Create createCmd `cmd:"" group:"controlplane" help:"Create a hosted control plane."`
-	Delete deleteCmd `cmd:"" group:"controlplane" help:"Delete a control plane."`
-	List   listCmd   `cmd:"" group:"controlplane" help:"List control planes for the account."`
+	Create createCmd `cmd:"" help:"Create a hosted control plane."`
+	Delete deleteCmd `cmd:"" help:"Delete a control plane."`
+	List   listCmd   `cmd:"" help:"List control planes for the account."`
 
 	Kubeconfig kubeconfig.Cmd `cmd:"" name:"kubeconfig" help:"Manage control plane kubeconfig data."`
 
