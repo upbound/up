@@ -118,7 +118,11 @@ type RedactedProfile struct {
 func (p RedactedProfile) MarshalJSON() ([]byte, error) {
 	type profile RedactedProfile
 	pc := profile(p)
-	pc.Session = "REDACTED"
+	s := "NONE"
+	if pc.Session != "" {
+		s = "REDACTED"
+	}
+	pc.Session = s
 	return json.Marshal(&pc)
 }
 

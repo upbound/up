@@ -65,10 +65,11 @@ type Flags struct {
 
 // Context includes common data that Upbound consumers may utilize.
 type Context struct {
-	Profile config.Profile
-	Token   string
-	Account string
-	Domain  *url.URL
+	ProfileName string
+	Profile     config.Profile
+	Token       string
+	Account     string
+	Domain      *url.URL
 
 	InsecureSkipTLSVerify bool
 	MCPExperimental       bool
@@ -120,20 +121,19 @@ func NewFromFlags(f Flags, opts ...Option) (*Context, error) { //nolint:gocyclo
 	// If profile identifier is not provided, use the default, or empty if the
 	// default cannot be obtained.
 	c.Profile = config.Profile{}
-	profileToUse := ""
 	if f.Profile == "" {
 		if name, p, err := c.Cfg.GetDefaultUpboundProfile(); err == nil {
 			c.Profile = p
-			profileToUse = name
+			c.ProfileName = name
 		}
 	} else {
 		if p, err := c.Cfg.GetUpboundProfile(f.Profile); err == nil {
 			c.Profile = p
-			profileToUse = f.Profile
+			c.ProfileName = f.Profile
 		}
 	}
 
-	of, err := c.applyOverrides(f, profileToUse)
+	of, err := c.applyOverrides(f, c.ProfileName)
 	if err != nil {
 		return nil, err
 	}

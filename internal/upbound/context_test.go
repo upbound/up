@@ -140,6 +140,7 @@ func TestNewFromFlags(t *testing.T) {
 			},
 			want: want{
 				c: &Context{
+					ProfileName:           "default",
 					Account:               "",
 					APIEndpoint:           withURL("https://api.upbound.io"),
 					Domain:                withURL("https://upbound.io"),
@@ -167,6 +168,7 @@ func TestNewFromFlags(t *testing.T) {
 			},
 			want: want{
 				c: &Context{
+					ProfileName:           "default",
 					Account:               "my-org",
 					APIEndpoint:           withURL("https://api.local.upbound.io"),
 					Domain:                withURL("https://local.upbound.io"),
@@ -205,6 +207,7 @@ func TestNewFromFlags(t *testing.T) {
 			},
 			want: want{
 				c: &Context{
+					ProfileName:           "default",
 					Account:               "not-my-org",
 					APIEndpoint:           withURL("http://not.a.url"),
 					Domain:                withURL("http://a.domain.org"),

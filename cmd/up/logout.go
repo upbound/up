@@ -31,7 +31,6 @@ const (
 	logoutPath = "/v1/logout"
 
 	errLogoutFailed      = "unable to logout"
-	errGetProfile        = "failed to get profile"
 	errRemoveTokenFailed = "failed to remove token"
 )
 
@@ -69,20 +68,15 @@ func (c *logoutCmd) Run(p pterm.TextPrinter, upCtx *upbound.Context) error {
 	if err := c.client.Do(req, nil); err != nil {
 		return errors.Wrap(err, errLogoutFailed)
 	}
-
 	// Logout is successful, remove token from config and update.
-	profile, err := upCtx.Cfg.GetUpboundProfile(c.Flags.Profile)
-	if err != nil {
-		return errors.Wrap(err, errGetProfile)
-	}
-	profile.Session = ""
-	if err := upCtx.Cfg.AddOrUpdateUpboundProfile(upCtx.Profile.ID, profile); err != nil {
+	upCtx.Profile.Session = ""
+	if err := upCtx.Cfg.AddOrUpdateUpboundProfile(upCtx.ProfileName, upCtx.Profile); err != nil {
 		return errors.Wrap(err, errRemoveTokenFailed)
 	}
 	if err := upCtx.CfgSrc.UpdateConfig(upCtx.Cfg); err != nil {
 		return errors.Wrap(err, errUpdateConfig)
 	}
 
-	p.Printfln("%s logged out", profile.ID)
+	p.Printfln("%s logged out", upCtx.Profile.ID)
 	return nil
 }
