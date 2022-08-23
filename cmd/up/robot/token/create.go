@@ -38,7 +38,7 @@ type createCmd struct {
 	RobotName string `arg:"" required:"" help:"Name of robot."`
 	TokenName string `arg:"" required:"" help:"Name of token."`
 
-	Output string `type:"path" short:"o" help:"Path to write JSON file containing access ID and token."`
+	Output string `type:"path" short:"o" required:"" help:"Path to write JSON file containing access ID and token."`
 }
 
 // Run executes the create command.
