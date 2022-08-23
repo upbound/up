@@ -22,6 +22,7 @@ import (
 	op "github.com/upbound/up-sdk-go/service/oldplanes"
 
 	"github.com/upbound/up/cmd/up/controlplane/kubeconfig"
+	"github.com/upbound/up/cmd/up/controlplane/pullsecret"
 	"github.com/upbound/up/internal/feature"
 	"github.com/upbound/up/internal/upbound"
 )
@@ -52,10 +53,11 @@ func (c *Cmd) AfterApply(kongCtx *kong.Context) error {
 
 // Cmd contains commands for interacting with control planes.
 type Cmd struct {
-	Create     createCmd     `cmd:"" maturity:"alpha" help:"Create a hosted control plane."`
-	Delete     deleteCmd     `cmd:"" maturity:"alpha" help:"Delete a control plane."`
-	List       listCmd       `cmd:"" maturity:"alpha" help:"List control planes for the account."`
-	PullSecret pullSecretCmd `cmd:"" help:"Create a package pull secret."`
+	Create createCmd `cmd:"" maturity:"alpha" help:"Create a hosted control plane."`
+	Delete deleteCmd `cmd:"" maturity:"alpha" help:"Delete a control plane."`
+	List   listCmd   `cmd:"" maturity:"alpha" help:"List control planes for the account."`
+
+	PullSecret pullsecret.Cmd `cmd:"" help:"Manage package pull secrets."`
 
 	Kubeconfig kubeconfig.Cmd `cmd:"" maturity:"alpha" name:"kubeconfig" help:"Manage control plane kubeconfig data."`
 

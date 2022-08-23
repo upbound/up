@@ -12,7 +12,7 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-package controlplane
+package pullsecret
 
 import (
 	"context"
@@ -35,7 +35,7 @@ const (
 
 // AfterApply constructs and binds Upbound-specific context to any subcommands
 // that have Run() methods that receive it.
-func (c *pullSecretCmd) AfterApply(kongCtx *kong.Context, upCtx *upbound.Context) error {
+func (c *createCmd) AfterApply(kongCtx *kong.Context, upCtx *upbound.Context) error {
 	kubeconfig, err := kube.GetKubeConfig(c.Kubeconfig)
 	if err != nil {
 		return err
@@ -62,8 +62,8 @@ func (c *pullSecretCmd) AfterApply(kongCtx *kong.Context, upCtx *upbound.Context
 	return nil
 }
 
-// pullSecretCmd creates a package pull secret.
-type pullSecretCmd struct {
+// createCmd creates a package pull secret.
+type createCmd struct {
 	kClient kubernetes.Interface
 	user    string
 	pass    string
@@ -77,7 +77,7 @@ type pullSecretCmd struct {
 }
 
 // Run executes the pull secret command.
-func (c *pullSecretCmd) Run(p pterm.TextPrinter, upCtx *upbound.Context) error { //nolint:gocyclo
+func (c *createCmd) Run(p pterm.TextPrinter, upCtx *upbound.Context) error { //nolint:gocyclo
 	if err := kube.NewImagePullApplicator(kube.NewSecretApplicator(c.kClient)).
 		Apply(context.Background(),
 			c.Name,
