@@ -24,12 +24,18 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 
 	"github.com/upbound/up/internal/auth"
+	"github.com/upbound/up/internal/feature"
 	"github.com/upbound/up/internal/install"
 	"github.com/upbound/up/internal/kube"
 	"github.com/upbound/up/internal/license"
 )
 
 const upboundChart = "upbound"
+
+// BeforeReset is the first hook to run.
+func (c *Cmd) BeforeReset(p *kong.Path, maturity feature.Maturity) error {
+	return feature.HideMaturity(p, maturity)
+}
 
 // AfterApply constructs and binds Upbound-specific context to any subcommands
 // that have Run() methods that receive it.
@@ -47,10 +53,10 @@ func (c *Cmd) AfterApply(kongCtx *kong.Context) error {
 
 // Cmd contains commands for managing Upbound.
 type Cmd struct {
-	Install   installCmd   `cmd:"" help:"Install Upbound."`
-	Mail      mailCmd      `cmd:"" help:"Run a local mail portal."`
-	Uninstall uninstallCmd `cmd:"" help:"Uninstall Upbound."`
-	Upgrade   upgradeCmd   `cmd:"" help:"Upgrade Upbound."`
+	Install   installCmd   `cmd:"" maturity:"alpha" help:"Install Upbound."`
+	Mail      mailCmd      `cmd:"" maturity:"alpha" help:"Run a local mail portal."`
+	Uninstall uninstallCmd `cmd:"" maturity:"alpha" help:"Uninstall Upbound."`
+	Upgrade   upgradeCmd   `cmd:"" maturity:"alpha" help:"Upgrade Upbound."`
 
 	Kubeconfig string `type:"existingfile" help:"Override default kubeconfig path."`
 	Namespace  string `short:"n" env:"UPBOUND_NAMESPACE" default:"upbound-system" help:"Kubernetes namespace for Upbound."`
