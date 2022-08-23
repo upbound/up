@@ -103,7 +103,7 @@ type cli struct {
 
 // BeforeReset runs before all other hooks. If command has alpha as an ancestor,
 // maturity level will be set to alpha.
-func (a *alpha) BeforeReset(ctx *kong.Context) error {
+func (a *alpha) BeforeReset(ctx *kong.Context) error { //nolint:unparam
 	ctx.Bind(feature.Alpha)
 	return nil
 }

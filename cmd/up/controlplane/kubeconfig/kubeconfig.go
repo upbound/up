@@ -16,6 +16,7 @@ package kubeconfig
 
 import (
 	"github.com/alecthomas/kong"
+
 	"github.com/upbound/up/internal/feature"
 )
 
