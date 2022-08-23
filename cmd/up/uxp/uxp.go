@@ -49,9 +49,9 @@ func (c *Cmd) AfterApply(kongCtx *kong.Context) error {
 
 // Cmd contains commands for managing UXP.
 type Cmd struct {
-	Install   installCmd   `cmd:"" group:"uxp" help:"Install UXP."`
-	Uninstall uninstallCmd `cmd:"" group:"uxp" help:"Uninstall UXP."`
-	Upgrade   upgradeCmd   `cmd:"" group:"uxp" help:"Upgrade UXP."`
+	Install   installCmd   `cmd:"" help:"Install UXP."`
+	Uninstall uninstallCmd `cmd:"" help:"Uninstall UXP."`
+	Upgrade   upgradeCmd   `cmd:"" help:"Upgrade UXP."`
 
 	Kubeconfig string `type:"existingfile" help:"Override default kubeconfig path."`
 	Namespace  string `short:"n" env:"UXP_NAMESPACE" default:"upbound-system" help:"Kubernetes namespace for UXP."`

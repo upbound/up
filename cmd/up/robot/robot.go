@@ -49,10 +49,10 @@ func (c *Cmd) AfterApply(kongCtx *kong.Context) error {
 
 // Cmd contains commands for interacting with robots.
 type Cmd struct {
-	Create createCmd `cmd:"" group:"robot" help:"Create a robot."`
-	Delete deleteCmd `cmd:"" group:"robot" help:"Delete a robot."`
-	List   listCmd   `cmd:"" group:"robot" help:"List robots for the account."`
-	Token  token.Cmd `cmd:"" group:"robot" help:"Interact with robot tokens."`
+	Create createCmd `cmd:"" help:"Create a robot."`
+	Delete deleteCmd `cmd:"" help:"Delete a robot."`
+	List   listCmd   `cmd:"" help:"List robots for the account."`
+	Token  token.Cmd `cmd:"" help:"Interact with robot tokens."`
 
 	// Common Upbound API configuration
 	Flags upbound.Flags `embed:""`
