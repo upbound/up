@@ -111,10 +111,7 @@ func (c *createCmd) Run(p pterm.TextPrinter, ac *accounts.Client, oc *organizati
 		return err
 	}
 	defer f.Close() //nolint:errcheck,gosec
-	return json.NewEncoder(f).Encode(&struct {
-		AccessID string `json:"accessId"`
-		Token    string `json:"token"`
-	}{
+	return json.NewEncoder(f).Encode(&upbound.TokenFile{
 		AccessID: access,
 		Token:    token,
 	})
