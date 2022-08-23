@@ -16,11 +16,14 @@ package kube
 
 import (
 	"context"
+	"encoding/base64"
+	"encoding/json"
 
 	corev1 "k8s.io/api/core/v1"
 	kerrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/client-go/kubernetes"
+	"k8s.io/kubectl/pkg/cmd/create"
 )
 
 // SecretApplicator creates or updates Secrets. In the event that the Secret
@@ -44,4 +47,57 @@ func (s *SecretApplicator) Apply(ctx context.Context, ns string, secret *corev1.
 		_, err = s.kube.CoreV1().Secrets(ns).Update(ctx, secret, metav1.UpdateOptions{})
 	}
 	return err
+}
+
+// ImagePullApplicator constructs and creates or updates an image pull Secret.
+type ImagePullApplicator struct {
+	secret *SecretApplicator
+}
+
+// NewImagePullApplicator constructs a new ImagePullApplicator with the passed
+// SecretApplicator.
+// TODO(hasheddan): consider moving applicators to a common interface.
+func NewImagePullApplicator(secret *SecretApplicator) *ImagePullApplicator {
+	return &ImagePullApplicator{
+		secret: secret,
+	}
+}
+
+// Apply constructs an DockerConfig image pull Secret with the provided registry
+// and credentials.
+func (i *ImagePullApplicator) Apply(ctx context.Context, name, ns, user, pass, registry string) error {
+	regAuth := &create.DockerConfigJSON{
+		Auths: map[string]create.DockerConfigEntry{
+			registry: {
+				Username: user,
+				Password: pass,
+				Auth:     encodeDockerConfigFieldAuth(user, pass),
+			},
+		},
+	}
+	regAuthJSON, err := json.Marshal(regAuth)
+	if err != nil {
+		return err
+	}
+
+	secret := &corev1.Secret{
+		ObjectMeta: metav1.ObjectMeta{
+			Name: name,
+		},
+		Type: corev1.SecretTypeDockerConfigJson,
+		Data: map[string][]byte{
+			corev1.DockerConfigJsonKey: regAuthJSON,
+		},
+	}
+	// Create image pull secret if it does not exist.
+	return i.secret.Apply(ctx, ns, secret)
+}
+
+// encodeDockerConfigFieldAuth returns base64 encoding of the username and
+// password string
+// NOTE(hasheddan): this function comes directly from kubectl
+// https://github.com/kubernetes/kubectl/blob/0f88fc6b598b7e883a391a477215afb080ec7733/pkg/cmd/create/create_secret_docker.go#L305
+func encodeDockerConfigFieldAuth(username, password string) string {
+	fieldValue := username + ":" + password
+	return base64.StdEncoding.EncodeToString([]byte(fieldValue))
 }
