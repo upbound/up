@@ -62,7 +62,7 @@ func (c *upgradeCmd) AfterApply(insCtx *install.Context, quiet config.QuietFlag)
 	}
 	c.kClient = client
 	secret := kube.NewSecretApplicator(client)
-	c.pullSecret = newImagePullApplicator(secret)
+	c.pullSecret = kube.NewImagePullApplicator(secret)
 	auth := auth.NewProvider(
 		auth.WithBasicAuth(id, token),
 		auth.WithEndpoint(c.Registry),
@@ -112,7 +112,7 @@ type upgradeCmd struct {
 	parser     install.ParameterParser
 	prompter   input.Prompter
 	access     *accessKeyApplicator
-	pullSecret *imagePullApplicator
+	pullSecret *kube.ImagePullApplicator
 	id         string
 	token      string
 	kClient    kubernetes.Interface
@@ -139,7 +139,7 @@ func (c *upgradeCmd) Run(insCtx *install.Context) error {
 	}
 
 	// Create or update image pull secret.
-	if err := c.pullSecret.apply(ctx, defaultImagePullSecret, insCtx.Namespace, c.id, c.token, c.Registry.String()); err != nil {
+	if err := c.pullSecret.Apply(ctx, defaultImagePullSecret, insCtx.Namespace, c.id, c.token, c.Registry.String()); err != nil {
 		return errors.Wrap(err, errCreateImagePullSecret)
 	}
 
