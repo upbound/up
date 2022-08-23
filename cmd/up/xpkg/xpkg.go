@@ -17,7 +17,7 @@ package xpkg
 // Cmd contains commands for interacting with xpkgs.
 type Cmd struct {
 	Build     buildCmd     `cmd:"" group:"xpkg" help:"Build a package."`
-	XPExtract XPExtractCmd `cmd:"" group:"xpkg" hidden:"" help:"Extract package contents into a Crossplane cache compatible format. Fetches from a remote registry by default."`
+	XPExtract xpExtractCmd `cmd:"" group:"xpkg" help:"Extract package contents into a Crossplane cache compatible format. Fetches from a remote registry by default."`
 	Init      initCmd      `cmd:"" group:"xpkg" help:"Initialize a package."`
 	Dep       depCmd       `cmd:"" group:"xpkg" help:"Manage package dependencies."`
 	Push      pushCmd      `cmd:"" group:"xpkg" help:"Push a package."`
