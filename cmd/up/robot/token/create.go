@@ -38,7 +38,7 @@ type createCmd struct {
 	RobotName string `arg:"" required:"" help:"Name of robot."`
 	TokenName string `arg:"" required:"" help:"Name of token."`
 
-	Output string `type:"path" short:"o" help:"Path to write JSON file containing access ID and token."`
+	Output string `type:"path" short:"o" required:"" help:"Path to write JSON file containing access ID and token."`
 }
 
 // Run executes the create command.
@@ -111,10 +111,7 @@ func (c *createCmd) Run(p pterm.TextPrinter, ac *accounts.Client, oc *organizati
 		return err
 	}
 	defer f.Close() //nolint:errcheck,gosec
-	return json.NewEncoder(f).Encode(&struct {
-		AccessID string `json:"accessId"`
-		Token    string `json:"token"`
-	}{
+	return json.NewEncoder(f).Encode(&upbound.TokenFile{
 		AccessID: access,
 		Token:    token,
 	})

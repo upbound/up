@@ -40,9 +40,9 @@ func (c *Cmd) AfterApply(kongCtx *kong.Context) error {
 
 // Cmd contains commands for interacting with organizations.
 type Cmd struct {
-	Create createCmd `cmd:"" group:"organizations" help:"Create an organization."`
-	Delete deleteCmd `cmd:"" group:"organizations" help:"Delete an organization."`
-	List   listCmd   `cmd:"" group:"organizations" help:"List organizations."`
+	Create createCmd `cmd:"" help:"Create an organization."`
+	Delete deleteCmd `cmd:"" help:"Delete an organization."`
+	List   listCmd   `cmd:"" help:"List organizations."`
 
 	// Common Upbound API configuration
 	Flags upbound.Flags `embed:""`

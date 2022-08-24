@@ -22,8 +22,15 @@ import (
 	op "github.com/upbound/up-sdk-go/service/oldplanes"
 
 	"github.com/upbound/up/cmd/up/controlplane/kubeconfig"
+	"github.com/upbound/up/cmd/up/controlplane/pullsecret"
+	"github.com/upbound/up/internal/feature"
 	"github.com/upbound/up/internal/upbound"
 )
+
+// BeforeReset is the first hook to run.
+func (c *Cmd) BeforeReset(p *kong.Path, maturity feature.Maturity) error {
+	return feature.HideMaturity(p, maturity)
+}
 
 // AfterApply constructs and binds a control plane client to any subcommands
 // that have Run() methods that receive it.
@@ -46,11 +53,13 @@ func (c *Cmd) AfterApply(kongCtx *kong.Context) error {
 
 // Cmd contains commands for interacting with control planes.
 type Cmd struct {
-	Create createCmd `cmd:"" help:"Create a hosted control plane."`
-	Delete deleteCmd `cmd:"" help:"Delete a control plane."`
-	List   listCmd   `cmd:"" help:"List control planes for the account."`
+	Create createCmd `cmd:"" maturity:"alpha" help:"Create a hosted control plane."`
+	Delete deleteCmd `cmd:"" maturity:"alpha" help:"Delete a control plane."`
+	List   listCmd   `cmd:"" maturity:"alpha" help:"List control planes for the account."`
 
-	Kubeconfig kubeconfig.Cmd `cmd:"" name:"kubeconfig" help:"Manage control plane kubeconfig data."`
+	PullSecret pullsecret.Cmd `cmd:"" help:"Manage package pull secrets."`
+
+	Kubeconfig kubeconfig.Cmd `cmd:"" maturity:"alpha" name:"kubeconfig" help:"Manage control plane kubeconfig data."`
 
 	// Common Upbound API configuration
 	Flags upbound.Flags `embed:""`

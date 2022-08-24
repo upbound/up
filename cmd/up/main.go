@@ -33,6 +33,7 @@ import (
 	"github.com/upbound/up/cmd/up/xpkg"
 	"github.com/upbound/up/cmd/up/xpls"
 	"github.com/upbound/up/internal/config"
+	"github.com/upbound/up/internal/feature"
 	"github.com/upbound/up/internal/version"
 
 	// TODO(epk): Remove this once we upgrade kubernetes deps to 1.25
@@ -69,6 +70,16 @@ func (c *cli) AfterApply(ctx *kong.Context) error { //nolint:unparam
 	return nil
 }
 
+// BeforeReset runs before all other hooks. Default maturity level is stable.
+func (c *cli) BeforeReset(ctx *kong.Context, p *kong.Path) error {
+	ctx.Bind(feature.Stable)
+	// If no command is selected, we are emitting help and filter maturity.
+	if ctx.Selected() == nil {
+		return feature.HideMaturity(p, feature.Stable)
+	}
+	return nil
+}
+
 type cli struct {
 	Version versionFlag      `short:"v" name:"version" help:"Print version and exit."`
 	Quiet   config.QuietFlag `short:"q" name:"quiet" help:"Suppress all output."`
@@ -78,22 +89,29 @@ type cli struct {
 
 	Login        loginCmd         `cmd:"" help:"Login to Upbound."`
 	Logout       logoutCmd        `cmd:"" help:"Logout of Upbound."`
-	ControlPlane controlplane.Cmd `cmd:"" name:"controlplane" aliases:"ctp" hidden:"" help:"Interact with control planes."`
-	Profile      profile.Cmd      `cmd:"" help:"Interact with Upbound Profiles"`
+	ControlPlane controlplane.Cmd `cmd:"" name:"controlplane" aliases:"ctp" help:"Interact with control planes."`
+	Profile      profile.Cmd      `cmd:"" help:"Interact with Upbound profiles."`
 	Organization organization.Cmd `cmd:"" name:"organization" aliases:"org" help:"Interact with organizations."`
 	Repository   repository.Cmd   `cmd:"" name:"repository" aliases:"repo" help:"Interact with repositories."`
 	Robot        robot.Cmd        `cmd:"" name:"robot" help:"Interact with robots."`
-	Upbound      upbound.Cmd      `cmd:"" hidden:"" help:"Interact with Upbound."`
+	Upbound      upbound.Cmd      `cmd:"" maturity:"alpha" help:"Interact with Upbound."`
 	UXP          uxp.Cmd          `cmd:"" help:"Interact with UXP."`
 	XPKG         xpkg.Cmd         `cmd:"" help:"Interact with UXP packages."`
 	XPLS         xpls.Cmd         `cmd:"" help:"Start xpls language server."`
-	Alpha        struct {
-		ControlPlane controlplane.Cmd `cmd:"" name:"controlplane" aliases:"ctp" group:"alpha" help:"Interact with control planes."`
-		Upbound      upbound.Cmd      `cmd:"" group:"alpha" help:"Interact with Upbound."`
-		XPKG         struct {
-			XPExtract xpkg.XPExtractCmd `cmd:"" group:"alpha" help:"Extract package contents into a Crossplane cache compatible format. Fetches from a remote registry by default."`
-		} `cmd:"" help:"Interact with UXP packages."`
-	} `cmd:"" help:"Alpha features. Commands may be removed in future releases."`
+	Alpha        alpha            `cmd:"" help:"Alpha features. Commands may be removed in future releases."`
+}
+
+// BeforeReset runs before all other hooks. If command has alpha as an ancestor,
+// maturity level will be set to alpha.
+func (a *alpha) BeforeReset(ctx *kong.Context) error { //nolint:unparam
+	ctx.Bind(feature.Alpha)
+	return nil
+}
+
+type alpha struct {
+	ControlPlane controlplane.Cmd `cmd:"" name:"controlplane" aliases:"ctp" help:"Interact with control planes."`
+	Upbound      upbound.Cmd      `cmd:"" help:"Interact with Upbound."`
+	XPKG         xpkg.Cmd         `cmd:"" help:"Interact with UXP packages."`
 }
 
 func main() {
@@ -102,7 +120,16 @@ func main() {
 	ctx := kong.Parse(&c,
 		kong.Name("up"),
 		kong.Description("The Upbound CLI"),
-		kong.UsageOnError())
-	err := ctx.Run()
-	ctx.FatalIfErrorf(err)
+		kong.Help(func(options kong.HelpOptions, ctx *kong.Context) error {
+			// Do not emit help if command is hidden.
+			if ctx.Selected() != nil && ctx.Selected().Hidden {
+				fmt.Fprintf(ctx.Stdout, "Refusing to emit help for hidden command. See %s variant.\n", feature.GetMaturity(ctx.Selected()))
+				return nil
+			}
+			return kong.DefaultHelpPrinter(options, ctx)
+		}),
+		kong.ConfigureHelp(kong.HelpOptions{
+			NoExpandSubcommands: true,
+		}))
+	ctx.FatalIfErrorf(ctx.Run())
 }

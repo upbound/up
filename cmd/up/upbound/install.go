@@ -102,7 +102,7 @@ func (c *installCmd) AfterApply(insCtx *install.Context, kongCtx *kong.Context, 
 	}
 	c.kClient = client
 	secret := kube.NewSecretApplicator(client)
-	c.pullSecret = newImagePullApplicator(secret)
+	c.pullSecret = kube.NewImagePullApplicator(secret)
 	auth := auth.NewProvider(
 		auth.WithBasicAuth(c.id, c.token),
 		auth.WithEndpoint(c.Registry),
@@ -152,7 +152,7 @@ type installCmd struct {
 	kClient    kubernetes.Interface
 	prompter   input.Prompter
 	access     *accessKeyApplicator
-	pullSecret *imagePullApplicator
+	pullSecret *kube.ImagePullApplicator
 	id         string
 	token      string
 	quiet      config.QuietFlag
@@ -218,7 +218,7 @@ func (c *installCmd) applySecrets(ctx context.Context, namespace string) error {
 		return nil
 	}
 	creatPullSecret := func() error {
-		if err := c.pullSecret.apply(
+		if err := c.pullSecret.Apply(
 			ctx,
 			defaultImagePullSecret,
 			namespace,

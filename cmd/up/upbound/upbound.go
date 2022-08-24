@@ -16,23 +16,26 @@ package upbound
 
 import (
 	"context"
-	"encoding/base64"
-	"encoding/json"
 	"net/url"
 
 	"github.com/alecthomas/kong"
 	"github.com/pkg/errors"
 	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
-	"k8s.io/kubectl/pkg/cmd/create"
 
 	"github.com/upbound/up/internal/auth"
+	"github.com/upbound/up/internal/feature"
 	"github.com/upbound/up/internal/install"
 	"github.com/upbound/up/internal/kube"
 	"github.com/upbound/up/internal/license"
 )
 
 const upboundChart = "upbound"
+
+// BeforeReset is the first hook to run.
+func (c *Cmd) BeforeReset(p *kong.Path, maturity feature.Maturity) error {
+	return feature.HideMaturity(p, maturity)
+}
 
 // AfterApply constructs and binds Upbound-specific context to any subcommands
 // that have Run() methods that receive it.
@@ -50,10 +53,10 @@ func (c *Cmd) AfterApply(kongCtx *kong.Context) error {
 
 // Cmd contains commands for managing Upbound.
 type Cmd struct {
-	Install   installCmd   `cmd:"" help:"Install Upbound."`
-	Mail      mailCmd      `cmd:"" help:"Run a local mail portal."`
-	Uninstall uninstallCmd `cmd:"" help:"Uninstall Upbound."`
-	Upgrade   upgradeCmd   `cmd:"" help:"Upgrade Upbound."`
+	Install   installCmd   `cmd:"" maturity:"alpha" help:"Install Upbound."`
+	Mail      mailCmd      `cmd:"" maturity:"alpha" help:"Run a local mail portal."`
+	Uninstall uninstallCmd `cmd:"" maturity:"alpha" help:"Uninstall Upbound."`
+	Upgrade   upgradeCmd   `cmd:"" maturity:"alpha" help:"Upgrade Upbound."`
 
 	Kubeconfig string `type:"existingfile" help:"Override default kubeconfig path."`
 	Namespace  string `short:"n" env:"UPBOUND_NAMESPACE" default:"upbound-system" help:"Kubernetes namespace for Upbound."`
@@ -117,55 +120,4 @@ func (l *accessKeyApplicator) apply(ctx context.Context, name, ns, version strin
 	}
 	// Create access key secret if it does not exist.
 	return l.secret.Apply(ctx, ns, secret)
-}
-
-// imagePullApplicator constructs and creates or updates an image pull Secret.
-type imagePullApplicator struct {
-	secret *kube.SecretApplicator
-}
-
-// newImagePullApplicator constructs a new imagePullApplicator with the passed
-// SecretApplicator.
-func newImagePullApplicator(secret *kube.SecretApplicator) *imagePullApplicator {
-	return &imagePullApplicator{
-		secret: secret,
-	}
-}
-
-// apply constructs an DockerConfig image pull Secret with the provided registry
-// and credentials.
-func (i *imagePullApplicator) apply(ctx context.Context, name, ns, user, pass, registry string) error {
-	regAuth := &create.DockerConfigJSON{
-		Auths: map[string]create.DockerConfigEntry{
-			registry: {
-				Username: user,
-				Password: pass,
-				Auth:     encodeDockerConfigFieldAuth(user, pass),
-			},
-		},
-	}
-	regAuthJSON, err := json.Marshal(regAuth)
-	if err != nil {
-		return err
-	}
-	secret := &corev1.Secret{
-		ObjectMeta: metav1.ObjectMeta{
-			Name: name,
-		},
-		Type: corev1.SecretTypeDockerConfigJson,
-		Data: map[string][]byte{
-			corev1.DockerConfigJsonKey: regAuthJSON,
-		},
-	}
-	// Create image pull secret if it does not exist.
-	return i.secret.Apply(ctx, ns, secret)
-}
-
-// encodeDockerConfigFieldAuth returns base64 encoding of the username and
-// password string
-// NOTE(hasheddan): this function comes directly from kubectl
-// https://github.com/kubernetes/kubectl/blob/0f88fc6b598b7e883a391a477215afb080ec7733/pkg/cmd/create/create_secret_docker.go#L305
-func encodeDockerConfigFieldAuth(username, password string) string {
-	fieldValue := username + ":" + password
-	return base64.StdEncoding.EncodeToString([]byte(fieldValue))
 }

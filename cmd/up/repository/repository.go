@@ -40,9 +40,9 @@ func (c *Cmd) AfterApply(kongCtx *kong.Context) error {
 
 // Cmd contains commands for interacting with repositories.
 type Cmd struct {
-	Create createCmd `cmd:"" group:"repository" help:"Create a repository."`
-	Delete deleteCmd `cmd:"" group:"repository" help:"Delete a repository."`
-	List   listCmd   `cmd:"" group:"repository" help:"List repositories for the account."`
+	Create createCmd `cmd:"" help:"Create a repository."`
+	Delete deleteCmd `cmd:"" help:"Delete a repository."`
+	List   listCmd   `cmd:"" help:"List repositories for the account."`
 
 	// Common Upbound API configuration
 	Flags upbound.Flags `embed:""`
