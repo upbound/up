@@ -16,7 +16,7 @@ require (
 	github.com/golang/tools v0.1.7
 	github.com/google/addlicense v1.0.0
 	github.com/google/go-cmp v0.5.8
-	github.com/google/go-containerregistry v0.8.0
+	github.com/google/go-containerregistry v0.11.0
 	github.com/google/uuid v1.3.0
 	github.com/goreleaser/nfpm/v2 v2.5.1
 	github.com/pkg/errors v0.9.1
@@ -25,9 +25,9 @@ require (
 	github.com/sourcegraph/go-lsp v0.0.0-20200429204803-219e11d77f5d
 	github.com/sourcegraph/jsonrpc2 v0.1.0
 	github.com/spf13/afero v1.6.0
-	github.com/spf13/cobra v1.4.0
+	github.com/spf13/cobra v1.5.0
 	github.com/upbound/up-sdk-go v0.1.1-0.20220818154855-ac8e6596abca
-	golang.org/x/sync v0.0.0-20210220032951-036812b2e83c
+	golang.org/x/sync v0.0.0-20220601150217-0de741cfad7f
 	golang.org/x/term v0.0.0-20210927222741-03fcf44c2211
 	helm.sh/helm/v3 v3.9.0
 	k8s.io/api v0.24.3
@@ -59,8 +59,7 @@ require (
 	github.com/Masterminds/sprig v2.22.0+incompatible // indirect
 	github.com/Masterminds/sprig/v3 v3.2.2 // indirect
 	github.com/Masterminds/squirrel v1.5.2 // indirect
-	github.com/Microsoft/go-winio v0.5.1 // indirect
-	github.com/Microsoft/hcsshim v0.9.2 // indirect
+	github.com/Microsoft/go-winio v0.5.2 // indirect
 	github.com/ProtonMail/go-crypto v0.0.0-20210408094314-bf0c5240ed99 // indirect
 	github.com/PuerkitoBio/purell v1.1.1 // indirect
 	github.com/PuerkitoBio/urlesc v0.0.0-20170810143723-de5bf2ad4578 // indirect
@@ -75,14 +74,13 @@ require (
 	github.com/chai2010/gettext-go v0.0.0-20160711120539-c6fed771bfd5 // indirect
 	github.com/containerd/console v1.0.3 // indirect
 	github.com/containerd/containerd v1.6.3 // indirect
-	github.com/containerd/continuity v0.2.2 // indirect
-	github.com/containerd/stargz-snapshotter/estargz v0.10.1 // indirect
-	github.com/cpuguy83/go-md2man/v2 v2.0.1 // indirect
+	github.com/containerd/stargz-snapshotter/estargz v0.12.0 // indirect
+	github.com/cpuguy83/go-md2man/v2 v2.0.2 // indirect
 	github.com/cyphar/filepath-securejoin v0.2.3 // indirect
 	github.com/davecgh/go-spew v1.1.1 // indirect
-	github.com/docker/cli v20.10.12+incompatible // indirect
+	github.com/docker/cli v20.10.17+incompatible // indirect
 	github.com/docker/distribution v2.8.1+incompatible // indirect
-	github.com/docker/docker v20.10.14+incompatible // indirect
+	github.com/docker/docker v20.10.17+incompatible // indirect
 	github.com/docker/go-connections v0.4.0 // indirect
 	github.com/docker/go-metrics v0.0.1 // indirect
 	github.com/docker/go-units v0.4.0 // indirect
@@ -121,7 +119,7 @@ require (
 	github.com/goreleaser/fileglob v1.2.0 // indirect
 	github.com/gorilla/mux v1.8.0 // indirect
 	github.com/gosuri/uitable v0.0.4 // indirect
-	github.com/gregjones/httpcache v0.0.0-20180305231024-9cad4c3443a7 // indirect
+	github.com/gregjones/httpcache v0.0.0-20190611155906-901d90724c79 // indirect
 	github.com/grpc-ecosystem/grpc-gateway v1.16.0 // indirect
 	github.com/huandu/xstrings v1.3.2 // indirect
 	github.com/imdario/mergo v0.3.12 // indirect
@@ -131,7 +129,7 @@ require (
 	github.com/josharian/intern v1.0.0 // indirect
 	github.com/json-iterator/go v1.1.12 // indirect
 	github.com/kevinburke/ssh_config v1.1.0 // indirect
-	github.com/klauspost/compress v1.13.6 // indirect
+	github.com/klauspost/compress v1.15.8 // indirect
 	github.com/lann/builder v0.0.0-20180802200727-47ae307949d0 // indirect
 	github.com/lann/ps v0.0.0-20150810152359-62de8c46ede0 // indirect
 	github.com/lib/pq v1.10.4 // indirect
@@ -157,8 +155,7 @@ require (
 	github.com/munnerz/goautoneg v0.0.0-20191010083416-a7dc8b61c822 // indirect
 	github.com/op/go-logging v0.0.0-20160315200505-970db520ece7 // indirect
 	github.com/opencontainers/go-digest v1.0.0 // indirect
-	github.com/opencontainers/image-spec v1.0.3-0.20211202183452-c5a74bcca799 // indirect
-	github.com/opencontainers/runc v1.1.1 // indirect
+	github.com/opencontainers/image-spec v1.0.3-0.20220114050600-8b9d41f48198 // indirect
 	github.com/peterbourgon/diskv v2.0.1+incompatible // indirect
 	github.com/pmezard/go-difflib v1.0.0 // indirect
 	github.com/prometheus/client_golang v1.12.1 // indirect
@@ -167,12 +164,12 @@ require (
 	github.com/prometheus/procfs v0.7.3 // indirect
 	github.com/rivo/uniseg v0.2.0 // indirect
 	github.com/rubenv/sql-migrate v1.1.1 // indirect
-	github.com/russross/blackfriday v1.5.2 // indirect
+	github.com/russross/blackfriday v1.6.0 // indirect
 	github.com/russross/blackfriday/v2 v2.1.0 // indirect
 	github.com/sassoftware/go-rpmutils v0.0.0-20190420191620-a8f1baeba37b // indirect
 	github.com/sergi/go-diff v1.2.0 // indirect
 	github.com/shopspring/decimal v1.2.0 // indirect
-	github.com/sirupsen/logrus v1.8.1 // indirect
+	github.com/sirupsen/logrus v1.9.0 // indirect
 	github.com/spf13/cast v1.4.1 // indirect
 	github.com/spf13/pflag v1.0.5 // indirect
 	github.com/stoewer/go-strcase v1.2.0 // indirect
@@ -200,9 +197,9 @@ require (
 	go.uber.org/multierr v1.6.0 // indirect
 	go.uber.org/zap v1.19.1 // indirect
 	golang.org/x/crypto v0.0.0-20220315160706-3147a52a75dd // indirect
-	golang.org/x/net v0.0.0-20220127200216-cd36cc0744dd // indirect
-	golang.org/x/oauth2 v0.0.0-20211104180415-d3ed0bb246c8 // indirect
-	golang.org/x/sys v0.0.0-20220319134239-a9b59b0215f8 // indirect
+	golang.org/x/net v0.0.0-20220708220712-1185a9018129 // indirect
+	golang.org/x/oauth2 v0.0.0-20220718184931-c8730f7fcb92 // indirect
+	golang.org/x/sys v0.0.0-20220715151400-c0bba94af5f8 // indirect
 	golang.org/x/text v0.3.7 // indirect
 	golang.org/x/time v0.0.0-20220210224613-90d013bbcef8 // indirect
 	golang.org/x/xerrors v0.0.0-20200804184101-5ec99f83aff1 // indirect
@@ -210,7 +207,7 @@ require (
 	google.golang.org/appengine v1.6.7 // indirect
 	google.golang.org/genproto v0.0.0-20220107163113-42d7afdf6368 // indirect
 	google.golang.org/grpc v1.43.0 // indirect
-	google.golang.org/protobuf v1.27.1 // indirect
+	google.golang.org/protobuf v1.28.0 // indirect
 	gopkg.in/inf.v0 v0.9.1 // indirect
 	gopkg.in/warnings.v0 v0.1.2 // indirect
 	gopkg.in/yaml.v2 v2.4.0 // indirect
@@ -230,10 +227,7 @@ require (
 replace (
 	github.com/crossplane/crossplane/controller/apiextensions => ./internal/vendor/github.com/crossplane/crossplane/controller/apiextensions
 	github.com/crossplane/crossplane/xcrd => ./internal/vendor/github.com/crossplane/crossplane/xcrd
-	github.com/docker/distribution => github.com/docker/distribution v0.0.0-20191216044856-a8371794149d
-	github.com/docker/docker => github.com/moby/moby v17.12.0-ce-rc1.0.20200618181300-9dc6525e6118+incompatible
 	github.com/golang/tools => ./internal/vendor/golang.org/x/tools
-	github.com/googleapis/gnostic => github.com/google/gnostic v0.5.5
 
 	// The following replacements should be kept in sync with upstream
 	// Kubernetes version.
