@@ -41,7 +41,13 @@ func Layer(r io.Reader, fileName, annotation string, fileSize int64, cfg *v1.Con
 		return nil, err
 	}
 
-	layer, err := tarball.LayerFromReader(tarBuf)
+	// TODO(hasheddan): we currently return a new reader every time here in
+	// order to calculate digest, then subsequently write contents to disk. We
+	// can greatly improve performance during package build by avoiding reading
+	// every layer into memory.
+	layer, err := tarball.LayerFromOpener(func() (io.ReadCloser, error) {
+		return io.NopCloser(bytes.NewReader(tarBuf.Bytes())), nil
+	})
 	if err != nil {
 		return nil, errors.Wrap(err, errLayerFromTar)
 	}

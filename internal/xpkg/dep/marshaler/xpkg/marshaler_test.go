@@ -420,7 +420,11 @@ func newPackageImage(path string) v1.Image {
 	_ = tw.WriteHeader(hdr)
 	_, _ = io.Copy(tw, pack)
 	_ = tw.Close()
-	packLayer, _ := tarball.LayerFromReader(buf)
+	packLayer, _ := tarball.LayerFromOpener(func() (io.ReadCloser, error) {
+		// NOTE(hasheddan): we must construct a new reader each time as we
+		// ingest packImg in multiple tests below.
+		return io.NopCloser(bytes.NewReader(buf.Bytes())), nil
+	})
 	packImg, _ := mutate.AppendLayers(empty.Image, packLayer)
 
 	return packImg
