@@ -23,6 +23,7 @@ import (
 	"net/url"
 
 	"github.com/alecthomas/kong"
+	"github.com/pkg/errors"
 	"github.com/spf13/afero"
 
 	"github.com/upbound/up-sdk-go"
@@ -42,6 +43,10 @@ const (
 	proxySubdomain = "proxy."
 	// Default registry subdomain.
 	xpkgSubdomain = "xpkg."
+)
+
+const (
+	errProfileNotFoundFmt = "profile not found with identifier: %s"
 )
 
 // Flags are common flags used by commands that interact with Upbound.
@@ -80,12 +85,21 @@ type Context struct {
 	Cfg              *config.Config
 	CfgSrc           config.Source
 
-	cfgPath string
-	fs      afero.Fs
+	allowMissingProfile bool
+	cfgPath             string
+	fs                  afero.Fs
 }
 
 // Option modifies a Context
 type Option func(*Context)
+
+// AllowMissingProfile indicates that Context should still be returned even if a
+// profile name is supplied and it does not exist in config.
+func AllowMissingProfile() Option {
+	return func(ctx *Context) {
+		ctx.allowMissingProfile = true
+	}
+}
 
 // NewFromFlags constructs a new context from flags.
 func NewFromFlags(f Flags, opts ...Option) (*Context, error) { //nolint:gocyclo
@@ -127,10 +141,12 @@ func NewFromFlags(f Flags, opts ...Option) (*Context, error) { //nolint:gocyclo
 			c.ProfileName = name
 		}
 	} else {
-		if p, err := c.Cfg.GetUpboundProfile(f.Profile); err == nil {
-			c.Profile = p
-			c.ProfileName = f.Profile
+		p, err := c.Cfg.GetUpboundProfile(f.Profile)
+		if err != nil && !c.allowMissingProfile {
+			return nil, errors.Errorf(errProfileNotFoundFmt, f.Profile)
 		}
+		c.Profile = p
+		c.ProfileName = f.Profile
 	}
 
 	of, err := c.applyOverrides(f, c.ProfileName)
@@ -207,8 +223,8 @@ func (c *Context) BuildSDKConfig(session string) (*up.Config, error) {
 // applyOverrides applies applicable overrides to the given Flags based on the
 // pre-existing configs, if there are any.
 func (c *Context) applyOverrides(f Flags, profileName string) (Flags, error) {
-	// no overrides to apply, return the supplied flags
-	if profileName == "" {
+	// profile doesn't exist, return the supplied flags
+	if _, ok := c.Cfg.Upbound.Profiles[profileName]; !ok {
 		return f, nil
 	}
 
