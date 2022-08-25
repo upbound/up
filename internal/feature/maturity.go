@@ -32,8 +32,9 @@ const (
 
 // HideMaturity hides commands that are not at the specified level of maturity.
 func HideMaturity(p *kong.Path, maturity Maturity) error {
-	children := p.Node().Children
-	for _, c := range children {
+	nodes := p.Node().Children // copy to avoid possibility of reslicing
+	nodes = append(nodes, p.Node())
+	for _, c := range nodes {
 		mt := Maturity(c.Tag.Get(maturityTag))
 		if mt == "" {
 			mt = Stable

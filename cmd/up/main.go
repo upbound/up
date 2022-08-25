@@ -109,9 +109,9 @@ func (a *alpha) BeforeReset(ctx *kong.Context) error { //nolint:unparam
 }
 
 type alpha struct {
-	ControlPlane controlplane.Cmd `cmd:"" name:"controlplane" aliases:"ctp" help:"Interact with control planes."`
-	Upbound      upbound.Cmd      `cmd:"" help:"Interact with Upbound."`
-	XPKG         xpkg.Cmd         `cmd:"" help:"Interact with UXP packages."`
+	ControlPlane controlplane.Cmd `cmd:"" maturity:"alpha" name:"controlplane" aliases:"ctp" help:"Interact with control planes."`
+	Upbound      upbound.Cmd      `cmd:"" maturity:"alpha" help:"Interact with Upbound."`
+	XPKG         xpkg.Cmd         `cmd:"" maturity:"alpha" help:"Interact with UXP packages."`
 }
 
 func main() {
