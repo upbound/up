@@ -57,7 +57,7 @@ func (c *loginCmd) BeforeApply() error { //nolint:unparam
 }
 
 func (c *loginCmd) AfterApply(kongCtx *kong.Context) error {
-	upCtx, err := upbound.NewFromFlags(c.Flags)
+	upCtx, err := upbound.NewFromFlags(c.Flags, upbound.AllowMissingProfile())
 	if err != nil {
 		return err
 	}
@@ -149,17 +149,6 @@ func (c *loginCmd) Run(p pterm.TextPrinter, upCtx *upbound.Context) error { // n
 	if err != nil {
 		return errors.Wrap(err, errLoginFailed)
 	}
-	// If no profile is specified, a new profile named `default` is used.
-	profileName, profile, err := upCtx.Cfg.GetDefaultUpboundProfile()
-	if err != nil {
-		// NOTE(tnthornton) err is returned if there is no default profile set
-		// or no profiles exist. In those cases, we don't want to error, rather
-		// we want to setup a profile and the default.
-		profile = config.Profile{}
-	}
-	if profileName == "" {
-		profileName = defaultProfileName
-	}
 	// If no account is specified and profile type is user, set profile account
 	// to user ID if not an email address. This is for convenience if a user is
 	// using a personal account.
@@ -167,18 +156,21 @@ func (c *loginCmd) Run(p pterm.TextPrinter, upCtx *upbound.Context) error { // n
 		upCtx.Account = auth.ID
 	}
 
-	profile.ID = auth.ID
-	profile.Type = profType
-	profile.Session = session
-	profile.Account = upCtx.Account
+	// If profile name was not provided and no default exists, set name to 'default'.
+	if upCtx.ProfileName == "" {
+		upCtx.ProfileName = defaultProfileName
+	}
 
-	if err := upCtx.Cfg.AddOrUpdateUpboundProfile(profileName, profile); err != nil {
+	upCtx.Profile.ID = auth.ID
+	upCtx.Profile.Type = profType
+	upCtx.Profile.Session = session
+	upCtx.Profile.Account = upCtx.Account
+
+	if err := upCtx.Cfg.AddOrUpdateUpboundProfile(upCtx.ProfileName, upCtx.Profile); err != nil {
 		return errors.Wrap(err, errLoginFailed)
 	}
-	if len(upCtx.Cfg.Upbound.Profiles) == 1 {
-		if err := upCtx.Cfg.SetDefaultUpboundProfile(profileName); err != nil {
-			return errors.Wrap(err, errLoginFailed)
-		}
+	if err := upCtx.Cfg.SetDefaultUpboundProfile(upCtx.ProfileName); err != nil {
+		return errors.Wrap(err, errLoginFailed)
 	}
 	if err := upCtx.CfgSrc.UpdateConfig(upCtx.Cfg); err != nil {
 		return errors.Wrap(err, errUpdateConfig)
