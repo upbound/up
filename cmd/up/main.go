@@ -90,8 +90,8 @@ type cli struct {
 	Login        loginCmd         `cmd:"" help:"Login to Upbound."`
 	Logout       logoutCmd        `cmd:"" help:"Logout of Upbound."`
 	ControlPlane controlplane.Cmd `cmd:"" name:"controlplane" aliases:"ctp" help:"Interact with control planes."`
-	Profile      profile.Cmd      `cmd:"" help:"Interact with Upbound profiles."`
 	Organization organization.Cmd `cmd:"" name:"organization" aliases:"org" help:"Interact with organizations."`
+	Profile      profile.Cmd      `cmd:"" help:"Interact with Upbound profiles."`
 	Repository   repository.Cmd   `cmd:"" name:"repository" aliases:"repo" help:"Interact with repositories."`
 	Robot        robot.Cmd        `cmd:"" name:"robot" help:"Interact with robots."`
 	Upbound      upbound.Cmd      `cmd:"" maturity:"alpha" help:"Interact with Upbound."`
