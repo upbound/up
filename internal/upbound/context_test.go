@@ -24,6 +24,7 @@ import (
 	"github.com/crossplane/crossplane-runtime/pkg/test"
 	"github.com/google/go-cmp/cmp"
 	"github.com/google/go-cmp/cmp/cmpopts"
+	"github.com/pkg/errors"
 	"github.com/spf13/afero"
 
 	"github.com/upbound/up/internal/config"
@@ -57,7 +58,18 @@ var (
 				"UP_ACCOUNT": "my-org",
 				"UP_INSECURE_SKIP_TLS_VERIFY": "true"
 			  }
-			}
+			},
+			"cool-profile": {
+				"id": "someone@upbound.io",
+				"type": "user",
+				"session": "a token",
+				"base": {
+				  "UP_DOMAIN": "https://local.upbound.io",
+				  "UP_MCP_EXPERIMENTAL": "true",
+				  "UP_ACCOUNT": "my-org",
+				  "UP_INSECURE_SKIP_TLS_VERIFY": "true"
+				}
+			  }
 		  }
 		}
 	  }
@@ -119,6 +131,41 @@ func TestNewFromFlags(t *testing.T) {
 			},
 			want: want{
 				c: &Context{
+					Account:          "",
+					APIEndpoint:      withURL("https://api.upbound.io"),
+					Cfg:              &config.Config{},
+					Domain:           withURL("https://upbound.io"),
+					Profile:          config.Profile{},
+					ProxyEndpoint:    withURL("https://proxy.upbound.io"),
+					RegistryEndpoint: withURL("https://xpkg.upbound.io"),
+				},
+			},
+		},
+		"ErrorSuppliedNotExist": {
+			reason: "We should return an error if profile is supplied and it does not exist.",
+			args: args{
+				flags: []string{
+					"--profile=not-here",
+				},
+			},
+			want: want{
+				err: errors.Errorf(errProfileNotFoundFmt, "not-here"),
+			},
+		},
+		"SuppliedNotExistAllowEmpty": {
+			reason: "We should successfully return a Context if a supplied profile does not exist and.",
+			args: args{
+				flags: []string{
+					"--profile=not-here",
+				},
+				opts: []Option{
+					withFS(afero.NewMemMapFs()),
+					AllowMissingProfile(),
+				},
+			},
+			want: want{
+				c: &Context{
+					ProfileName:      "not-here",
 					Account:          "",
 					APIEndpoint:      withURL("https://api.upbound.io"),
 					Cfg:              &config.Config{},
@@ -196,6 +243,7 @@ func TestNewFromFlags(t *testing.T) {
 			reason: "We should return a Context that includes the persisted Profile from base config overridden based on flags",
 			args: args{
 				flags: []string{
+					"--profile=cool-profile",
 					"--account=not-my-org",
 					fmt.Sprintf("--domain=%s", withURL("http://a.domain.org")),
 					fmt.Sprintf("--override-api-endpoint=%s", withURL("http://not.a.url")),
@@ -207,7 +255,7 @@ func TestNewFromFlags(t *testing.T) {
 			},
 			want: want{
 				c: &Context{
-					ProfileName:           "default",
+					ProfileName:           "cool-profile",
 					Account:               "not-my-org",
 					APIEndpoint:           withURL("http://not.a.url"),
 					Domain:                withURL("http://a.domain.org"),
