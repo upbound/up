@@ -73,25 +73,12 @@ $ up login --username=hasheddan --password=supersecret --profile=dev
 $ up login --token=supersecrettoken --profile=dev
 ```
 
-## Hosted Control Plane
+## Universal Crossplane
 
-Create hosted control plane in Upbound:
+`up` can be used to manage the lifecycle of an [Upbound Universal Crossplane]
+installation.
 
-```
-$ up controlplane create my-hosted-cp
-```
-
-```
-$ up ctp create my-hosted-cp
-```
-
-## Self-Hosted Control Plane
-
-Creating a self-hosted control plane in Upbound consists of three primary steps:
-installing UXP, creating a self-hosted control plane in Upbound (i.e.
-"attaching"), and connecting UXP to that control plane.
-
-### Installing UXP
+### Installing
 
 Install latest stable version:
 
@@ -131,11 +118,11 @@ $ up uxp install -f uxp-params.yaml
 
 ### Upgrading Crossplane to UXP
 
-`up` also supports upgrading a Crossplane installation to a compatible UXP
-version. Compatibility is defined as having matching major, minor, and patch
-versions (in accordance with [semantic versioning]). In addition, UXP must be
-installed in the same namespace where Crossplane is currently installed.
-Crossplane is typically installed in the `crossplane-system` namespace.
+`up` supports upgrading a Crossplane installation to a compatible UXP version.
+Compatibility is defined as having matching major, minor, and patch versions (in
+accordance with [semantic versioning]). In addition, UXP must be installed in
+the same namespace where Crossplane is currently installed. Crossplane is
+typically installed in the `crossplane-system` namespace.
 
 Upgrade Crossplane vX.Y.Z to UXP:
 
@@ -148,44 +135,7 @@ $ up uxp upgrade vX.Y.Z-up.N -n crossplane-system
 > set `UXP_NAMESPACE=<namespace>` to avoid having to supply it for every UXP
 > command.
 
-### Attaching a Self-Hosted Control PLane
-
-Attach a self-hosted control plane in Upbound:
-
-```
-$ up controlplane attach my-self-hosted-cp
-<control-plane-token>
-```
-
-```
-$ up ctp attach my-self-hosted-cp
-<control-plane-token>
-```
-
-Self-hosted control planes can be created with "view only" permissions:
-
-```
-$ up ctp attach my-self-hosted-cp --view-only
-<control-plane-token>
-```
-
-### Connecting UXP to a Self-Hosted Control Plane
-
-Connect UXP to self-hosted control plane:
-
-```
-$ up uxp connect <control-plane-token>
-```
-
-Most users pipe the attach command into the connect one:
-
-```
-$ up controlplane attach my-self-hosted-cp | up uxp connect -
-```
-
-```
-$ up ctp attach my-self-hosted-cp | up uxp connect -
-```
 
 <!-- Named Links -->
+[Upbound Universal Crossplane]: https://github.com/upbound/universal-crossplane
 [semantic versioning]: https://semver.org/
