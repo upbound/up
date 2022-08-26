@@ -109,9 +109,15 @@ Format: `up controlplane pull-secret <cmd> ...` Alias: `up ctp pull-secret
       currently configured `kubeconfig`. If `-f` is not provided, the session
       token in the current profile is used. Session tokens expire within 30
       days. If `-f` is provided, it must point to a file with valid token
-      credentials in the following JSON format: `{"accessId": "<access-id>",
-      "token":"<token>"}`. This is the same format emitted by `up robot token
-      create`. Robot tokens do not expire.
+      credentials in the following JSON format:
+      ```json
+      {
+        "accessId": "<access-id>",
+        "token":"<token>"
+      }
+      ```
+      This is the same format emitted by `up robot token create`. Robot tokens
+      do not expire.
 
 ## Profile
 
