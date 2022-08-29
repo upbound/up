@@ -129,6 +129,7 @@ func main() {
 			return kong.DefaultHelpPrinter(options, ctx)
 		}),
 		kong.ConfigureHelp(kong.HelpOptions{
+			Compact:             true,
 			NoExpandSubcommands: true,
 		}))
 	ctx.FatalIfErrorf(ctx.Run())
