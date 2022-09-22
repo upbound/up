@@ -45,15 +45,9 @@ type deleteCmd struct {
 }
 
 // Run executes the delete command.
-func (c *deleteCmd) Run(experimental bool, p pterm.TextPrinter, cc *cp.Client, oc *op.Client, upCtx *upbound.Context) error {
-	if experimental {
-		if err := cc.Delete(context.Background(), upCtx.Account, c.ID); err != nil {
-			return err
-		}
-	} else {
-		if err := oc.Delete(context.Background(), c.id); err != nil {
-			return err
-		}
+func (c *deleteCmd) Run(p pterm.TextPrinter, cc *cp.Client, oc *op.Client, upCtx *upbound.Context) error {
+	if err := cc.Delete(context.Background(), upCtx.Account, c.ID); err != nil {
+		return err
 	}
 	p.Printfln("%s deleted", c.ID)
 	return nil

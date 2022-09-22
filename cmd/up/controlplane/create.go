@@ -32,22 +32,12 @@ type createCmd struct {
 }
 
 // Run executes the create command.
-func (c *createCmd) Run(experimental bool, p pterm.TextPrinter, cc *cp.Client, oc *op.Client, upCtx *upbound.Context) error {
-	if experimental {
-		if _, err := cc.Create(context.Background(), upCtx.Account, &cp.ControlPlaneCreateParameters{
-			Name:        c.Name,
-			Description: c.Description,
-		}); err != nil {
-			return err
-		}
-	} else {
-		if _, err := oc.Create(context.Background(), &op.ControlPlaneCreateParameters{
-			Account:     upCtx.Account,
-			Name:        c.Name,
-			Description: c.Description,
-		}); err != nil {
-			return err
-		}
+func (c *createCmd) Run(p pterm.TextPrinter, cc *cp.Client, oc *op.Client, upCtx *upbound.Context) error {
+	if _, err := cc.Create(context.Background(), upCtx.Account, &cp.ControlPlaneCreateParameters{
+		Name:        c.Name,
+		Description: c.Description,
+	}); err != nil {
+		return err
 	}
 
 	p.Printfln("%s created", c.Name)

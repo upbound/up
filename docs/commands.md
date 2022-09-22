@@ -450,8 +450,6 @@ commands may choose not to utilize the group flags when not relevant.
   specified command. Can be either an organization or a personal account.
 - `--endpoint = URL` (Env: `UP_DOMAIN`) (Default: `https://api.upbound.io`):
   Endpoint to use when communicating with the Upbound API.
-- `--mcp-experimental = BOOL` (Env: `UP_MCP_EXPERIMENTAL`): Use experimental
-  control planes API.
 - `--profile = STRING` (Env: `UP_PROFILE`); Profile with which to perform the
   specified command.
 
@@ -500,8 +498,6 @@ will be prompted for their License ID and License Key on installation.
         - `--endpoint = URL` (Env: `UP_DOMAIN`) (Default:
           `https://api.upbound.io`): Endpoint to use when communicating with the
           Upbound API.
-        - `--mcp-experimental = BOOL` (Env: `UP_MCP_EXPERIMENTAL`): Use
-          experimental control planes API.
         - `--profile = STRING` (Env: `UP_PROFILE`); Profile with which to
           perform the specified command.
     - Behavior: Installs Upbound into cluster specified by currently configured

@@ -54,7 +54,6 @@ var (
 			  "session": "a token",
 			  "base": {
 				"UP_DOMAIN": "https://local.upbound.io",
-				"UP_MCP_EXPERIMENTAL": "true",
 				"UP_ACCOUNT": "my-org",
 				"UP_INSECURE_SKIP_TLS_VERIFY": "true"
 			  }
@@ -65,7 +64,6 @@ var (
 				"session": "a token",
 				"base": {
 				  "UP_DOMAIN": "https://local.upbound.io",
-				  "UP_MCP_EXPERIMENTAL": "true",
 				  "UP_ACCOUNT": "my-org",
 				  "UP_INSECURE_SKIP_TLS_VERIFY": "true"
 				}
@@ -220,7 +218,6 @@ func TestNewFromFlags(t *testing.T) {
 					APIEndpoint:           withURL("https://api.local.upbound.io"),
 					Domain:                withURL("https://local.upbound.io"),
 					InsecureSkipTLSVerify: true,
-					MCPExperimental:       true,
 					Profile: config.Profile{
 						ID:      "someone@upbound.io",
 						Type:    config.UserProfileType,
@@ -230,7 +227,6 @@ func TestNewFromFlags(t *testing.T) {
 							"UP_ACCOUNT":                  "my-org",
 							"UP_DOMAIN":                   "https://local.upbound.io",
 							"UP_INSECURE_SKIP_TLS_VERIFY": "true",
-							"UP_MCP_EXPERIMENTAL":         "true",
 						},
 					},
 					ProxyEndpoint:    withURL("https://proxy.local.upbound.io"),
@@ -260,7 +256,6 @@ func TestNewFromFlags(t *testing.T) {
 					APIEndpoint:           withURL("http://not.a.url"),
 					Domain:                withURL("http://a.domain.org"),
 					InsecureSkipTLSVerify: true,
-					MCPExperimental:       true,
 					Profile: config.Profile{
 						ID:      "someone@upbound.io",
 						Type:    config.UserProfileType,
@@ -270,7 +265,6 @@ func TestNewFromFlags(t *testing.T) {
 							"UP_ACCOUNT":                  "my-org",
 							"UP_DOMAIN":                   "https://local.upbound.io",
 							"UP_INSECURE_SKIP_TLS_VERIFY": "true",
-							"UP_MCP_EXPERIMENTAL":         "true",
 						},
 					},
 					ProxyEndpoint:    withURL("http://proxy.a.domain.org"),

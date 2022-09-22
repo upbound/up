@@ -41,31 +41,21 @@ func (c *listCmd) AfterApply(experimental bool, kongCtx *kong.Context, upCtx *up
 type listCmd struct{}
 
 // Run executes the list command.
-func (c *listCmd) Run(experimental bool, p pterm.TextPrinter, pt *pterm.TablePrinter, ac *accounts.Client, cc *cp.Client, upCtx *upbound.Context) error {
-	var cps []cp.ControlPlaneResponse
-	var err error
-	if experimental {
-		// TODO(hasheddan): we currently just max out single page size, but we
-		// may opt to support limiting page size and iterating through pages via
-		// flags in the future.
-		cpList, err := cc.List(context.Background(), upCtx.Account, common.WithSize(maxItems))
-		if err != nil {
-			return err
-		}
-		cps = cpList.ControlPlanes
-	} else {
-		cps, err = ac.ListControlPlanes(context.Background(), upCtx.Account)
-		if err != nil {
-			return err
-		}
+func (c *listCmd) Run(p pterm.TextPrinter, pt *pterm.TablePrinter, ac *accounts.Client, cc *cp.Client, upCtx *upbound.Context) error {
+	// TODO(hasheddan): we currently just max out single page size, but we
+	// may opt to support limiting page size and iterating through pages via
+	// flags in the future.
+	cpList, err := cc.List(context.Background(), upCtx.Account, common.WithSize(maxItems))
+	if err != nil {
+		return err
 	}
-	if len(cps) == 0 {
+	if len(cpList.ControlPlanes) == 0 {
 		p.Printfln("No control planes found in %s", upCtx.Account)
 		return nil
 	}
-	data := make([][]string, len(cps)+1)
+	data := make([][]string, len(cpList.ControlPlanes)+1)
 	data[0] = []string{"NAME", "ID", "STATUS"}
-	for i, cp := range cps {
+	for i, cp := range cpList.ControlPlanes {
 		data[i+1] = []string{cp.ControlPlane.Name, cp.ControlPlane.ID.String(), string(cp.Status)}
 	}
 	return pt.WithHasHeader().WithData(data).Render()

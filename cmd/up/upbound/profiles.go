@@ -29,7 +29,6 @@ var (
 	accountKey            = "UP_ACCOUNT"
 	domainKey             = "UP_DOMAIN"
 	insecureTLSSkipVerify = "UP_INSECURE_SKIP_TLS_VERIFY"
-	mcpExperimentalKey    = "UP_MCP_EXPERIMENTAL"
 )
 
 // getSelfHostedProfile returns the standard profile we set up for selfhosted
@@ -44,7 +43,6 @@ func getSelfHostedProfile(domain string) (string, config.Profile) {
 			accountKey:            account,
 			domainKey:             fmt.Sprintf("https://%s", domain),
 			insecureTLSSkipVerify: "true",
-			mcpExperimentalKey:    "true",
 		},
 	}
 }
