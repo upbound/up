@@ -56,9 +56,6 @@ type Flags struct {
 	Profile string   `env:"UP_PROFILE" help:"Profile used to execute command."`
 	Account string   `short:"a" env:"UP_ACCOUNT" help:"Account used to execute command."`
 
-	// Experimental
-	MCPExperimental bool `env:"UP_MCP_EXPERIMENTAL" hidden:"" help:"Use experimental managed control planes API."`
-
 	// Insecure
 	InsecureSkipTLSVerify bool `env:"UP_INSECURE_SKIP_TLS_VERIFY" help:"[INSECURE] Skip verifying TLS certificates."`
 
@@ -77,7 +74,6 @@ type Context struct {
 	Domain      *url.URL
 
 	InsecureSkipTLSVerify bool
-	MCPExperimental       bool
 
 	APIEndpoint      *url.URL
 	ProxyEndpoint    *url.URL
@@ -175,8 +171,6 @@ func NewFromFlags(f Flags, opts ...Option) (*Context, error) { //nolint:gocyclo
 		c.RegistryEndpoint = &u
 	}
 
-	c.MCPExperimental = of.MCPExperimental
-
 	c.Account = of.Account
 	c.Domain = of.Domain
 
@@ -262,7 +256,6 @@ func (f Flags) MarshalJSON() ([]byte, error) {
 		Domain                string `json:"domain,omitempty"`
 		Profile               string `json:"profile,omitempty"`
 		Account               string `json:"account,omitempty"`
-		MCPExperimental       bool   `json:"mcp_experimental,omitempty"`
 		InsecureSkipTLSVerify bool   `json:"insecure_skip_tls_verify,omitempty"`
 		APIEndpoint           string `json:"override_api_endpoint,omitempty"`
 		ProxyEndpoint         string `json:"override_proxy_endpoint,omitempty"`
@@ -271,7 +264,6 @@ func (f Flags) MarshalJSON() ([]byte, error) {
 		Domain:                nullableURL(f.Domain),
 		Profile:               f.Profile,
 		Account:               f.Account,
-		MCPExperimental:       f.MCPExperimental,
 		InsecureSkipTLSVerify: f.InsecureSkipTLSVerify,
 		APIEndpoint:           nullableURL(f.APIEndpoint),
 		ProxyEndpoint:         nullableURL(f.ProxyEndpoint),
