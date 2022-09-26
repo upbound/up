@@ -21,7 +21,6 @@ import (
 	"github.com/pterm/pterm"
 
 	cp "github.com/upbound/up-sdk-go/service/controlplanes"
-	op "github.com/upbound/up-sdk-go/service/oldplanes"
 	"github.com/upbound/up/internal/upbound"
 )
 
@@ -45,7 +44,7 @@ type deleteCmd struct {
 }
 
 // Run executes the delete command.
-func (c *deleteCmd) Run(p pterm.TextPrinter, cc *cp.Client, oc *op.Client, upCtx *upbound.Context) error {
+func (c *deleteCmd) Run(p pterm.TextPrinter, cc *cp.Client, upCtx *upbound.Context) error {
 	if err := cc.Delete(context.Background(), upCtx.Account, c.ID); err != nil {
 		return err
 	}

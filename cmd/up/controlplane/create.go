@@ -20,7 +20,6 @@ import (
 	"github.com/pterm/pterm"
 
 	cp "github.com/upbound/up-sdk-go/service/controlplanes"
-	op "github.com/upbound/up-sdk-go/service/oldplanes"
 	"github.com/upbound/up/internal/upbound"
 )
 
@@ -32,7 +31,7 @@ type createCmd struct {
 }
 
 // Run executes the create command.
-func (c *createCmd) Run(p pterm.TextPrinter, cc *cp.Client, oc *op.Client, upCtx *upbound.Context) error {
+func (c *createCmd) Run(p pterm.TextPrinter, cc *cp.Client, upCtx *upbound.Context) error {
 	if _, err := cc.Create(context.Background(), upCtx.Account, &cp.ControlPlaneCreateParameters{
 		Name:        c.Name,
 		Description: c.Description,
