@@ -17,9 +17,7 @@ package controlplane
 import (
 	"github.com/alecthomas/kong"
 
-	"github.com/upbound/up-sdk-go/service/accounts"
 	cp "github.com/upbound/up-sdk-go/service/controlplanes"
-	op "github.com/upbound/up-sdk-go/service/oldplanes"
 
 	"github.com/upbound/up/cmd/up/controlplane/kubeconfig"
 	"github.com/upbound/up/cmd/up/controlplane/pullsecret"
@@ -45,8 +43,6 @@ func (c *Cmd) AfterApply(kongCtx *kong.Context) error {
 	}
 	kongCtx.Bind(upCtx)
 	kongCtx.Bind(cp.NewClient(cfg))
-	kongCtx.Bind(op.NewClient(cfg))
-	kongCtx.Bind(accounts.NewClient(cfg))
 	return nil
 }
 

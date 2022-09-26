@@ -20,7 +20,6 @@ import (
 	"github.com/alecthomas/kong"
 	"github.com/pterm/pterm"
 
-	"github.com/upbound/up-sdk-go/service/accounts"
 	"github.com/upbound/up-sdk-go/service/common"
 	cp "github.com/upbound/up-sdk-go/service/controlplanes"
 
@@ -41,7 +40,7 @@ func (c *listCmd) AfterApply(experimental bool, kongCtx *kong.Context, upCtx *up
 type listCmd struct{}
 
 // Run executes the list command.
-func (c *listCmd) Run(p pterm.TextPrinter, pt *pterm.TablePrinter, ac *accounts.Client, cc *cp.Client, upCtx *upbound.Context) error {
+func (c *listCmd) Run(p pterm.TextPrinter, pt *pterm.TablePrinter, cc *cp.Client, upCtx *upbound.Context) error {
 	// TODO(hasheddan): we currently just max out single page size, but we
 	// may opt to support limiting page size and iterating through pages via
 	// flags in the future.
