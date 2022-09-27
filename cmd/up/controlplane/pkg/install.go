@@ -23,6 +23,7 @@ import (
 	"github.com/crossplane/crossplane-runtime/pkg/errors"
 	"github.com/google/go-containerregistry/pkg/name"
 	"github.com/pterm/pterm"
+	corev1 "k8s.io/api/core/v1"
 	v1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 	"k8s.io/apimachinery/pkg/runtime/schema"
@@ -94,9 +95,10 @@ type installCmd struct {
 	Package string `arg:"" help:"Reference to the ${package_type}."`
 
 	// NOTE(hasheddan): kong automatically cleans paths tagged with existingfile.
-	Kubeconfig string        `type:"existingfile" help:"Override default kubeconfig path."`
-	Name       string        `help:"Name of ${package_type}."`
-	Wait       time.Duration `short:"w" help:"Wait duration for successful ${package_type} installation."`
+	Kubeconfig         string        `type:"existingfile" help:"Override default kubeconfig path."`
+	Name               string        `help:"Name of ${package_type}."`
+	PackagePullSecrets []string      `help:"List of secrets used to pull ${package_type}."`
+	Wait               time.Duration `short:"w" help:"Wait duration for successful ${package_type} installation."`
 }
 
 // Run executes the install command.
@@ -108,6 +110,12 @@ func (c *installCmd) Run(p pterm.TextPrinter, upCtx *upbound.Context) error {
 	if c.Name == "" {
 		c.Name = xpkg.ToDNSLabel(ref.Context().RepositoryStr())
 	}
+	packagePullSecrets := make([]corev1.LocalObjectReference, len(c.PackagePullSecrets))
+	for i, s := range c.PackagePullSecrets {
+		packagePullSecrets[i] = corev1.LocalObjectReference{
+			Name: s,
+		}
+	}
 	if _, err := c.r.Create(context.Background(), &unstructured.Unstructured{Object: map[string]interface{}{
 		"apiVersion": "pkg.crossplane.io/v1",
 		"kind":       c.kind,
@@ -115,7 +123,8 @@ func (c *installCmd) Run(p pterm.TextPrinter, upCtx *upbound.Context) error {
 			"name": c.Name,
 		},
 		"spec": map[string]interface{}{
-			"package": ref.Name(),
+			"package":            ref.Name(),
+			"packagePullSecrets": packagePullSecrets,
 		},
 	}}, v1.CreateOptions{}); err != nil {
 		return err
