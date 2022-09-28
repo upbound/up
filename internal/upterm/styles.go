@@ -26,7 +26,17 @@ var (
 		Text:  " 👀",
 	}
 
+	RaisedPrefix = pterm.Prefix{
+		Style: &pterm.Style{pterm.FgLightMagenta},
+		Text:  " 🙌",
+	}
+
 	spinnerStyle = &pterm.Style{pterm.FgDarkGray}
+
+	CheckmarkSuccessSpinner = pterm.DefaultSpinner.WithStyle(spinnerStyle)
+	EyesInfoSpinner         = pterm.DefaultSpinner.WithStyle(spinnerStyle)
+
+	ComponentText = pterm.DefaultBasicText.WithStyle(&pterm.ThemeDefault.TreeTextStyle)
 
 	cp = &pterm.PrefixPrinter{
 		MessageStyle: &pterm.Style{pterm.FgLightWhite},
@@ -35,20 +45,11 @@ var (
 			Text:  " √ ",
 		},
 	}
+
 	ip = &pterm.PrefixPrinter{
 		MessageStyle: &pterm.Style{pterm.FgLightWhite},
 		Prefix:       EyesPrefix,
 	}
-
-	CheckmarkSuccessSpinner = pterm.DefaultSpinner.WithStyle(spinnerStyle)
-	EyesInfoSpinner         = pterm.DefaultSpinner.WithStyle(spinnerStyle)
-
-	RaisedPrefix = pterm.Prefix{
-		Style: &pterm.Style{pterm.FgLightMagenta},
-		Text:  " 🙌",
-	}
-
-	ComponentText = pterm.DefaultBasicText.WithStyle(&pterm.ThemeDefault.TreeTextStyle)
 )
 
 func init() {
