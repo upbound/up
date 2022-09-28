@@ -12,7 +12,7 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-package upbound
+package upterm
 
 import (
 	"fmt"
@@ -21,17 +21,22 @@ import (
 )
 
 var (
-	eyesPrefix = pterm.Prefix{
+	EyesPrefix = pterm.Prefix{
 		Style: &pterm.Style{pterm.FgLightMagenta},
 		Text:  " 👀",
 	}
 
-	raisedPrefix = pterm.Prefix{
+	RaisedPrefix = pterm.Prefix{
 		Style: &pterm.Style{pterm.FgLightMagenta},
 		Text:  " 🙌",
 	}
 
 	spinnerStyle = &pterm.Style{pterm.FgDarkGray}
+
+	CheckmarkSuccessSpinner = pterm.DefaultSpinner.WithStyle(spinnerStyle)
+	EyesInfoSpinner         = pterm.DefaultSpinner.WithStyle(spinnerStyle)
+
+	ComponentText = pterm.DefaultBasicText.WithStyle(&pterm.ThemeDefault.TreeTextStyle)
 
 	cp = &pterm.PrefixPrinter{
 		MessageStyle: &pterm.Style{pterm.FgLightWhite},
@@ -40,23 +45,19 @@ var (
 			Text:  " √ ",
 		},
 	}
+
 	ip = &pterm.PrefixPrinter{
 		MessageStyle: &pterm.Style{pterm.FgLightWhite},
-		Prefix:       eyesPrefix,
+		Prefix:       EyesPrefix,
 	}
-
-	checkmarkSuccessSpinner = pterm.DefaultSpinner.WithStyle(spinnerStyle)
-	eyesInfoSpinner         = pterm.DefaultSpinner.WithStyle(spinnerStyle)
-
-	componentText = pterm.DefaultBasicText.WithStyle(&pterm.ThemeDefault.TreeTextStyle)
 )
 
 func init() {
-	checkmarkSuccessSpinner.SuccessPrinter = cp
-	eyesInfoSpinner.InfoPrinter = ip
+	CheckmarkSuccessSpinner.SuccessPrinter = cp
+	EyesInfoSpinner.InfoPrinter = ip
 }
 
-func wrapWithSuccessSpinner(msg string, spinner *pterm.SpinnerPrinter, f func() error) error {
+func WrapWithSuccessSpinner(msg string, spinner *pterm.SpinnerPrinter, f func() error) error {
 	s, err := spinner.Start(msg)
 	if err != nil {
 		return err
@@ -70,6 +71,6 @@ func wrapWithSuccessSpinner(msg string, spinner *pterm.SpinnerPrinter, f func() 
 	return nil
 }
 
-func stepCounter(msg string, index, total int) string {
+func StepCounter(msg string, index, total int) string {
 	return fmt.Sprintf("[%d/%d]: %s", index, total, msg)
 }

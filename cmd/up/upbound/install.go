@@ -22,14 +22,17 @@ import (
 	"time"
 
 	"github.com/alecthomas/kong"
+	xpv1 "github.com/crossplane/crossplane-runtime/apis/common/v1"
+	"github.com/crossplane/crossplane-runtime/pkg/resource"
 	"github.com/pkg/errors"
 	"github.com/pterm/pterm"
 	corev1 "k8s.io/api/core/v1"
 	kerrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 	"k8s.io/apimachinery/pkg/runtime/schema"
+	"k8s.io/client-go/dynamic"
 	"k8s.io/client-go/kubernetes"
-	"k8s.io/client-go/rest"
 	"sigs.k8s.io/yaml"
 
 	"github.com/upbound/up/internal/auth"
@@ -41,6 +44,7 @@ import (
 	"github.com/upbound/up/internal/license"
 	"github.com/upbound/up/internal/resources"
 	"github.com/upbound/up/internal/upbound"
+	"github.com/upbound/up/internal/upterm"
 )
 
 var (
@@ -79,7 +83,7 @@ func (c *installCmd) BeforeApply() error {
 }
 
 // AfterApply sets default values in command after assignment and validation.
-func (c *installCmd) AfterApply(insCtx *install.Context, kongCtx *kong.Context, quiet config.QuietFlag) error {
+func (c *installCmd) AfterApply(insCtx *install.Context, kongCtx *kong.Context, quiet config.QuietFlag) error { //nolint:gocyclo
 	upCtx, err := upbound.NewFromFlags(c.Flags)
 	if err != nil {
 		return err
@@ -96,13 +100,18 @@ func (c *installCmd) AfterApply(insCtx *install.Context, kongCtx *kong.Context, 
 	}
 	c.id = id
 	c.token = token
-	client, err := kubernetes.NewForConfig(insCtx.Kubeconfig)
+	kClient, err := kubernetes.NewForConfig(insCtx.Kubeconfig)
 	if err != nil {
 		return err
 	}
-	c.kClient = client
-	secret := kube.NewSecretApplicator(client)
+	c.kClient = kClient
+	secret := kube.NewSecretApplicator(kClient)
 	c.pullSecret = kube.NewImagePullApplicator(secret)
+	dClient, err := dynamic.NewForConfig(insCtx.Kubeconfig)
+	if err != nil {
+		return err
+	}
+	c.dClient = dClient
 	auth := auth.NewProvider(
 		auth.WithBasicAuth(c.id, c.token),
 		auth.WithEndpoint(c.Registry),
@@ -150,6 +159,7 @@ type installCmd struct {
 	mgr        install.Manager
 	parser     install.ParameterParser
 	kClient    kubernetes.Interface
+	dClient    dynamic.Interface
 	prompter   input.Prompter
 	access     *accessKeyApplicator
 	pullSecret *kube.ImagePullApplicator
@@ -180,12 +190,12 @@ func (c *installCmd) Run(insCtx *install.Context, upCtx *upbound.Context) error 
 		return err
 	}
 
-	if err := c.installUpbound(context.Background(), insCtx.Kubeconfig, params); err != nil {
+	if err := c.installUpbound(context.Background(), params); err != nil {
 		return err
 	}
 
 	if !c.quiet {
-		spinnerIngress, _ := checkmarkSuccessSpinner.Start(stepCounter("Gathering ingress information", 5, 5))
+		spinnerIngress, _ := upterm.CheckmarkSuccessSpinner.Start(upterm.StepCounter("Gathering ingress information", 5, 5))
 		// Sleep for 1s to ensure pterm has enough time for 1 spin. Without this
 		// line, the operation can complete too quick resulting in two lines
 		// written for the "Gathering" spinner.
@@ -196,7 +206,7 @@ func (c *installCmd) Run(insCtx *install.Context, upCtx *upbound.Context) error 
 		}
 		spinnerIngress.Success()
 
-		pterm.Info.WithPrefix(raisedPrefix).Println("Upbound ready")
+		pterm.Info.WithPrefix(upterm.RaisedPrefix).Println("Upbound ready")
 		time.Sleep(2 * time.Second)
 
 		outputConnectingInfo(ipAddress, hostNames)
@@ -238,17 +248,17 @@ func (c *installCmd) applySecrets(ctx context.Context, namespace string) error {
 		return creatPullSecret()
 	}
 
-	if err := wrapWithSuccessSpinner(
-		stepCounter(fmt.Sprintf("Creating namespace %s", namespace), 1, 5),
-		checkmarkSuccessSpinner,
+	if err := upterm.WrapWithSuccessSpinner(
+		upterm.StepCounter(fmt.Sprintf("Creating namespace %s", namespace), 1, 5),
+		upterm.CheckmarkSuccessSpinner,
 		createNs,
 	); err != nil {
 		return err
 	}
 
-	if err := wrapWithSuccessSpinner(
-		stepCounter(fmt.Sprintf("Creating secret %s", defaultImagePullSecret), 2, 5),
-		checkmarkSuccessSpinner,
+	if err := upterm.WrapWithSuccessSpinner(
+		upterm.StepCounter(fmt.Sprintf("Creating secret %s", defaultImagePullSecret), 2, 5),
+		upterm.CheckmarkSuccessSpinner,
 		creatPullSecret,
 	); err != nil {
 		return err
@@ -267,7 +277,7 @@ func (c *installCmd) applySecrets(ctx context.Context, namespace string) error {
 	return nil
 }
 
-func (c *installCmd) installUpbound(ctx context.Context, kubeconfig *rest.Config, params map[string]any) error {
+func (c *installCmd) installUpbound(ctx context.Context, params map[string]any) error {
 	install := func() error {
 		if err := c.mgr.Install(c.Version, params); err != nil {
 			return err
@@ -279,31 +289,39 @@ func (c *installCmd) installUpbound(ctx context.Context, kubeconfig *rest.Config
 		return install()
 	}
 
-	if err := wrapWithSuccessSpinner(
-		stepCounter("Initializing Upbound", 3, 5),
-		checkmarkSuccessSpinner,
+	if err := upterm.WrapWithSuccessSpinner(
+		upterm.StepCounter("Initializing Upbound", 3, 5),
+		upterm.CheckmarkSuccessSpinner,
 		install,
 	); err != nil {
 		return err
 	}
 
 	// Print Info message to indicate next large step
-	spinnerStart, _ := eyesInfoSpinner.Start(stepCounter("Starting Upbound", 4, 5))
+	spinnerStart, _ := upterm.EyesInfoSpinner.Start(upterm.StepCounter("Starting Upbound", 4, 5))
 	spinnerStart.Info()
 
-	watchCtx, cancel := context.WithTimeout(ctx, time.Duration(watcherTimeout*int64(time.Second)))
-	defer cancel()
 	ccancel := make(chan bool)
 	stopped := make(chan bool)
 	// NOTE(tnthornton) we spin off the deployment watching so that we can
 	// watch both the custom resource as well as the deployment events at
 	// the same time.
-	go watchDeployments(watchCtx, c.kClient, ccancel, stopped) //nolint:errcheck
+	// TODO(hasheddan): consider using DynamicWatch and cancelling via context.
+	go watchDeployments(ctx, c.kClient, ccancel, stopped) //nolint:errcheck
 
-	if err := watchCustomResource(watchCtx, upboundGVR, kubeconfig); err != nil {
+	errC, err := kube.DynamicWatch(ctx, c.dClient.Resource(upboundGVR), &watcherTimeout, func(u *unstructured.Unstructured) (bool, error) {
+		up := resources.Upbound{Unstructured: *u}
+		if resource.IsConditionTrue(up.GetCondition(xpv1.TypeReady)) {
+			return true, nil
+		}
+		return false, nil
+	})
+	if err != nil {
 		return err
 	}
-
+	if err := <-errC; err != nil {
+		return err
+	}
 	ccancel <- true
 	close(ccancel)
 	<-stopped

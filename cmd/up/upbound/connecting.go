@@ -20,6 +20,7 @@ import (
 	"github.com/pterm/pterm"
 
 	"github.com/upbound/up/internal/resources"
+	"github.com/upbound/up/internal/upterm"
 )
 
 const (
@@ -30,7 +31,7 @@ const (
 
 func outputConnectingInfo(ipAddress, hostNames string) {
 	pterm.Println()
-	pterm.Info.WithPrefix(eyesPrefix).Println("Next Steps 👇")
+	pterm.Info.WithPrefix(upterm.EyesPrefix).Println("Next Steps 👇")
 	pterm.Println()
 	pterm.Println("👉 (1): Add the following entry to your /etc/hosts file:")
 	pterm.Println()

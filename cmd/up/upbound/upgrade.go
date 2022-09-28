@@ -17,12 +17,14 @@ package upbound
 import (
 	"context"
 	"io"
-	"time"
 
+	xpv1 "github.com/crossplane/crossplane-runtime/apis/common/v1"
+	"github.com/crossplane/crossplane-runtime/pkg/resource"
 	"github.com/pkg/errors"
 	"github.com/pterm/pterm"
+	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
+	"k8s.io/client-go/dynamic"
 	"k8s.io/client-go/kubernetes"
-	"k8s.io/client-go/rest"
 	"sigs.k8s.io/yaml"
 
 	"github.com/upbound/up/internal/auth"
@@ -32,6 +34,8 @@ import (
 	"github.com/upbound/up/internal/install/helm"
 	"github.com/upbound/up/internal/kube"
 	"github.com/upbound/up/internal/license"
+	"github.com/upbound/up/internal/resources"
+	"github.com/upbound/up/internal/upterm"
 )
 
 const (
@@ -56,13 +60,18 @@ func (c *upgradeCmd) AfterApply(insCtx *install.Context, quiet config.QuietFlag)
 	}
 	c.id = id
 	c.token = token
-	client, err := kubernetes.NewForConfig(insCtx.Kubeconfig)
+	kClient, err := kubernetes.NewForConfig(insCtx.Kubeconfig)
 	if err != nil {
 		return err
 	}
-	c.kClient = client
-	secret := kube.NewSecretApplicator(client)
+	c.kClient = kClient
+	secret := kube.NewSecretApplicator(kClient)
 	c.pullSecret = kube.NewImagePullApplicator(secret)
+	dClient, err := dynamic.NewForConfig(insCtx.Kubeconfig)
+	if err != nil {
+		return err
+	}
+	c.dClient = dClient
 	auth := auth.NewProvider(
 		auth.WithBasicAuth(id, token),
 		auth.WithEndpoint(c.Registry),
@@ -116,6 +125,7 @@ type upgradeCmd struct {
 	id         string
 	token      string
 	kClient    kubernetes.Interface
+	dClient    dynamic.Interface
 	quiet      config.QuietFlag
 
 	// NOTE(hasheddan): version is currently required for upgrade with OCI image
@@ -154,18 +164,18 @@ func (c *upgradeCmd) Run(insCtx *install.Context) error {
 		}
 	}
 
-	if err := c.upgradeUpbound(context.Background(), insCtx.Kubeconfig, params); err != nil {
+	if err := c.upgradeUpbound(context.Background(), params); err != nil {
 		return err
 	}
 
 	if !c.quiet {
-		pterm.Info.WithPrefix(raisedPrefix).Println("Upbound ready")
+		pterm.Info.WithPrefix(upterm.RaisedPrefix).Println("Upbound ready")
 	}
 
 	return nil
 }
 
-func (c *upgradeCmd) upgradeUpbound(ctx context.Context, kubeconfig *rest.Config, params map[string]any) error {
+func (c *upgradeCmd) upgradeUpbound(ctx context.Context, params map[string]any) error {
 	upgrade := func() error {
 		if err := c.mgr.Upgrade(c.Version, params); err != nil {
 			return err
@@ -177,28 +187,37 @@ func (c *upgradeCmd) upgradeUpbound(ctx context.Context, kubeconfig *rest.Config
 		return upgrade()
 	}
 
-	if err := wrapWithSuccessSpinner(
-		stepCounter("Upgrading Upbound", 1, 2),
-		checkmarkSuccessSpinner,
+	if err := upterm.WrapWithSuccessSpinner(
+		upterm.StepCounter("Upgrading Upbound", 1, 2),
+		upterm.CheckmarkSuccessSpinner,
 		upgrade,
 	); err != nil {
 		return err
 	}
 
 	// Print Info message to indicate next large step
-	spinnerStart, _ := eyesInfoSpinner.Start(stepCounter("Starting Upbound", 2, 2))
+	spinnerStart, _ := upterm.EyesInfoSpinner.Start(upterm.StepCounter("Starting Upbound", 2, 2))
 	spinnerStart.Info()
 
-	watchCtx, cancel := context.WithTimeout(ctx, time.Duration(watcherTimeout*int64(time.Second)))
-	defer cancel()
 	ccancel := make(chan bool)
 	stopped := make(chan bool)
 	// NOTE(tnthornton) we spin off the deployment watching so that we can
 	// watch both the custom resource as well as the deployment events at
 	// the same time.
+	// TODO(hasheddan): consider using DynamicWatch and cancelling via context.
 	go watchDeployments(ctx, c.kClient, ccancel, stopped) //nolint:errcheck
 
-	if err := watchCustomResource(watchCtx, upboundGVR, kubeconfig); err != nil {
+	errC, err := kube.DynamicWatch(ctx, c.dClient.Resource(upboundGVR), &watcherTimeout, func(u *unstructured.Unstructured) (bool, error) {
+		up := resources.Upbound{Unstructured: *u}
+		if resource.IsConditionTrue(up.GetCondition(xpv1.TypeReady)) {
+			return true, nil
+		}
+		return false, nil
+	})
+	if err != nil {
+		return err
+	}
+	if err := <-errC; err != nil {
 		return err
 	}
 
