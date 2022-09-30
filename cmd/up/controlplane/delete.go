@@ -17,37 +17,22 @@ package controlplane
 import (
 	"context"
 
-	"github.com/google/uuid"
 	"github.com/pterm/pterm"
 
 	cp "github.com/upbound/up-sdk-go/service/controlplanes"
 	"github.com/upbound/up/internal/upbound"
 )
 
-// AfterApply sets values in command after assignment and validation.
-func (c *deleteCmd) AfterApply(experimental bool) error {
-	if !experimental {
-		u, err := uuid.Parse(c.ID)
-		if err != nil {
-			return err
-		}
-		c.id = u
-	}
-	return nil
-}
-
 // deleteCmd deletes a control plane on Upbound.
 type deleteCmd struct {
-	id uuid.UUID
-
-	ID string `arg:"" help:"ID of control plane. ID is name if using experimental MCP API."`
+	Name string `arg:"" help:"Name of control plane."`
 }
 
 // Run executes the delete command.
 func (c *deleteCmd) Run(p pterm.TextPrinter, cc *cp.Client, upCtx *upbound.Context) error {
-	if err := cc.Delete(context.Background(), upCtx.Account, c.ID); err != nil {
+	if err := cc.Delete(context.Background(), upCtx.Account, c.Name); err != nil {
 		return err
 	}
-	p.Printfln("%s deleted", c.ID)
+	p.Printfln("%s deleted", c.Name)
 	return nil
 }

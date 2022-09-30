@@ -31,7 +31,7 @@ const (
 )
 
 // AfterApply sets default values in command after assignment and validation.
-func (c *listCmd) AfterApply(experimental bool, kongCtx *kong.Context, upCtx *upbound.Context) error {
+func (c *listCmd) AfterApply(kongCtx *kong.Context, upCtx *upbound.Context) error {
 	kongCtx.Bind(pterm.DefaultTable.WithWriter(kongCtx.Stdout).WithSeparator("   "))
 	return nil
 }
