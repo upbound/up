@@ -41,6 +41,10 @@ const (
 	apiSubdomain = "api."
 	// Default proxy subdomain.
 	proxySubdomain = "proxy."
+
+	// Base path for proxy.
+	proxyPath = "/v1/controlPlanes"
+
 	// Default registry subdomain.
 	xpkgSubdomain = "xpkg."
 )
@@ -161,6 +165,7 @@ func NewFromFlags(f Flags, opts ...Option) (*Context, error) { //nolint:gocyclo
 	if c.ProxyEndpoint == nil {
 		u := *of.Domain
 		u.Host = proxySubdomain + u.Host
+		u.Path = proxyPath
 		c.ProxyEndpoint = &u
 	}
 

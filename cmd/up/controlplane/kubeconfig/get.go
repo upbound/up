@@ -20,34 +20,15 @@ import (
 	"path"
 	"strings"
 
-	"github.com/google/uuid"
-	"github.com/pkg/errors"
 	"github.com/pterm/pterm"
 
 	"github.com/upbound/up/internal/kube"
 	"github.com/upbound/up/internal/upbound"
 )
 
-const (
-	errSetAccount = "must set account when using MCP experimental API"
-)
-
 // AfterApply sets default values in command after assignment and validation.
-func (c *getCmd) AfterApply(experimental bool, upCtx *upbound.Context) error {
+func (c *getCmd) AfterApply(upCtx *upbound.Context) error {
 	c.stdin = os.Stdin
-
-	if !experimental {
-		u, err := uuid.Parse(c.ID)
-		if err != nil {
-			return err
-		}
-		c.id = u
-	}
-
-	if experimental && upCtx.Account == "" {
-		return errors.New(errSetAccount)
-	}
-
 	return nil
 }
 
@@ -58,13 +39,11 @@ type getCmd struct {
 	File  string `type:"path" short:"f" help:"File to merge kubeconfig."`
 	Token string `required:"" help:"API token used to authenticate."`
 
-	id uuid.UUID
-
-	ID string `arg:"" name:"control-plane-ID" required:"" help:"ID of control plane. ID is name if using experimental MCP API."`
+	Name string `arg:"" name:"control-plane-name" required:"" help:"Name of control plane."`
 }
 
 // Run executes the get command.
-func (c *getCmd) Run(experimental bool, p pterm.TextPrinter, upCtx *upbound.Context) error {
+func (c *getCmd) Run(p pterm.TextPrinter, upCtx *upbound.Context) error {
 	// TODO(hasheddan): consider implementing a custom decoder
 	if c.Token == "-" {
 		b, err := io.ReadAll(c.stdin)
@@ -74,20 +53,9 @@ func (c *getCmd) Run(experimental bool, p pterm.TextPrinter, upCtx *upbound.Cont
 		c.Token = strings.TrimSpace(string(b))
 	}
 
-	var err error
-	var kubeCurCtx string
-	if experimental {
-		upCtx.ProxyEndpoint.Path = "/v1/controlPlanes"
-		kubeCurCtx, err = kube.BuildControlPlaneKubeconfig(upCtx.ProxyEndpoint, path.Join(upCtx.Account, c.ID), c.Token, c.File, true)
-		if err != nil {
-			return err
-		}
-	} else {
-		upCtx.ProxyEndpoint.Path = "/controlPlanes"
-		kubeCurCtx, err = kube.BuildControlPlaneKubeconfig(upCtx.ProxyEndpoint, c.id.String(), c.Token, c.File, false)
-		if err != nil {
-			return err
-		}
+	kubeCurCtx, err := kube.BuildControlPlaneKubeconfig(upCtx.ProxyEndpoint, path.Join(upCtx.Account, c.Name), c.Token, c.File)
+	if err != nil {
+		return err
 	}
 
 	p.Printfln("Current context set to %s", kubeCurCtx)
