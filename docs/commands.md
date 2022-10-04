@@ -96,7 +96,7 @@ commands may choose not to utilize the group flags when not relevant.
 Format: `up controlplane pull-secret <cmd> ...` Alias: `up ctp pull-secret
 <cmd>...`
 
-- `create <control-plane-ID>`
+- `create <control-plane-name>`
     - Flags:
         - `-f,--file = FILE`: Path to token credentials file. Credentials from
           profile are used if not specified.
@@ -436,7 +436,7 @@ control planes.
     - Flags:
         - `--description = STRING`: Control plane description.
     - Behavior: Creates a hosted control plane in Upbound.
-- `delete <id>`
+- `delete <name>`
     - Behavior: Deletes a control plane in Upbound.
 - `list`
     - Behavior: Lists all control planes for the configured account.
@@ -458,7 +458,7 @@ commands may choose not to utilize the group flags when not relevant.
 Format: `up alpha controlplane kubeconfig <cmd> ...` Alias: `up ctp kubeconfig
 <cmd>...`
 
-- `get <control-plane-ID>`
+- `get <control-plane-name>`
     - Flags:
         - `--token = STRING` (*Required*): API token for authenticating to
           control plane. If `-` is given the value will be read from stdin.
