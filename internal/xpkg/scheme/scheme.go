@@ -15,6 +15,7 @@
 package scheme
 
 import (
+	admv1 "k8s.io/api/admissionregistration/v1"
 	extv1 "k8s.io/apiextensions-apiserver/pkg/apis/apiextensions/v1"
 	extv1beta1 "k8s.io/apiextensions-apiserver/pkg/apis/apiextensions/v1beta1"
 	"k8s.io/apimachinery/pkg/runtime"
@@ -53,6 +54,9 @@ func BuildObjectScheme() (*runtime.Scheme, error) {
 		return nil, err
 	}
 	if err := extv1.AddToScheme(objScheme); err != nil {
+		return nil, err
+	}
+	if err := admv1.AddToScheme(objScheme); err != nil {
 		return nil, err
 	}
 	return objScheme, nil

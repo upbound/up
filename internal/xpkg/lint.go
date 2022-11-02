@@ -18,6 +18,7 @@ import (
 	"github.com/Masterminds/semver"
 	"github.com/pkg/errors"
 
+	admv1 "k8s.io/api/admissionregistration/v1"
 	extv1 "k8s.io/apiextensions-apiserver/pkg/apis/apiextensions/v1"
 	extv1beta1 "k8s.io/apiextensions-apiserver/pkg/apis/apiextensions/v1beta1"
 	"k8s.io/apimachinery/pkg/runtime"
@@ -31,20 +32,27 @@ import (
 )
 
 const (
-	errNotExactlyOneMeta    = "not exactly one package meta type"
-	errNotMeta              = "meta type is not a package"
-	errNotMetaProvider      = "package meta type is not Provider"
-	errNotMetaConfiguration = "package meta type is not Configuration"
-	errNotCRD               = "object is not a CRD"
-	errNotXRD               = "object is not an XRD"
-	errNotComposition       = "object is not a Composition"
-	errBadConstraints       = "package version constraints are poorly formatted"
+	errNotExactlyOneMeta                 = "not exactly one package meta type"
+	errNotMeta                           = "meta type is not a package"
+	errNotMetaProvider                   = "package meta type is not Provider"
+	errNotMetaConfiguration              = "package meta type is not Configuration"
+	errNotCRD                            = "object is not a CRD"
+	errNotMutatingWebhookConfiguration   = "object is not a MutatingWebhookConfiguration"
+	errNotValidatingWebhookConfiguration = "object is not a ValidatingWebhookConfiguration"
+	errNotXRD                            = "object is not an XRD"
+	errNotComposition                    = "object is not a Composition"
+	errBadConstraints                    = "package version constraints are poorly formatted"
 )
 
 // NewProviderLinter is a convenience function for creating a package linter for
 // providers.
 func NewProviderLinter() linter.Linter {
-	return linter.NewPackageLinter(linter.PackageLinterFns(OneMeta), linter.ObjectLinterFns(IsProvider, PackageValidSemver), linter.ObjectLinterFns(IsCRD))
+	return linter.NewPackageLinter(linter.PackageLinterFns(OneMeta), linter.ObjectLinterFns(IsProvider, PackageValidSemver),
+		linter.ObjectLinterFns(linter.Or(
+			IsCRD,
+			IsValidatingWebhookConfiguration,
+			IsMutatingWebhookConfiguration,
+		)))
 }
 
 // NewConfigurationLinter is a convenience function for creating a package linter for
@@ -102,6 +110,26 @@ func IsCRD(o runtime.Object) error {
 		return nil
 	default:
 		return errors.New(errNotCRD)
+	}
+}
+
+// IsMutatingWebhookConfiguration checks that an object is a MutatingWebhookConfiguration.
+func IsMutatingWebhookConfiguration(o runtime.Object) error {
+	switch o.(type) {
+	case *admv1.MutatingWebhookConfiguration:
+		return nil
+	default:
+		return errors.New(errNotMutatingWebhookConfiguration)
+	}
+}
+
+// IsValidatingWebhookConfiguration checks that an object is a MutatingWebhookConfiguration.
+func IsValidatingWebhookConfiguration(o runtime.Object) error {
+	switch o.(type) {
+	case *admv1.ValidatingWebhookConfiguration:
+		return nil
+	default:
+		return errors.New(errNotValidatingWebhookConfiguration)
 	}
 }
 
