@@ -37,6 +37,14 @@ GOLANGCILINT_VERSION = 1.47.3
 -include build/makelib/golang.mk
 
 # ====================================================================================
+# Setup binaries
+ifneq ($(shell type sha256sum 2>/dev/null),)
+SHA256SUM := sha256sum
+else
+$(error Please install sha256sum)
+endif
+
+# ====================================================================================
 # Targets
 
 # run `make help` to see the targets and options
@@ -67,9 +75,9 @@ build.artifacts.platform: build.artifacts.bundle.platform
 endif
 
 build.artifacts.bundle.platform:
-	@sha256sum $(GO_OUT_DIR)/up$(GO_OUT_EXT) | head -c 64 >  $(GO_OUT_DIR)/up.sha256
+	@$(SHA256SUM) $(GO_OUT_DIR)/up$(GO_OUT_EXT) | head -c 64 >  $(GO_OUT_DIR)/up.sha256
 	@tar -czvf $(abspath $(OUTPUT_DIR)/bundle/up/$(PLATFORM)).tar.gz -C $(GO_BIN_DIR) $(PLATFORM)/up$(GO_OUT_EXT) $(PLATFORM)/up.sha256
-	@sha256sum $(GO_OUT_DIR)/docker-credential-up$(GO_OUT_EXT) | head -c 64 >  $(GO_OUT_DIR)/docker-credential-up.sha256
+	@$(SHA256SUM) $(GO_OUT_DIR)/docker-credential-up$(GO_OUT_EXT) | head -c 64 >  $(GO_OUT_DIR)/docker-credential-up.sha256
 	@tar -czvf $(abspath $(OUTPUT_DIR)/bundle/docker-credential-up/$(PLATFORM)).tar.gz -C $(GO_BIN_DIR) $(PLATFORM)/docker-credential-up$(GO_OUT_EXT) $(PLATFORM)/docker-credential-up.sha256
 
 build.artifacts.pkg.platform:
