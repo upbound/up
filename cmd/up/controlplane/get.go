@@ -31,7 +31,7 @@ func (c *getCmd) AfterApply(kongCtx *kong.Context, upCtx *upbound.Context) error
 	return nil
 }
 
-// listCmd list control planes in an account on Upbound.
+// getCmd gets a single control plane in an account on Upbound.
 type getCmd struct {
 	Name string `arg:"" required:"" help:"Name of control plane."`
 }
@@ -45,8 +45,7 @@ func (c *getCmd) Run(p pterm.TextPrinter, pt *pterm.TablePrinter, cc *cp.Client,
 
 	// We convert to a list so we can match the output of the list command
 	cpList := cp.ControlPlaneListResponse{
-		ControlPlanes: make([]cp.ControlPlaneResponse, 1),
+		ControlPlanes: []cp.ControlPlaneResponse{*ctp},
 	}
-	cpList.ControlPlanes[0] = *ctp
-	return PrintControlPlanes(&cpList, pt)
+	return printControlPlanes(&cpList, pt)
 }
