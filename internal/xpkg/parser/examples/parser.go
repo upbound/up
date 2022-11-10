@@ -20,6 +20,7 @@ import (
 	"io"
 	"unicode"
 
+	"github.com/crossplane/crossplane-runtime/pkg/errors"
 	"github.com/crossplane/crossplane-runtime/pkg/parser"
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 	"k8s.io/apimachinery/pkg/util/yaml"
@@ -70,7 +71,7 @@ func (p *Parser) Parse(ctx context.Context, reader io.ReadCloser) (*Examples, er
 		}
 		var obj unstructured.Unstructured
 		if err := k8syaml.Unmarshal(bytes, &obj); err != nil {
-			return ex, err
+			return ex, annotateErr(err, reader)
 		}
 		ex.objects = append(ex.objects, obj)
 	}
@@ -88,4 +89,12 @@ func isWhiteSpace(bytes []byte) bool {
 		}
 	}
 	return empty
+}
+
+// annotateErr annotates an error if the reader is an AnnotatedReadCloser.
+func annotateErr(err error, reader io.ReadCloser) error {
+	if anno, ok := reader.(parser.AnnotatedReadCloser); ok {
+		return errors.Wrapf(err, "%+v", anno.Annotate())
+	}
+	return err
 }
