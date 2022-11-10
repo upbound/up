@@ -52,6 +52,11 @@ func (c *listCmd) Run(p pterm.TextPrinter, pt *pterm.TablePrinter, cc *cp.Client
 		p.Printfln("No control planes found in %s", upCtx.Account)
 		return nil
 	}
+	return PrintControlPlanes(cpList, pt)
+}
+
+// Prints a list of control planes. This is also used by the get command
+func PrintControlPlanes(cpList *cp.ControlPlaneListResponse, pt *pterm.TablePrinter) error {
 	data := make([][]string, len(cpList.ControlPlanes)+1)
 	data[0] = []string{"NAME", "ID", "STATUS"}
 	for i, cp := range cpList.ControlPlanes {

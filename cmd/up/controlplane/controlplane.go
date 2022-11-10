@@ -52,6 +52,7 @@ type Cmd struct {
 	Create createCmd `cmd:"" maturity:"alpha" help:"Create a hosted control plane."`
 	Delete deleteCmd `cmd:"" maturity:"alpha" help:"Delete a control plane."`
 	List   listCmd   `cmd:"" maturity:"alpha" help:"List control planes for the account."`
+	Get    getCmd    `cmd:"" maturity:"alpha" help:"Get a single control plane."`
 
 	Configuration pkg.Cmd `cmd:"" set:"package_type=Configuration" help:"Manage Configurations."`
 	Provider      pkg.Cmd `cmd:"" set:"package_type=Provider" help:"Manage Providers."`
