@@ -18,6 +18,7 @@ import (
 	"bufio"
 	"context"
 	"io"
+	"unicode"
 
 	"github.com/crossplane/crossplane-runtime/pkg/parser"
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
@@ -64,6 +65,9 @@ func (p *Parser) Parse(ctx context.Context, reader io.ReadCloser) (*Examples, er
 		if len(bytes) == 0 {
 			continue
 		}
+		if isWhiteSpace(bytes) {
+			continue
+		}
 		var obj unstructured.Unstructured
 		if err := k8syaml.Unmarshal(bytes, &obj); err != nil {
 			return ex, err
@@ -71,4 +75,17 @@ func (p *Parser) Parse(ctx context.Context, reader io.ReadCloser) (*Examples, er
 		ex.objects = append(ex.objects, obj)
 	}
 	return ex, nil
+}
+
+// isWhiteSpace determines whether the passed in bytes are all unicode white
+// space.
+func isWhiteSpace(bytes []byte) bool {
+	empty := true
+	for _, b := range bytes {
+		if !unicode.IsSpace(rune(b)) {
+			empty = false
+			break
+		}
+	}
+	return empty
 }
