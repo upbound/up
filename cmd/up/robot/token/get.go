@@ -38,7 +38,7 @@ func (c *getCmd) AfterApply(kongCtx *kong.Context, upCtx *upbound.Context) error
 	return nil
 }
 
-// deleteCmd deletes a robot token on Upbound.
+// getCmd deletes a robot token on Upbound.
 type getCmd struct {
 	RobotName string `arg:"" required:"" help:"Name of robot."`
 	TokenName string `arg:"" required:"" help:"Name of token."`

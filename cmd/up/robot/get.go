@@ -51,7 +51,7 @@ func (c *getCmd) Run(p pterm.TextPrinter, pt *pterm.TablePrinter, ac *accounts.C
 	// The get command accepts a name, but the get API call takes an ID
 	// Therefore we get all robots and find the one the user requested
 	// The API doesn't guarantee uniqueness, but we just print the first
-	// one we fine. If a user wants to list all of them, they can use
+	// one we find. If a user wants to list all of them, they can use
 	// the list command.
 	rs, err := oc.ListRobots(context.Background(), a.Organization.ID)
 	if err != nil {
@@ -65,5 +65,5 @@ func (c *getCmd) Run(p pterm.TextPrinter, pt *pterm.TablePrinter, ac *accounts.C
 			return printRobots(rList, pt)
 		}
 	}
-	return errors.New("No robot named \"" + c.Name + "\"")
+	return errors.New("no robot named \"" + c.Name + "\"")
 }

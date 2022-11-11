@@ -32,7 +32,7 @@ func (c *getCmd) AfterApply(kongCtx *kong.Context, upCtx *upbound.Context) error
 	return nil
 }
 
-// getCmd gets a single control plane in an account on Upbound.
+// getCmd gets a single organization on Upbound.
 type getCmd struct {
 	Name string `arg:"" required:"" help:"Name of organization."`
 }
@@ -53,5 +53,5 @@ func (c *getCmd) Run(p pterm.TextPrinter, pt *pterm.TablePrinter, oc *organizati
 			return printOrganizations(orgs, pt)
 		}
 	}
-	return errors.Errorf("No organization named %s", c.Name)
+	return errors.Errorf("no organization named %s", c.Name)
 }

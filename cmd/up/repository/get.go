@@ -31,7 +31,7 @@ func (c *getCmd) AfterApply(kongCtx *kong.Context, upCtx *upbound.Context) error
 	return nil
 }
 
-// getCmd gets a single repo
+// getCmd gets a single repo.
 type getCmd struct {
 	Name string `arg:"" required:"" help:"Name of repo."`
 }
