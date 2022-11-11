@@ -85,7 +85,7 @@ func (c *getCmd) Run(p pterm.TextPrinter, pt *pterm.TablePrinter, ac *accounts.C
 		return errors.Errorf(errFindTokenFmt, c.TokenName, c.RobotName, upCtx.Account)
 	}
 
-	// We pick the first token with this name, though there mayh be more
+	// We pick the first token with this name, though there may be more
 	// than one. If a user wants to see all of the tokens with the same name
 	// they can use the list command.
 	var theToken *common.DataSet
