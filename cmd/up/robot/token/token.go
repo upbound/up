@@ -45,5 +45,6 @@ func (c *Cmd) AfterApply(kongCtx *kong.Context, upCtx *upbound.Context) error {
 type Cmd struct {
 	Create createCmd `cmd:"" help:"Create a token for the robot."`
 	Delete deleteCmd `cmd:"" help:"Delete a token for the robot."`
-	List   listCmd   `cmd:"" help:"List a token for the robot."`
+	List   listCmd   `cmd:"" help:"List the tokens for the robot."`
+	Get    getCmd    `cmd:"" help:"Get a token for the robot."`
 }

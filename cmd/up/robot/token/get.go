@@ -17,35 +17,35 @@ package token
 import (
 	"context"
 	"fmt"
-	"time"
 
 	"github.com/alecthomas/kong"
 	"github.com/google/uuid"
 	"github.com/pkg/errors"
 	"github.com/pterm/pterm"
-	"k8s.io/apimachinery/pkg/util/duration"
 
 	"github.com/upbound/up-sdk-go/service/accounts"
 	"github.com/upbound/up-sdk-go/service/common"
 	"github.com/upbound/up-sdk-go/service/organizations"
 	"github.com/upbound/up-sdk-go/service/robots"
+	"github.com/upbound/up-sdk-go/service/tokens"
 
 	"github.com/upbound/up/internal/upbound"
 )
 
 // AfterApply sets default values in command after assignment and validation.
-func (c *listCmd) AfterApply(kongCtx *kong.Context, upCtx *upbound.Context) error {
+func (c *getCmd) AfterApply(kongCtx *kong.Context, upCtx *upbound.Context) error {
 	kongCtx.Bind(pterm.DefaultTable.WithWriter(kongCtx.Stdout).WithSeparator("   "))
 	return nil
 }
 
-// listCmd creates a robot on Upbound.
-type listCmd struct {
+// getCmd deletes a robot token on Upbound.
+type getCmd struct {
 	RobotName string `arg:"" required:"" help:"Name of robot."`
+	TokenName string `arg:"" required:"" help:"Name of token."`
 }
 
-// Run executes the list robot tokens command.
-func (c *listCmd) Run(p pterm.TextPrinter, pt *pterm.TablePrinter, ac *accounts.Client, oc *organizations.Client, rc *robots.Client, upCtx *upbound.Context) error { //nolint:gocyclo
+// Run executes the get robot token command.
+func (c *getCmd) Run(p pterm.TextPrinter, pt *pterm.TablePrinter, ac *accounts.Client, oc *organizations.Client, rc *robots.Client, tc *tokens.Client, upCtx *upbound.Context) error { //nolint:gocyclo
 	a, err := ac.Get(context.Background(), upCtx.Account)
 	if err != nil {
 		return err
@@ -60,19 +60,17 @@ func (c *listCmd) Run(p pterm.TextPrinter, pt *pterm.TablePrinter, ac *accounts.
 	if len(rs) == 0 {
 		return errors.Errorf(errFindRobotFmt, c.RobotName, upCtx.Account)
 	}
-	// TODO(hasheddan): because this API does not guarantee name uniqueness, we
-	// must guarantee that exactly one robot exists in the specified account
-	// with the provided name. Logic should be simplified when the API is
-	// updated.
+
+	// We pick the first robot account with this name, though there
+	// may be more than one. If a user wants to see all of the tokens
+	// for robots with the same name, they can use the list commands
 	var rid *uuid.UUID
 	for _, r := range rs {
 		if r.Name == c.RobotName {
-			if rid != nil {
-				return errors.Errorf(errMultipleRobotFmt, c.RobotName, upCtx.Account)
-			}
 			// Pin range variable so that we can take address.
 			r := r
 			rid = &r.ID
+			break
 		}
 	}
 	if rid == nil {
@@ -84,24 +82,24 @@ func (c *listCmd) Run(p pterm.TextPrinter, pt *pterm.TablePrinter, ac *accounts.
 		return err
 	}
 	if len(ts.DataSet) == 0 {
-		p.Printfln("No tokens found for robot %s in %s", c.RobotName, upCtx.Account)
-		return nil
+		return errors.Errorf(errFindTokenFmt, c.TokenName, c.RobotName, upCtx.Account)
 	}
-	return printTokens(ts.DataSet, pt)
-}
 
-func printTokens(ts []common.DataSet, pt *pterm.TablePrinter) error {
-	data := make([][]string, len(ts)+1)
-	data[0] = []string{"NAME", "ID", "CREATED"}
-	for i, t := range ts {
-		n := fmt.Sprint(t.AttributeSet["name"])
-		c := "n/a"
-		if ca, ok := t.Meta["createdAt"]; ok {
-			if ct, err := time.Parse(time.RFC3339, fmt.Sprint(ca)); err == nil {
-				c = duration.HumanDuration(time.Since(ct))
-			}
+	// We pick the first token with this name, though there may be more
+	// than one. If a user wants to see all of the tokens with the same name
+	// they can use the list command.
+	var theToken *common.DataSet
+	for _, t := range ts.DataSet {
+		if fmt.Sprint(t.AttributeSet["name"]) == c.TokenName {
+			// Pin range variable so that we can take address.
+			t := t
+			theToken = &t
+			break
 		}
-		data[i+1] = []string{n, t.ID.String(), c}
 	}
-	return pt.WithHasHeader().WithData(data).Render()
+	if theToken == nil {
+		return errors.Errorf(errFindTokenFmt, c.TokenName, c.RobotName, upCtx.Account)
+	}
+	tList := []common.DataSet{*theToken}
+	return printTokens(tList, pt)
 }

@@ -43,6 +43,7 @@ type Cmd struct {
 	Create createCmd `cmd:"" help:"Create a repository."`
 	Delete deleteCmd `cmd:"" help:"Delete a repository."`
 	List   listCmd   `cmd:"" help:"List repositories for the account."`
+	Get    getCmd    `cmd:"" help:"Get a repository for the account."`
 
 	// Common Upbound API configuration
 	Flags upbound.Flags `embed:""`

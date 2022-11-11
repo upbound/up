@@ -25,6 +25,7 @@ import (
 
 	"github.com/upbound/up-sdk-go/service/common"
 	"github.com/upbound/up-sdk-go/service/repositories"
+	repos "github.com/upbound/up-sdk-go/service/repositories"
 
 	"github.com/upbound/up/internal/upbound"
 )
@@ -52,6 +53,11 @@ func (c *listCmd) Run(p pterm.TextPrinter, pt *pterm.TablePrinter, rc *repositor
 		p.Printfln("No repositories found in %s", upCtx.Account)
 		return nil
 	}
+	return printRepos(rList, pt)
+}
+
+// Prints a list of repos. This is also used by the get command
+func printRepos(rList *repos.RepositoryListResponse, pt *pterm.TablePrinter) error {
 	data := make([][]string, len(rList.Repositories)+1)
 	data[0] = []string{"NAME", "TYPE", "PUBLIC", "UPDATED"}
 	for i, r := range rList.Repositories {

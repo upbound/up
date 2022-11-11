@@ -12,7 +12,7 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-package organization
+package repository
 
 import (
 	"context"
@@ -20,39 +20,32 @@ import (
 	"github.com/alecthomas/kong"
 	"github.com/pterm/pterm"
 
-	"github.com/upbound/up-sdk-go/service/organizations"
+	repos "github.com/upbound/up-sdk-go/service/repositories"
 
 	"github.com/upbound/up/internal/upbound"
 )
 
 // AfterApply sets default values in command after assignment and validation.
-func (c *listCmd) AfterApply(kongCtx *kong.Context, upCtx *upbound.Context) error {
+func (c *getCmd) AfterApply(kongCtx *kong.Context, upCtx *upbound.Context) error {
 	kongCtx.Bind(pterm.DefaultTable.WithWriter(kongCtx.Stdout).WithSeparator("   "))
 	return nil
 }
 
-// listCmd lists organizations on Upbound.
-type listCmd struct{}
+// getCmd gets a single repo.
+type getCmd struct {
+	Name string `arg:"" required:"" help:"Name of repo."`
+}
 
-// Run executes the list command.
-func (c *listCmd) Run(p pterm.TextPrinter, pt *pterm.TablePrinter, oc *organizations.Client, upCtx *upbound.Context) error {
-	orgs, err := oc.List(context.Background())
+// Run executes the get command.
+func (c *getCmd) Run(p pterm.TextPrinter, pt *pterm.TablePrinter, rc *repos.Client, upCtx *upbound.Context) error {
+	repo, err := rc.Get(context.Background(), upCtx.Account, c.Name)
 	if err != nil {
 		return err
 	}
-	if len(orgs) == 0 {
-		p.Printfln("No organizations found.")
-		return nil
-	}
-	return printOrganizations(orgs, pt)
-}
 
-// Prints a list of control planes. This is also used by the get command
-func printOrganizations(orgs []organizations.Organization, pt *pterm.TablePrinter) error {
-	data := make([][]string, len(orgs)+1)
-	data[0] = []string{"NAME", "ROLE"}
-	for i, o := range orgs {
-		data[i+1] = []string{o.Name, string(o.Role)}
+	// We convert to a list so we can match the output of the list command
+	repoList := repos.RepositoryListResponse{
+		Repositories: []repos.Repository{repo.Repository},
 	}
-	return pt.WithHasHeader().WithData(data).Render()
+	return printRepos(&repoList, pt)
 }
