@@ -18,6 +18,7 @@ import (
 	"context"
 
 	"github.com/alecthomas/kong"
+	"github.com/pkg/errors"
 	"github.com/pterm/pterm"
 
 	"github.com/upbound/up-sdk-go/service/organizations"
@@ -26,33 +27,31 @@ import (
 )
 
 // AfterApply sets default values in command after assignment and validation.
-func (c *listCmd) AfterApply(kongCtx *kong.Context, upCtx *upbound.Context) error {
+func (c *getCmd) AfterApply(kongCtx *kong.Context, upCtx *upbound.Context) error {
 	kongCtx.Bind(pterm.DefaultTable.WithWriter(kongCtx.Stdout).WithSeparator("   "))
 	return nil
 }
 
-// listCmd lists organizations on Upbound.
-type listCmd struct{}
+// getCmd gets a single control plane in an account on Upbound.
+type getCmd struct {
+	Name string `arg:"" required:"" help:"Name of organization."`
+}
 
-// Run executes the list command.
-func (c *listCmd) Run(p pterm.TextPrinter, pt *pterm.TablePrinter, oc *organizations.Client, upCtx *upbound.Context) error {
+// Run executes the get command.
+func (c *getCmd) Run(p pterm.TextPrinter, pt *pterm.TablePrinter, oc *organizations.Client, upCtx *upbound.Context) error {
+
+	// The get command accepts a name, but the get API call takes an ID
+	// Therefore we get all orgs and find the one the user requested
 	orgs, err := oc.List(context.Background())
 	if err != nil {
 		return err
 	}
-	if len(orgs) == 0 {
-		p.Printfln("No organizations found.")
-		return nil
+	for _, o := range orgs {
+		if o.Name == c.Name {
+			// We convert to a list so we can match the output of the list command
+			orgs := []organizations.Organization{o}
+			return printOrganizations(orgs, pt)
+		}
 	}
-	return printOrganizations(orgs, pt)
-}
-
-// Prints a list of control planes. This is also used by the get command
-func printOrganizations(orgs []organizations.Organization, pt *pterm.TablePrinter) error {
-	data := make([][]string, len(orgs)+1)
-	data[0] = []string{"NAME", "ROLE"}
-	for i, o := range orgs {
-		data[i+1] = []string{o.Name, string(o.Role)}
-	}
-	return pt.WithHasHeader().WithData(data).Render()
+	return errors.Errorf("No organization named %s", c.Name)
 }

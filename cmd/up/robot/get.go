@@ -16,12 +16,10 @@ package robot
 
 import (
 	"context"
-	"time"
 
 	"github.com/alecthomas/kong"
 	"github.com/pkg/errors"
 	"github.com/pterm/pterm"
-	"k8s.io/apimachinery/pkg/util/duration"
 
 	"github.com/upbound/up-sdk-go/service/accounts"
 	"github.com/upbound/up-sdk-go/service/organizations"
@@ -30,16 +28,18 @@ import (
 )
 
 // AfterApply sets default values in command after assignment and validation.
-func (c *listCmd) AfterApply(kongCtx *kong.Context, upCtx *upbound.Context) error {
+func (c *getCmd) AfterApply(kongCtx *kong.Context, upCtx *upbound.Context) error {
 	kongCtx.Bind(pterm.DefaultTable.WithWriter(kongCtx.Stdout).WithSeparator("   "))
 	return nil
 }
 
-// listCmd creates a robot on Upbound.
-type listCmd struct{}
+// getCmd gets a single robot in an account on Upbound.
+type getCmd struct {
+	Name string `arg:"" required:"" help:"Name of robot."`
+}
 
-// Run executes the list robots command.
-func (c *listCmd) Run(p pterm.TextPrinter, pt *pterm.TablePrinter, ac *accounts.Client, oc *organizations.Client, upCtx *upbound.Context) error {
+// Run executes the get robot command.
+func (c *getCmd) Run(p pterm.TextPrinter, pt *pterm.TablePrinter, ac *accounts.Client, oc *organizations.Client, upCtx *upbound.Context) error {
 	a, err := ac.Get(context.Background(), upCtx.Account)
 	if err != nil {
 		return err
@@ -47,22 +47,23 @@ func (c *listCmd) Run(p pterm.TextPrinter, pt *pterm.TablePrinter, ac *accounts.
 	if a.Account.Type != accounts.AccountOrganization {
 		return errors.New(errUserAccount)
 	}
+
+	// The get command accepts a name, but the get API call takes an ID
+	// Therefore we get all robots and find the one the user requested
+	// The API doesn't guarantee uniqueness, but we just print the first
+	// one we fine. If a user wants to list all of them, they can use
+	// the list command.
 	rs, err := oc.ListRobots(context.Background(), a.Organization.ID)
 	if err != nil {
 		return err
 	}
-	if len(rs) == 0 {
-		p.Printfln("No robots found in %s", upCtx.Account)
-		return nil
-	}
-	return printRobots(rs, pt)
-}
 
-func printRobots(rs []organizations.Robot, pt *pterm.TablePrinter) error {
-	data := make([][]string, len(rs)+1)
-	data[0] = []string{"NAME", "ID", "DESCRIPTION", "CREATED"}
-	for i, r := range rs {
-		data[i+1] = []string{r.Name, r.ID.String(), r.Description, duration.HumanDuration(time.Since(r.CreatedAt))}
+	for _, r := range rs {
+		if r.Name == c.Name {
+			// We convert to a list so we can match the output of the list command
+			rList := []organizations.Robot{r}
+			return printRobots(rList, pt)
+		}
 	}
-	return pt.WithHasHeader().WithData(data).Render()
+	return errors.New("No robot named \"" + c.Name + "\"")
 }

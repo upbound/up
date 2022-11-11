@@ -43,6 +43,7 @@ type Cmd struct {
 	Create createCmd `cmd:"" help:"Create an organization."`
 	Delete deleteCmd `cmd:"" help:"Delete an organization."`
 	List   listCmd   `cmd:"" help:"List organizations."`
+	Get    getCmd    `cmd:"" help:"Get an organization."`
 
 	// Common Upbound API configuration
 	Flags upbound.Flags `embed:""`

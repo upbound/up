@@ -52,6 +52,7 @@ type Cmd struct {
 	Create createCmd `cmd:"" help:"Create a robot."`
 	Delete deleteCmd `cmd:"" help:"Delete a robot."`
 	List   listCmd   `cmd:"" help:"List robots for the account."`
+	Get    getCmd    `cmd:"" help:"Get a robot for the account."`
 	Token  token.Cmd `cmd:"" help:"Interact with robot tokens."`
 
 	// Common Upbound API configuration
