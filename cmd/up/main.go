@@ -24,6 +24,7 @@ import (
 	"github.com/pterm/pterm"
 
 	"github.com/upbound/up/cmd/up/controlplane"
+	"github.com/upbound/up/cmd/up/globals"
 	"github.com/upbound/up/cmd/up/organization"
 	"github.com/upbound/up/cmd/up/profile"
 	"github.com/upbound/up/cmd/up/repository"
@@ -66,6 +67,17 @@ func (c *cli) AfterApply(ctx *kong.Context) error { //nolint:unparam
 		// other tooling difficult.
 		pterm.DisableStyling()
 	}
+
+	switch c.Globals.Format {
+	case "":
+	case globals.OutputJSON:
+	case globals.OutputYAML:
+		break
+	default:
+		return fmt.Errorf("Invalid output format: '%s'", c.Globals.Format)
+	}
+	ctx.Bind(&c.Globals)
+
 	ctx.Bind(c.Quiet)
 	return nil
 }
@@ -81,6 +93,7 @@ func (c *cli) BeforeReset(ctx *kong.Context, p *kong.Path) error {
 }
 
 type cli struct {
+	Globals globals.Globals  `embed:""`
 	Version versionFlag      `short:"v" name:"version" help:"Print version and exit."`
 	Quiet   config.QuietFlag `short:"q" name:"quiet" help:"Suppress all output."`
 	Pretty  bool             `name:"pretty" help:"Pretty print output."`

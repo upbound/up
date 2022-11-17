@@ -23,7 +23,9 @@ import (
 	"github.com/upbound/up-sdk-go/service/common"
 	cp "github.com/upbound/up-sdk-go/service/controlplanes"
 
+	"github.com/upbound/up/cmd/up/globals"
 	"github.com/upbound/up/internal/upbound"
+	"github.com/upbound/up/internal/upterm"
 )
 
 const (
@@ -40,13 +42,16 @@ func (c *listCmd) AfterApply(kongCtx *kong.Context, upCtx *upbound.Context) erro
 type listCmd struct{}
 
 // Run executes the list command.
-func (c *listCmd) Run(p pterm.TextPrinter, pt *pterm.TablePrinter, cc *cp.Client, upCtx *upbound.Context) error {
+func (c *listCmd) Run(g *globals.Globals, p pterm.TextPrinter, pt *pterm.TablePrinter, cc *cp.Client, upCtx *upbound.Context) error {
 	// TODO(hasheddan): we currently just max out single page size, but we
 	// may opt to support limiting page size and iterating through pages via
 	// flags in the future.
 	cpList, err := cc.List(context.Background(), upCtx.Account, common.WithSize(maxItems))
 	if err != nil {
 		return err
+	}
+	if g.Format != "" {
+		return upterm.PrintFormatted(g.Format, cpList.ControlPlanes)
 	}
 	if len(cpList.ControlPlanes) == 0 {
 		p.Printfln("No control planes found in %s", upCtx.Account)

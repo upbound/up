@@ -1,0 +1,27 @@
+// Copyright 2022 Upbound Inc
+//
+// Licensed under the Apache License, Version 2.0 (the "License");
+// you may not use this file except in compliance with the License.
+// You may obtain a copy of the License at
+//
+//      http://www.apache.org/licenses/LICENSE-2.0
+//
+// Unless required by applicable law or agreed to in writing, software
+// distributed under the License is distributed on an "AS IS" BASIS,
+// WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+// See the License for the specific language governing permissions and
+// limitations under the License.
+package globals
+
+// Allowed values for the global format option
+const (
+	OutputJSON = "json"
+	OutputYAML = "yaml"
+)
+
+// Global command-line flags. They aren't defined in the main package next
+// to the rest of the options because this structure needs to be available
+// within other packages, and "main" can't be imported.
+type Globals struct {
+	Format string `name:"format" help:"Output format. Currently support: json"`
+}
