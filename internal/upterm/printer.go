@@ -1,0 +1,122 @@
+// Copyright 2022 Upbound Inc
+//
+// Licensed under the Apache License, Version 2.0 (the "License");
+// you may not use this file except in compliance with the License.
+// You may obtain a copy of the License at
+//
+//      http://www.apache.org/licenses/LICENSE-2.0
+//
+// Unless required by applicable law or agreed to in writing, software
+// distributed under the License is distributed on an "AS IS" BASIS,
+// WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+// See the License for the specific language governing permissions and
+// limitations under the License.
+package upterm
+
+import (
+	"encoding/json"
+	"fmt"
+	"reflect"
+
+	"github.com/pterm/pterm"
+	"github.com/upbound/up/internal/config"
+
+	"gopkg.in/yaml.v3"
+)
+
+// The ObjectPrinter is intended to make it easy to print individual structs
+// and lists of structs for the 'get' and 'list' commands. It can print as
+// a human-readable table, or computer-readable (JSON or YAML)
+type ObjectPrinter struct {
+	Quiet  config.QuietFlag
+	Pretty bool
+	Format config.Format
+
+	TablePrinter *pterm.TablePrinter
+}
+
+var (
+	DefaultObjPrinter = ObjectPrinter{
+		Quiet:        false,
+		Pretty:       false,
+		Format:       config.Default,
+		TablePrinter: pterm.DefaultTable.WithSeparator("   "),
+	}
+)
+
+// Print will print a single option or an array/slice of objects.
+// When printing with default table output, it will only print a given set
+// of fields. To specify those fields, the caller should provide the human-readable
+// names for those fields (used for column headers) and a function that can be called
+// on a single struct that returns those fields as strings.
+// When printing JSON or YAML, this will print *all* fields, regardless of
+// the list of fields.
+func (p *ObjectPrinter) Print(obj any, fieldNames []string, extractFields func(any) []string) error {
+	// Step 1: If user specified quiet, skip printing
+	if p.Quiet {
+		return nil
+	}
+
+	// Step 2: Enable color-printing. Note: This is only implemented for the
+	// default table printing, not JSON or YAML.
+	if p.Pretty {
+		pterm.EnableColor()
+	} else {
+		pterm.DisableColor()
+	}
+
+	// Step 3: Print the object with the appropriate formatting.
+	if p.Format == config.JSON {
+		return printJSON(obj)
+	}
+	if p.Format == config.YAML {
+		return printYAML(obj)
+	}
+	return p.printDefault(obj, fieldNames, extractFields)
+}
+
+func printJSON(obj any) error {
+	js, err := json.MarshalIndent(obj, "", "    ")
+	if err != nil {
+		return err
+	}
+	_, err = fmt.Println(string(js))
+	return err
+}
+
+func printYAML(obj any) error {
+	ys, err := yaml.Marshal(obj)
+	if err != nil {
+		return err
+	}
+	_, err = fmt.Println(string(ys))
+	return err
+}
+
+func (p *ObjectPrinter) printDefault(obj any, fieldNames []string, extractFields func(any) []string) error {
+	t := reflect.TypeOf(obj)
+	k := t.Kind()
+	if k == reflect.Array || k == reflect.Slice {
+		return p.printDefaultList(obj, fieldNames, extractFields)
+	}
+	return p.printDefaultObj(obj, fieldNames, extractFields)
+}
+
+func (p *ObjectPrinter) printDefaultList(obj any, fieldNames []string, extractFields func(any) []string) error {
+	s := reflect.ValueOf(obj)
+	l := s.Len()
+
+	data := make([][]string, l+1)
+	data[0] = fieldNames
+	for i := 0; i < l; i++ {
+		data[i+1] = extractFields(s.Index(i).Interface())
+	}
+	return p.TablePrinter.WithHasHeader().WithData(data).Render()
+}
+
+func (p *ObjectPrinter) printDefaultObj(obj any, fieldNames []string, extractFields func(any) []string) error {
+	data := make([][]string, 2)
+	data[0] = fieldNames
+	data[1] = extractFields(obj)
+	return p.TablePrinter.WithHasHeader().WithData(data).Render()
+}
