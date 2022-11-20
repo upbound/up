@@ -19,6 +19,7 @@ import (
 	"reflect"
 
 	"github.com/pterm/pterm"
+
 	"github.com/upbound/up/internal/config"
 
 	"gopkg.in/yaml.v3"

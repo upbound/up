@@ -24,7 +24,6 @@ import (
 	"github.com/pterm/pterm"
 
 	"github.com/upbound/up/cmd/up/controlplane"
-	"github.com/upbound/up/cmd/up/globals"
 	"github.com/upbound/up/cmd/up/organization"
 	"github.com/upbound/up/cmd/up/profile"
 	"github.com/upbound/up/cmd/up/repository"
@@ -35,6 +34,7 @@ import (
 	"github.com/upbound/up/cmd/up/xpls"
 	"github.com/upbound/up/internal/config"
 	"github.com/upbound/up/internal/feature"
+	"github.com/upbound/up/internal/upterm"
 	"github.com/upbound/up/internal/version"
 
 	// TODO(epk): Remove this once we upgrade kubernetes deps to 1.25
@@ -68,16 +68,12 @@ func (c *cli) AfterApply(ctx *kong.Context) error { //nolint:unparam
 		pterm.DisableStyling()
 	}
 
-	switch c.Globals.Format {
-	case "":
-	case globals.OutputJSON:
-	case globals.OutputYAML:
-		break
-	default:
-		return fmt.Errorf("Invalid output format: '%s'", c.Globals.Format)
-	}
-	ctx.Bind(&c.Globals)
+	printer := upterm.DefaultObjPrinter
+	printer.Format = c.Format
+	printer.Pretty = c.Pretty
+	printer.Quiet = c.Quiet
 
+	ctx.Bind(printer)
 	ctx.Bind(c.Quiet)
 	return nil
 }
@@ -93,7 +89,7 @@ func (c *cli) BeforeReset(ctx *kong.Context, p *kong.Path) error {
 }
 
 type cli struct {
-	Globals globals.Globals  `embed:""`
+	Format  config.Format    `name:"format" enum:"default,json,yaml" default:"default" help:"Format for get/list commands. Can be: json, yaml, default"`
 	Version versionFlag      `short:"v" name:"version" help:"Print version and exit."`
 	Quiet   config.QuietFlag `short:"q" name:"quiet" help:"Suppress all output."`
 	Pretty  bool             `name:"pretty" help:"Pretty print output."`
