@@ -45,6 +45,10 @@ var (
 	}
 )
 
+func init() {
+	pterm.DisableStyling()
+}
+
 // Print will print a single option or an array/slice of objects.
 // When printing with default table output, it will only print a given set
 // of fields. To specify those fields, the caller should provide the human-readable
@@ -53,27 +57,26 @@ var (
 // When printing JSON or YAML, this will print *all* fields, regardless of
 // the list of fields.
 func (p *ObjectPrinter) Print(obj any, fieldNames []string, extractFields func(any) []string) error {
-	// Step 1: If user specified quiet, skip printing
+	// Step 1: If user specified quiet, skip printing entirely
 	if p.Quiet {
 		return nil
 	}
 
-	// Step 2: Enable color-printing. Note: This is only implemented for the
-	// default table printing, not JSON or YAML.
+	// Step 2: Enable color printing if desired. Note: This is only
+	// implemented for the default table printing, not JSON or YAML.
 	if p.Pretty {
-		pterm.EnableColor()
-	} else {
-		pterm.DisableColor()
+		pterm.EnableStyling()
 	}
 
 	// Step 3: Print the object with the appropriate formatting.
-	if p.Format == config.JSON {
+	switch p.Format {
+	case config.JSON:
 		return printJSON(obj)
-	}
-	if p.Format == config.YAML {
+	case config.YAML:
 		return printYAML(obj)
+	default:
+		return p.printDefault(obj, fieldNames, extractFields)
 	}
-	return p.printDefault(obj, fieldNames, extractFields)
 }
 
 func printJSON(obj any) error {
