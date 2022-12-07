@@ -74,6 +74,8 @@ func (p *ObjectPrinter) Print(obj any, fieldNames []string, extractFields func(a
 		return printJSON(obj)
 	case config.YAML:
 		return printYAML(obj)
+	case config.Default:
+		fallthrough
 	default:
 		return p.printDefault(obj, fieldNames, extractFields)
 	}
