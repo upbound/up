@@ -23,6 +23,7 @@ import (
 	repos "github.com/upbound/up-sdk-go/service/repositories"
 
 	"github.com/upbound/up/internal/upbound"
+	"github.com/upbound/up/internal/upterm"
 )
 
 // AfterApply sets default values in command after assignment and validation.
@@ -37,7 +38,7 @@ type getCmd struct {
 }
 
 // Run executes the get command.
-func (c *getCmd) Run(p pterm.TextPrinter, pt *pterm.TablePrinter, rc *repos.Client, upCtx *upbound.Context) error {
+func (c *getCmd) Run(printer upterm.ObjectPrinter, rc *repos.Client, upCtx *upbound.Context) error {
 	repo, err := rc.Get(context.Background(), upCtx.Account, c.Name)
 	if err != nil {
 		return err
@@ -47,5 +48,5 @@ func (c *getCmd) Run(p pterm.TextPrinter, pt *pterm.TablePrinter, rc *repos.Clie
 	repoList := repos.RepositoryListResponse{
 		Repositories: []repos.Repository{repo.Repository},
 	}
-	return printRepos(&repoList, pt)
+	return printer.Print(repoList.Repositories, fieldNames, extractFields)
 }

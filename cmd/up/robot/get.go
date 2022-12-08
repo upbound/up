@@ -25,6 +25,7 @@ import (
 	"github.com/upbound/up-sdk-go/service/organizations"
 
 	"github.com/upbound/up/internal/upbound"
+	"github.com/upbound/up/internal/upterm"
 )
 
 // AfterApply sets default values in command after assignment and validation.
@@ -39,7 +40,7 @@ type getCmd struct {
 }
 
 // Run executes the get robot command.
-func (c *getCmd) Run(p pterm.TextPrinter, pt *pterm.TablePrinter, ac *accounts.Client, oc *organizations.Client, upCtx *upbound.Context) error {
+func (c *getCmd) Run(printer upterm.ObjectPrinter, ac *accounts.Client, oc *organizations.Client, upCtx *upbound.Context) error {
 	a, err := ac.Get(context.Background(), upCtx.Account)
 	if err != nil {
 		return err
@@ -60,9 +61,7 @@ func (c *getCmd) Run(p pterm.TextPrinter, pt *pterm.TablePrinter, ac *accounts.C
 
 	for _, r := range rs {
 		if r.Name == c.Name {
-			// We convert to a list so we can match the output of the list command
-			rList := []organizations.Robot{r}
-			return printRobots(rList, pt)
+			return printer.Print(r, fieldNames, extractFields)
 		}
 	}
 	return errors.New("no robot named \"" + c.Name + "\"")

@@ -31,7 +31,10 @@ import (
 	"github.com/upbound/up-sdk-go/service/robots"
 
 	"github.com/upbound/up/internal/upbound"
+	"github.com/upbound/up/internal/upterm"
 )
+
+var fieldNames = []string{"NAME", "ID", "CREATED"}
 
 // AfterApply sets default values in command after assignment and validation.
 func (c *listCmd) AfterApply(kongCtx *kong.Context, upCtx *upbound.Context) error {
@@ -45,7 +48,7 @@ type listCmd struct {
 }
 
 // Run executes the list robot tokens command.
-func (c *listCmd) Run(p pterm.TextPrinter, pt *pterm.TablePrinter, ac *accounts.Client, oc *organizations.Client, rc *robots.Client, upCtx *upbound.Context) error { //nolint:gocyclo
+func (c *listCmd) Run(printer upterm.ObjectPrinter, p pterm.TextPrinter, ac *accounts.Client, oc *organizations.Client, rc *robots.Client, upCtx *upbound.Context) error { //nolint:gocyclo
 	a, err := ac.Get(context.Background(), upCtx.Account)
 	if err != nil {
 		return err
@@ -87,21 +90,18 @@ func (c *listCmd) Run(p pterm.TextPrinter, pt *pterm.TablePrinter, ac *accounts.
 		p.Printfln("No tokens found for robot %s in %s", c.RobotName, upCtx.Account)
 		return nil
 	}
-	return printTokens(ts.DataSet, pt)
+	return printer.Print(ts.DataSet, fieldNames, extractFields)
 }
 
-func printTokens(ts []common.DataSet, pt *pterm.TablePrinter) error {
-	data := make([][]string, len(ts)+1)
-	data[0] = []string{"NAME", "ID", "CREATED"}
-	for i, t := range ts {
-		n := fmt.Sprint(t.AttributeSet["name"])
-		c := "n/a"
-		if ca, ok := t.Meta["createdAt"]; ok {
-			if ct, err := time.Parse(time.RFC3339, fmt.Sprint(ca)); err == nil {
-				c = duration.HumanDuration(time.Since(ct))
-			}
+func extractFields(obj any) []string {
+	t := obj.(common.DataSet)
+
+	n := fmt.Sprint(t.AttributeSet["name"])
+	c := "n/a"
+	if ca, ok := t.Meta["createdAt"]; ok {
+		if ct, err := time.Parse(time.RFC3339, fmt.Sprint(ca)); err == nil {
+			c = duration.HumanDuration(time.Since(ct))
 		}
-		data[i+1] = []string{n, t.ID.String(), c}
 	}
-	return pt.WithHasHeader().WithData(data).Render()
+	return []string{n, t.ID.String(), c}
 }

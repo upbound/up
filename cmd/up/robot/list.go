@@ -27,7 +27,10 @@ import (
 	"github.com/upbound/up-sdk-go/service/organizations"
 
 	"github.com/upbound/up/internal/upbound"
+	"github.com/upbound/up/internal/upterm"
 )
+
+var fieldNames = []string{"NAME", "ID", "DESCRIPTION", "CREATED"}
 
 // AfterApply sets default values in command after assignment and validation.
 func (c *listCmd) AfterApply(kongCtx *kong.Context, upCtx *upbound.Context) error {
@@ -39,7 +42,7 @@ func (c *listCmd) AfterApply(kongCtx *kong.Context, upCtx *upbound.Context) erro
 type listCmd struct{}
 
 // Run executes the list robots command.
-func (c *listCmd) Run(p pterm.TextPrinter, pt *pterm.TablePrinter, ac *accounts.Client, oc *organizations.Client, upCtx *upbound.Context) error {
+func (c *listCmd) Run(printer upterm.ObjectPrinter, p pterm.TextPrinter, ac *accounts.Client, oc *organizations.Client, upCtx *upbound.Context) error {
 	a, err := ac.Get(context.Background(), upCtx.Account)
 	if err != nil {
 		return err
@@ -55,14 +58,10 @@ func (c *listCmd) Run(p pterm.TextPrinter, pt *pterm.TablePrinter, ac *accounts.
 		p.Printfln("No robots found in %s", upCtx.Account)
 		return nil
 	}
-	return printRobots(rs, pt)
+	return printer.Print(rs, fieldNames, extractFields)
 }
 
-func printRobots(rs []organizations.Robot, pt *pterm.TablePrinter) error {
-	data := make([][]string, len(rs)+1)
-	data[0] = []string{"NAME", "ID", "DESCRIPTION", "CREATED"}
-	for i, r := range rs {
-		data[i+1] = []string{r.Name, r.ID.String(), r.Description, duration.HumanDuration(time.Since(r.CreatedAt))}
-	}
-	return pt.WithHasHeader().WithData(data).Render()
+func extractFields(obj any) []string {
+	r := obj.(organizations.Robot)
+	return []string{r.Name, r.ID.String(), r.Description, duration.HumanDuration(time.Since(r.CreatedAt))}
 }

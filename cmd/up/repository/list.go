@@ -28,6 +28,7 @@ import (
 	repos "github.com/upbound/up-sdk-go/service/repositories"
 
 	"github.com/upbound/up/internal/upbound"
+	"github.com/upbound/up/internal/upterm"
 )
 
 const (
@@ -43,8 +44,10 @@ func (c *listCmd) AfterApply(kongCtx *kong.Context, upCtx *upbound.Context) erro
 // listCmd lists repositories in an account on Upbound.
 type listCmd struct{}
 
+var fieldNames = []string{"NAME", "TYPE", "PUBLIC", "UPDATED"}
+
 // Run executes the list command.
-func (c *listCmd) Run(p pterm.TextPrinter, pt *pterm.TablePrinter, rc *repositories.Client, upCtx *upbound.Context) error {
+func (c *listCmd) Run(printer upterm.ObjectPrinter, p pterm.TextPrinter, rc *repositories.Client, upCtx *upbound.Context) error {
 	rList, err := rc.List(context.Background(), upCtx.Account, common.WithSize(maxItems))
 	if err != nil {
 		return err
@@ -53,23 +56,19 @@ func (c *listCmd) Run(p pterm.TextPrinter, pt *pterm.TablePrinter, rc *repositor
 		p.Printfln("No repositories found in %s", upCtx.Account)
 		return nil
 	}
-	return printRepos(rList, pt)
+	return printer.Print(rList.Repositories, fieldNames, extractFields)
 }
 
-// Prints a list of repos. This is also used by the get command
-func printRepos(rList *repos.RepositoryListResponse, pt *pterm.TablePrinter) error {
-	data := make([][]string, len(rList.Repositories)+1)
-	data[0] = []string{"NAME", "TYPE", "PUBLIC", "UPDATED"}
-	for i, r := range rList.Repositories {
-		rt := "unknown"
-		if r.Type != nil {
-			rt = string(*r.Type)
-		}
-		u := "n/a"
-		if r.UpdatedAt != nil {
-			u = duration.HumanDuration(time.Since(*r.UpdatedAt))
-		}
-		data[i+1] = []string{r.Name, rt, strconv.FormatBool(r.Public), u}
+func extractFields(obj any) []string {
+	r := obj.(repos.Repository)
+
+	rt := "unknown"
+	if r.Type != nil {
+		rt = string(*r.Type)
 	}
-	return pt.WithHasHeader().WithData(data).Render()
+	u := "n/a"
+	if r.UpdatedAt != nil {
+		u = duration.HumanDuration(time.Since(*r.UpdatedAt))
+	}
+	return []string{r.Name, rt, strconv.FormatBool(r.Public), u}
 }
