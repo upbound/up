@@ -24,6 +24,7 @@ import (
 	"github.com/upbound/up-sdk-go/service/organizations"
 
 	"github.com/upbound/up/internal/upbound"
+	"github.com/upbound/up/internal/upterm"
 )
 
 // AfterApply sets default values in command after assignment and validation.
@@ -38,7 +39,7 @@ type getCmd struct {
 }
 
 // Run executes the get command.
-func (c *getCmd) Run(p pterm.TextPrinter, pt *pterm.TablePrinter, oc *organizations.Client, upCtx *upbound.Context) error {
+func (c *getCmd) Run(printer upterm.ObjectPrinter, oc *organizations.Client, upCtx *upbound.Context) error {
 
 	// The get command accepts a name, but the get API call takes an ID
 	// Therefore we get all orgs and find the one the user requested
@@ -48,9 +49,7 @@ func (c *getCmd) Run(p pterm.TextPrinter, pt *pterm.TablePrinter, oc *organizati
 	}
 	for _, o := range orgs {
 		if o.Name == c.Name {
-			// We convert to a list so we can match the output of the list command
-			orgs := []organizations.Organization{o}
-			return printOrganizations(orgs, pt)
+			return printer.Print(o, fieldNames, extractFields)
 		}
 	}
 	return errors.Errorf("no organization named %s", c.Name)

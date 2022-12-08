@@ -23,6 +23,7 @@ import (
 	"github.com/upbound/up-sdk-go/service/organizations"
 
 	"github.com/upbound/up/internal/upbound"
+	"github.com/upbound/up/internal/upterm"
 )
 
 // AfterApply sets default values in command after assignment and validation.
@@ -34,8 +35,10 @@ func (c *listCmd) AfterApply(kongCtx *kong.Context, upCtx *upbound.Context) erro
 // listCmd lists organizations on Upbound.
 type listCmd struct{}
 
+var fieldNames = []string{"NAME", "ROLE"}
+
 // Run executes the list command.
-func (c *listCmd) Run(p pterm.TextPrinter, pt *pterm.TablePrinter, oc *organizations.Client, upCtx *upbound.Context) error {
+func (c *listCmd) Run(printer upterm.ObjectPrinter, p pterm.TextPrinter, oc *organizations.Client, upCtx *upbound.Context) error {
 	orgs, err := oc.List(context.Background())
 	if err != nil {
 		return err
@@ -44,15 +47,10 @@ func (c *listCmd) Run(p pterm.TextPrinter, pt *pterm.TablePrinter, oc *organizat
 		p.Printfln("No organizations found.")
 		return nil
 	}
-	return printOrganizations(orgs, pt)
+	return printer.Print(orgs, fieldNames, extractFields)
 }
 
-// Prints a list of control planes. This is also used by the get command
-func printOrganizations(orgs []organizations.Organization, pt *pterm.TablePrinter) error {
-	data := make([][]string, len(orgs)+1)
-	data[0] = []string{"NAME", "ROLE"}
-	for i, o := range orgs {
-		data[i+1] = []string{o.Name, string(o.Role)}
-	}
-	return pt.WithHasHeader().WithData(data).Render()
+func extractFields(obj any) []string {
+	o := obj.(organizations.Organization)
+	return []string{o.Name, string(o.Role)}
 }

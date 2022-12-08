@@ -30,6 +30,7 @@ import (
 	"github.com/upbound/up-sdk-go/service/tokens"
 
 	"github.com/upbound/up/internal/upbound"
+	"github.com/upbound/up/internal/upterm"
 )
 
 // AfterApply sets default values in command after assignment and validation.
@@ -45,7 +46,7 @@ type getCmd struct {
 }
 
 // Run executes the get robot token command.
-func (c *getCmd) Run(p pterm.TextPrinter, pt *pterm.TablePrinter, ac *accounts.Client, oc *organizations.Client, rc *robots.Client, tc *tokens.Client, upCtx *upbound.Context) error { //nolint:gocyclo
+func (c *getCmd) Run(printer upterm.ObjectPrinter, ac *accounts.Client, oc *organizations.Client, rc *robots.Client, tc *tokens.Client, upCtx *upbound.Context) error { //nolint:gocyclo
 	a, err := ac.Get(context.Background(), upCtx.Account)
 	if err != nil {
 		return err
@@ -100,6 +101,5 @@ func (c *getCmd) Run(p pterm.TextPrinter, pt *pterm.TablePrinter, ac *accounts.C
 	if theToken == nil {
 		return errors.Errorf(errFindTokenFmt, c.TokenName, c.RobotName, upCtx.Account)
 	}
-	tList := []common.DataSet{*theToken}
-	return printTokens(tList, pt)
+	return printer.Print(*theToken, fieldNames, extractFields)
 }
