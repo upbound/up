@@ -69,13 +69,11 @@ func (p *ObjectPrinter) Print(obj any, fieldNames []string, extractFields func(a
 	}
 
 	// Step 3: Print the object with the appropriate formatting.
-	switch p.Format {
+	switch p.Format { //nolint:exhaustive
 	case config.JSON:
 		return printJSON(obj)
 	case config.YAML:
 		return printYAML(obj)
-	case config.Default:
-		fallthrough
 	default:
 		return p.printDefault(obj, fieldNames, extractFields)
 	}
