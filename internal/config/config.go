@@ -42,6 +42,15 @@ const (
 // QuietFlag provides a named boolean type for the QuietFlag.
 type QuietFlag bool
 
+// Allowed values for the global format option
+type Format string
+
+const (
+	Default Format = "default"
+	JSON    Format = "json"
+	YAML    Format = "yaml"
+)
+
 // Config is format for the up configuration file.
 type Config struct {
 	Upbound Upbound `json:"upbound"`

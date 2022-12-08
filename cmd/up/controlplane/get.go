@@ -23,6 +23,7 @@ import (
 	cp "github.com/upbound/up-sdk-go/service/controlplanes"
 
 	"github.com/upbound/up/internal/upbound"
+	"github.com/upbound/up/internal/upterm"
 )
 
 // AfterApply sets default values in command after assignment and validation.
@@ -37,15 +38,11 @@ type getCmd struct {
 }
 
 // Run executes the get command.
-func (c *getCmd) Run(p pterm.TextPrinter, pt *pterm.TablePrinter, cc *cp.Client, upCtx *upbound.Context) error {
+func (c *getCmd) Run(printer upterm.ObjectPrinter, cc *cp.Client, upCtx *upbound.Context) error {
 	ctp, err := cc.Get(context.Background(), upCtx.Account, c.Name)
 	if err != nil {
 		return err
 	}
 
-	// We convert to a list so we can match the output of the list command
-	cpList := cp.ControlPlaneListResponse{
-		ControlPlanes: []cp.ControlPlaneResponse{*ctp},
-	}
-	return printControlPlanes(&cpList, pt)
+	return printer.Print(*ctp, fieldNames, extractFields)
 }

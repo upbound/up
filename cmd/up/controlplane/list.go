@@ -24,11 +24,14 @@ import (
 	cp "github.com/upbound/up-sdk-go/service/controlplanes"
 
 	"github.com/upbound/up/internal/upbound"
+	"github.com/upbound/up/internal/upterm"
 )
 
 const (
 	maxItems = 100
 )
+
+var fieldNames = []string{"NAME", "ID", "STATUS"}
 
 // AfterApply sets default values in command after assignment and validation.
 func (c *listCmd) AfterApply(kongCtx *kong.Context, upCtx *upbound.Context) error {
@@ -40,7 +43,7 @@ func (c *listCmd) AfterApply(kongCtx *kong.Context, upCtx *upbound.Context) erro
 type listCmd struct{}
 
 // Run executes the list command.
-func (c *listCmd) Run(p pterm.TextPrinter, pt *pterm.TablePrinter, cc *cp.Client, upCtx *upbound.Context) error {
+func (c *listCmd) Run(printer upterm.ObjectPrinter, p pterm.TextPrinter, cc *cp.Client, upCtx *upbound.Context) error {
 	// TODO(hasheddan): we currently just max out single page size, but we
 	// may opt to support limiting page size and iterating through pages via
 	// flags in the future.
@@ -52,15 +55,10 @@ func (c *listCmd) Run(p pterm.TextPrinter, pt *pterm.TablePrinter, cc *cp.Client
 		p.Printfln("No control planes found in %s", upCtx.Account)
 		return nil
 	}
-	return printControlPlanes(cpList, pt)
+	return printer.Print(cpList.ControlPlanes, fieldNames, extractFields)
 }
 
-// Prints a list of control planes. This is also used by the get command
-func printControlPlanes(cpList *cp.ControlPlaneListResponse, pt *pterm.TablePrinter) error {
-	data := make([][]string, len(cpList.ControlPlanes)+1)
-	data[0] = []string{"NAME", "ID", "STATUS"}
-	for i, cp := range cpList.ControlPlanes {
-		data[i+1] = []string{cp.ControlPlane.Name, cp.ControlPlane.ID.String(), string(cp.Status)}
-	}
-	return pt.WithHasHeader().WithData(data).Render()
+func extractFields(obj any) []string {
+	c := obj.(cp.ControlPlaneResponse)
+	return []string{c.ControlPlane.Name, c.ControlPlane.ID.String(), string(c.Status)}
 }

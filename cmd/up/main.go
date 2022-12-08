@@ -34,6 +34,7 @@ import (
 	"github.com/upbound/up/cmd/up/xpls"
 	"github.com/upbound/up/internal/config"
 	"github.com/upbound/up/internal/feature"
+	"github.com/upbound/up/internal/upterm"
 	"github.com/upbound/up/internal/version"
 
 	// TODO(epk): Remove this once we upgrade kubernetes deps to 1.25
@@ -66,6 +67,13 @@ func (c *cli) AfterApply(ctx *kong.Context) error { //nolint:unparam
 		// other tooling difficult.
 		pterm.DisableStyling()
 	}
+
+	printer := upterm.DefaultObjPrinter
+	printer.Format = c.Format
+	printer.Pretty = c.Pretty
+	printer.Quiet = c.Quiet
+
+	ctx.Bind(printer)
 	ctx.Bind(c.Quiet)
 	return nil
 }
@@ -81,6 +89,7 @@ func (c *cli) BeforeReset(ctx *kong.Context, p *kong.Path) error {
 }
 
 type cli struct {
+	Format  config.Format    `name:"format" enum:"default,json,yaml" default:"default" help:"Format for get/list commands. Can be: json, yaml, default"`
 	Version versionFlag      `short:"v" name:"version" help:"Print version and exit."`
 	Quiet   config.QuietFlag `short:"q" name:"quiet" help:"Suppress all output."`
 	Pretty  bool             `name:"pretty" help:"Pretty print output."`
