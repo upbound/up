@@ -22,6 +22,7 @@ import (
 
 	"github.com/upbound/up-sdk-go/service/organizations"
 
+	"github.com/upbound/up/cmd/up/organization/user"
 	"github.com/upbound/up/internal/upbound"
 )
 
@@ -80,6 +81,8 @@ type Cmd struct {
 	Delete deleteCmd `cmd:"" help:"Delete an organization."`
 	List   listCmd   `cmd:"" help:"List organizations."`
 	Get    getCmd    `cmd:"" help:"Get an organization."`
+
+	User user.Cmd `cmd:"" help:"Manage organization users."`
 
 	// Common Upbound API configuration
 	Flags upbound.Flags `embed:""`

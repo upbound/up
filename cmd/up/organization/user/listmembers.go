@@ -12,7 +12,7 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-package organization
+package user
 
 import (
 	"context"
@@ -22,36 +22,34 @@ import (
 	"github.com/pterm/pterm"
 
 	"github.com/upbound/up-sdk-go/service/organizations"
-
 	"github.com/upbound/up/internal/upbound"
 	"github.com/upbound/up/internal/upterm"
 )
 
+var listMembersFieldNames = []string{"ID", "NAME", "PERMISSION"}
+
 // AfterApply sets default values in command after assignment and validation.
-func (c *listCmd) AfterApply(kongCtx *kong.Context, upCtx *upbound.Context) error {
+func (c *listMembersCmd) AfterApply(kongCtx *kong.Context, upCtx *upbound.Context) error {
 	kongCtx.Bind(pterm.DefaultTable.WithWriter(kongCtx.Stdout).WithSeparator("   "))
 	return nil
 }
 
-// listCmd lists organizations on Upbound.
-type listCmd struct{}
-
-var fieldNames = []string{"ID", "NAME", "ROLE"}
+// listMembersCmd lists users in an organization.
+type listMembersCmd struct {
+	OrgID uint `arg:"" required:"" help:"ID of the organization."`
+}
 
 // Run executes the list command.
-func (c *listCmd) Run(printer upterm.ObjectPrinter, p pterm.TextPrinter, oc *organizations.Client, upCtx *upbound.Context) error {
-	orgs, err := oc.List(context.Background())
+func (c *listMembersCmd) Run(printer upterm.ObjectPrinter, p pterm.TextPrinter, oc *organizations.Client, upCtx *upbound.Context) error {
+	resp, err := oc.ListMembers(context.Background(), c.OrgID)
 	if err != nil {
 		return err
 	}
-	if len(orgs) == 0 {
-		p.Printfln("No organizations found.")
-		return nil
-	}
-	return printer.Print(orgs, fieldNames, extractFields)
+
+	return printer.Print(resp, listMembersFieldNames, extractMemberFields)
 }
 
-func extractFields(obj any) []string {
-	o := obj.(organizations.Organization)
-	return []string{strconv.Itoa(int(o.ID)), o.Name, string(o.Role)}
+func extractMemberFields(obj any) []string {
+	m := obj.(organizations.Member)
+	return []string{strconv.Itoa(int(m.User.ID)), m.User.Name, string(m.Permission)}
 }
