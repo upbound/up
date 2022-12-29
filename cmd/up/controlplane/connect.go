@@ -17,32 +17,29 @@ package controlplane
 import (
 	"context"
 	"fmt"
+	"io"
+	"net/url"
+	"path"
+	"strings"
+
 	"github.com/alecthomas/kong"
 	"github.com/pkg/errors"
 	"github.com/pterm/pterm"
-	cp "github.com/upbound/up-sdk-go/service/controlplanes"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	applyconfigurationscorev1 "k8s.io/client-go/applyconfigurations/core/v1"
+	applyconfigurationsmetav1 "k8s.io/client-go/applyconfigurations/meta/v1"
+	"k8s.io/client-go/kubernetes"
+	v1 "k8s.io/client-go/tools/clientcmd/api/v1"
+	"sigs.k8s.io/yaml"
+
 	"github.com/upbound/up/internal/install"
 	"github.com/upbound/up/internal/install/helm"
 	"github.com/upbound/up/internal/kube"
-	"io"
-	corev1 "k8s.io/api/core/v1"
-	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
-	"k8s.io/client-go/kubernetes"
-	v1 "k8s.io/client-go/tools/clientcmd/api/v1"
-	apiregistrationv1 "k8s.io/kube-aggregator/pkg/apis/apiregistration/v1"
-	"net/url"
-	"os"
-	"path"
-	"sigs.k8s.io/yaml"
-	"strings"
-
 	"github.com/upbound/up/internal/upbound"
-
-	aggregatorclient "k8s.io/kube-aggregator/pkg/client/clientset_generated/clientset"
 )
 
 var (
-	repoURL, _ = url.Parse("https://charts.upbound.io/stable")
+	mcpRepoURL = urlMustParse("https://charts.upbound.io/beta")
 )
 
 const (
@@ -52,16 +49,15 @@ const (
 
 // AfterApply sets default values in command after assignment and validation.
 func (c *connectCmd) AfterApply(kongCtx *kong.Context, upCtx *upbound.Context) error {
-	kubeconfig, err := kube.GetKubeConfig("/Users/hasanturken/.kube/config")
+	kubeconfig, err := kube.GetKubeConfig(c.Kubeconfig)
 	if err != nil {
 		return err
 	}
 
 	mgr, err := helm.NewManager(kubeconfig,
 		"mcp-connector",
-		repoURL,
-		helm.WithNamespace("kube-system"),
-		helm.WithChart(os.NewFile(0, "/Users/hasanturken/Workspace/upbound/mcp-connector/_output/charts/mcp-connector-0.0.1.tgz")))
+		mcpRepoURL,
+		helm.WithNamespace(c.Namespace))
 	if err != nil {
 		return err
 	}
@@ -71,10 +67,7 @@ func (c *connectCmd) AfterApply(kongCtx *kong.Context, upCtx *upbound.Context) e
 		return err
 	}
 	c.kClient = client
-	c.kAggregator, err = aggregatorclient.NewForConfig(kubeconfig)
-	if err != nil {
-		return errors.Wrap(err, "cannot create aggregator client")
-	}
+
 	base := map[string]any{}
 	if c.File != nil {
 		defer c.File.Close() //nolint:errcheck,gosec
@@ -95,25 +88,29 @@ func (c *connectCmd) AfterApply(kongCtx *kong.Context, upCtx *upbound.Context) e
 
 // getCmd gets a single control plane in an account on Upbound.
 type connectCmd struct {
-	mgr         install.Manager
-	parser      install.ParameterParser
-	kAggregator aggregatorclient.Interface
-	kClient     kubernetes.Interface
+	mgr     install.Manager
+	parser  install.ParameterParser
+	kClient kubernetes.Interface
 
 	Name  string `arg:"" required:"" help:"Name of control plane."`
-	For   string `required:"" help:"APIVersion of the resources to connect for."`
 	Token string `required:"" help:"API token used to authenticate."`
+
+	Kubeconfig string `type:"existingfile" help:"Override default kubeconfig path."`
+	Namespace  string `short:"n" env:"MCP_CONNECTOR_NAMESPACE" default:"kube-system" help:"Kubernetes namespace for MCP Connector."`
 
 	install.CommonParams
 }
 
 // Run executes the get command.
-func (c *connectCmd) Run(p pterm.TextPrinter, cc *cp.Client, upCtx *upbound.Context) error {
+func (c *connectCmd) Run(p pterm.TextPrinter, upCtx *upbound.Context) error {
+	if err := c.applyMCPKubeconfig(upCtx); err != nil {
+		return err
+	}
 	params, err := c.parser.Parse()
 	if err != nil {
 		return errors.Wrap(err, errParseInstallParameters)
 	}
-	if err = c.mgr.Install("0.0.1", params); err != nil {
+	if err = c.mgr.Install("", params); err != nil {
 		return err
 	}
 
@@ -121,13 +118,17 @@ func (c *connectCmd) Run(p pterm.TextPrinter, cc *cp.Client, upCtx *upbound.Cont
 	if err != nil {
 		return err
 	}
-	//p.Printfln("Installed %s version %s", "mcp-connector", curVer)
 
+	p.Printfln("Connected to the MCP %q, ready for binding APIs!", c.Name)
+	return nil
+}
+
+func (c *connectCmd) applyMCPKubeconfig(upCtx *upbound.Context) error {
 	// Create a secret with MCP Kubeconfig
 	proxy := upCtx.ProxyEndpoint
 	id := path.Join(upCtx.Account, c.Name)
-	key := fmt.Sprintf("upbound-%s", strings.ReplaceAll(id, "/", "-"))
-	proxy.Path = path.Join(proxy.Path, id, "k8s")
+	key := fmt.Sprintf(kube.UpboundKubeconfigKeyFmt, strings.ReplaceAll(id, "/", "-"))
+	proxy.Path = path.Join(proxy.Path, id, kube.UpboundK8sResource)
 
 	mcpCfg := &v1.Config{
 		Kind:       "Config",
@@ -162,45 +163,37 @@ func (c *connectCmd) Run(p pterm.TextPrinter, cc *cp.Client, upCtx *upbound.Cont
 
 	b, err := yaml.Marshal(mcpCfg)
 	if err != nil {
-		return errors.Wrap(err, "cannot marshal kubeconfig")
+		return errors.Wrap(err, "cannot marshal MCP kubeconfig")
 	}
 
-	secret := corev1.Secret{
-		ObjectMeta: metav1.ObjectMeta{
-			Name:      "mcp-config",
-			Namespace: "kube-system",
+	secretName := "mcp-config"
+	versionV1 := "v1"
+	kindSecret := "Secret"
+	_, err = c.kClient.CoreV1().Secrets(c.Namespace).Apply(context.Background(), &applyconfigurationscorev1.SecretApplyConfiguration{
+		TypeMetaApplyConfiguration: applyconfigurationsmetav1.TypeMetaApplyConfiguration{
+			Kind:       &kindSecret,
+			APIVersion: &versionV1,
+		},
+		ObjectMetaApplyConfiguration: &applyconfigurationsmetav1.ObjectMetaApplyConfiguration{
+			Name:      &secretName,
+			Namespace: &c.Namespace,
 		},
 		Data: map[string][]byte{
 			"kubeconfig": b,
 		},
-	}
-	_, err = c.kClient.CoreV1().Secrets("kube-system").Create(context.Background(), &secret, metav1.CreateOptions{})
-	if err != nil {
-		return errors.Wrap(err, "cannot create mcp kubeconfig secret")
-	}
+	}, metav1.ApplyOptions{FieldManager: "up"})
 
-	// Deploy APIService for the requested Group/Version
-	apiVersion := strings.Split(c.For, "/")
-	_, err = c.kAggregator.ApiregistrationV1().APIServices().Create(context.Background(), &apiregistrationv1.APIService{
-		ObjectMeta: metav1.ObjectMeta{
-			Name: apiVersion[1] + "." + apiVersion[0],
-		},
-		Spec: apiregistrationv1.APIServiceSpec{
-			Group:   apiVersion[0],
-			Version: apiVersion[1],
-			Service: &apiregistrationv1.ServiceReference{
-				Namespace: "kube-system",
-				Name:      "mcp-connector",
-			},
-			GroupPriorityMinimum:  1000,
-			VersionPriority:       15,
-			InsecureSkipTLSVerify: true,
-		},
-	}, metav1.CreateOptions{})
 	if err != nil {
-		return errors.Wrap(err, "cannot create APIService")
+		return errors.Wrap(err, "cannot apply MCP kubeconfig secret")
 	}
-	p.Printfln("Connected to the MCP %s for %s!", c.Name, c.For)
 
 	return nil
+}
+
+func urlMustParse(s string) *url.URL {
+	u, err := url.Parse(s)
+	if err != nil {
+		panic(err)
+	}
+	return u
 }

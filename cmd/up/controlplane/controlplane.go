@@ -16,8 +16,8 @@ package controlplane
 
 import (
 	"github.com/alecthomas/kong"
-	cp "github.com/upbound/up-sdk-go/service/controlplanes"
 
+	cp "github.com/upbound/up-sdk-go/service/controlplanes"
 	"github.com/upbound/up/cmd/up/controlplane/kubeconfig"
 	"github.com/upbound/up/cmd/up/controlplane/pkg"
 	"github.com/upbound/up/cmd/up/controlplane/pullsecret"
@@ -48,12 +48,13 @@ func (c *Cmd) AfterApply(kongCtx *kong.Context) error {
 
 // Cmd contains commands for interacting with control planes.
 type Cmd struct {
-	Create createCmd `cmd:"" maturity:"alpha" help:"Create a hosted control plane."`
+	Create createCmd `cmd:"" maturity:"alpha" help:"Create a managed control plane."`
 	Delete deleteCmd `cmd:"" maturity:"alpha" help:"Delete a control plane."`
 	List   listCmd   `cmd:"" maturity:"alpha" help:"List control planes for the account."`
 	Get    getCmd    `cmd:"" maturity:"alpha" help:"Get a single control plane."`
 
-	Connect connectCmd `cmd:"" maturity:"alpha" help:"Connect an app cluster to a managed control plane."`
+	Connect connectCmd `cmd:"" maturity:"alpha" help:"Connect an App Cluster to a managed control plane."`
+	Bind    bindCmd    `cmd:"" maturity:"alpha" help:"Bind APIs to a managed pontrol plane."`
 
 	Configuration pkg.Cmd `cmd:"" set:"package_type=Configuration" help:"Manage Configurations."`
 	Provider      pkg.Cmd `cmd:"" set:"package_type=Provider" help:"Manage Providers."`
