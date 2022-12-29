@@ -56,7 +56,7 @@ func BuildControlPlaneKubeconfig(proxy *url.URL, id string, token, kube string) 
 	if err != nil {
 		return "", err
 	}
-	key := fmt.Sprintf(UpboundKubeconfigKeyFmt, strings.ReplaceAll(id, "/", "-"))
+	key := fmt.Sprintf("upbound-%s", strings.ReplaceAll(id, "/", "-"))
 	proxy.Path = path.Join(proxy.Path, id, k8sResource)
 	conf.Clusters[key] = &api.Cluster{
 		Server: proxy.String(),
