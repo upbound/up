@@ -43,6 +43,8 @@ var (
 )
 
 const (
+	connectorName = "mcp-connector"
+
 	errReadParametersFile     = "unable to read parameters file"
 	errParseInstallParameters = "unable to parse install parameters"
 )
@@ -55,7 +57,7 @@ func (c *connectCmd) AfterApply(kongCtx *kong.Context, upCtx *upbound.Context) e
 	}
 
 	mgr, err := helm.NewManager(kubeconfig,
-		"mcp-connector",
+		connectorName,
 		mcpRepoURL,
 		helm.WithNamespace(c.Namespace))
 	if err != nil {
@@ -114,8 +116,7 @@ func (c *connectCmd) Run(p pterm.TextPrinter, upCtx *upbound.Context) error {
 		return err
 	}
 
-	_, err = c.mgr.GetCurrentVersion()
-	if err != nil {
+	if _, err = c.mgr.GetCurrentVersion(); err != nil {
 		return err
 	}
 
@@ -183,11 +184,7 @@ func (c *connectCmd) applyMCPKubeconfig(upCtx *upbound.Context) error {
 		},
 	}, metav1.ApplyOptions{FieldManager: "up"})
 
-	if err != nil {
-		return errors.Wrap(err, "cannot apply MCP kubeconfig secret")
-	}
-
-	return nil
+	return errors.Wrap(err, "cannot apply MCP kubeconfig secret")
 }
 
 func urlMustParse(s string) *url.URL {

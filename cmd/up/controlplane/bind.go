@@ -16,6 +16,8 @@ package controlplane
 
 import (
 	"context"
+	"strings"
+
 	"github.com/alecthomas/kong"
 	"github.com/crossplane/crossplane-runtime/pkg/errors"
 	"github.com/crossplane/crossplane-runtime/pkg/resource"
@@ -25,7 +27,6 @@ import (
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/client-go/dynamic"
-	"strings"
 
 	cp "github.com/upbound/up-sdk-go/service/controlplanes"
 	"github.com/upbound/up/internal/install"
@@ -35,7 +36,7 @@ import (
 
 // AfterApply sets default values in command after assignment and validation.
 func (c *bindCmd) AfterApply(kongCtx *kong.Context, upCtx *upbound.Context) error {
-	kubeconfig, err := kube.GetKubeConfig("/Users/hasanturken/.kube/config")
+	kubeconfig, err := kube.GetKubeConfig(c.Kubeconfig)
 	if err != nil {
 		return err
 	}
@@ -52,7 +53,9 @@ func (c *bindCmd) AfterApply(kongCtx *kong.Context, upCtx *upbound.Context) erro
 type bindCmd struct {
 	kDynamic dynamic.Interface
 
-	APIVersion string `arg:"" required:"" help:"APIVersion of the resources to connect for."`
+	APIVersion string `arg:"" required:"" help:"APIVersion of the resources to connect for. Expected as [group]/[version]"`
+
+	Kubeconfig string `type:"existingfile" help:"Override default kubeconfig path."`
 	Namespace  string `short:"n" env:"MCP_CONNECTOR_NAMESPACE" default:"kube-system" help:"Kubernetes namespace for MCP Connector."`
 
 	install.CommonParams
@@ -62,7 +65,14 @@ type bindCmd struct {
 func (c *bindCmd) Run(p pterm.TextPrinter, cc *cp.Client, upCtx *upbound.Context) error {
 	// Deploy APIService for the requested Group/Version
 	apiVersion := strings.Split(c.APIVersion, "/")
-	_, err := c.kDynamic.Resource(schema.GroupVersionResource{}).Create(context.Background(), &unstructured.Unstructured{
+	if len(apiVersion) != 2 {
+		return errors.New("invalid APIVersion format, expected as [group]/[version]")
+	}
+	_, err := c.kDynamic.Resource(schema.GroupVersionResource{
+		Group:    "apiregistration.k8s.io",
+		Version:  "v1",
+		Resource: "apiservices",
+	}).Create(context.Background(), &unstructured.Unstructured{
 		Object: map[string]interface{}{
 			"apiVersion": "apiregistration.k8s.io/v1",
 			"kind":       "APIService",
@@ -74,10 +84,11 @@ func (c *bindCmd) Run(p pterm.TextPrinter, cc *cp.Client, upCtx *upbound.Context
 				"version": apiVersion[1],
 				"service": map[string]interface{}{
 					"namespace": c.Namespace,
-					"name":      "mcp-connector",
+					"name":      connectorName,
 				},
-				"groupPriorityMinimum":  1000,
-				"versionPriority":       15,
+				"groupPriorityMinimum": 1000,
+				"versionPriority":      15,
+				// TODO(turkenh): remove this when MCP connector has proper TLS setup
 				"insecureSkipTLSVerify": true,
 			},
 		},
