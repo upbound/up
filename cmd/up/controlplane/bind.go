@@ -16,14 +16,16 @@ package controlplane
 
 import (
 	"context"
-	"strings"
-
 	"github.com/alecthomas/kong"
-	"github.com/pkg/errors"
+	"github.com/crossplane/crossplane-runtime/pkg/errors"
+	"github.com/crossplane/crossplane-runtime/pkg/resource"
 	"github.com/pterm/pterm"
+	kerrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
-	apiregistrationv1 "k8s.io/kube-aggregator/pkg/apis/apiregistration/v1"
-	aggregatorclient "k8s.io/kube-aggregator/pkg/client/clientset_generated/clientset"
+	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
+	"k8s.io/apimachinery/pkg/runtime/schema"
+	"k8s.io/client-go/dynamic"
+	"strings"
 
 	cp "github.com/upbound/up-sdk-go/service/controlplanes"
 	"github.com/upbound/up/internal/install"
@@ -38,16 +40,17 @@ func (c *bindCmd) AfterApply(kongCtx *kong.Context, upCtx *upbound.Context) erro
 		return err
 	}
 
-	c.kAggregator, err = aggregatorclient.NewForConfig(kubeconfig)
+	c.kDynamic, err = dynamic.NewForConfig(kubeconfig)
 	if err != nil {
-		return errors.Wrap(err, "cannot create aggregator client")
+		return errors.Wrap(err, "cannot create a dynamic client")
 	}
+
 	return nil
 }
 
 // bindCmd gets a single control plane in an account on Upbound.
 type bindCmd struct {
-	kAggregator aggregatorclient.Interface
+	kDynamic dynamic.Interface
 
 	APIVersion string `arg:"" required:"" help:"APIVersion of the resources to connect for."`
 	Namespace  string `short:"n" env:"MCP_CONNECTOR_NAMESPACE" default:"kube-system" help:"Kubernetes namespace for MCP Connector."`
@@ -59,25 +62,30 @@ type bindCmd struct {
 func (c *bindCmd) Run(p pterm.TextPrinter, cc *cp.Client, upCtx *upbound.Context) error {
 	// Deploy APIService for the requested Group/Version
 	apiVersion := strings.Split(c.APIVersion, "/")
-	_, err := c.kAggregator.ApiregistrationV1().APIServices().Create(context.Background(), &apiregistrationv1.APIService{
-		ObjectMeta: metav1.ObjectMeta{
-			Name: apiVersion[1] + "." + apiVersion[0],
-		},
-		Spec: apiregistrationv1.APIServiceSpec{
-			Group:   apiVersion[0],
-			Version: apiVersion[1],
-			Service: &apiregistrationv1.ServiceReference{
-				Namespace: c.Namespace,
-				Name:      "mcp-connector",
+	_, err := c.kDynamic.Resource(schema.GroupVersionResource{}).Create(context.Background(), &unstructured.Unstructured{
+		Object: map[string]interface{}{
+			"apiVersion": "apiregistration.k8s.io/v1",
+			"kind":       "APIService",
+			"metadata": map[string]interface{}{
+				"name": apiVersion[1] + "." + apiVersion[0],
 			},
-			GroupPriorityMinimum:  1000,
-			VersionPriority:       15,
-			InsecureSkipTLSVerify: true,
+			"spec": map[string]interface{}{
+				"group":   apiVersion[0],
+				"version": apiVersion[1],
+				"service": map[string]interface{}{
+					"namespace": c.Namespace,
+					"name":      "mcp-connector",
+				},
+				"groupPriorityMinimum":  1000,
+				"versionPriority":       15,
+				"insecureSkipTLSVerify": true,
+			},
 		},
 	}, metav1.CreateOptions{})
-	if err != nil {
+	if resource.Ignore(kerrors.IsAlreadyExists, err) != nil {
 		return errors.Wrap(err, "cannot create APIService")
 	}
+
 	p.Printfln("APIs under %s were bound to the Managed Control Plane!", c.APIVersion)
 
 	return nil
