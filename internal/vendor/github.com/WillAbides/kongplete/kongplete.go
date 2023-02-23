@@ -124,6 +124,9 @@ func nodeCommand(node *kong.Node, predictors map[string]complete.Predictor) (*co
 		}
 		if childCmd != nil {
 			cmd.Sub[child.Name] = *childCmd
+			for _, a := range child.Aliases {
+				cmd.Sub[a] = *childCmd
+			}
 		}
 	}
 

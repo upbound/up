@@ -43,14 +43,14 @@ func TestComplete(t *testing.T) {
 			OMG     string `kong:"required,enum='oh,my,gizzles'"`
 			Number  int    `kong:"required,short=n,enum='1,2,3'"`
 			BooFlag bool   `kong:"name=boofl,short=b"`
-		} `kong:"cmd"`
+		} `kong:"cmd,aliases='b'"`
 		Baz struct{} `kong:"cmd,hidden"`
 	}
 
 	for _, td := range []completeTest{
 		{
 			parser: kong.Must(&cli),
-			want:   []string{"foo", "bar"},
+			want:   []string{"foo", "bar", "b"},
 			line:   "myApp ",
 		},
 		{
@@ -101,13 +101,33 @@ func TestComplete(t *testing.T) {
 		},
 		{
 			parser: kong.Must(&cli),
+			want:   []string{"bar", "b"},
+			line:   "myApp b",
+		},
+		{
+			parser: kong.Must(&cli),
+			want:   []string{"thing1", "thing2"},
+			line:   "myApp b ",
+		},
+		{
+			parser: kong.Must(&cli),
 			want:   []string{"thing1", "thing2"},
 			line:   "myApp bar thing",
 		},
 		{
 			parser: kong.Must(&cli),
+			want:   []string{"thing1", "thing2"},
+			line:   "myApp b thing",
+		},
+		{
+			parser: kong.Must(&cli),
 			want:   []string{"otherthing1", "otherthing2"},
 			line:   "myApp bar thing1 ",
+		},
+		{
+			parser: kong.Must(&cli),
+			want:   []string{"otherthing1", "otherthing2"},
+			line:   "myApp b thing1 ",
 		},
 		{
 			parser: kong.Must(&cli),
