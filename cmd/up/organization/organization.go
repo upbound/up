@@ -44,12 +44,7 @@ func (c *Cmd) AfterApply(kongCtx *kong.Context) error {
 }
 
 func PredictOrgs() complete.Predictor {
-	return predictOrgs()
-}
-
-func predictOrgs() complete.PredictFunc {
-
-	return func(a complete.Args) []string {
+	return complete.PredictFunc(func(a complete.Args) (prediction []string) {
 		c, err := upbound.MakeClients()
 		oc := c.OrgClient
 		if oc == nil || err != nil {
@@ -70,7 +65,7 @@ func predictOrgs() complete.PredictFunc {
 			data[i] = o.Name
 		}
 		return data
-	}
+	})
 }
 
 // Cmd contains commands for interacting with organizations.
