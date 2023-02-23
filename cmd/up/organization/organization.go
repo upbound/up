@@ -22,7 +22,6 @@ import (
 
 	"github.com/upbound/up-sdk-go/service/organizations"
 
-	"github.com/upbound/up/internal/config"
 	"github.com/upbound/up/internal/upbound"
 )
 
@@ -37,17 +36,20 @@ func (c *Cmd) AfterApply(kongCtx *kong.Context) error {
 	if err != nil {
 		return err
 	}
-	config.Helpers.OrgsClient = organizations.NewClient(cfg)
 	kongCtx.Bind(upCtx)
-	kongCtx.Bind(config.Helpers.OrgsClient)
+	kongCtx.Bind(organizations.NewClient(cfg))
 	return nil
 }
 
 func PredictOrgs() complete.Predictor {
 	return complete.PredictFunc(func(a complete.Args) (prediction []string) {
-		c, err := upbound.MakeClients()
-		oc := c.OrgClient
-		if oc == nil || err != nil {
+		cfg, err := upbound.BuildSDKConfigForCompletors()
+		if err != nil {
+			return nil
+		}
+
+		oc := organizations.NewClient(cfg)
+		if oc == nil {
 			return nil
 		}
 

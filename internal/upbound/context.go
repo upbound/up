@@ -27,7 +27,6 @@ import (
 	"github.com/spf13/afero"
 
 	"github.com/upbound/up-sdk-go"
-	"github.com/upbound/up-sdk-go/service/organizations"
 	orgs "github.com/upbound/up-sdk-go/service/organizations"
 	"github.com/upbound/up/internal/config"
 )
@@ -226,29 +225,22 @@ func (c *Context) BuildSDKConfig(session string) (*up.Config, error) {
 	}), nil
 }
 
-// MakeClients makes clients for use by completion predictors.
-// It reduces boilerplate code for each completion predictor.
-// Note that at completion time, the command-line has not been parsed, so
-// we cannot use any flags the user has specified.
+// BuildSDKConfigForCompletors reduces boilerplate
+// code for writing completers.  Note that at completion time,
+// the command-line has not been parsed, so we cannot use any flags
+// the user has specified.
 // TODO: Check the environment for variables like UP_DOMAIN
-
-func MakeClients() (Clients, error) {
-	c := Clients{}
+func BuildSDKConfigForCompletors() (*up.Config, error) {
 	f := Flags{}
 	upCtx, err := NewFromFlags(f)
 	if err != nil {
-		return c, err
+		return nil, err
 	}
 	cfg, err := upCtx.BuildSDKConfig(upCtx.Profile.Session)
 	if err != nil {
-		return c, err
+		return nil, err
 	}
-
-	c.OrgClient = organizations.NewClient(cfg)
-	if c.OrgClient == nil {
-		return c, err
-	}
-	return c, err
+	return cfg, nil
 }
 
 // applyOverrides applies applicable overrides to the given Flags based on the
