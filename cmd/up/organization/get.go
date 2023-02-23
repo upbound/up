@@ -35,7 +35,7 @@ func (c *getCmd) AfterApply(kongCtx *kong.Context, upCtx *upbound.Context) error
 
 // getCmd gets a single organization on Upbound.
 type getCmd struct {
-	Name string `arg:"" required:"" help:"Name of organization."`
+	Name string `arg:"" required:"" help:"Name of organization." predictor:"orgs"`
 }
 
 // Run executes the get command.

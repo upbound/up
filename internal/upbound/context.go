@@ -219,6 +219,24 @@ func (c *Context) BuildSDKConfig(session string) (*up.Config, error) {
 	}), nil
 }
 
+// BuildSDKConfigForCompletors reduces boilerplate
+// code for writing completers.  Note that at completion time,
+// the command-line has not been parsed, so we cannot use any flags
+// the user has specified.
+// TODO: Check the environment for variables like UP_DOMAIN
+func BuildSDKConfigForCompletors() (*up.Config, error) {
+	f := Flags{}
+	upCtx, err := NewFromFlags(f)
+	if err != nil {
+		return nil, err
+	}
+	cfg, err := upCtx.BuildSDKConfig(upCtx.Profile.Session)
+	if err != nil {
+		return nil, err
+	}
+	return cfg, nil
+}
+
 // applyOverrides applies applicable overrides to the given Flags based on the
 // pre-existing configs, if there are any.
 func (c *Context) applyOverrides(f Flags, profileName string) (Flags, error) {

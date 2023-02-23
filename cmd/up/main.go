@@ -18,10 +18,12 @@ import (
 	"fmt"
 	"io"
 	"math/rand"
+	"os"
 	"time"
 
 	"github.com/alecthomas/kong"
 	"github.com/pterm/pterm"
+	"github.com/willabides/kongplete"
 
 	"github.com/upbound/up/cmd/up/controlplane"
 	"github.com/upbound/up/cmd/up/organization"
@@ -96,18 +98,19 @@ type cli struct {
 
 	License licenseCmd `cmd:"" help:"Print Up license information."`
 
-	Login        loginCmd         `cmd:"" help:"Login to Upbound."`
-	Logout       logoutCmd        `cmd:"" help:"Logout of Upbound."`
-	ControlPlane controlplane.Cmd `cmd:"" name:"controlplane" aliases:"ctp" help:"Interact with control planes."`
-	Organization organization.Cmd `cmd:"" name:"organization" aliases:"org" help:"Interact with organizations."`
-	Profile      profile.Cmd      `cmd:"" help:"Interact with Upbound profiles."`
-	Repository   repository.Cmd   `cmd:"" name:"repository" aliases:"repo" help:"Interact with repositories."`
-	Robot        robot.Cmd        `cmd:"" name:"robot" help:"Interact with robots."`
-	Upbound      upbound.Cmd      `cmd:"" maturity:"alpha" help:"Interact with Upbound."`
-	UXP          uxp.Cmd          `cmd:"" help:"Interact with UXP."`
-	XPKG         xpkg.Cmd         `cmd:"" help:"Interact with UXP packages."`
-	XPLS         xpls.Cmd         `cmd:"" help:"Start xpls language server."`
-	Alpha        alpha            `cmd:"" help:"Alpha features. Commands may be removed in future releases."`
+	Login              loginCmd                     `cmd:"" help:"Login to Upbound."`
+	Logout             logoutCmd                    `cmd:"" help:"Logout of Upbound."`
+	ControlPlane       controlplane.Cmd             `cmd:"" name:"controlplane" aliases:"ctp" help:"Interact with control planes."`
+	Organization       organization.Cmd             `cmd:"" name:"organization" aliases:"org" help:"Interact with organizations."`
+	Profile            profile.Cmd                  `cmd:"" help:"Interact with Upbound profiles."`
+	Repository         repository.Cmd               `cmd:"" name:"repository" aliases:"repo" help:"Interact with repositories."`
+	Robot              robot.Cmd                    `cmd:"" name:"robot" help:"Interact with robots."`
+	Upbound            upbound.Cmd                  `cmd:"" maturity:"alpha" help:"Interact with Upbound."`
+	UXP                uxp.Cmd                      `cmd:"" help:"Interact with UXP."`
+	XPKG               xpkg.Cmd                     `cmd:"" help:"Interact with UXP packages."`
+	XPLS               xpls.Cmd                     `cmd:"" help:"Start xpls language server."`
+	Alpha              alpha                        `cmd:"" help:"Alpha features. Commands may be removed in future releases."`
+	InstallCompletions kongplete.InstallCompletions `cmd:"" help:"Install shell completions"`
 }
 
 // BeforeReset runs before all other hooks. If command has alpha as an ancestor,
@@ -126,7 +129,8 @@ type alpha struct {
 func main() {
 	rand.Seed(time.Now().UTC().UnixNano())
 	c := cli{}
-	ctx := kong.Parse(&c,
+
+	parser := kong.Must(&c,
 		kong.Name("up"),
 		kong.Description("The Upbound CLI"),
 		kong.Help(func(options kong.HelpOptions, ctx *kong.Context) error {
@@ -141,5 +145,11 @@ func main() {
 			Compact:             true,
 			NoExpandSubcommands: true,
 		}))
+
+	kongplete.Complete(parser,
+		kongplete.WithPredictor("orgs", organization.PredictOrgs()),
+	)
+	ctx, err := parser.Parse(os.Args[1:])
+	parser.FatalIfErrorf(err)
 	ctx.FatalIfErrorf(ctx.Run())
 }

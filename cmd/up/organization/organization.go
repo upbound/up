@@ -15,7 +15,10 @@
 package organization
 
 import (
+	"context"
+
 	"github.com/alecthomas/kong"
+	"github.com/posener/complete"
 
 	"github.com/upbound/up-sdk-go/service/organizations"
 
@@ -38,10 +41,39 @@ func (c *Cmd) AfterApply(kongCtx *kong.Context) error {
 	return nil
 }
 
+func PredictOrgs() complete.Predictor {
+	return complete.PredictFunc(func(a complete.Args) (prediction []string) {
+		cfg, err := upbound.BuildSDKConfigForCompletors()
+		if err != nil {
+			return nil
+		}
+
+		oc := organizations.NewClient(cfg)
+		if oc == nil {
+			return nil
+		}
+
+		orgs, err := oc.List(context.Background())
+		if err != nil {
+			return nil
+		}
+
+		if len(orgs) == 0 {
+			return nil
+		}
+
+		data := make([]string, len(orgs))
+		for i, o := range orgs {
+			data[i] = o.Name
+		}
+		return data
+	})
+}
+
 // Cmd contains commands for interacting with organizations.
 type Cmd struct {
 	Create createCmd `cmd:"" help:"Create an organization."`
-	Delete deleteCmd `cmd:"" help:"Delete an organization."`
+	Delete deleteCmd `cmd:"" help:"Delete an organization." predictor:"orgs"`
 	List   listCmd   `cmd:"" help:"List organizations."`
 	Get    getCmd    `cmd:"" help:"Get an organization."`
 
