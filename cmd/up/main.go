@@ -110,7 +110,7 @@ type cli struct {
 	XPKG               xpkg.Cmd                     `cmd:"" help:"Interact with UXP packages."`
 	XPLS               xpls.Cmd                     `cmd:"" help:"Start xpls language server."`
 	Alpha              alpha                        `cmd:"" help:"Alpha features. Commands may be removed in future releases."`
-	InstallCompletions kongplete.InstallCompletions `cmd:"" help:"install shell completions"`
+	InstallCompletions kongplete.InstallCompletions `cmd:"" help:"Install shell completions"`
 }
 
 // BeforeReset runs before all other hooks. If command has alpha as an ancestor,
