@@ -27,7 +27,6 @@ import (
 	"github.com/spf13/afero"
 
 	"github.com/upbound/up-sdk-go"
-	orgs "github.com/upbound/up-sdk-go/service/organizations"
 	"github.com/upbound/up/internal/config"
 )
 
@@ -93,11 +92,6 @@ type Context struct {
 
 // Option modifies a Context
 type Option func(*Context)
-
-// Clients is a set of clients, meant for use by completion predictors
-type Clients struct {
-	OrgClient *orgs.Client
-}
 
 // AllowMissingProfile indicates that Context should still be returned even if a
 // profile name is supplied and it does not exist in config.
