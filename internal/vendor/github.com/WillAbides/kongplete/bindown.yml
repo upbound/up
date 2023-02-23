@@ -1,0 +1,120 @@
+systems:
+  - darwin/amd64
+  - darwin/arm64
+  - linux/amd64
+dependencies:
+  gofumpt:
+    template: origin#gofumpt
+    vars:
+      version: 0.2.0
+  golangci-lint:
+    template: origin#golangci-lint
+    vars:
+      version: 1.43.0
+  shellcheck:
+    template: origin#shellcheck
+    vars:
+      version: 0.8.0
+templates:
+  origin#gofumpt:
+    url: https://github.com/mvdan/gofumpt/releases/download/v{{.version}}/gofumpt_v{{.version}}_{{.os}}_{{.arch}}{{.suffix}}
+    archive_path: gofumpt_v{{.version}}_{{.os}}_{{.arch}}{{.suffix}}
+    bin: gofumpt{{.suffix}}
+    vars:
+      suffix: ""
+    required_vars:
+      - version
+    overrides:
+      - matcher:
+          os:
+            - windows
+        dependency:
+          vars:
+            suffix: .exe
+    systems:
+      - darwin/amd64
+      - darwin/arm64
+      - linux/386
+      - linux/amd64
+      - linux/arm
+      - linux/arm64
+      - windows/386
+      - windows/amd64
+  origin#golangci-lint:
+    url: https://github.com/golangci/golangci-lint/releases/download/v{{.version}}/golangci-lint-{{.version}}-{{.os}}-{{.arch}}{{.urlsuffix}}
+    archive_path: golangci-lint-{{.version}}-{{.os}}-{{.arch}}/golangci-lint{{.archivepathsuffix}}
+    bin: golangci-lint
+    link: true
+    vars:
+      archivepathsuffix: ""
+      urlsuffix: .tar.gz
+    required_vars:
+      - version
+    overrides:
+      - matcher:
+          os:
+            - windows
+        dependency:
+          vars:
+            archivepathsuffix: .exe
+            urlsuffix: .zip
+    systems:
+      - darwin/amd64
+      - darwin/arm64
+      - linux/386
+      - linux/amd64
+      - linux/arm64
+      - windows/386
+      - windows/amd64
+      - freebsd/386
+      - freebsd/amd64
+      - linux/mips64
+      - linux/mips64le
+      - linux/s390x
+      - linux/ppc64le
+  origin#shellcheck:
+    url: https://github.com/koalaman/shellcheck/releases/download/v{{.version}}/shellcheck-v{{.version}}.{{.os}}.{{.arch}}.tar.xz
+    archive_path: shellcheck-v{{.version}}/shellcheck
+    bin: shellcheck
+    required_vars:
+      - version
+    overrides:
+      - matcher:
+          os:
+            - windows
+        dependency:
+          url: https://github.com/koalaman/shellcheck/releases/download/v{{.version}}/shellcheck-v{{.version}}.zip
+          archive_path: shellcheck.exe
+      - matcher:
+          os:
+            - darwin
+          arch:
+            - arm64
+        dependency:
+          vars:
+            arch: amd64
+    substitutions:
+      arch:
+        amd64: x86_64
+    systems:
+      - darwin/amd64
+      - darwin/arm64
+      - linux/amd64
+      - windows/amd64
+template_sources:
+  origin: https://raw.githubusercontent.com/WillAbides/bindown-templates/master/bindown.yml
+url_checksums:
+  https://github.com/golangci/golangci-lint/releases/download/v1.39.0/golangci-lint-1.39.0-darwin-amd64.tar.gz: 7e9a47ab540aa3e8472fbf8120d28bed3b9d9cf625b955818e8bc69628d7187c
+  https://github.com/golangci/golangci-lint/releases/download/v1.39.0/golangci-lint-1.39.0-linux-amd64.tar.gz: 3a73aa7468087caa62673c8adea99b4e4dff846dc72707222db85f8679b40cbf
+  https://github.com/golangci/golangci-lint/releases/download/v1.43.0/golangci-lint-1.43.0-darwin-amd64.tar.gz: 5971ed73d25767b2b955a694e59c7381d56df46e3681a93e067c601d0d6cffad
+  https://github.com/golangci/golangci-lint/releases/download/v1.43.0/golangci-lint-1.43.0-darwin-arm64.tar.gz: d0c69713b675ee09212273c2136a0d1b30203ddfc1c611a1a4fd5bfa90f9e457
+  https://github.com/golangci/golangci-lint/releases/download/v1.43.0/golangci-lint-1.43.0-linux-amd64.tar.gz: f3515cebec926257da703ba0a2b169e4a322c11dc31a8b4656b50a43e48877f4
+  https://github.com/koalaman/shellcheck/releases/download/v0.7.2/shellcheck-v0.7.2.darwin.x86_64.tar.xz: 969bd7ef668e8167cfbba569fb9f4a0b2fc1c4021f87032b6a0b0e525fb77369
+  https://github.com/koalaman/shellcheck/releases/download/v0.7.2/shellcheck-v0.7.2.linux.x86_64.tar.xz: 70423609f27b504d6c0c47e340f33652aea975e45f312324f2dbf91c95a3b188
+  https://github.com/koalaman/shellcheck/releases/download/v0.8.0/shellcheck-v0.8.0.darwin.x86_64.tar.xz: e065d4afb2620cc8c1d420a9b3e6243c84ff1a693c1ff0e38f279c8f31e86634
+  https://github.com/koalaman/shellcheck/releases/download/v0.8.0/shellcheck-v0.8.0.linux.x86_64.tar.xz: ab6ee1b178f014d1b86d1e24da20d1139656c8b0ed34d2867fbb834dad02bf0a
+  https://github.com/mvdan/gofumpt/releases/download/v0.1.1/gofumpt_v0.1.1_darwin_amd64: 97e4d6d97d70ba6d5177b1fbbbdf7e447bce69b8ccfb0ea64b75699a8393a095
+  https://github.com/mvdan/gofumpt/releases/download/v0.1.1/gofumpt_v0.1.1_linux_amd64: 8884cb7b22d09bc8920748db5756d276ddfdb9e0f9a64edd6185b61a61e860ad
+  https://github.com/mvdan/gofumpt/releases/download/v0.2.0/gofumpt_v0.2.0_darwin_amd64: aa2c54cbe73618b76b0841bb2e48c4b83563833905fabfeffabd1f26ea15ce1f
+  https://github.com/mvdan/gofumpt/releases/download/v0.2.0/gofumpt_v0.2.0_darwin_arm64: fcafeedb2b64402cabdb738e2e5577f21cb1547b6956d2f37abf8d055d907d05
+  https://github.com/mvdan/gofumpt/releases/download/v0.2.0/gofumpt_v0.2.0_linux_amd64: 3112bd66606c2f15ef44443f7f98af6985c8d84d348adad4bd89c6a6519d6eb4
