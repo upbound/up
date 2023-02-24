@@ -57,7 +57,7 @@ const (
 type Flags struct {
 	// Optional
 	Domain  *url.URL `env:"UP_DOMAIN" default:"https://upbound.io" help:"Root Upbound domain."`
-	Profile string   `env:"UP_PROFILE" help:"Profile used to execute command."`
+	Profile string   `env:"UP_PROFILE" help:"Profile used to execute command." predictor:"profiles"`
 	Account string   `short:"a" env:"UP_ACCOUNT" help:"Account used to execute command."`
 
 	// Insecure
@@ -217,24 +217,6 @@ func (c *Context) BuildSDKConfig(session string) (*up.Config, error) {
 	return up.NewConfig(func(conf *up.Config) {
 		conf.Client = client
 	}), nil
-}
-
-// BuildSDKConfigForCompletors reduces boilerplate
-// code for writing completers.  Note that at completion time,
-// the command-line has not been parsed, so we cannot use any flags
-// the user has specified.
-// TODO: Check the environment for variables like UP_DOMAIN
-func BuildSDKConfigForCompletors() (*up.Config, error) {
-	f := Flags{}
-	upCtx, err := NewFromFlags(f)
-	if err != nil {
-		return nil, err
-	}
-	cfg, err := upCtx.BuildSDKConfig(upCtx.Profile.Session)
-	if err != nil {
-		return nil, err
-	}
-	return cfg, nil
 }
 
 // applyOverrides applies applicable overrides to the given Flags based on the

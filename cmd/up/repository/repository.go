@@ -15,8 +15,12 @@
 package repository
 
 import (
-	"github.com/alecthomas/kong"
+	"context"
 
+	"github.com/alecthomas/kong"
+	"github.com/posener/complete"
+
+	"github.com/upbound/up-sdk-go/service/common"
 	"github.com/upbound/up-sdk-go/service/repositories"
 
 	"github.com/upbound/up/internal/upbound"
@@ -36,6 +40,39 @@ func (c *Cmd) AfterApply(kongCtx *kong.Context) error {
 	kongCtx.Bind(upCtx)
 	kongCtx.Bind(repositories.NewClient(cfg))
 	return nil
+}
+
+func PredictRepos() complete.Predictor {
+	return complete.PredictFunc(func(a complete.Args) (prediction []string) {
+		upCtx, err := upbound.NewFromFlags(upbound.Flags{})
+		if err != nil {
+			return nil
+		}
+		cfg, err := upCtx.BuildSDKConfig(upCtx.Profile.Session)
+		if err != nil {
+			return nil
+		}
+
+		rc := repositories.NewClient(cfg)
+		if rc == nil {
+			return nil
+		}
+
+		repos, err := rc.List(context.Background(), upCtx.Account, common.WithSize(maxItems))
+		if err != nil {
+			return nil
+		}
+
+		if len(repos.Repositories) == 0 {
+			return nil
+		}
+
+		data := make([]string, len(repos.Repositories))
+		for i, o := range repos.Repositories {
+			data[i] = o.Name
+		}
+		return data
+	})
 }
 
 // Cmd contains commands for interacting with repositories.

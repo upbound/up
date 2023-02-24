@@ -150,7 +150,12 @@ func main() {
 
 	kongplete.Complete(parser,
 		kongplete.WithPredictor("orgs", organization.PredictOrgs()),
+		kongplete.WithPredictor("ctps", controlplane.PredictControlPlanes()),
+		kongplete.WithPredictor("repos", repository.PredictRepos()),
+		kongplete.WithPredictor("robots", robot.PredictRobots()),
+		kongplete.WithPredictor("profiles", profile.PredictProfiles()),
 	)
+
 	ctx, err := parser.Parse(os.Args[1:])
 	parser.FatalIfErrorf(err)
 	ctx.FatalIfErrorf(ctx.Run())

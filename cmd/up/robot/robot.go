@@ -15,7 +15,10 @@
 package robot
 
 import (
+	"context"
+
 	"github.com/alecthomas/kong"
+	"github.com/posener/complete"
 
 	"github.com/upbound/up-sdk-go/service/accounts"
 	"github.com/upbound/up-sdk-go/service/organizations"
@@ -45,6 +48,49 @@ func (c *Cmd) AfterApply(kongCtx *kong.Context) error {
 	kongCtx.Bind(organizations.NewClient(cfg))
 	kongCtx.Bind(robots.NewClient(cfg))
 	return nil
+}
+
+func PredictRobots() complete.Predictor {
+	return complete.PredictFunc(func(a complete.Args) (prediction []string) {
+		upCtx, err := upbound.NewFromFlags(upbound.Flags{})
+		if err != nil {
+			return nil
+		}
+		cfg, err := upCtx.BuildSDKConfig(upCtx.Profile.Session)
+		if err != nil {
+			return nil
+		}
+
+		ac := accounts.NewClient(cfg)
+		if ac == nil {
+			return nil
+		}
+
+		oc := organizations.NewClient(cfg)
+		if oc == nil {
+			return nil
+		}
+
+		account, err := ac.Get(context.Background(), upCtx.Account)
+		if err != nil {
+			return nil
+		}
+		if account.Account.Type != accounts.AccountOrganization {
+			return nil
+		}
+		rs, err := oc.ListRobots(context.Background(), account.Organization.ID)
+		if err != nil {
+			return nil
+		}
+		if len(rs) == 0 {
+			return nil
+		}
+		data := make([]string, len(rs))
+		for i, r := range rs {
+			data[i] = r.Name
+		}
+		return data
+	})
 }
 
 // Cmd contains commands for interacting with robots.

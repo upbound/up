@@ -64,7 +64,7 @@ func (c *deleteCmd) AfterApply(p pterm.TextPrinter, upCtx *upbound.Context) erro
 type deleteCmd struct {
 	prompter input.Prompter
 
-	Name string `arg:"" required:"" help:"Name of robot."`
+	Name string `arg:"" required:"" help:"Name of robot." predictor:"robots"`
 
 	Force bool `help:"Force delete robot even if conflicts exist." default:"false"`
 }

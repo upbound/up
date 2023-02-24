@@ -15,7 +15,10 @@
 package controlplane
 
 import (
+	"context"
+
 	"github.com/alecthomas/kong"
+	"github.com/posener/complete"
 
 	cp "github.com/upbound/up-sdk-go/service/controlplanes"
 	"github.com/upbound/up/cmd/up/controlplane/kubeconfig"
@@ -44,6 +47,39 @@ func (c *Cmd) AfterApply(kongCtx *kong.Context) error {
 	kongCtx.Bind(upCtx)
 	kongCtx.Bind(cp.NewClient(cfg))
 	return nil
+}
+
+func PredictControlPlanes() complete.Predictor {
+	return complete.PredictFunc(func(a complete.Args) (prediction []string) {
+		upCtx, err := upbound.NewFromFlags(upbound.Flags{})
+		if err != nil {
+			return nil
+		}
+		cfg, err := upCtx.BuildSDKConfig(upCtx.Profile.Session)
+		if err != nil {
+			return nil
+		}
+
+		cp := cp.NewClient(cfg)
+		if cp == nil {
+			return nil
+		}
+
+		ctps, err := cp.List(context.Background(), upCtx.Account)
+		if err != nil {
+			return nil
+		}
+
+		if len(ctps.ControlPlanes) == 0 {
+			return nil
+		}
+
+		data := make([]string, len(ctps.ControlPlanes))
+		for i, ctp := range ctps.ControlPlanes {
+			data[i] = ctp.ControlPlane.Name
+		}
+		return data
+	})
 }
 
 // Cmd contains commands for interacting with control planes.

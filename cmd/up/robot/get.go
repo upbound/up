@@ -36,7 +36,7 @@ func (c *getCmd) AfterApply(kongCtx *kong.Context, upCtx *upbound.Context) error
 
 // getCmd gets a single robot in an account on Upbound.
 type getCmd struct {
-	Name string `arg:"" required:"" help:"Name of robot."`
+	Name string `arg:"" required:"" help:"Name of robot." predictor:"robots"`
 }
 
 // Run executes the get robot command.

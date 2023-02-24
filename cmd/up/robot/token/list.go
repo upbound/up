@@ -44,7 +44,7 @@ func (c *listCmd) AfterApply(kongCtx *kong.Context, upCtx *upbound.Context) erro
 
 // listCmd creates a robot on Upbound.
 type listCmd struct {
-	RobotName string `arg:"" required:"" help:"Name of robot."`
+	RobotName string `arg:"" required:"" help:"Name of robot." predictor:"robots"`
 }
 
 // Run executes the list robot tokens command.

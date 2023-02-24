@@ -25,7 +25,7 @@ const (
 )
 
 type useCmd struct {
-	Name string `arg:"" required:"" help:"Name of the Profile to use."`
+	Name string `arg:"" required:"" help:"Name of the Profile to use." predictor:"profiles"`
 }
 
 // Run executes the Use command.

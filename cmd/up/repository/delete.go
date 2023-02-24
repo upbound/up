@@ -55,7 +55,7 @@ func (c *deleteCmd) AfterApply(p pterm.TextPrinter, upCtx *upbound.Context) erro
 type deleteCmd struct {
 	prompter input.Prompter
 
-	Name string `arg:"" required:"" help:"Name of repository."`
+	Name string `arg:"" required:"" help:"Name of repository." predictor:"repos"`
 
 	Force bool `help:"Force deletion of repository." default:"false"`
 }
