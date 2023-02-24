@@ -16,6 +16,7 @@ package profile
 
 import (
 	"github.com/alecthomas/kong"
+	"github.com/posener/complete"
 
 	"github.com/upbound/up/cmd/up/profile/config"
 	"github.com/upbound/up/internal/upbound"
@@ -42,4 +43,25 @@ func (c *Cmd) AfterApply(kongCtx *kong.Context) error {
 
 	kongCtx.Bind(upCtx)
 	return nil
+}
+
+func PredictProfiles() complete.Predictor {
+	return complete.PredictFunc(func(a complete.Args) (prediction []string) {
+		upCtx, err := upbound.NewFromFlags(upbound.Flags{})
+		if err != nil {
+			return nil
+		}
+
+		profiles, err := upCtx.Cfg.GetUpboundProfiles()
+		if err != nil {
+			return nil
+		}
+
+		data := make([]string, 0)
+
+		for name := range profiles {
+			data = append(data, name)
+		}
+		return data
+	})
 }

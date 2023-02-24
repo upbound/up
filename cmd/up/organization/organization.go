@@ -43,7 +43,11 @@ func (c *Cmd) AfterApply(kongCtx *kong.Context) error {
 
 func PredictOrgs() complete.Predictor {
 	return complete.PredictFunc(func(a complete.Args) (prediction []string) {
-		cfg, err := upbound.BuildSDKConfigForCompletors()
+		upCtx, err := upbound.NewFromFlags(upbound.Flags{})
+		if err != nil {
+			return nil
+		}
+		cfg, err := upCtx.BuildSDKConfig(upCtx.Profile.Session)
 		if err != nil {
 			return nil
 		}
@@ -73,7 +77,7 @@ func PredictOrgs() complete.Predictor {
 // Cmd contains commands for interacting with organizations.
 type Cmd struct {
 	Create createCmd `cmd:"" help:"Create an organization."`
-	Delete deleteCmd `cmd:"" help:"Delete an organization." predictor:"orgs"`
+	Delete deleteCmd `cmd:"" help:"Delete an organization."`
 	List   listCmd   `cmd:"" help:"List organizations."`
 	Get    getCmd    `cmd:"" help:"Get an organization."`
 

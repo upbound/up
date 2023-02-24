@@ -54,7 +54,7 @@ func (c *deleteCmd) AfterApply(p pterm.TextPrinter) error {
 type deleteCmd struct {
 	prompter input.Prompter
 
-	Name string `arg:"" required:"" help:"Name of organization."`
+	Name string `arg:"" required:"" help:"Name of organization." predictor:"orgs"`
 
 	Force bool `help:"Force deletion of the organization." default:"false"`
 }

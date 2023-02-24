@@ -25,7 +25,7 @@ import (
 
 // deleteCmd deletes a control plane on Upbound.
 type deleteCmd struct {
-	Name string `arg:"" help:"Name of control plane."`
+	Name string `arg:"" help:"Name of control plane." predictor:"ctps"`
 }
 
 // Run executes the delete command.

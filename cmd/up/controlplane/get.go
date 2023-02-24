@@ -34,7 +34,7 @@ func (c *getCmd) AfterApply(kongCtx *kong.Context, upCtx *upbound.Context) error
 
 // getCmd gets a single control plane in an account on Upbound.
 type getCmd struct {
-	Name string `arg:"" required:"" help:"Name of control plane."`
+	Name string `arg:"" required:"" help:"Name of control plane." predictor:"ctps"`
 }
 
 // Run executes the get command.
