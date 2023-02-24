@@ -25,6 +25,7 @@ import (
 	"github.com/pterm/pterm"
 	"github.com/willabides/kongplete"
 
+	"github.com/upbound/up/cmd/up/configuration"
 	"github.com/upbound/up/cmd/up/controlplane"
 	"github.com/upbound/up/cmd/up/organization"
 	"github.com/upbound/up/cmd/up/profile"
@@ -100,6 +101,7 @@ type cli struct {
 
 	Login              loginCmd                     `cmd:"" help:"Login to Upbound."`
 	Logout             logoutCmd                    `cmd:"" help:"Logout of Upbound."`
+	Configuration      configuration.Cmd            `cmd:"" name:"configuration" aliases:"cfg" help:"Interact with configurations."`
 	ControlPlane       controlplane.Cmd             `cmd:"" name:"controlplane" aliases:"ctp" help:"Interact with control planes."`
 	Organization       organization.Cmd             `cmd:"" name:"organization" aliases:"org" help:"Interact with organizations."`
 	Profile            profile.Cmd                  `cmd:"" help:"Interact with Upbound profiles."`
