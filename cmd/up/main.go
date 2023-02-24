@@ -154,6 +154,7 @@ func main() {
 		kongplete.WithPredictor("repos", repository.PredictRepos()),
 		kongplete.WithPredictor("robots", robot.PredictRobots()),
 		kongplete.WithPredictor("profiles", profile.PredictProfiles()),
+		kongplete.WithPredictor("configs", configuration.PredictConfigurations()),
 	)
 
 	ctx, err := parser.Parse(os.Args[1:])
