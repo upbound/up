@@ -26,7 +26,7 @@ import (
 
 // getCmd gets a single root configuration in an account on Upbound.
 type getCmd struct {
-	Name string `arg:"" required:"" name:"The name of the configuration."`
+	Name string `arg:"" required:"" name:"The name of the configuration." predictor:"configs"`
 }
 
 // Run executes the get command.

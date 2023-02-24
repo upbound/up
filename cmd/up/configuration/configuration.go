@@ -15,7 +15,10 @@
 package configuration
 
 import (
+	"context"
+
 	"github.com/alecthomas/kong"
+	"github.com/posener/complete"
 
 	"github.com/upbound/up-sdk-go/service/configurations"
 	"github.com/upbound/up/internal/upbound"
@@ -35,6 +38,39 @@ func (c *Cmd) AfterApply(kongCtx *kong.Context) error {
 	kongCtx.Bind(upCtx)
 	kongCtx.Bind(configurations.NewClient(cfg))
 	return nil
+}
+
+func PredictConfigurations() complete.Predictor {
+	return complete.PredictFunc(func(a complete.Args) (prediction []string) {
+		upCtx, err := upbound.NewFromFlags(upbound.Flags{})
+		if err != nil {
+			return nil
+		}
+		cfg, err := upCtx.BuildSDKConfig(upCtx.Profile.Session)
+		if err != nil {
+			return nil
+		}
+
+		cp := configurations.NewClient(cfg)
+		if cp == nil {
+			return nil
+		}
+
+		configs, err := cp.List(context.Background(), upCtx.Account)
+		if err != nil {
+			return nil
+		}
+
+		if len(configs.Configurations) == 0 {
+			return nil
+		}
+
+		data := make([]string, len(configs.Configurations))
+		for i, config := range configs.Configurations {
+			data[i] = *config.Name
+		}
+		return data
+	})
 }
 
 // Cmd contains commands for interacting with root configurations.
