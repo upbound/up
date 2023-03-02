@@ -19,6 +19,7 @@ require (
 	github.com/google/go-containerregistry v0.11.0
 	github.com/google/uuid v1.3.0
 	github.com/goreleaser/nfpm/v2 v2.5.1
+	github.com/pkg/browser v0.0.0-20210911075715-681adbf594b8
 	github.com/pkg/errors v0.9.1
 	github.com/posener/complete v1.2.3
 	github.com/pterm/pterm v0.12.45
@@ -233,6 +234,7 @@ replace (
 	github.com/crossplane/crossplane/controller/apiextensions => ./internal/vendor/github.com/crossplane/crossplane/controller/apiextensions
 	github.com/crossplane/crossplane/xcrd => ./internal/vendor/github.com/crossplane/crossplane/xcrd
 	github.com/golang/tools => ./internal/vendor/golang.org/x/tools
+	github.com/upbound/up-sdk-go => /Users/alainroy/dev/up-sdk-go
 	github.com/willabides/kongplete => ./internal/vendor/github.com/WillAbides/kongplete
 
 	// The following replacements should be kept in sync with upstream

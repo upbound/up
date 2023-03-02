@@ -21,6 +21,7 @@ import (
 	"github.com/posener/complete"
 
 	"github.com/upbound/up-sdk-go/service/configurations"
+	"github.com/upbound/up-sdk-go/service/gitsources"
 	"github.com/upbound/up/internal/upbound"
 )
 
@@ -37,6 +38,7 @@ func (c *Cmd) AfterApply(kongCtx *kong.Context) error {
 	}
 	kongCtx.Bind(upCtx)
 	kongCtx.Bind(configurations.NewClient(cfg))
+	kongCtx.Bind(gitsources.NewClient(cfg))
 	return nil
 }
 
@@ -75,8 +77,9 @@ func PredictConfigurations() complete.Predictor {
 
 // Cmd contains commands for interacting with root configurations.
 type Cmd struct {
-	List listCmd `cmd:"" help:"List root configurations for the account."`
-	Get  getCmd  `cmd:"" help:"Get a single configuration for the account."`
+	Create createCmd `cmd:"" help:"Create a configuration."`
+	List   listCmd   `cmd:"" help:"List root configurations for the account."`
+	Get    getCmd    `cmd:"" help:"Get a single configuration for the account."`
 
 	Flags upbound.Flags `embed:""`
 }
