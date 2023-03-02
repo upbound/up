@@ -28,7 +28,7 @@ require (
 	github.com/sourcegraph/jsonrpc2 v0.1.0
 	github.com/spf13/afero v1.6.0
 	github.com/spf13/cobra v1.5.0
-	github.com/upbound/up-sdk-go v0.1.1-0.20230222232256-66958111bc23
+	github.com/upbound/up-sdk-go v0.1.1-0.20230302173957-faffb23de55a
 	github.com/willabides/kongplete v0.3.0
 	golang.org/x/sync v0.0.0-20220601150217-0de741cfad7f
 	golang.org/x/term v0.0.0-20210927222741-03fcf44c2211
@@ -234,7 +234,6 @@ replace (
 	github.com/crossplane/crossplane/controller/apiextensions => ./internal/vendor/github.com/crossplane/crossplane/controller/apiextensions
 	github.com/crossplane/crossplane/xcrd => ./internal/vendor/github.com/crossplane/crossplane/xcrd
 	github.com/golang/tools => ./internal/vendor/golang.org/x/tools
-	github.com/upbound/up-sdk-go => /Users/alainroy/dev/up-sdk-go
 	github.com/willabides/kongplete => ./internal/vendor/github.com/WillAbides/kongplete
 
 	// The following replacements should be kept in sync with upstream
