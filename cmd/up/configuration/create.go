@@ -73,7 +73,7 @@ func (c *createCmd) Run(p pterm.TextPrinter, cc *configurations.Client, gc *gits
 		c.Provider = string(configurations.ProviderGitHub)
 	}
 
-	// Step 1: Authorize and ionstall the GitHub app, if it needs to be installed.
+	// Step 1: Authorize and install the GitHub app, if it needs to be installed.
 	err := c.handleLogin(gc, upCtx)
 	if err != nil {
 		return err
