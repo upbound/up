@@ -19,6 +19,7 @@ require (
 	github.com/google/go-containerregistry v0.11.0
 	github.com/google/uuid v1.3.0
 	github.com/goreleaser/nfpm/v2 v2.5.1
+	github.com/pkg/browser v0.0.0-20210911075715-681adbf594b8
 	github.com/pkg/errors v0.9.1
 	github.com/posener/complete v1.2.3
 	github.com/pterm/pterm v0.12.45
@@ -27,7 +28,7 @@ require (
 	github.com/sourcegraph/jsonrpc2 v0.1.0
 	github.com/spf13/afero v1.6.0
 	github.com/spf13/cobra v1.5.0
-	github.com/upbound/up-sdk-go v0.1.1-0.20230222232256-66958111bc23
+	github.com/upbound/up-sdk-go v0.1.1-0.20230302173957-faffb23de55a
 	github.com/willabides/kongplete v0.3.0
 	golang.org/x/sync v0.0.0-20220601150217-0de741cfad7f
 	golang.org/x/term v0.0.0-20210927222741-03fcf44c2211
