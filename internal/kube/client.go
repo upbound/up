@@ -47,15 +47,8 @@ func GetKubeConfig(path string) (*rest.Config, error) {
 }
 
 // BuildControlPlaneKubeconfig builds a kubeconfig entry for a control plane.
-// TODO(hasheddan): consider refactoring this function to be less specific to
-// the one command that consumes it.
-func BuildControlPlaneKubeconfig(proxy *url.URL, id string, token, kube string) (string, error) { //nolint:interfacer
-	po := clientcmd.NewDefaultPathOptions()
-	po.LoadingRules.ExplicitPath = kube
-	conf, err := po.GetStartingConfig()
-	if err != nil {
-		return "", err
-	}
+func BuildControlPlaneKubeconfig(proxy *url.URL, id string, token string) *api.Config { //nolint:interfacer
+	conf := api.NewConfig()
 	key := fmt.Sprintf(UpboundKubeconfigKeyFmt, strings.ReplaceAll(id, "/", "-"))
 	proxy.Path = path.Join(proxy.Path, id, UpboundK8sResource)
 	conf.Clusters[key] = &api.Cluster{
@@ -69,5 +62,27 @@ func BuildControlPlaneKubeconfig(proxy *url.URL, id string, token, kube string) 
 		AuthInfo: key,
 	}
 	conf.CurrentContext = key
-	return key, clientcmd.ModifyConfig(po, *conf, true)
+	return conf
+}
+
+// ApplyControlPlaneKubeconfig applies a control plane kubeconfig to an existing
+// kubeconfig file and sets it as the current context.
+func ApplyControlPlaneKubeconfig(mcpConf *api.Config, existingFilePath string) error {
+	po := clientcmd.NewDefaultPathOptions()
+	po.LoadingRules.ExplicitPath = existingFilePath
+	conf, err := po.GetStartingConfig()
+	if err != nil {
+		return err
+	}
+	for k, v := range mcpConf.Clusters {
+		conf.Clusters[k] = v
+	}
+	for k, v := range mcpConf.AuthInfos {
+		conf.AuthInfos[k] = v
+	}
+	for k, v := range mcpConf.Contexts {
+		conf.Contexts[k] = v
+	}
+	conf.CurrentContext = mcpConf.CurrentContext
+	return clientcmd.ModifyConfig(po, *conf, true)
 }
