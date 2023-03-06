@@ -78,7 +78,7 @@ func (c *depCmd) AfterApply(kongCtx *kong.Context) error {
 		}
 		c.ws = ws
 
-		if err := ws.Parse(); err != nil {
+		if err := ws.Parse(ctx); err != nil {
 			return err
 		}
 	}

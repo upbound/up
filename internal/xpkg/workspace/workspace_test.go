@@ -57,6 +57,7 @@ func init() {
 }
 
 func TestParse(t *testing.T) {
+	ctx := context.Background()
 	cases := map[string]struct {
 		reason string
 		opt    Option
@@ -125,7 +126,7 @@ func TestParse(t *testing.T) {
 		t.Run(name, func(t *testing.T) {
 			ws, _ := New("/ws", tc.opt)
 
-			if diff := cmp.Diff(tc.err, ws.Parse(), test.EquateErrors()); diff != "" {
+			if diff := cmp.Diff(tc.err, ws.Parse(ctx), test.EquateErrors()); diff != "" {
 				t.Errorf("\n%s\nParse(...): -want error, +got error:\n%s", tc.reason, diff)
 			}
 			if len(tc.nodes) != len(ws.view.nodes) {

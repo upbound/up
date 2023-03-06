@@ -169,8 +169,7 @@ func (s *Server) DidChange(ctx context.Context, params *protocol.DidChangeTextDo
 		return
 	}
 
-	// nolint contextcheck because it seems like a linter error.
-	if err := s.snap.ReParseFile(filename); err != nil { // nolint:contextcheck
+	if err := s.snap.ReParseFile(ctx, filename); err != nil {
 		s.log.Debug(err.Error())
 		return
 	}

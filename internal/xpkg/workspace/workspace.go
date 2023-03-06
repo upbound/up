@@ -148,7 +148,7 @@ func (w *Workspace) Write(m *meta.Meta) error {
 }
 
 // Parse parses the full workspace in order to hydrate the workspace's View.
-func (w *Workspace) Parse() error {
+func (w *Workspace) Parse(ctx context.Context) error {
 	w.mu.Lock()
 	defer w.mu.Unlock()
 
@@ -179,7 +179,7 @@ func (w *Workspace) Parse() error {
 			NodeIDs: make(map[NodeIdentifier]struct{}),
 		}
 
-		_ = w.view.ParseFile(p)
+		_ = w.view.ParseFile(ctx, p)
 		return nil
 	})
 }
@@ -192,7 +192,7 @@ func (w *Workspace) View() *View {
 
 // ParseFile parses all YAML objects at the given path and updates the workspace
 // node cache.
-func (v *View) ParseFile(path string) error {
+func (v *View) ParseFile(ctx context.Context, path string) error {
 	details, ok := v.uriToDetails[span.URIFromPath(path)]
 	if !ok {
 		return errors.New(errInvalidFileURI)
@@ -209,7 +209,7 @@ func (v *View) ParseFile(path string) error {
 				path:     path,
 				rootNode: true,
 			}
-			if _, err := v.parseDoc(pCtx); err != nil {
+			if _, err := v.parseDoc(ctx, pCtx); err != nil {
 				// We attempt to parse subsequent documents if we encounter an error
 				// in a preceding one.
 				// TODO(hasheddan): errors should be aggregated and returned as
@@ -231,7 +231,7 @@ type parseContext struct {
 
 // parseDoc recursively parses a YAML document into PackageNodes. Embedded nodes
 // are added to the parent's list of dependants.
-func (v *View) parseDoc(pCtx parseContext) (NodeIdentifier, error) { //nolint:gocyclo
+func (v *View) parseDoc(ctx context.Context, pCtx parseContext) (NodeIdentifier, error) { //nolint:gocyclo
 	b, err := pCtx.node.MarshalYAML()
 	if err != nil {
 		return NodeIdentifier{}, err
@@ -262,15 +262,15 @@ func (v *View) parseDoc(pCtx parseContext) (NodeIdentifier, error) { //nolint:go
 			return NodeIdentifier{}, err
 		}
 	case xpextv1.CompositionKind:
-		if err := v.parseComposition(pCtx); err != nil {
+		if err := v.parseComposition(ctx, pCtx); err != nil {
 			return NodeIdentifier{}, err
 		}
 	case pkgmetav1.ConfigurationKind:
-		if err := v.parseMeta(pCtx); err != nil {
+		if err := v.parseMeta(ctx, pCtx); err != nil {
 			return NodeIdentifier{}, err
 		}
 	case pkgmetav1.ProviderKind:
-		if err := v.parseMeta(pCtx); err != nil {
+		if err := v.parseMeta(ctx, pCtx); err != nil {
 			return NodeIdentifier{}, err
 		}
 	default:
@@ -294,14 +294,14 @@ func (v *View) parseDoc(pCtx parseContext) (NodeIdentifier, error) { //nolint:go
 	return id, nil
 }
 
-func (v *View) parseComposition(ctx parseContext) error {
+func (v *View) parseComposition(ctx context.Context, pCtx parseContext) error {
 	var cp xpextv1.Composition
-	if err := k8syaml.Unmarshal(ctx.docBytes, &cp); err != nil {
+	if err := k8syaml.Unmarshal(pCtx.docBytes, &cp); err != nil {
 		// we have a composition but failed to unmarshal it, skip for now.
 		return nil // nolint:nilerr
 	}
 
-	resNode, err := compResources.FilterNode(ctx.node)
+	resNode, err := compResources.FilterNode(pCtx.node)
 	if err != nil {
 		return err
 	}
@@ -333,10 +333,10 @@ func (v *View) parseComposition(ctx parseContext) error {
 			// TODO(hasheddan): surface this error as a diagnostic.
 			continue
 		}
-		ctx.node = sNode
-		ctx.rootNode = false
+		pCtx.node = sNode
+		pCtx.rootNode = false
 
-		id, err := v.parseDoc(ctx)
+		id, err := v.parseDoc(ctx, pCtx)
 		if err != nil {
 			// TODO(hasheddan): surface this error as a diagnostic.
 			continue
@@ -366,9 +366,9 @@ func (v *View) parseExample(ctx parseContext) {
 	}
 }
 
-func (v *View) parseMeta(ctx parseContext) error {
-	v.metaLocation = filepath.Dir(ctx.path)
-	p, err := v.parser.Parse(context.Background(), io.NopCloser(bytes.NewReader(ctx.docBytes)))
+func (v *View) parseMeta(ctx context.Context, pCtx parseContext) error {
+	v.metaLocation = filepath.Dir(pCtx.path)
+	p, err := v.parser.Parse(ctx, io.NopCloser(bytes.NewReader(pCtx.docBytes)))
 	if err != nil {
 		return err
 	}

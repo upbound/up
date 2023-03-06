@@ -183,8 +183,7 @@ func (f *Factory) WatchExt() <-chan cache.Event {
 // init initializes the snapshot with needed details from the workspace
 // and dep manager.
 func (s *Snapshot) init(ctx context.Context) error {
-	// nolint contextcheck because it seems like a linter error.
-	if err := s.w.Parse(); err != nil { //nolint:contextcheck
+	if err := s.w.Parse(ctx); err != nil {
 		return err
 	}
 
@@ -270,10 +269,10 @@ func (s *Snapshot) Package(name string) *mxpkg.ParsedPackage {
 // ReParseFile re-parses the file at the given path. This is only useful in
 // cases where our snapshot representation has changed prior to the given file
 // being saved.
-func (s *Snapshot) ReParseFile(path string) error {
+func (s *Snapshot) ReParseFile(ctx context.Context, path string) error {
 	s.mu.Lock()
 	defer s.mu.Unlock()
-	return s.wsview.ParseFile(path)
+	return s.wsview.ParseFile(ctx, path)
 }
 
 // UpdateContent updates the current in-memory content representation for the
