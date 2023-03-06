@@ -20,8 +20,8 @@ import (
 	"time"
 
 	"github.com/alecthomas/kong"
+	"github.com/crossplane/crossplane-runtime/pkg/errors"
 	"github.com/google/uuid"
-	"github.com/pkg/errors"
 	"github.com/pterm/pterm"
 	"k8s.io/apimachinery/pkg/util/duration"
 

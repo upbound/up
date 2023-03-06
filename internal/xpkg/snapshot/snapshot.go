@@ -141,7 +141,7 @@ func NewFactory(workdir string, opts ...FactoryOption) (*Factory, error) {
 }
 
 // New constructs a new Snapshot at the given workdir, with the supplied logger.
-func (f *Factory) New(opts ...Option) (*Snapshot, error) {
+func (f *Factory) New(ctx context.Context, opts ...Option) (*Snapshot, error) {
 	s := &Snapshot{
 		// log is not set to a default so that we can share the logger consistently
 		// with the corresponding subsystems.
@@ -167,7 +167,7 @@ func (f *Factory) New(opts ...Option) (*Snapshot, error) {
 		o(s)
 	}
 
-	if err := s.init(); err != nil {
+	if err := s.init(ctx); err != nil {
 		return nil, err
 	}
 
@@ -182,8 +182,9 @@ func (f *Factory) WatchExt() <-chan cache.Event {
 
 // init initializes the snapshot with needed details from the workspace
 // and dep manager.
-func (s *Snapshot) init() error {
-	if err := s.w.Parse(); err != nil {
+func (s *Snapshot) init(ctx context.Context) error {
+	// nolint contextcheck because it seems like a linter error.
+	if err := s.w.Parse(); err != nil { //nolint:contextcheck
 		return err
 	}
 
@@ -195,7 +196,7 @@ func (s *Snapshot) init() error {
 		if err != nil {
 			return err
 		}
-		extView, err := s.dm.View(context.Background(), deps)
+		extView, err := s.dm.View(ctx, deps)
 		if err != nil {
 			return err
 		}
@@ -204,7 +205,7 @@ func (s *Snapshot) init() error {
 		for _, pkg := range extView.Packages() {
 
 			for _, o := range pkg.Objects() {
-				validators, err := ValidatorsForObj(o, s)
+				validators, err := ValidatorsForObj(ctx, o, s)
 				if err != nil {
 					// skip adding the validator
 					continue
@@ -219,7 +220,7 @@ func (s *Snapshot) init() error {
 	}
 
 	// initialize snapshot validators with workspace validators
-	if err := s.loadWSValidators(); err != nil {
+	if err := s.loadWSValidators(ctx); err != nil {
 		return err
 	}
 
@@ -350,9 +351,9 @@ func (s *Snapshot) updateChanges(_ context.Context, uri span.URI, changes []prot
 
 // loadWSValidators processes the details from the parsed workspace, extracting
 // the corresponding validators and applying them to the workspace.
-func (s *Snapshot) loadWSValidators() error { // nolint:gocyclo
+func (s *Snapshot) loadWSValidators(ctx context.Context) error { // nolint:gocyclo
 	for _, d := range s.wsview.FileDetails() {
-		validators, err := s.validatorsFromBytes(d.Body)
+		validators, err := s.validatorsFromBytes(ctx, d.Body)
 		if err != nil {
 			continue
 		}
@@ -363,7 +364,7 @@ func (s *Snapshot) loadWSValidators() error { // nolint:gocyclo
 	return nil
 }
 
-func (s *Snapshot) validatorsFromBytes(b []byte) (map[schema.GroupVersionKind]validator.Validator, error) {
+func (s *Snapshot) validatorsFromBytes(ctx context.Context, b []byte) (map[schema.GroupVersionKind]validator.Validator, error) {
 	result := map[schema.GroupVersionKind]validator.Validator{}
 
 	yr := apimachyaml.NewYAMLReader(bufio.NewReader(bytes.NewReader(b)))
@@ -391,7 +392,7 @@ func (s *Snapshot) validatorsFromBytes(b []byte) (map[schema.GroupVersionKind]va
 			}
 		}
 
-		validators, err := ValidatorsForObj(o, s)
+		validators, err := ValidatorsForObj(ctx, o, s)
 		if err != nil {
 			// skip YAML document if we cannot acquire validators for object
 			continue
@@ -406,10 +407,10 @@ func (s *Snapshot) validatorsFromBytes(b []byte) (map[schema.GroupVersionKind]va
 }
 
 // ValidateAllFiles performs validations on all files in Snapshot.
-func (s *Snapshot) ValidateAllFiles() (map[span.URI][]protocol.Diagnostic, error) {
+func (s *Snapshot) ValidateAllFiles(ctx context.Context) (map[span.URI][]protocol.Diagnostic, error) {
 	results := make(map[span.URI][]protocol.Diagnostic)
 	for f := range s.wsview.FileDetails() {
-		diags, _ := s.Validate(f)
+		diags, _ := s.Validate(ctx, f)
 		results[f] = diags
 	}
 	return results, nil
@@ -418,13 +419,13 @@ func (s *Snapshot) ValidateAllFiles() (map[span.URI][]protocol.Diagnostic, error
 // ValidateMeta performs validations specifically on the meta file. This is
 // specifically helpful when performing background validations and not
 // responding to validation requests synchronously.
-func (s *Snapshot) ValidateMeta() (span.URI, []protocol.Diagnostic, error) {
+func (s *Snapshot) ValidateMeta(ctx context.Context) (span.URI, []protocol.Diagnostic, error) {
 	if s.wsview.MetaLocation() == "" {
 		// nothing to do here, there is no crossplane.yaml in this snapshot
 		return "", nil, os.ErrNotExist
 	}
 	uri := span.URIFromPath(filepath.Join(s.wsview.MetaLocation(), xpkg.MetaFile))
-	diags, _ := s.Validate(uri)
+	diags, _ := s.Validate(ctx, uri)
 	return uri, diags, nil
 }
 
@@ -432,7 +433,7 @@ func (s *Snapshot) ValidateMeta() (span.URI, []protocol.Diagnostic, error) {
 // for any validation errors encountered.
 // TODO(hasheddan): consider decoupling forming diagnostics from getting
 // validation errors.
-func (s *Snapshot) Validate(uri span.URI) ([]protocol.Diagnostic, error) { // nolint:gocyclo
+func (s *Snapshot) Validate(ctx context.Context, uri span.URI) ([]protocol.Diagnostic, error) { // nolint:gocyclo
 	s.mu.RLock()
 	defer s.mu.RUnlock()
 	diags := []protocol.Diagnostic{}
@@ -458,7 +459,7 @@ func (s *Snapshot) Validate(uri span.URI) ([]protocol.Diagnostic, error) { // no
 			continue
 		}
 
-		diags = append(diags, validationDiagnostics(v.Validate(n.GetObject()), n.GetAST(), n.GetGVK())...)
+		diags = append(diags, validationDiagnostics(v.Validate(ctx, n.GetObject()), n.GetAST(), n.GetGVK())...)
 	}
 	return diags, nil
 }

@@ -21,8 +21,8 @@ import (
 	"path/filepath"
 	"strings"
 
+	"github.com/crossplane/crossplane-runtime/pkg/errors"
 	"github.com/google/go-containerregistry/pkg/v1/mutate"
-	"github.com/pkg/errors"
 	"github.com/spf13/afero"
 	"github.com/spf13/afero/tarfs"
 	"k8s.io/apimachinery/pkg/runtime"

@@ -204,12 +204,12 @@ func (v *View) ParseFile(path string) error {
 	}
 	for _, doc := range f.Docs {
 		if doc.Body != nil {
-			ctx := parseContext{
+			pCtx := parseContext{
 				node:     doc,
 				path:     path,
 				rootNode: true,
 			}
-			if _, err := v.parseDoc(ctx); err != nil {
+			if _, err := v.parseDoc(pCtx); err != nil {
 				// We attempt to parse subsequent documents if we encounter an error
 				// in a preceding one.
 				// TODO(hasheddan): errors should be aggregated and returned as
@@ -231,12 +231,12 @@ type parseContext struct {
 
 // parseDoc recursively parses a YAML document into PackageNodes. Embedded nodes
 // are added to the parent's list of dependants.
-func (v *View) parseDoc(ctx parseContext) (NodeIdentifier, error) { //nolint:gocyclo
-	b, err := ctx.node.MarshalYAML()
+func (v *View) parseDoc(pCtx parseContext) (NodeIdentifier, error) { //nolint:gocyclo
+	b, err := pCtx.node.MarshalYAML()
 	if err != nil {
 		return NodeIdentifier{}, err
 	}
-	ctx.docBytes = b
+	pCtx.docBytes = b
 
 	var obj unstructured.Unstructured
 	// NOTE(hasheddan): unmarshal returns an error if Kind is not defined.
@@ -248,47 +248,47 @@ func (v *View) parseDoc(ctx parseContext) (NodeIdentifier, error) { //nolint:goc
 	if err := k8syaml.Unmarshal(b, &obj); err != nil {
 		return NodeIdentifier{}, err
 	}
-	ctx.obj = obj
+	pCtx.obj = obj
 	// NOTE(hasheddan): if we are at document root (i.e. this is a
 	// DocumentNode), we must set the underlying ast.Node to the document body
 	// so that we can access child nodes generically in validation.
-	if doc, ok := ctx.node.(*ast.DocumentNode); ok {
-		ctx.node = doc.Body
+	if doc, ok := pCtx.node.(*ast.DocumentNode); ok {
+		pCtx.node = doc.Body
 	}
 
 	switch obj.GetKind() {
 	case xpextv1.CompositeResourceDefinitionKind:
-		if err := v.parseXRD(ctx); err != nil {
+		if err := v.parseXRD(pCtx); err != nil {
 			return NodeIdentifier{}, err
 		}
 	case xpextv1.CompositionKind:
-		if err := v.parseComposition(ctx); err != nil {
+		if err := v.parseComposition(pCtx); err != nil {
 			return NodeIdentifier{}, err
 		}
 	case pkgmetav1.ConfigurationKind:
-		if err := v.parseMeta(ctx); err != nil {
+		if err := v.parseMeta(pCtx); err != nil {
 			return NodeIdentifier{}, err
 		}
 	case pkgmetav1.ProviderKind:
-		if err := v.parseMeta(ctx); err != nil {
+		if err := v.parseMeta(pCtx); err != nil {
 			return NodeIdentifier{}, err
 		}
 	default:
-		v.parseExample(ctx)
+		v.parseExample(pCtx)
 	}
 	// TODO(hasheddan): if this is an embedded resource we don't have a name so
 	// we should form a deterministic name based on its parent Composition.
 	id := nodeID(obj.GetName(), obj.GroupVersionKind())
 
 	v.nodes[id] = &PackageNode{
-		ast:      ctx.node,
-		fileName: ctx.path,
+		ast:      pCtx.node,
+		fileName: pCtx.path,
 		gvk:      obj.GroupVersionKind(),
 		obj:      &obj,
 	}
 
-	if ctx.rootNode {
-		v.appendID(ctx.path, id)
+	if pCtx.rootNode {
+		v.appendID(pCtx.path, id)
 	}
 
 	return id, nil

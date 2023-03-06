@@ -15,9 +15,10 @@
 package snapshot
 
 import (
+	"context"
 	"encoding/json"
 
-	"github.com/pkg/errors"
+	"github.com/crossplane/crossplane-runtime/pkg/errors"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/kube-openapi/pkg/validation/spec"
@@ -46,7 +47,7 @@ const (
 )
 
 // ValidatorsForObj returns a mapping of GVK -> validator for the given runtime.Object.
-func ValidatorsForObj(o runtime.Object, s *Snapshot) (map[schema.GroupVersionKind]*validator.ObjectValidator, error) { // nolint:gocyclo
+func ValidatorsForObj(ctx context.Context, o runtime.Object, s *Snapshot) (map[schema.GroupVersionKind]*validator.ObjectValidator, error) { // nolint:gocyclo
 	validators := make(map[schema.GroupVersionKind]*validator.ObjectValidator)
 
 	switch rd := o.(type) {
@@ -63,7 +64,7 @@ func ValidatorsForObj(o runtime.Object, s *Snapshot) (map[schema.GroupVersionKin
 			return nil, err
 		}
 	case *xpextv1.CompositeResourceDefinition:
-		if err := validatorsFromV1XRD(rd, validators); err != nil {
+		if err := validatorsFromV1XRD(ctx, rd, validators); err != nil {
 			// XR validators failed we should log this and move on
 			s.log.Debug(errFailedToGetValidatorsXRD, "info", err)
 		}
@@ -114,7 +115,7 @@ func validatorsFromV1Beta1CRD(c *extv1beta1.CustomResourceDefinition, acc map[sc
 			return err
 		}
 		for _, v := range internal.Spec.Versions {
-			appendToValidators(gvk(internal.Spec.Group, v.Name, internal.Spec.Names.Kind), acc, sv)
+			appendToValidators(gvk(internal.Spec.Group, v.Name, internal.Spec.Names.Kind), acc, validator.NewUsingContext(sv))
 		}
 		return nil
 	}
@@ -123,7 +124,7 @@ func validatorsFromV1Beta1CRD(c *extv1beta1.CustomResourceDefinition, acc map[sc
 		if err != nil {
 			return err
 		}
-		appendToValidators(gvk(internal.Spec.Group, v.Name, internal.Spec.Names.Kind), acc, sv)
+		appendToValidators(gvk(internal.Spec.Group, v.Name, internal.Spec.Names.Kind), acc, validator.NewUsingContext(sv))
 	}
 
 	return nil
@@ -136,7 +137,7 @@ func validatorsFromV1CRD(c *extv1.CustomResourceDefinition, acc map[schema.Group
 		if err != nil {
 			return err
 		}
-		appendToValidators(gvk(c.Spec.Group, v.Name, c.Spec.Names.Kind), acc, sv)
+		appendToValidators(gvk(c.Spec.Group, v.Name, c.Spec.Names.Kind), acc, validator.NewUsingContext(sv))
 	}
 
 	return nil
@@ -158,16 +159,16 @@ func validatorsFromV1Beta1XRD(x *xpextv1beta1.CompositeResourceDefinition, acc m
 			}
 
 			if x.Spec.ClaimNames != nil {
-				appendToValidators(gvk(x.Spec.Group, v.Name, x.Spec.ClaimNames.Kind), acc, sv)
+				appendToValidators(gvk(x.Spec.Group, v.Name, x.Spec.ClaimNames.Kind), acc, validator.NewUsingContext(sv))
 			}
-			appendToValidators(gvk(x.Spec.Group, v.Name, x.Spec.Names.Kind), acc, sv)
+			appendToValidators(gvk(x.Spec.Group, v.Name, x.Spec.Names.Kind), acc, validator.NewUsingContext(sv))
 		}
 	}
 	return nil
 }
 
-func validatorsFromV1XRD(x *xpextv1.CompositeResourceDefinition, acc map[schema.GroupVersionKind]*validator.ObjectValidator) error {
-	errs := validateOpenAPIV3Schema(x)
+func validatorsFromV1XRD(ctx context.Context, x *xpextv1.CompositeResourceDefinition, acc map[schema.GroupVersionKind]*validator.ObjectValidator) error {
+	errs := validateOpenAPIV3Schema(ctx, x)
 	if len(errs) != 0 {
 		// NOTE (@tnthornton) we're using this as a mechanism to ensure we don't
 		// cause upstream validators to panic while evaluating a broken schema.
@@ -191,9 +192,9 @@ func validatorsFromV1XRD(x *xpextv1.CompositeResourceDefinition, acc map[schema.
 			}
 
 			if x.Spec.ClaimNames != nil {
-				appendToValidators(gvk(x.Spec.Group, v.Name, x.Spec.ClaimNames.Kind), acc, sv)
+				appendToValidators(gvk(x.Spec.Group, v.Name, x.Spec.ClaimNames.Kind), acc, validator.NewUsingContext(sv))
 			}
-			appendToValidators(gvk(x.Spec.Group, v.Name, x.Spec.Names.Kind), acc, sv)
+			appendToValidators(gvk(x.Spec.Group, v.Name, x.Spec.Names.Kind), acc, validator.NewUsingContext(sv))
 		}
 	}
 	return nil

@@ -57,7 +57,7 @@ func DefaultXRDValidators() (validator.Validator, error) {
 
 // Validate performs validation rules on the given data input per the rules
 // defined for the Validator.
-func (x *XRDValidator) Validate(data any) *validate.Result {
+func (x *XRDValidator) Validate(ctx context.Context, data any) *validate.Result {
 	xrd, err := x.Marshal(data)
 	if err != nil {
 		// TODO(@tnthornton) add debug logging
@@ -67,7 +67,7 @@ func (x *XRDValidator) Validate(data any) *validate.Result {
 	errs := make([]error, 0)
 
 	for _, v := range x.validators {
-		errs = append(errs, v.validate(xrd)...)
+		errs = append(errs, v.validate(ctx, xrd)...)
 	}
 
 	return &validate.Result{
@@ -97,7 +97,7 @@ func (x *XRDValidator) Marshal(data any) (*xpextv1.CompositeResourceDefinition, 
 }
 
 type xrdValidator interface {
-	validate(*xpextv1.CompositeResourceDefinition) []error
+	validate(context.Context, *xpextv1.CompositeResourceDefinition) []error
 }
 
 // XRDSchemaValidator validates XRD schema definitions.
@@ -108,9 +108,9 @@ func NewXRDSchemaValidator() *XRDSchemaValidator {
 	return &XRDSchemaValidator{}
 }
 
-func (v *XRDSchemaValidator) validate(xrd *xpextv1.CompositeResourceDefinition) []error {
+func (v *XRDSchemaValidator) validate(ctx context.Context, xrd *xpextv1.CompositeResourceDefinition) []error {
 
-	errs := validateOpenAPIV3Schema(xrd)
+	errs := validateOpenAPIV3Schema(ctx, xrd)
 
 	errList := []error{}
 
@@ -134,7 +134,7 @@ func (v *XRDSchemaValidator) validate(xrd *xpextv1.CompositeResourceDefinition) 
 
 // validateOpenAPIV3Schema validates the spec.versions[*].schema.openAPIV3Schema
 // section of the given XRD definition.
-func validateOpenAPIV3Schema(xrd *xpextv1.CompositeResourceDefinition) []error {
+func validateOpenAPIV3Schema(ctx context.Context, xrd *xpextv1.CompositeResourceDefinition) []error {
 	crd, err := xcrd.ForCompositeResource(xrd)
 	if err != nil {
 		return nil
@@ -147,7 +147,7 @@ func validateOpenAPIV3Schema(xrd *xpextv1.CompositeResourceDefinition) []error {
 		return nil
 	}
 	// TODO(hasheddan): propagate actual context to validation.
-	felist := validation.ValidateCustomResourceDefinition(context.TODO(), internal)
+	felist := validation.ValidateCustomResourceDefinition(ctx, internal)
 	if felist != nil {
 		return felist.ToAggregate().Errors()
 	}

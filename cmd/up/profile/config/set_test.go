@@ -15,17 +15,16 @@
 package config
 
 import (
-	"io/ioutil"
 	"os"
 	"testing"
 
+	"github.com/crossplane/crossplane-runtime/pkg/errors"
 	"github.com/crossplane/crossplane-runtime/pkg/test"
 	"github.com/google/go-cmp/cmp"
-	"github.com/pkg/errors"
 )
 
 func TestSetValidateInput(t *testing.T) {
-	tf, _ := ioutil.TempFile("", "")
+	tf, _ := os.CreateTemp("", "")
 
 	type args struct {
 		key   string

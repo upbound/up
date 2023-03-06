@@ -128,7 +128,7 @@ func (s *Server) Initialize(ctx context.Context, conn *jsonrpc2.Conn, id jsonrpc
 
 	s.snapFactory = factory
 
-	snap, err := s.snapFactory.New()
+	snap, err := s.snapFactory.New(ctx)
 	if err != nil {
 		panic(err)
 	}
@@ -169,14 +169,15 @@ func (s *Server) DidChange(ctx context.Context, params *protocol.DidChangeTextDo
 		return
 	}
 
-	if err := s.snap.ReParseFile(filename); err != nil {
+	// nolint contextcheck because it seems like a linter error.
+	if err := s.snap.ReParseFile(filename); err != nil { // nolint:contextcheck
 		s.log.Debug(err.Error())
 		return
 	}
 
 	// TODO(hasheddan): diagnostics should be cached and validation should
 	// be performed selectively.
-	diags, err := s.snap.Validate(params.TextDocument.URI.SpanURI())
+	diags, err := s.snap.Validate(ctx, params.TextDocument.URI.SpanURI())
 	if err != nil {
 		s.log.Debug(errValidateNodes, "error", err)
 		return
@@ -190,7 +191,7 @@ func (s *Server) DidChange(ctx context.Context, params *protocol.DidChangeTextDo
 
 // DidOpen handles calls to DidOpen.
 func (s *Server) DidOpen(ctx context.Context, params *protocol.DidOpenTextDocumentParams) {
-	diags, err := s.snap.Validate(params.TextDocument.URI.SpanURI())
+	diags, err := s.snap.Validate(ctx, params.TextDocument.URI.SpanURI())
 	if err != nil {
 		s.log.Debug(errValidateNodes, "error", err)
 		return
@@ -207,14 +208,14 @@ func (s *Server) DidSave(ctx context.Context, params *protocol.DidSaveTextDocume
 	s.mu.Lock()
 	defer s.mu.Unlock()
 	// create new snapshot here
-	snap, err := s.snapFactory.New()
+	snap, err := s.snapFactory.New(ctx)
 	if err != nil {
 		s.log.Debug(errParseWorkspace, "error", err)
 		return
 	}
 	s.snap = snap
 
-	diags, err := s.snap.Validate(params.TextDocument.URI.SpanURI())
+	diags, err := s.snap.Validate(ctx, params.TextDocument.URI.SpanURI())
 	if err != nil {
 		s.log.Debug(errValidateNodes, "error", err)
 		return
@@ -231,7 +232,7 @@ func (s *Server) DidChangeWatchedFiles(ctx context.Context, params *protocol.Did
 	s.mu.Lock()
 	defer s.mu.Unlock()
 
-	snap, err := s.snapFactory.New()
+	snap, err := s.snapFactory.New(ctx)
 	if err != nil {
 		s.log.Debug(errParseWorkspace, "error", err)
 		return
@@ -242,7 +243,7 @@ func (s *Server) DidChangeWatchedFiles(ctx context.Context, params *protocol.Did
 	for _, c := range params.Changes {
 		// only attempt to handle changes for files
 		if strings.HasPrefix(c.URI.SpanURI().Filename(), fileProtocol) {
-			diags, err := s.snap.Validate(c.URI.SpanURI())
+			diags, err := s.snap.Validate(ctx, c.URI.SpanURI())
 			if err != nil {
 				s.log.Debug(errValidateNodes, "error", err)
 				return
@@ -297,7 +298,7 @@ func (s *Server) registerWatchFilesCapability(ctx context.Context) {
 
 func (s *Server) checkForUpdates(ctx context.Context) {
 	go func() {
-		local, remote, ok := s.i.CanUpgrade()
+		local, remote, ok := s.i.CanUpgrade(ctx)
 		if !ok {
 			// can't upgrade, nothing to do
 			return
@@ -312,7 +313,7 @@ func (s *Server) checkForUpdates(ctx context.Context) {
 
 func (s *Server) checkMetaFile(ctx context.Context) {
 	go func() {
-		uri, diags, err := s.snap.ValidateMeta()
+		uri, diags, err := s.snap.ValidateMeta(ctx)
 		if err != nil {
 			s.log.Debug(errValidateMeta, "error", err)
 			return
@@ -336,7 +337,7 @@ func (s *Server) watchSnapshot(ctx context.Context) { // nolint:gocyclo
 			go func() {
 				s.mu.Lock()
 				defer s.mu.Unlock()
-				snap, err := s.snapFactory.New()
+				snap, err := s.snapFactory.New(ctx)
 				if err != nil {
 					s.log.Debug(err.Error())
 				}
@@ -344,7 +345,7 @@ func (s *Server) watchSnapshot(ctx context.Context) { // nolint:gocyclo
 
 				params := make([]*protocol.PublishDiagnosticsParams, 0)
 
-				validations, err := snap.ValidateAllFiles()
+				validations, err := snap.ValidateAllFiles(ctx)
 				if err != nil {
 					s.log.Debug(err.Error())
 					return

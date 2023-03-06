@@ -4,7 +4,6 @@ go 1.18
 
 require (
 	github.com/Masterminds/semver v1.5.0
-	github.com/Masterminds/semver/v3 v3.1.1
 	github.com/alecthomas/kong v0.6.1
 	github.com/crossplane/crossplane v1.5.0
 	github.com/crossplane/crossplane-runtime v0.15.1-0.20210930095326-d5661210733b
@@ -12,7 +11,7 @@ require (
 	github.com/crossplane/crossplane/xcrd v0.0.0-00010101000000-000000000000
 	github.com/docker/docker-credential-helpers v0.6.4
 	github.com/goccy/go-yaml v1.9.5-0.20211210133106-251b4db627e0
-	github.com/golang-jwt/jwt v3.2.1+incompatible
+	github.com/golang-jwt/jwt v3.2.2+incompatible
 	github.com/golang/tools v0.1.7
 	github.com/google/addlicense v1.0.0
 	github.com/google/go-cmp v0.5.8
@@ -20,7 +19,6 @@ require (
 	github.com/google/uuid v1.3.0
 	github.com/goreleaser/nfpm/v2 v2.5.1
 	github.com/pkg/browser v0.0.0-20210911075715-681adbf594b8
-	github.com/pkg/errors v0.9.1
 	github.com/posener/complete v1.2.3
 	github.com/pterm/pterm v0.12.45
 	github.com/radovskyb/watcher v1.0.7
@@ -60,6 +58,7 @@ require (
 	github.com/BurntSushi/toml v1.0.0 // indirect
 	github.com/MakeNowJust/heredoc v0.0.0-20170808103936-bb23615498cd // indirect
 	github.com/Masterminds/goutils v1.1.1 // indirect
+	github.com/Masterminds/semver/v3 v3.1.1 // indirect
 	github.com/Masterminds/sprig v2.22.0+incompatible // indirect
 	github.com/Masterminds/sprig/v3 v3.2.2 // indirect
 	github.com/Masterminds/squirrel v1.5.2 // indirect
@@ -163,6 +162,7 @@ require (
 	github.com/opencontainers/go-digest v1.0.0 // indirect
 	github.com/opencontainers/image-spec v1.0.3-0.20220114050600-8b9d41f48198 // indirect
 	github.com/peterbourgon/diskv v2.0.1+incompatible // indirect
+	github.com/pkg/errors v0.9.1 // indirect
 	github.com/pmezard/go-difflib v1.0.0 // indirect
 	github.com/prometheus/client_golang v1.12.1 // indirect
 	github.com/prometheus/client_model v0.2.0 // indirect

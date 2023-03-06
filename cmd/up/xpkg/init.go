@@ -18,9 +18,9 @@ import (
 	"path"
 	"path/filepath"
 
-	"github.com/Masterminds/semver/v3"
+	"github.com/Masterminds/semver"
+	"github.com/crossplane/crossplane-runtime/pkg/errors"
 	v1 "github.com/crossplane/crossplane/apis/pkg/meta/v1"
-	"github.com/pkg/errors"
 	"github.com/pterm/pterm"
 	"github.com/spf13/afero"
 

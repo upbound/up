@@ -63,7 +63,7 @@ func DefaultCompositionValidators(s *Snapshot) (validator.Validator, error) {
 
 // Validate performs validation rules on the given data input per the rules
 // defined for the Validator.
-func (c *CompositionValidator) Validate(data any) *validate.Result {
+func (c *CompositionValidator) Validate(ctx context.Context, data any) *validate.Result {
 	errs := []error{}
 
 	comp, err := c.marshal(data)
@@ -77,7 +77,7 @@ func (c *CompositionValidator) Validate(data any) *validate.Result {
 	)
 
 	r := icomposite.NewReconciler(resource.CompositeKind(compRefGVK), icomposite.WithLogger(c.s.log))
-	cds, err := r.Reconcile(context.Background(), comp)
+	cds, err := r.Reconcile(ctx, comp)
 	if err != nil {
 		// some validation errors occur during reconciliation that we want to
 		// send to the end user.
@@ -92,7 +92,7 @@ func (c *CompositionValidator) Validate(data any) *validate.Result {
 	if len(errs) == 0 {
 		for i, cd := range cds {
 			for _, v := range c.validators {
-				errs = append(errs, v.validate(i, cd)...)
+				errs = append(errs, v.validate(ctx, i, cd)...)
 			}
 		}
 	}
@@ -129,7 +129,7 @@ func (c *CompositionValidator) marshal(data any) (*xpextv1.Composition, error) {
 }
 
 type compositionValidator interface {
-	validate(int, resource.Composed) []error
+	validate(context.Context, int, resource.Composed) []error
 }
 
 // PatchesValidator validates the patches fields of a Composition.
@@ -146,14 +146,14 @@ func NewPatchesValidator(s *Snapshot) *PatchesValidator {
 
 // Validate validates that the composed resource is valid per the base
 // resource's schema.
-func (p *PatchesValidator) validate(idx int, cd resource.Composed) []error {
+func (p *PatchesValidator) validate(ctx context.Context, idx int, cd resource.Composed) []error {
 	cdgvk := cd.GetObjectKind().GroupVersionKind()
 	v, ok := p.s.validators[cdgvk]
 	if !ok {
 		return gvkDNEWarning(cdgvk, fmt.Sprintf(resourceBaseFmt, idx, "apiVersion"))
 	}
 
-	result := v.Validate(cd)
+	result := v.Validate(ctx, cd)
 	if result != nil {
 		errs := []error{}
 		for _, e := range result.Errors {

@@ -16,6 +16,7 @@ package version
 
 import (
 	"bytes"
+	"context"
 	"errors"
 	"fmt"
 	"io"
@@ -143,7 +144,7 @@ func TestGetCurrent(t *testing.T) {
 
 	for _, tc := range cases {
 
-		version, err := tc.args.i.getCurrent()
+		version, err := tc.args.i.getCurrent(context.Background())
 
 		if diff := cmp.Diff(tc.want.version, version); diff != "" {
 			t.Errorf("\n%s\nGetCurrent(...): -want err, +got err:\n%s", tc.reason, diff)

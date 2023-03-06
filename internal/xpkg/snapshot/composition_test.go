@@ -15,6 +15,7 @@
 package snapshot
 
 import (
+	"context"
 	"encoding/json"
 	"testing"
 
@@ -38,6 +39,7 @@ import (
 func TestCompositionValidation(t *testing.T) {
 	objScheme, _ := scheme.BuildObjectScheme()
 	metaScheme, _ := scheme.BuildMetaScheme()
+	ctx := context.Background()
 
 	s := &Snapshot{
 		objScheme:  objScheme,
@@ -119,7 +121,7 @@ func TestCompositionValidation(t *testing.T) {
 					},
 				},
 				validators: func() map[schema.GroupVersionKind]validator.Validator {
-					v, _ := s.validatorsFromBytes(testSingleVersionCRD)
+					v, _ := s.validatorsFromBytes(ctx, testSingleVersionCRD)
 					return v
 				}(),
 			},
@@ -181,7 +183,7 @@ func TestCompositionValidation(t *testing.T) {
 					},
 				},
 				validators: func() map[schema.GroupVersionKind]validator.Validator {
-					v, _ := s.validatorsFromBytes(testSingleVersionCRD)
+					v, _ := s.validatorsFromBytes(ctx, testSingleVersionCRD)
 					return v
 				}(),
 			},
@@ -246,7 +248,7 @@ func TestCompositionValidation(t *testing.T) {
 					},
 				},
 				validators: func() map[schema.GroupVersionKind]validator.Validator {
-					v, _ := s.validatorsFromBytes(testSingleVersionCRD)
+					v, _ := s.validatorsFromBytes(ctx, testSingleVersionCRD)
 					return v
 				}(),
 			},
@@ -292,7 +294,7 @@ func TestCompositionValidation(t *testing.T) {
 					},
 				},
 				validators: func() map[schema.GroupVersionKind]validator.Validator {
-					v, _ := s.validatorsFromBytes(testSingleVersionCRD)
+					v, _ := s.validatorsFromBytes(ctx, testSingleVersionCRD)
 					return v
 				}(),
 			},
@@ -320,7 +322,7 @@ func TestCompositionValidation(t *testing.T) {
 					},
 				},
 				validators: func() map[schema.GroupVersionKind]validator.Validator {
-					v, _ := s.validatorsFromBytes(testSingleVersionCRD)
+					v, _ := s.validatorsFromBytes(ctx, testSingleVersionCRD)
 					return v
 				}(),
 			},
@@ -356,7 +358,7 @@ func TestCompositionValidation(t *testing.T) {
 					},
 				},
 				validators: func() map[schema.GroupVersionKind]validator.Validator {
-					v, _ := s.validatorsFromBytes(testSingleVersionCRD)
+					v, _ := s.validatorsFromBytes(ctx, testSingleVersionCRD)
 					return v
 				}(),
 			},
@@ -388,7 +390,7 @@ func TestCompositionValidation(t *testing.T) {
 
 			v, _ := DefaultCompositionValidators(s)
 
-			result := v.Validate(&u)
+			result := v.Validate(ctx, &u)
 
 			if diff := cmp.Diff(tc.want.result, result); diff != "" {
 				t.Errorf("\n%s\nCompositionValidation(...): -want error, +got error:\n%s", tc.reason, diff)
