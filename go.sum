@@ -1279,6 +1279,8 @@ github.com/ultraware/funlen v0.0.3/go.mod h1:Dp4UiAus7Wdb9KUZsYWZEWiRzGuM2kXM1lP
 github.com/ultraware/whitespace v0.0.4/go.mod h1:aVMh/gQve5Maj9hQ/hg+F75lr/X5A89uZnzAmWSineA=
 github.com/upbound/up-sdk-go v0.1.1-0.20230302173957-faffb23de55a h1:5yVrx/HuHuf7nm2XQlSrf7Y7BBatj4KpXJ1L1U7odC8=
 github.com/upbound/up-sdk-go v0.1.1-0.20230302173957-faffb23de55a/go.mod h1:9CKfSnGU780w/DLl3WcD0Pb/VPIn5gyX78uCGO8rxu4=
+github.com/upbound/up-sdk-go v0.1.1-0.20230306153040-40ca736ef35b h1:ar1vYCG9fIkkbFTHapQopwodTPb156RNQt6Jz7vA5h8=
+github.com/upbound/up-sdk-go v0.1.1-0.20230306153040-40ca736ef35b/go.mod h1:9CKfSnGU780w/DLl3WcD0Pb/VPIn5gyX78uCGO8rxu4=
 github.com/urfave/cli v1.20.0/go.mod h1:70zkFmudgCuE/ngEzBv17Jvp/497gISqfk5gWijbERA=
 github.com/urfave/cli v1.22.1/go.mod h1:Gos4lmkARVdJ6EkW0WaNv/tZAAMe9V7XWyB60NtXRu0=
 github.com/urfave/cli v1.22.4/go.mod h1:Gos4lmkARVdJ6EkW0WaNv/tZAAMe9V7XWyB60NtXRu0=
