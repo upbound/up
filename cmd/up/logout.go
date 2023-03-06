@@ -41,7 +41,7 @@ func (c *logoutCmd) AfterApply(kongCtx *kong.Context) error {
 		return err
 	}
 	kongCtx.Bind(upCtx)
-	cfg, err := upCtx.BuildSDKConfig(upCtx.Profile.Session)
+	cfg, err := upCtx.BuildSDKConfig()
 	if err != nil {
 		return err
 	}

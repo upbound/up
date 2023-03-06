@@ -191,16 +191,18 @@ func NewFromFlags(f Flags, opts ...Option) (*Context, error) { //nolint:gocyclo
 
 // BuildSDKConfig builds an Upbound SDK config suitable for usage with any
 // service client.
-func (c *Context) BuildSDKConfig(session string) (*up.Config, error) {
+func (c *Context) BuildSDKConfig() (*up.Config, error) {
 	cj, err := cookiejar.New(nil)
 	if err != nil {
 		return nil, err
 	}
-	cj.SetCookies(c.APIEndpoint, []*http.Cookie{{
-		Name:  CookieName,
-		Value: session,
-	},
-	})
+	if c.Profile.Session != "" {
+		cj.SetCookies(c.APIEndpoint, []*http.Cookie{{
+			Name:  CookieName,
+			Value: c.Profile.Session,
+		},
+		})
+	}
 	tr := &http.Transport{
 		TLSClientConfig: &tls.Config{
 			InsecureSkipVerify: c.InsecureSkipTLSVerify, //nolint:gosec
