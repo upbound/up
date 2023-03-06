@@ -30,6 +30,7 @@ import (
 	"github.com/pkg/errors"
 	"github.com/pterm/pterm"
 
+	"github.com/upbound/up-sdk-go/service/userinfo"
 	"github.com/upbound/up/internal/config"
 	uphttp "github.com/upbound/up/internal/http"
 	"github.com/upbound/up/internal/input"
@@ -134,8 +135,9 @@ func (c *loginCmd) Run(p pterm.TextPrinter, upCtx *upbound.Context) error { // n
 	if err != nil {
 		return errors.Wrap(err, errLoginFailed)
 	}
-	upCtx.APIEndpoint.Path = loginPath
-	req, err := http.NewRequestWithContext(ctx, http.MethodPost, upCtx.APIEndpoint.String(), bytes.NewReader(jsonStr))
+	loginEndpoint := *upCtx.APIEndpoint
+	loginEndpoint.Path = loginPath
+	req, err := http.NewRequestWithContext(ctx, http.MethodPost, loginEndpoint.String(), bytes.NewReader(jsonStr))
 	if err != nil {
 		return errors.Wrap(err, errLoginFailed)
 	}
@@ -149,11 +151,21 @@ func (c *loginCmd) Run(p pterm.TextPrinter, upCtx *upbound.Context) error { // n
 	if err != nil {
 		return errors.Wrap(err, errLoginFailed)
 	}
-	// If no account is specified and profile type is user, set profile account
-	// to user ID if not an email address. This is for convenience if a user is
-	// using a personal account.
-	if upCtx.Account == "" && profType == config.UserProfileType && !isEmail(auth.ID) {
-		upCtx.Account = auth.ID
+
+	// Set session early so that it can be used to fetch user info if necessary.
+	upCtx.Profile.Session = session
+
+	// If the default account is not set, the user's personal account is used.
+	if upCtx.Account == "" {
+		conf, err := upCtx.BuildSDKConfig()
+		if err != nil {
+			return errors.Wrap(err, errLoginFailed)
+		}
+		info, err := userinfo.NewClient(conf).Get(ctx)
+		if err != nil {
+			return errors.Wrap(err, errLoginFailed)
+		}
+		upCtx.Account = info.User.Username
 	}
 
 	// If profile name was not provided and no default exists, set name to 'default'.
@@ -163,7 +175,6 @@ func (c *loginCmd) Run(p pterm.TextPrinter, upCtx *upbound.Context) error { // n
 
 	upCtx.Profile.ID = auth.ID
 	upCtx.Profile.Type = profType
-	upCtx.Profile.Session = session
 	upCtx.Profile.Account = upCtx.Account
 
 	if err := upCtx.Cfg.AddOrUpdateUpboundProfile(upCtx.ProfileName, upCtx.Profile); err != nil {

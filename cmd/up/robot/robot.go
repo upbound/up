@@ -39,7 +39,7 @@ func (c *Cmd) AfterApply(kongCtx *kong.Context) error {
 	if err != nil {
 		return err
 	}
-	cfg, err := upCtx.BuildSDKConfig(upCtx.Profile.Session)
+	cfg, err := upCtx.BuildSDKConfig()
 	if err != nil {
 		return err
 	}
@@ -56,7 +56,7 @@ func PredictRobots() complete.Predictor {
 		if err != nil {
 			return nil
 		}
-		cfg, err := upCtx.BuildSDKConfig(upCtx.Profile.Session)
+		cfg, err := upCtx.BuildSDKConfig()
 		if err != nil {
 			return nil
 		}

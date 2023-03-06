@@ -88,7 +88,7 @@ func (c *pushCmd) Run(p pterm.TextPrinter, upCtx *upbound.Context) error { //nol
 		if len(parts) != 2 {
 			return errors.New(errCreateAccountRepo)
 		}
-		cfg, err := upCtx.BuildSDKConfig(upCtx.Profile.Session)
+		cfg, err := upCtx.BuildSDKConfig()
 		if err != nil {
 			return err
 		}
