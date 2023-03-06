@@ -21,6 +21,7 @@ import (
 	"github.com/posener/complete"
 
 	"github.com/upbound/up-sdk-go/service/configurations"
+	"github.com/upbound/up-sdk-go/service/controlplanes"
 	"github.com/upbound/up-sdk-go/service/gitsources"
 	"github.com/upbound/up/internal/upbound"
 )
@@ -38,6 +39,7 @@ func (c *Cmd) AfterApply(kongCtx *kong.Context) error {
 	}
 	kongCtx.Bind(upCtx)
 	kongCtx.Bind(configurations.NewClient(cfg))
+	kongCtx.Bind(controlplanes.NewClient(cfg))
 	kongCtx.Bind(gitsources.NewClient(cfg))
 	return nil
 }
@@ -80,6 +82,7 @@ type Cmd struct {
 	Create createCmd `cmd:"" help:"Create a configuration."`
 	List   listCmd   `cmd:"" help:"List root configurations for the account."`
 	Get    getCmd    `cmd:"" help:"Get a single configuration for the account."`
+	Delete deleteCmd `cmd:"" help:"Delete a single configuration for the account."`
 
 	Flags upbound.Flags `embed:""`
 }

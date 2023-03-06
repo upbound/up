@@ -20,6 +20,7 @@ import (
 	"github.com/alecthomas/kong"
 	"github.com/posener/complete"
 
+	"github.com/upbound/up-sdk-go/service/configurations"
 	cp "github.com/upbound/up-sdk-go/service/controlplanes"
 	"github.com/upbound/up/cmd/up/controlplane/kubeconfig"
 	"github.com/upbound/up/cmd/up/controlplane/pkg"
@@ -46,6 +47,7 @@ func (c *Cmd) AfterApply(kongCtx *kong.Context) error {
 	}
 	kongCtx.Bind(upCtx)
 	kongCtx.Bind(cp.NewClient(cfg))
+	kongCtx.Bind(configurations.NewClient(cfg))
 	return nil
 }
 

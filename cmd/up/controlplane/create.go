@@ -19,7 +19,9 @@ import (
 
 	"github.com/pterm/pterm"
 
+	"github.com/upbound/up-sdk-go/service/configurations"
 	cp "github.com/upbound/up-sdk-go/service/controlplanes"
+
 	"github.com/upbound/up/internal/upbound"
 )
 
@@ -27,14 +29,22 @@ import (
 type createCmd struct {
 	Name string `arg:"" required:"" help:"Name of control plane."`
 
-	Description string `short:"d" help:"Description for control plane."`
+	ConfigurationName string `required:"" help:"The name of the Configuration."`
+	Description       string `short:"d" help:"Description for control plane."`
 }
 
 // Run executes the create command.
-func (c *createCmd) Run(p pterm.TextPrinter, cc *cp.Client, upCtx *upbound.Context) error {
+func (c *createCmd) Run(p pterm.TextPrinter, cc *cp.Client, cfc *configurations.Client, upCtx *upbound.Context) error {
+	// Get the UUID from the Configuration name, if it exists.
+	cfg, err := cfc.Get(context.Background(), upCtx.Account, c.ConfigurationName)
+	if err != nil {
+		return err
+	}
+
 	if _, err := cc.Create(context.Background(), upCtx.Account, &cp.ControlPlaneCreateParameters{
-		Name:        c.Name,
-		Description: c.Description,
+		Name:            c.Name,
+		Description:     c.Description,
+		ConfigurationID: cfg.ID,
 	}); err != nil {
 		return err
 	}
