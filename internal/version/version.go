@@ -17,7 +17,7 @@ package version
 import (
 	"context"
 	"fmt"
-	"io/ioutil"
+	"io"
 	"net/http"
 	"strings"
 	"time"
@@ -86,9 +86,9 @@ func WithLogger(l logging.Logger) Option {
 // CanUpgrade queries locally for the version of up, uses the Informer's client
 // to check what the currently published version of up is and returns the local
 // and remote versions and whether or not we could upgrade up.
-func (i *Informer) CanUpgrade() (string, string, bool) {
+func (i *Informer) CanUpgrade(ctx context.Context) (string, string, bool) {
 	local := GetVersion()
-	remote, err := i.getCurrent()
+	remote, err := i.getCurrent(ctx)
 	if err != nil {
 		i.log.Debug(fmt.Sprintf(errFailedToQueryRemoteFmt, cliURL), "error", err)
 		return "", "", false
@@ -114,8 +114,8 @@ func (i *Informer) newAvailable(local, remote string) bool {
 	return rv.GreaterThan(lv)
 }
 
-func (i *Informer) getCurrent() (string, error) {
-	r, err := http.NewRequestWithContext(context.Background(), http.MethodGet, cliURL, nil)
+func (i *Informer) getCurrent(ctx context.Context) (string, error) {
+	r, err := http.NewRequestWithContext(ctx, http.MethodGet, cliURL, nil)
 	if err != nil {
 		return "", err
 	}
@@ -125,7 +125,7 @@ func (i *Informer) getCurrent() (string, error) {
 	}
 	defer resp.Body.Close() // nolint:errcheck
 
-	v, err := ioutil.ReadAll(resp.Body)
+	v, err := io.ReadAll(resp.Body)
 	if err != nil {
 		return "", err
 	}

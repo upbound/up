@@ -15,6 +15,7 @@
 package snapshot
 
 import (
+	"context"
 	"testing"
 
 	"github.com/google/go-cmp/cmp"
@@ -263,7 +264,7 @@ func TestValidateOpenAPIV3Schema(t *testing.T) {
 	for name, tc := range cases {
 		t.Run(name, func(t *testing.T) {
 
-			got := validateOpenAPIV3Schema(tc.args.xrd)
+			got := validateOpenAPIV3Schema(context.Background(), tc.args.xrd)
 
 			if diff := cmp.Diff(tc.want.errs, got); diff != "" {
 				t.Errorf("\n%s\nValidateOpenAPIV3Schema(...): -want error, +got error:\n%s", tc.reason, diff)

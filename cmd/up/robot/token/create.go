@@ -21,8 +21,8 @@ import (
 	"os"
 	"path/filepath"
 
+	"github.com/crossplane/crossplane-runtime/pkg/errors"
 	"github.com/google/uuid"
-	"github.com/pkg/errors"
 	"github.com/pterm/pterm"
 
 	"github.com/upbound/up-sdk-go/service/accounts"

@@ -18,10 +18,10 @@ import (
 	"context"
 	"testing"
 
+	"github.com/crossplane/crossplane-runtime/pkg/errors"
 	"github.com/crossplane/crossplane-runtime/pkg/test"
 	"github.com/crossplane/crossplane/apis/pkg/v1beta1"
 	"github.com/google/go-cmp/cmp"
-	"github.com/pkg/errors"
 )
 
 func TestResolveTag(t *testing.T) {

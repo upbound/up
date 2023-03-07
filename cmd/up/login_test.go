@@ -22,10 +22,10 @@ import (
 	"testing"
 	"testing/iotest"
 
+	"github.com/crossplane/crossplane-runtime/pkg/errors"
 	"github.com/crossplane/crossplane-runtime/pkg/test"
 	"github.com/golang-jwt/jwt"
 	"github.com/google/go-cmp/cmp"
-	"github.com/pkg/errors"
 	"github.com/pterm/pterm"
 
 	"github.com/upbound/up/internal/config"

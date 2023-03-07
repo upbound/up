@@ -17,7 +17,7 @@ package uxp
 import (
 	"io"
 
-	"github.com/pkg/errors"
+	"github.com/crossplane/crossplane-runtime/pkg/errors"
 	"github.com/pterm/pterm"
 	"sigs.k8s.io/yaml"
 

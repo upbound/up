@@ -15,12 +15,12 @@
 package config
 
 import (
-	"io/ioutil"
+	"io"
 	"testing"
 
+	"github.com/crossplane/crossplane-runtime/pkg/errors"
 	"github.com/crossplane/crossplane-runtime/pkg/test"
 	"github.com/google/go-cmp/cmp"
-	"github.com/pkg/errors"
 )
 
 func TestAddOrUpdateUpboundProfile(t *testing.T) {
@@ -505,7 +505,7 @@ func TestBaseToJSON(t *testing.T) {
 		t.Run(name, func(t *testing.T) {
 			r, err := tc.args.cfg.BaseToJSON(tc.args.profile)
 			if r != nil {
-				base, _ := ioutil.ReadAll(r)
+				base, _ := io.ReadAll(r)
 				if diff := cmp.Diff(tc.want.base, string(base)); diff != "" {
 					t.Errorf("\n%s\nBaseToJSON(...): -want, +got:\n%s", tc.reason, diff)
 				}

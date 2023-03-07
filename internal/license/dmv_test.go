@@ -18,14 +18,14 @@ import (
 	"bytes"
 	"context"
 	"fmt"
-	"io/ioutil"
+	"io"
 	"net/http"
 	"net/url"
 	"testing"
 
+	"github.com/crossplane/crossplane-runtime/pkg/errors"
 	"github.com/crossplane/crossplane-runtime/pkg/test"
 	"github.com/google/go-cmp/cmp"
-	"github.com/pkg/errors"
 
 	"github.com/upbound/up/internal/http/mocks"
 )
@@ -57,7 +57,7 @@ func TestGetAccessKey(t *testing.T) {
 					DoFn: func(req *http.Request) (*http.Response, error) {
 						return &http.Response{
 							StatusCode: http.StatusOK,
-							Body:       ioutil.NopCloser(bytes.NewReader([]byte(fmt.Sprintf(`{"key": "%s", "signature": "%s"}`, successToken, successSig)))),
+							Body:       io.NopCloser(bytes.NewReader([]byte(fmt.Sprintf(`{"key": "%s", "signature": "%s"}`, successToken, successSig)))),
 						}, nil
 					},
 				},

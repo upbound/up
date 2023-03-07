@@ -15,7 +15,7 @@
 package profile
 
 import (
-	"github.com/pkg/errors"
+	"github.com/crossplane/crossplane-runtime/pkg/errors"
 
 	"github.com/upbound/up/internal/upbound"
 )

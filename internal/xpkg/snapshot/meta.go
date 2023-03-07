@@ -19,18 +19,17 @@ import (
 	"context"
 	"errors"
 	"fmt"
-	"io/ioutil"
+	"io"
 	"strings"
-
-	"k8s.io/apimachinery/pkg/runtime"
-	"k8s.io/kube-openapi/pkg/validation/validate"
-	"sigs.k8s.io/yaml"
 
 	"github.com/Masterminds/semver"
 	"github.com/crossplane/crossplane-runtime/pkg/parser"
 	metav1 "github.com/crossplane/crossplane/apis/pkg/meta/v1"
 	"github.com/crossplane/crossplane/apis/pkg/meta/v1alpha1"
 	"github.com/crossplane/crossplane/apis/pkg/v1beta1"
+	"k8s.io/apimachinery/pkg/runtime"
+	"k8s.io/kube-openapi/pkg/validation/validate"
+	"sigs.k8s.io/yaml"
 
 	"github.com/upbound/up/internal/xpkg/dep/manager"
 	pyaml "github.com/upbound/up/internal/xpkg/parser/yaml"
@@ -79,8 +78,8 @@ func DefaultMetaValidators(s *Snapshot) (*MetaValidator, error) {
 
 // Validate performs validation rules on the given data input per the rules
 // defined for the Validator.
-func (m *MetaValidator) Validate(data any) *validate.Result {
-	pkg, o, err := m.Marshal(data)
+func (m *MetaValidator) Validate(ctx context.Context, data any) *validate.Result {
+	pkg, o, err := m.Marshal(ctx, data)
 	if err != nil {
 		// TODO(@tnthornton) add debug logging
 		return validator.Nop
@@ -94,7 +93,7 @@ func (m *MetaValidator) Validate(data any) *validate.Result {
 	for i, d := range pkg.GetDependencies() {
 		cd := manager.ConvertToV1beta1(d)
 		for _, v := range m.validators {
-			errs = append(errs, v.validate(i, cd))
+			errs = append(errs, v.validate(ctx, i, cd))
 		}
 	}
 
@@ -104,14 +103,14 @@ func (m *MetaValidator) Validate(data any) *validate.Result {
 }
 
 // Marshal marshals the given data object into a Pkg, errors otherwise.
-func (m *MetaValidator) Marshal(data any) (metav1.Pkg, runtime.Object, error) {
+func (m *MetaValidator) Marshal(ctx context.Context, data any) (metav1.Pkg, runtime.Object, error) {
 	b, err := yaml.Marshal(data)
 	if err != nil {
 		return nil, nil, err
 	}
 
 	// convert data to a package
-	ppkg, err := m.p.Parse(context.Background(), ioutil.NopCloser(bytes.NewReader(b)))
+	ppkg, err := m.p.Parse(ctx, io.NopCloser(bytes.NewReader(b)))
 	if err != nil {
 		return nil, nil, err
 	}
@@ -129,7 +128,7 @@ func (m *MetaValidator) Marshal(data any) (metav1.Pkg, runtime.Object, error) {
 }
 
 type metaValidator interface {
-	validate(int, v1beta1.Dependency) error
+	validate(context.Context, int, v1beta1.Dependency) error
 }
 
 // validateAPIVersion tests if the provided object is a deprecated version
@@ -173,7 +172,7 @@ func NewTypeValidator(s *Snapshot) *TypeValidator {
 }
 
 // validate validates the dependency versions in a meta file.
-func (v *TypeValidator) validate(i int, d v1beta1.Dependency) error {
+func (v *TypeValidator) validate(_ context.Context, i int, d v1beta1.Dependency) error {
 	got := v.s.Package(d.Package)
 	if got == nil {
 		return nil
@@ -207,9 +206,9 @@ func NewVersionValidator(manager DepManager) *VersionValidator {
 }
 
 // validate validates the dependency versions in a meta file.
-func (v *VersionValidator) validate(i int, d v1beta1.Dependency) error {
+func (v *VersionValidator) validate(ctx context.Context, i int, d v1beta1.Dependency) error {
 	// check explicit version
-	vers, err := v.manager.Versions(context.Background(), d)
+	vers, err := v.manager.Versions(ctx, d)
 	if err != nil {
 		// TODO(@tnthornton) add debug logging here
 		return nil // nolint:nilerr

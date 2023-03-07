@@ -22,12 +22,12 @@ import (
 	"path/filepath"
 	"testing"
 
+	"github.com/crossplane/crossplane-runtime/pkg/errors"
 	"github.com/google/go-cmp/cmp"
 	v1 "github.com/google/go-containerregistry/pkg/v1"
 	"github.com/google/go-containerregistry/pkg/v1/empty"
 	"github.com/google/go-containerregistry/pkg/v1/mutate"
 	"github.com/google/go-containerregistry/pkg/v1/tarball"
-	"github.com/pkg/errors"
 	"github.com/spf13/afero"
 	apimetav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/utils/pointer"

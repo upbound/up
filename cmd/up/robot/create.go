@@ -18,7 +18,7 @@ import (
 	"context"
 	"strconv"
 
-	"github.com/pkg/errors"
+	"github.com/crossplane/crossplane-runtime/pkg/errors"
 	"github.com/pterm/pterm"
 
 	"github.com/upbound/up-sdk-go/service/accounts"

@@ -17,8 +17,8 @@ package xpkg
 import (
 	"strings"
 
+	"github.com/crossplane/crossplane-runtime/pkg/errors"
 	"github.com/google/go-containerregistry/pkg/name"
-	"github.com/pkg/errors"
 )
 
 const (

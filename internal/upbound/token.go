@@ -18,7 +18,7 @@ import (
 	"encoding/json"
 	"path/filepath"
 
-	"github.com/pkg/errors"
+	"github.com/crossplane/crossplane-runtime/pkg/errors"
 	"github.com/spf13/afero"
 )
 

@@ -17,10 +17,10 @@ package config
 import (
 	"encoding/json"
 	"fmt"
-	"io/ioutil"
+	"io"
 	"os"
 
-	"github.com/pkg/errors"
+	"github.com/crossplane/crossplane-runtime/pkg/errors"
 
 	"github.com/upbound/up/internal/upbound"
 )
@@ -77,7 +77,7 @@ func (c *setCmd) validateInput() error {
 }
 
 func mapFromFile(f *os.File) (map[string]any, error) {
-	b, err := ioutil.ReadAll(f)
+	b, err := io.ReadAll(f)
 	if err != nil {
 		return nil, err
 	}

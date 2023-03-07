@@ -23,10 +23,11 @@ import (
 	"net/url"
 
 	"github.com/alecthomas/kong"
-	"github.com/pkg/errors"
+	"github.com/crossplane/crossplane-runtime/pkg/errors"
 	"github.com/spf13/afero"
 
 	"github.com/upbound/up-sdk-go"
+
 	"github.com/upbound/up/internal/config"
 )
 

@@ -21,7 +21,7 @@ import (
 	"os"
 	"strings"
 
-	"github.com/pkg/errors"
+	"github.com/crossplane/crossplane-runtime/pkg/errors"
 	"golang.org/x/term"
 )
 

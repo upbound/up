@@ -23,7 +23,7 @@ import (
 	"strings"
 
 	"github.com/alecthomas/kong"
-	"github.com/pkg/errors"
+	"github.com/crossplane/crossplane-runtime/pkg/errors"
 	"github.com/pterm/pterm"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	applyconfigurationscorev1 "k8s.io/client-go/applyconfigurations/core/v1"

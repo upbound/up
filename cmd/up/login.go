@@ -26,8 +26,8 @@ import (
 	"time"
 
 	"github.com/alecthomas/kong"
+	"github.com/crossplane/crossplane-runtime/pkg/errors"
 	"github.com/golang-jwt/jwt"
-	"github.com/pkg/errors"
 	"github.com/pterm/pterm"
 
 	"github.com/upbound/up-sdk-go/service/userinfo"

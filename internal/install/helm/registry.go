@@ -19,10 +19,10 @@ import (
 	"net/url"
 	"path/filepath"
 
+	"github.com/crossplane/crossplane-runtime/pkg/errors"
 	"github.com/google/go-containerregistry/pkg/name"
 	v1 "github.com/google/go-containerregistry/pkg/v1"
 	"github.com/google/go-containerregistry/pkg/v1/remote"
-	"github.com/pkg/errors"
 	"github.com/spf13/afero"
 )
 

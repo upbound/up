@@ -97,7 +97,7 @@ func TestWSLoadValidators(t *testing.T) {
 				WithDepManager(NewMockDepManager()),
 			)
 
-			snap, err := factory.New(WithWorkspace(ws))
+			snap, err := factory.New(context.Background(), WithWorkspace(ws))
 
 			if diff := cmp.Diff(tc.err, err, test.EquateErrors()); diff != "" {
 				t.Errorf("\n%s\nLoadWSValidators(...): -want error, +got error:\n%s", tc.reason, diff)

@@ -18,22 +18,20 @@ import (
 	"archive/tar"
 	"context"
 	"io"
-	"io/ioutil"
 	"os"
 	"sort"
 	"testing"
 
+	"github.com/crossplane/crossplane-runtime/pkg/errors"
+	"github.com/crossplane/crossplane-runtime/pkg/parser"
+	"github.com/crossplane/crossplane-runtime/pkg/test"
 	"github.com/google/go-cmp/cmp"
 	"github.com/google/go-cmp/cmp/cmpopts"
 	v1 "github.com/google/go-containerregistry/pkg/v1"
 	"github.com/google/go-containerregistry/pkg/v1/mutate"
 	"github.com/google/go-containerregistry/pkg/v1/partial"
-	"github.com/pkg/errors"
 	"github.com/spf13/afero"
 	"github.com/spf13/afero/tarfs"
-
-	"github.com/crossplane/crossplane-runtime/pkg/parser"
-	"github.com/crossplane/crossplane-runtime/pkg/test"
 
 	"github.com/upbound/up/internal/xpkg/parser/examples"
 	"github.com/upbound/up/internal/xpkg/parser/yaml"
@@ -302,7 +300,7 @@ func readImg(i v1.Image) (xpkgContents, error) {
 		return contents, err
 	}
 
-	pkgBytes, err := ioutil.ReadAll(pkgYaml)
+	pkgBytes, err := io.ReadAll(pkgYaml)
 	if err != nil {
 		return contents, err
 	}
@@ -314,7 +312,7 @@ func readImg(i v1.Image) (xpkgContents, error) {
 	}
 
 	if exYaml != nil {
-		exBytes, err := ioutil.ReadAll(exYaml)
+		exBytes, err := io.ReadAll(exYaml)
 		if err != nil {
 			return contents, err
 		}
