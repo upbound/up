@@ -20,6 +20,7 @@ import (
 
 	"github.com/pterm/pterm"
 
+	"github.com/upbound/up-sdk-go/service/common"
 	"github.com/upbound/up-sdk-go/service/configurations"
 	"github.com/upbound/up-sdk-go/service/controlplanes"
 	"github.com/upbound/up/internal/input"
@@ -44,8 +45,7 @@ func (c *deleteCmd) AfterApply(cc *configurations.Client, cpc *controlplanes.Cli
 	if err != nil {
 		return err
 	}
-	// TODO(jastang): add this as a query parameter / list option instead
-	cpList, err := cpc.List(context.Background(), fmt.Sprintf("%s?configurationId=%s", upCtx.Account, cfg.ID.String()))
+	cpList, err := cpc.List(context.Background(), upCtx.Account, common.ListOption(controlplanes.WithConfiguration(cfg.ID)))
 	if err != nil {
 		return err
 	}
