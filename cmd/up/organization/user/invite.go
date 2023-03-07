@@ -28,7 +28,7 @@ import (
 type inviteCmd struct {
 	OrgID      uint                                      `arg:"" required:"" help:"ID of the organization."`
 	Email      string                                    `arg:"" required:"" help:"Email address of the user to invite."`
-	Permission organizations.OrganizationPermissionGroup `short:"p" default:"member" help:"Role of the user to invite (owner or member)."`
+	Permission organizations.OrganizationPermissionGroup `short:"p" enum:"member,owner" default:"member" help:"Role of the user to invite (owner or member)."`
 }
 
 // Run executes the invite command.
