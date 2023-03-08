@@ -52,10 +52,6 @@ type createCmd struct {
 
 	Debug bool `hidden:"" help:"Debug auth workflow"`
 
-	// NoPrompt is a temporary flag. Once we update MCP to allow redirections to the CLI
-	// we'll eliminaite both this flag and the prompt
-	NoPrompt bool `hidden:"" help:"Don't prompt user to hit return, but wait for callback"`
-
 	// Common Upbound API configuration
 	Flags upbound.Flags `embed:""`
 }
