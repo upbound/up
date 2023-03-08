@@ -33,9 +33,8 @@ import (
 )
 
 const (
-	github      = "github.com"
-	success     = "resultCode=success"
-	redirectUri = "redirect_uri"
+	github  = "github.com"
+	success = "resultCode=success"
 )
 
 // createCmd creates a configuration on Upbound.
@@ -83,7 +82,7 @@ func (c *createCmd) Run(p pterm.TextPrinter, cc *configurations.Client, gc *gits
 }
 
 // handleLogin uses the gitsources login API to authorize and install the GitHub app
-func (c *createCmd) handleLogin(gc *gitsources.Client, upCtx *upbound.Context) error {
+func (c *createCmd) handleLogin(gc *gitsources.Client, upCtx *upbound.Context) error { //nolint:gocyclo
 	s := authServer{
 		debug:    c.Debug,
 		session:  upCtx.Profile.Session,
@@ -93,7 +92,7 @@ func (c *createCmd) handleLogin(gc *gitsources.Client, upCtx *upbound.Context) e
 	if err != nil {
 		return err
 	}
-	defer s.shutdown()
+	defer s.shutdown() //nolint:errcheck
 
 	r, err := gc.Login(context.Background(), port)
 	if err != nil {
@@ -155,15 +154,12 @@ func (c *createCmd) handleCreate(cc *configurations.Client, upCtx *upbound.Conte
 
 // authServer is used to track state for the web server we create
 type authServer struct {
-	debug            bool
-	session          string
-	server           http.Server
-	context          context.Context
-	cancel           context.CancelFunc
-	originalRedirect string
-	code             string
-	state            string
-	authDone         bool
+	debug    bool
+	session  string
+	server   http.Server
+	context  context.Context
+	cancel   context.CancelFunc
+	authDone bool
 }
 
 // startHttpServer creates the HTTP server we use to wait for the
