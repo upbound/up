@@ -21,7 +21,6 @@ import (
 	"net"
 	"net/http"
 	"net/http/httputil"
-	"net/url"
 	"strings"
 	"time"
 
@@ -34,9 +33,8 @@ import (
 )
 
 const (
-	github      = "github.com"
-	success     = "resultCode=success"
-	redirectUri = "redirect_uri"
+	github  = "github.com"
+	success = "resultCode=success"
 )
 
 // createCmd creates a configuration on Upbound.
@@ -53,10 +51,6 @@ type createCmd struct {
 	Provider string `hidden:"" default:"github" help:"Name of provider (e.g. github)"`
 
 	Debug bool `hidden:"" help:"Debug auth workflow"`
-
-	// NoPrompt is a temporary flag. Once we update MCP to allow redirections to the CLI
-	// we'll eliminaite both this flag and the prompt
-	NoPrompt bool `hidden:"" help:"Don't prompt user to hit return, but wait for callback"`
 
 	// Common Upbound API configuration
 	Flags upbound.Flags `embed:""`
@@ -84,8 +78,19 @@ func (c *createCmd) Run(p pterm.TextPrinter, cc *configurations.Client, gc *gits
 }
 
 // handleLogin uses the gitsources login API to authorize and install the GitHub app
-func (c *createCmd) handleLogin(gc *gitsources.Client, upCtx *upbound.Context) error {
-	r, err := gc.Login(context.Background())
+func (c *createCmd) handleLogin(gc *gitsources.Client, upCtx *upbound.Context) error { //nolint:gocyclo
+	s := authServer{
+		debug:    c.Debug,
+		session:  upCtx.Profile.Session,
+		authDone: false,
+	}
+	port, err := s.startHttpServer()
+	if err != nil {
+		return err
+	}
+	defer s.shutdown() //nolint:errcheck
+
+	r, err := gc.Login(context.Background(), port)
 	if err != nil {
 		return err
 	}
@@ -108,7 +113,12 @@ func (c *createCmd) handleLogin(gc *gitsources.Client, upCtx *upbound.Context) e
 		case strings.HasSuffix(hostname, github):
 			// Case 1: The user hasn't yet authorized or installed the GitHub app
 			// We'll open a web browser and wait for the process to complete
-			return c.continueLogin(r.RedirectURL, upCtx.Profile.Session)
+			err := browser.OpenURL(r.RedirectURL.String())
+			if err != nil {
+				return err
+			}
+			s.WaitForCallback()
+			return nil
 		case strings.Contains(r.RedirectURL.String(), success):
 			// Case 2: The GitHub app has already been authorized and installed
 			fmt.Printf("No need to authorize Upbound Github App: already authorized\n")
@@ -123,40 +133,6 @@ func (c *createCmd) handleLogin(gc *gitsources.Client, upCtx *upbound.Context) e
 	}
 
 	return errors.New("Failed to be redirected")
-}
-
-// createLogin is called when the GitHub app hasn't been authorized or installed
-// It does two things: It starts a webserver which will receive redirections,
-// and it will open a web browser to start the authorization/installation process.
-func (c *createCmd) continueLogin(url *url.URL, session string) error {
-	s := authServer{
-		debug:    c.Debug,
-		session:  session,
-		authDone: false,
-	}
-	u, _ := s.startHttpServer()
-	if c.Debug {
-		fmt.Printf("New auth redirect %s\n", u)
-	}
-
-	// The gitsources login API gave as a URL that we should send the user to.
-	// However, it has an embedded redirect_uri parameter. We change that
-	// parameter to be the web server we just pointed at. That way, we'll
-	// know when the app has been authorized and installed so we can proceed
-	// with the creation of the configuration.
-	// We may be able to make server-side changes to simplify this in a future
-	// iteration.
-	values := url.Query()
-	s.originalRedirect = values.Get(redirectUri)
-	values.Del(redirectUri)
-	values.Add(redirectUri, u)
-	url.RawQuery = values.Encode()
-	err := browser.OpenURL(url.String())
-	if err != nil {
-		return err
-	}
-	err = s.waitForFinalCallback(c.NoPrompt)
-	return err
 }
 
 // handleCreate will create the configuration.
@@ -174,20 +150,18 @@ func (c *createCmd) handleCreate(cc *configurations.Client, upCtx *upbound.Conte
 
 // authServer is used to track state for the web server we create
 type authServer struct {
-	debug            bool
-	session          string
-	server           http.Server
-	context          context.Context
-	cancel           context.CancelFunc
-	originalRedirect string
-	code             string
-	state            string
-	authDone         bool
+	debug    bool
+	session  string
+	server   http.Server
+	context  context.Context
+	cancel   context.CancelFunc
+	authDone bool
 }
 
 // startHttpServer creates the HTTP server we use to wait for the
 // callbacks from Github
-func (s *authServer) startHttpServer() (string, error) {
+func (s *authServer) startHttpServer() (int, error) {
+	var port = 0
 	s.context, s.cancel = context.WithCancel(context.Background())
 	s.server = http.Server{
 		ReadTimeout:       5 * time.Second,
@@ -196,9 +170,10 @@ func (s *authServer) startHttpServer() (string, error) {
 	}
 	listener, err := net.Listen("tcp", "127.0.0.1:0")
 	if err != nil {
-		return "", err
+		return port, err
 	}
-	localUrl := fmt.Sprintf("http://127.0.0.1:%d/", listener.Addr().(*net.TCPAddr).Port)
+	port = listener.Addr().(*net.TCPAddr).Port
+	localUrl := fmt.Sprintf("http://127.0.0.1:%d/", port)
 	if s.debug {
 		fmt.Printf("Starting web server: %s", localUrl)
 	}
@@ -206,26 +181,23 @@ func (s *authServer) startHttpServer() (string, error) {
 	go func() {
 		s.server.Serve(listener) //nolint:errcheck
 	}()
-	return localUrl, nil
+	return port, nil
 }
 
-// WaitForFinalCallback waits until the authorization and installation
+// WaitForCallback waits until the authorization and installation
 // process is complete. We'll receive two callbacks (one for each)
 //
 // NOTE: In this first iteration, we can only receive the first callback.
 // We need to update MCP API so that the user will be redirected to the CLI
 // Therefore by default we'll just prompt the user to hit the return key.
 // This is lame, but we'll iterate and get it right shortly.
-func (s *authServer) waitForFinalCallback(noPrompt bool) error {
-	if noPrompt {
-		<-s.context.Done()
-		err := s.server.Shutdown(context.Background())
-		return err
-	}
-	fmt.Println("Hit enter once you've authorized and installed the GitHub app.")
-	fmt.Println("(This is a temporary requirement that will go away soon.)")
-	fmt.Scanln()
-	return nil
+func (s *authServer) WaitForCallback() {
+	<-s.context.Done()
+}
+
+func (s *authServer) shutdown() error {
+	err := s.server.Shutdown(context.Background())
+	return err
 }
 
 // handleAuthCompletion is an HTTP handler, and it receives the callbacks
@@ -242,33 +214,8 @@ func (s *authServer) handleAuthCompletion(w http.ResponseWriter, r *http.Request
 		fmt.Printf("Request:\n%s\n", string(dump))
 	}
 
-	if !s.authDone {
-		// This is the first callback, received after the GitHub app has been authorized
-		if s.debug {
-			fmt.Printf("Received first callback\n")
-			fmt.Printf("Original redirect: %s\n", s.originalRedirect)
-		}
-
-		// Redirect the user back to Upbound. Upbound wil redirect the user
-		// to Github to install the application.
-		values := r.URL.Query()
-		s.code = values.Get("code")
-		s.state = values.Get("state")
-		newRedirect := fmt.Sprintf("%s?code=%s&state=%s", s.originalRedirect, s.code, s.state)
-		if s.debug {
-			fmt.Printf("New redirect: %s\n", newRedirect)
-		}
-
-		w.Header().Set("Set-Cookie", fmt.Sprintf("SID=%s", s.session))
-		w.Header().Set("location", newRedirect)
-		w.WriteHeader(http.StatusFound)
-		return
-	}
-
-	// This is the second callback.
-	// Today we won't receive the second callback, after the GitHub app has been installed.
-	// We'll need to make server side changes to get the callback. The work is coming soon.
-	fmt.Printf("Received second callback.\n")
+	fmt.Fprintf(w, "You have authorized and install the GitHub app. You can close this window now.\n")
+	fmt.Printf("The GitHub app has been authorized and installed.\n")
 
 	// Inform the other goroutine that the process is done.
 	s.cancel()

@@ -45,5 +45,11 @@ func (c *listCmd) Run(printer upterm.ObjectPrinter, p pterm.TextPrinter, cc *con
 // extractFields helps render the console output by mapping the response to desired fields.
 func extractFields(obj any) []string {
 	o := obj.(configurations.ConfigurationResponse)
-	return []string{*o.Name, o.TemplateID, string(o.Provider), o.Repo, o.Branch, o.CreatedAt.String(), o.SyncedAt.String()}
+	var syncedAt string
+	if o.SyncedAt != nil {
+		syncedAt = o.SyncedAt.String()
+	} else {
+		syncedAt = "n/a"
+	}
+	return []string{*o.Name, o.TemplateID, string(o.Provider), o.Repo, o.Branch, o.CreatedAt.String(), syncedAt}
 }
