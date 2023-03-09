@@ -12,7 +12,7 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-package organization
+package user
 
 import (
 	"context"
@@ -22,36 +22,34 @@ import (
 	"github.com/pterm/pterm"
 
 	"github.com/upbound/up-sdk-go/service/organizations"
-
 	"github.com/upbound/up/internal/upbound"
 	"github.com/upbound/up/internal/upterm"
 )
 
+var listInvitesFieldNames = []string{"ID", "EMAIL", "PERMISSION"}
+
 // AfterApply sets default values in command after assignment and validation.
-func (c *listCmd) AfterApply(kongCtx *kong.Context, upCtx *upbound.Context) error {
+func (c *listInvitesCmd) AfterApply(kongCtx *kong.Context, upCtx *upbound.Context) error {
 	kongCtx.Bind(pterm.DefaultTable.WithWriter(kongCtx.Stdout).WithSeparator("   "))
 	return nil
 }
 
-// listCmd lists organizations on Upbound.
-type listCmd struct{}
-
-var fieldNames = []string{"ID", "NAME", "ROLE"}
+// listInvitesCmd lists invites in an organization.
+type listInvitesCmd struct {
+	OrgID uint `arg:"" required:"" help:"ID of the organization."`
+}
 
 // Run executes the list command.
-func (c *listCmd) Run(printer upterm.ObjectPrinter, p pterm.TextPrinter, oc *organizations.Client, upCtx *upbound.Context) error {
-	orgs, err := oc.List(context.Background())
+func (c *listInvitesCmd) Run(printer upterm.ObjectPrinter, p pterm.TextPrinter, oc *organizations.Client, upCtx *upbound.Context) error {
+	resp, err := oc.ListInvites(context.Background(), c.OrgID)
 	if err != nil {
 		return err
 	}
-	if len(orgs) == 0 {
-		p.Printfln("No organizations found.")
-		return nil
-	}
-	return printer.Print(orgs, fieldNames, extractFields)
+
+	return printer.Print(resp, listInvitesFieldNames, extractInviteFields)
 }
 
-func extractFields(obj any) []string {
-	o := obj.(organizations.Organization)
-	return []string{strconv.Itoa(int(o.ID)), o.Name, string(o.Role)}
+func extractInviteFields(obj any) []string {
+	m := obj.(organizations.Invite)
+	return []string{strconv.Itoa(int(m.ID)), m.Email, string(m.Permission)}
 }
