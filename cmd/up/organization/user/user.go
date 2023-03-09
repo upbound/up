@@ -24,7 +24,7 @@ import (
 // AfterApply constructs and binds a robots client to any subcommands
 // that have Run() methods that receive it.
 func (c *Cmd) AfterApply(kongCtx *kong.Context, upCtx *upbound.Context) error {
-	cfg, err := upCtx.BuildSDKConfig(upCtx.Profile.Session)
+	cfg, err := upCtx.BuildSDKConfig()
 	if err != nil {
 		return err
 	}
