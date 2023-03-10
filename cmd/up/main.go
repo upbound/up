@@ -26,6 +26,7 @@ import (
 	"github.com/willabides/kongplete"
 
 	"github.com/upbound/up/cmd/up/configuration"
+	"github.com/upbound/up/cmd/up/configuration/template"
 	"github.com/upbound/up/cmd/up/controlplane"
 	"github.com/upbound/up/cmd/up/organization"
 	"github.com/upbound/up/cmd/up/profile"
@@ -155,6 +156,7 @@ func main() {
 		kongplete.WithPredictor("robots", robot.PredictRobots()),
 		kongplete.WithPredictor("profiles", profile.PredictProfiles()),
 		kongplete.WithPredictor("configs", configuration.PredictConfigurations()),
+		kongplete.WithPredictor("templates", template.PredictTemplates()),
 	)
 
 	ctx, err := parser.Parse(os.Args[1:])

@@ -23,6 +23,7 @@ import (
 	"github.com/upbound/up-sdk-go/service/configurations"
 	"github.com/upbound/up-sdk-go/service/controlplanes"
 	"github.com/upbound/up-sdk-go/service/gitsources"
+	"github.com/upbound/up/cmd/up/configuration/template"
 	"github.com/upbound/up/internal/upbound"
 )
 
@@ -79,10 +80,11 @@ func PredictConfigurations() complete.Predictor {
 
 // Cmd contains commands for interacting with root configurations.
 type Cmd struct {
-	Create createCmd `cmd:"" help:"Create a configuration."`
-	List   listCmd   `cmd:"" help:"List root configurations for the account."`
-	Get    getCmd    `cmd:"" help:"Get a single configuration for the account."`
-	Delete deleteCmd `cmd:"" help:"Delete a single configuration for the account."`
+	Create   createCmd    `cmd:"" help:"Create a configuration."`
+	List     listCmd      `cmd:"" help:"List root configurations for the account."`
+	Get      getCmd       `cmd:"" help:"Get a single configuration for the account."`
+	Delete   deleteCmd    `cmd:"" help:"Delete a single configuration for the account."`
+	Template template.Cmd `cmd:"" help:"Interact with configuration templates."`
 
 	Flags upbound.Flags `embed:""`
 }
