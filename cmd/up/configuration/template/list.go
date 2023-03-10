@@ -26,7 +26,7 @@ import (
 
 var fieldNames = []string{"ID", "DESCRIPTION", "REPO"}
 
-// listCmd lists root configurations in an account on Upbound.
+// listCmd lists configuration templates on Upbound.
 type listCmd struct{}
 
 // Run executes the list command.
