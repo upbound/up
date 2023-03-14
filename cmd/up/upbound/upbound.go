@@ -12,6 +12,10 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
+// Please note: As of March 2023, the `upbound` commands have been disabled.
+// We're keeping the code here for now, so they're easily resurrected.
+// The upbound commands were meant to support the Upbound self-hosted option.
+
 package upbound
 
 import (

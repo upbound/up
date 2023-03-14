@@ -108,7 +108,6 @@ type cli struct {
 	Profile            profile.Cmd                  `cmd:"" help:"Interact with Upbound profiles."`
 	Repository         repository.Cmd               `cmd:"" name:"repository" aliases:"repo" help:"Interact with repositories."`
 	Robot              robot.Cmd                    `cmd:"" name:"robot" help:"Interact with robots."`
-	Upbound            upbound.Cmd                  `cmd:"" maturity:"alpha" help:"Interact with Upbound."`
 	UXP                uxp.Cmd                      `cmd:"" help:"Interact with UXP."`
 	XPKG               xpkg.Cmd                     `cmd:"" help:"Interact with UXP packages."`
 	XPLS               xpls.Cmd                     `cmd:"" help:"Start xpls language server."`
