@@ -77,6 +77,31 @@ Format: `up controlplane <cmd> ...` Alias: `up ctp <cmd> ...`
 Commands in the **Control Plane** group are used to manage and interact with
 control planes.
 
+- `create <control plane name>`
+    - Flags:
+        - `--configuration-name = STRING`: (Required) Name of the configuration to
+          use to bootstrap the control plane with.
+        - `--description = STRING`: Description for the control plane.
+    - Behavior: Creates a new control plane.
+- `list`
+    - Behavior: Lists all control planes.
+- `get <control plane name>`
+    - Behavior: Gets a single control plane.
+- `delete <control plane name>`
+    - Behavior: Deletes the specified control plane.
+- `connect <control plane name> <namespace in the control plane>`
+    - Flags:
+        - `--token = STRING`: Optional token for the connector to use. If not
+          provided, a new one will be generated.
+        - `--cluster-name = STRING`: Optional name for the cluster that will be
+          connected to the control plane. If not provided, namespace argument will
+          be used.
+        - `--kubeconfig = STRING`: sets `kubeconfig` path. Same defaults as
+          `kubectl` are used if not provided.
+    - Behavior: Connects the current cluster to the specified control plane's
+      namespace. This means that all claim requests in the cluster will be proxied
+      to the given namespace in the control plane.
+
 **Group Flags**
 
 Group flags can be passed for any command in the **Control Plane** group. Some
@@ -118,6 +143,21 @@ Format: `up controlplane pull-secret <cmd> ...` Alias: `up ctp pull-secret
       ```
       This is the same format emitted by `up robot token create`. Robot tokens
       do not expire.
+
+**Subgroup: Kubeconfig**
+
+Format: `up controlplane kubeconfig <cmd> ...` Alias: `up ctp kubeconfig
+<cmd>...`
+
+- `get <control plane name>`
+    - Flags:
+        - `--token = STRING`: Required token to be used in the generated kubeconfig
+          to access the control plane
+        - `--file = STRING`: Optional file path to write the kubeconfig to. If not
+          provided, the default kubeconfig file will be used.
+    - Behavior: Adds an entry to the default kubeconfig file that can be used to
+      connect to the specified control plane. This kubeconfig file will be
+      configured to use the current cluster as the control plane.
 
 ## Profile
 
