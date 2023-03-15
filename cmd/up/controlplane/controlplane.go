@@ -92,7 +92,6 @@ type Cmd struct {
 	Get    getCmd    `cmd:"" help:"Get a single control plane."`
 
 	Connect connectCmd `cmd:"" help:"Connect an App Cluster to a managed control plane."`
-	Bind    bindCmd    `cmd:"" help:"Bind APIs to a managed pontrol plane."`
 
 	Configuration pkg.Cmd `cmd:"" set:"package_type=Configuration" help:"Manage Configurations."`
 	Provider      pkg.Cmd `cmd:"" set:"package_type=Provider" help:"Manage Providers."`

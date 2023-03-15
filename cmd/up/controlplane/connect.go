@@ -19,18 +19,17 @@ import (
 	"fmt"
 	"io"
 	"net/url"
-	"path"
-	"strings"
+	"strconv"
 
 	"github.com/alecthomas/kong"
 	"github.com/crossplane/crossplane-runtime/pkg/errors"
 	"github.com/pterm/pterm"
-	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
-	applyconfigurationscorev1 "k8s.io/client-go/applyconfigurations/core/v1"
-	applyconfigurationsmetav1 "k8s.io/client-go/applyconfigurations/meta/v1"
 	"k8s.io/client-go/kubernetes"
-	v1 "k8s.io/client-go/tools/clientcmd/api/v1"
 	"sigs.k8s.io/yaml"
+
+	"github.com/upbound/up-sdk-go/service/accounts"
+	"github.com/upbound/up-sdk-go/service/robots"
+	"github.com/upbound/up-sdk-go/service/tokens"
 
 	"github.com/upbound/up/internal/install"
 	"github.com/upbound/up/internal/install/helm"
@@ -51,6 +50,9 @@ const (
 
 // AfterApply sets default values in command after assignment and validation.
 func (c *connectCmd) AfterApply(kongCtx *kong.Context, upCtx *upbound.Context) error {
+	if c.ClusterName == "" {
+		c.ClusterName = c.Namespace
+	}
 	kubeconfig, err := kube.GetKubeConfig(c.Kubeconfig)
 	if err != nil {
 		return err
@@ -59,7 +61,7 @@ func (c *connectCmd) AfterApply(kongCtx *kong.Context, upCtx *upbound.Context) e
 	mgr, err := helm.NewManager(kubeconfig,
 		connectorName,
 		mcpRepoURL,
-		helm.WithNamespace(c.Namespace))
+		helm.WithNamespace(c.InstallationNamespace))
 	if err != nil {
 		return err
 	}
@@ -88,29 +90,40 @@ func (c *connectCmd) AfterApply(kongCtx *kong.Context, upCtx *upbound.Context) e
 	return nil
 }
 
-// getCmd gets a single control plane in an account on Upbound.
+// connectCmd connects the current cluster to a control plane in an account on
+// Upbound.
 type connectCmd struct {
 	mgr     install.Manager
 	parser  install.ParameterParser
 	kClient kubernetes.Interface
 
-	Name  string `arg:"" required:"" help:"Name of control plane."`
-	Token string `required:"" help:"API token used to authenticate."`
+	Name      string `arg:"" required:"" help:"Name of control plane."`
+	Namespace string `arg:"" required:"" help:"Namespace in the control plane where the claims of the cluster will be stored."`
 
-	Kubeconfig string `type:"existingfile" help:"Override default kubeconfig path."`
-	Namespace  string `short:"n" env:"MCP_CONNECTOR_NAMESPACE" default:"kube-system" help:"Kubernetes namespace for MCP Connector."`
+	Token                 string `help:"API token used to authenticate. If not provided, a new robot and a token will be created."`
+	ClusterName           string `help:"Name of the cluster connecting to the control plane. If not provided, the namespace argument value will be used."`
+	Kubeconfig            string `type:"existingfile" help:"Override the default kubeconfig path."`
+	InstallationNamespace string `short:"n" env:"MCP_CONNECTOR_NAMESPACE" default:"kube-system" help:"Kubernetes namespace for MCP Connector. Default is kube-system."`
 
 	install.CommonParams
 }
 
-// Run executes the get command.
+// Run executes the connect command.
 func (c *connectCmd) Run(p pterm.TextPrinter, upCtx *upbound.Context) error {
-	if err := c.applyMCPKubeconfig(upCtx); err != nil {
-		return err
+	token, err := c.getToken(p, upCtx)
+	if err != nil {
+		return errors.Wrap(err, "failed to get token")
 	}
 	params, err := c.parser.Parse()
 	if err != nil {
 		return errors.Wrap(err, errParseInstallParameters)
+	}
+	params["mcp"] = map[string]string{
+		"account":   upCtx.Account,
+		"name":      c.Name,
+		"namespace": c.Namespace,
+		"host":      fmt.Sprintf("%s://%s", upCtx.ProxyEndpoint.Scheme, upCtx.ProxyEndpoint.Host),
+		"token":     token,
 	}
 	if err = c.mgr.Install("", params); err != nil {
 		return err
@@ -120,71 +133,76 @@ func (c *connectCmd) Run(p pterm.TextPrinter, upCtx *upbound.Context) error {
 		return err
 	}
 
-	p.Printfln("Connected to the MCP %q, ready for binding APIs!", c.Name)
+	p.Printfln("Connected to the control plane %q !", c.Name)
 	return nil
 }
 
-func (c *connectCmd) applyMCPKubeconfig(upCtx *upbound.Context) error {
-	// Create a secret with MCP Kubeconfig
-	proxy := upCtx.ProxyEndpoint
-	id := path.Join(upCtx.Account, c.Name)
-	key := fmt.Sprintf(kube.UpboundKubeconfigKeyFmt, strings.ReplaceAll(id, "/", "-"))
-	proxy.Path = path.Join(proxy.Path, id, kube.UpboundK8sResource)
-
-	mcpCfg := &v1.Config{
-		Kind:       "Config",
-		APIVersion: "v1",
-		Clusters: []v1.NamedCluster{
-			{
-				Name: key,
-				Cluster: v1.Cluster{
-					Server: proxy.String(),
-				},
-			},
-		},
-		AuthInfos: []v1.NamedAuthInfo{
-			{
-				Name: key,
-				AuthInfo: v1.AuthInfo{
-					Token: c.Token,
-				},
-			},
-		},
-		Contexts: []v1.NamedContext{
-			{
-				Name: key,
-				Context: v1.Context{
-					Cluster:  key,
-					AuthInfo: key,
-				},
-			},
-		},
-		CurrentContext: key,
+func (c *connectCmd) getToken(p pterm.TextPrinter, upCtx *upbound.Context) (string, error) {
+	if c.Token != "" {
+		return c.Token, nil
 	}
-
-	b, err := yaml.Marshal(mcpCfg)
+	cfg, err := upCtx.BuildSDKConfig()
 	if err != nil {
-		return errors.Wrap(err, "cannot marshal MCP kubeconfig")
+		return "", errors.Wrap(err, "failed to build SDK config")
 	}
-
-	secretName := "mcp-config"
-	versionV1 := "v1"
-	kindSecret := "Secret"
-	_, err = c.kClient.CoreV1().Secrets(c.Namespace).Apply(context.Background(), &applyconfigurationscorev1.SecretApplyConfiguration{
-		TypeMetaApplyConfiguration: applyconfigurationsmetav1.TypeMetaApplyConfiguration{
-			Kind:       &kindSecret,
-			APIVersion: &versionV1,
+	a, err := accounts.NewClient(cfg).Get(context.Background(), upCtx.Account)
+	if err != nil {
+		return "", errors.Wrap(err, "failed to get account details")
+	}
+	var tokenOwner tokens.TokenOwner
+	switch a.Account.Type {
+	case accounts.AccountOrganization:
+		r, err := robots.NewClient(cfg).Create(context.Background(), &robots.RobotCreateParameters{
+			Attributes: robots.RobotAttributes{
+				Name:        c.ClusterName,
+				Description: "A robot used by the MCP Connector running in " + c.ClusterName,
+			},
+			Relationships: robots.RobotRelationships{
+				Owner: robots.RobotOwner{
+					Data: robots.RobotOwnerData{
+						Type: "organization",
+						ID:   upCtx.Account,
+					},
+				},
+			},
+		})
+		if err != nil {
+			return "", errors.Wrap(err, "failed to create robot")
+		}
+		p.Printfln("Created a robot account named %q.", c.ClusterName)
+		tokenOwner = tokens.TokenOwner{
+			Data: tokens.TokenOwnerData{
+				Type: tokens.TokenOwnerRobot,
+				ID:   r.ID.String(),
+			},
+		}
+		p.Println("Creating a token for the robot account. This token will be" +
+			"used to authenticate the cluster.")
+	case accounts.AccountUser:
+		tokenOwner = tokens.TokenOwner{
+			Data: tokens.TokenOwnerData{
+				Type: tokens.TokenOwnerUser,
+				ID:   strconv.Itoa(int(a.User.ID)),
+			},
+		}
+		p.Println("Creating a token for the user account. This token will be" +
+			"used to authenticate the cluster.")
+	default:
+		return "", errors.New("only organization and user accounts are supported")
+	}
+	resp, err := tokens.NewClient(cfg).Create(context.Background(), &tokens.TokenCreateParameters{
+		Attributes: tokens.TokenAttributes{
+			Name: c.ClusterName,
 		},
-		ObjectMetaApplyConfiguration: &applyconfigurationsmetav1.ObjectMetaApplyConfiguration{
-			Name:      &secretName,
-			Namespace: &c.Namespace,
+		Relationships: tokens.TokenRelationships{
+			Owner: tokenOwner,
 		},
-		Data: map[string][]byte{
-			"kubeconfig": b,
-		},
-	}, metav1.ApplyOptions{FieldManager: "up"})
-
-	return errors.Wrap(err, "cannot apply MCP kubeconfig secret")
+	})
+	if err != nil {
+		return "", errors.Wrap(err, "failed to create token")
+	}
+	p.Printfln("Created a token named %q", c.ClusterName)
+	return fmt.Sprint(resp.DataSet.Meta["jwt"]), nil
 }
 
 func urlMustParse(s string) *url.URL {
