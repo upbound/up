@@ -26,14 +26,19 @@ import (
 
 // inviteCmd sends out an invitation to a user to join an organization.
 type inviteCmd struct {
-	OrgID      uint                                      `arg:"" required:"" help:"ID of the organization."`
+	OrgName    string                                    `arg:"" required:"" help:"Name of the organization."`
 	Email      string                                    `arg:"" required:"" help:"Email address of the user to invite."`
 	Permission organizations.OrganizationPermissionGroup `short:"p" enum:"member,owner" default:"member" help:"Role of the user to invite (owner or member)."`
 }
 
 // Run executes the invite command.
 func (c *inviteCmd) Run(printer upterm.ObjectPrinter, p pterm.TextPrinter, oc *organizations.Client, upCtx *upbound.Context) error {
-	if err := oc.CreateInvite(context.Background(), c.OrgID, &organizations.OrganizationInviteCreateParameters{
+	orgID, err := oc.GetOrgID(context.Background(), c.OrgName)
+	if err != nil {
+		return err
+	}
+
+	if err = oc.CreateInvite(context.Background(), orgID, &organizations.OrganizationInviteCreateParameters{
 		Email:      c.Email,
 		Permission: c.Permission,
 	}); err != nil {

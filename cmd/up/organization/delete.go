@@ -61,16 +61,9 @@ type deleteCmd struct {
 
 // Run executes the delete command.
 func (c *deleteCmd) Run(p pterm.TextPrinter, oc *organizations.Client) error {
-	orgs, err := oc.List(context.Background())
+	id, err := oc.GetOrgID(context.Background(), c.Name)
 	if err != nil {
 		return err
-	}
-	var id uint
-	for _, o := range orgs {
-		if o.Name == c.Name {
-			id = o.ID
-			break
-		}
 	}
 	if err := oc.Delete(context.Background(), id); err != nil {
 		return err

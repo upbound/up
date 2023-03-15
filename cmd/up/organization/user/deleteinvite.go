@@ -30,7 +30,7 @@ import (
 type deleteInviteCmd struct {
 	prompter input.Prompter
 
-	OrgID       uint   `arg:"" required:"" help:"ID of the organization."`
+	OrgName     string `arg:"" required:"" help:"Name of the organization."`
 	InviteEmail string `arg:"" required:"" help:"Email of the invitation to delete."`
 
 	Force bool `help:"Force deletion of the invite." default:"false"`
@@ -63,14 +63,18 @@ func (c *deleteInviteCmd) AfterApply(p pterm.TextPrinter) error {
 
 // Run executes the invite command.
 func (c *deleteInviteCmd) Run(printer upterm.ObjectPrinter, p pterm.TextPrinter, oc *organizations.Client, upCtx *upbound.Context) error {
-	currentInvites, err := oc.ListInvites(context.Background(), c.OrgID)
+	orgID, err := oc.GetOrgID(context.Background(), c.OrgName)
+	if err != nil {
+		return err
+	}
+	currentInvites, err := oc.ListInvites(context.Background(), orgID)
 	if err != nil {
 		return err
 	}
 
 	for _, invite := range currentInvites {
 		if invite.Email == c.InviteEmail {
-			if err := oc.DeleteInvite(context.Background(), c.OrgID, invite.ID); err != nil {
+			if err := oc.DeleteInvite(context.Background(), orgID, invite.ID); err != nil {
 				return err
 			}
 			p.Printfln("Invitation %d deleted", invite.ID)

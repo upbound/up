@@ -36,12 +36,16 @@ func (c *listInvitesCmd) AfterApply(kongCtx *kong.Context, upCtx *upbound.Contex
 
 // listInvitesCmd lists invites in an organization.
 type listInvitesCmd struct {
-	OrgID uint `arg:"" required:"" help:"ID of the organization."`
+	OrgName string `arg:"" required:"" help:"Name of the organization."`
 }
 
 // Run executes the list command.
 func (c *listInvitesCmd) Run(printer upterm.ObjectPrinter, p pterm.TextPrinter, oc *organizations.Client, upCtx *upbound.Context) error {
-	resp, err := oc.ListInvites(context.Background(), c.OrgID)
+	orgID, err := oc.GetOrgID(context.Background(), c.OrgName)
+	if err != nil {
+		return err
+	}
+	resp, err := oc.ListInvites(context.Background(), orgID)
 	if err != nil {
 		return err
 	}
