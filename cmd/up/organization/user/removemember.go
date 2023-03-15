@@ -27,11 +27,13 @@ import (
 )
 
 // removeMemberCmd removes a user from an organization.
+// Ideally it would take the username or email. Today that information
+// isn't available via the API, so the user ID is required.
 type removeMemberCmd struct {
 	prompter input.Prompter
 
-	OrgID  uint `arg:"" required:"" help:"ID of the organization."`
-	UserID uint `arg:"" required:"" help:"ID of the user to remove."`
+	OrgName string `arg:"" required:"" help:"Name of the organization."`
+	UserID  uint   `arg:"" required:"" help:"ID of the user to remove."`
 
 	Force bool `help:"Force removal of the member." default:"false"`
 }
@@ -54,19 +56,23 @@ func (c *removeMemberCmd) AfterApply(p pterm.TextPrinter) error {
 	}
 
 	if input.InputYes(confirm) {
-		p.Printfln("Removing member %s. This cannot be undone.", c.UserID)
+		p.Printfln("Removing member %d. This cannot be undone.", c.UserID)
 		return nil
 	}
 
 	return fmt.Errorf("operation canceled")
 }
 
-// Run executes the invite command.
+// Run executes the remove-member command.
 func (c *removeMemberCmd) Run(printer upterm.ObjectPrinter, p pterm.TextPrinter, oc *organizations.Client, upCtx *upbound.Context) error {
-	if err := oc.RemoveMember(context.Background(), c.OrgID, c.UserID); err != nil {
+	orgID, err := oc.GetOrgID(context.Background(), c.OrgName)
+	if err != nil {
+		return err
+	}
+	if err = oc.RemoveMember(context.Background(), orgID, c.UserID); err != nil {
 		return err
 	}
 
-	p.Printfln("User %d removed", c.UserID)
+	p.Printfln("User %d removed from %s", c.UserID, c.OrgName)
 	return nil
 }

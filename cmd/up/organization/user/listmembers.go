@@ -36,12 +36,16 @@ func (c *listMembersCmd) AfterApply(kongCtx *kong.Context, upCtx *upbound.Contex
 
 // listMembersCmd lists users in an organization.
 type listMembersCmd struct {
-	OrgID uint `arg:"" required:"" help:"ID of the organization."`
+	OrgName string `arg:"" required:"" help:"Name of the organization."`
 }
 
 // Run executes the list command.
 func (c *listMembersCmd) Run(printer upterm.ObjectPrinter, p pterm.TextPrinter, oc *organizations.Client, upCtx *upbound.Context) error {
-	resp, err := oc.ListMembers(context.Background(), c.OrgID)
+	id, err := oc.GetOrgID(context.Background(), c.OrgName)
+	if err != nil {
+		return err
+	}
+	resp, err := oc.ListMembers(context.Background(), id)
 	if err != nil {
 		return err
 	}
