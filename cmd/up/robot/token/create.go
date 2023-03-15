@@ -83,7 +83,7 @@ func (c *createCmd) Run(p pterm.TextPrinter, ac *accounts.Client, oc *organizati
 			Owner: tokens.TokenOwner{
 				Data: tokens.TokenOwnerData{
 					Type: tokens.TokenOwnerRobot,
-					ID:   id,
+					ID:   id.String(),
 				},
 			},
 		},

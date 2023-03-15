@@ -18,7 +18,6 @@ import (
 	"context"
 	"fmt"
 	"io"
-	"net/http"
 	"net/url"
 	"strconv"
 
@@ -150,8 +149,7 @@ func (c *connectCmd) getToken(p pterm.TextPrinter, upCtx *upbound.Context) (stri
 	if err != nil {
 		return "", errors.Wrap(err, "failed to get account details")
 	}
-	var ownerType tokens.TokenOwnerType
-	var id string
+	var tokenOwner tokens.TokenOwner
 	switch a.Account.Type {
 	case accounts.AccountOrganization:
 		r, err := robots.NewClient(cfg).Create(context.Background(), &robots.RobotCreateParameters{
@@ -172,46 +170,38 @@ func (c *connectCmd) getToken(p pterm.TextPrinter, upCtx *upbound.Context) (stri
 			return "", errors.Wrap(err, "failed to create robot")
 		}
 		p.Printfln("Created a robot account named %q.", c.ClusterName)
-		ownerType = tokens.TokenOwnerRobot
-		id = r.ID.String()
+		tokenOwner = tokens.TokenOwner{
+			Data: tokens.TokenOwnerData{
+				Type: tokens.TokenOwnerRobot,
+				ID:   r.ID.String(),
+			},
+		}
 		p.Println("Creating a token for the robot account. This token will be" +
 			"used to authenticate the cluster.")
 	case accounts.AccountUser:
-		ownerType = tokens.TokenOwnerUser
-		id = strconv.Itoa(int(a.User.ID))
+		tokenOwner = tokens.TokenOwner{
+			Data: tokens.TokenOwnerData{
+				Type: tokens.TokenOwnerUser,
+				ID:   strconv.Itoa(int(a.User.ID)),
+			},
+		}
 		p.Println("Creating a token for the user account. This token will be" +
 			"used to authenticate the cluster.")
 	default:
 		return "", errors.New("only organization and user accounts are supported")
 	}
-
-	// TODO(muvaf): Temporary workaround until the following issue is resolved:
-	// https://github.com/upbound/up-sdk-go/pull/47
-	body := map[string]interface{}{
-		"data": map[string]interface{}{
-			"type": "tokens",
-			"attributes": map[string]interface{}{
-				"name": c.ClusterName,
-			},
-			"relationships": map[string]interface{}{
-				"owner": map[string]interface{}{
-					"data": map[string]interface{}{
-						"type": ownerType,
-						"id":   id,
-					},
-				},
-			},
+	resp, err := tokens.NewClient(cfg).Create(context.Background(), &tokens.TokenCreateParameters{
+		Attributes: tokens.TokenAttributes{
+			Name: c.ClusterName,
 		},
-	}
-	req, err := cfg.Client.NewRequest(context.Background(), http.MethodPost, "v1/tokens", "", body)
+		Relationships: tokens.TokenRelationships{
+			Owner: tokenOwner,
+		},
+	})
 	if err != nil {
-		return "", err
-	}
-	resp := &tokens.TokenResponse{}
-	if err := cfg.Client.Do(req, &resp); err != nil {
 		return "", errors.Wrap(err, "failed to create token")
 	}
-	p.Printfln("Created a token named %q.", c.ClusterName)
+	p.Printfln("Created a token named %q", c.ClusterName)
 	return fmt.Sprint(resp.DataSet.Meta["jwt"]), nil
 }
 
