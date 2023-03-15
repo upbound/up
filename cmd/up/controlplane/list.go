@@ -31,7 +31,7 @@ const (
 	maxItems = 100
 )
 
-var fieldNames = []string{"NAME", "ID", "STATUS"}
+var fieldNames = []string{"NAME", "ID", "STATUS", "DEPLOYED CONFIGURATION", "CONFIGURATION STATUS"}
 
 // AfterApply sets default values in command after assignment and validation.
 func (c *listCmd) AfterApply(kongCtx *kong.Context, upCtx *upbound.Context) error {
@@ -60,5 +60,5 @@ func (c *listCmd) Run(printer upterm.ObjectPrinter, p pterm.TextPrinter, cc *cp.
 
 func extractFields(obj any) []string {
 	c := obj.(cp.ControlPlaneResponse)
-	return []string{c.ControlPlane.Name, c.ControlPlane.ID.String(), string(c.Status)}
+	return []string{c.ControlPlane.Name, c.ControlPlane.ID.String(), string(c.Status), *c.ControlPlane.Configuration.Name, string(c.ControlPlane.Configuration.Status)}
 }

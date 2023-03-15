@@ -123,7 +123,9 @@ func (a *alpha) BeforeReset(ctx *kong.Context) error { //nolint:unparam
 }
 
 type alpha struct {
-	ControlPlane controlplane.Cmd `cmd:"" maturity:"alpha" name:"controlplane" aliases:"ctp" help:"Interact with control planes."`
+	// For now, we maintain compatibility for systems that may still use the alpha variant.
+	// This nudges users towards the stable variant when they attempt to emit help.
+	ControlPlane controlplane.Cmd `cmd:"" hidden:"" name:"controlplane" aliases:"ctp" help:"Interact with control planes."`
 	Upbound      upbound.Cmd      `cmd:"" maturity:"alpha" help:"Interact with Upbound."`
 	XPKG         xpkg.Cmd         `cmd:"" maturity:"alpha" help:"Interact with UXP packages."`
 }

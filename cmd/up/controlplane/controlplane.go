@@ -86,20 +86,20 @@ func PredictControlPlanes() complete.Predictor {
 
 // Cmd contains commands for interacting with control planes.
 type Cmd struct {
-	Create createCmd `cmd:"" maturity:"alpha" help:"Create a managed control plane."`
-	Delete deleteCmd `cmd:"" maturity:"alpha" help:"Delete a control plane."`
-	List   listCmd   `cmd:"" maturity:"alpha" help:"List control planes for the account."`
-	Get    getCmd    `cmd:"" maturity:"alpha" help:"Get a single control plane."`
+	Create createCmd `cmd:"" help:"Create a managed control plane."`
+	Delete deleteCmd `cmd:"" help:"Delete a control plane."`
+	List   listCmd   `cmd:"" help:"List control planes for the account."`
+	Get    getCmd    `cmd:"" help:"Get a single control plane."`
 
-	Connect connectCmd `cmd:"" maturity:"alpha" help:"Connect an App Cluster to a managed control plane."`
-	Bind    bindCmd    `cmd:"" maturity:"alpha" help:"Bind APIs to a managed pontrol plane."`
+	Connect connectCmd `cmd:"" help:"Connect an App Cluster to a managed control plane."`
+	Bind    bindCmd    `cmd:"" help:"Bind APIs to a managed pontrol plane."`
 
 	Configuration pkg.Cmd `cmd:"" set:"package_type=Configuration" help:"Manage Configurations."`
 	Provider      pkg.Cmd `cmd:"" set:"package_type=Provider" help:"Manage Providers."`
 
 	PullSecret pullsecret.Cmd `cmd:"" help:"Manage package pull secrets."`
 
-	Kubeconfig kubeconfig.Cmd `cmd:"" maturity:"alpha" name:"kubeconfig" help:"Manage control plane kubeconfig data."`
+	Kubeconfig kubeconfig.Cmd `cmd:"" name:"kubeconfig" help:"Manage control plane kubeconfig data."`
 
 	// Common Upbound API configuration
 	Flags upbound.Flags `embed:""`
