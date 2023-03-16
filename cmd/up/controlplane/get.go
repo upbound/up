@@ -18,6 +18,7 @@ import (
 	"context"
 
 	"github.com/alecthomas/kong"
+	"github.com/crossplane/crossplane-runtime/pkg/errors"
 	"github.com/pterm/pterm"
 
 	cp "github.com/upbound/up-sdk-go/service/controlplanes"
@@ -25,6 +26,8 @@ import (
 	"github.com/upbound/up/internal/upbound"
 	"github.com/upbound/up/internal/upterm"
 )
+
+const errNoConfigurationFound = "no configuration associated to this control plane"
 
 // AfterApply sets default values in command after assignment and validation.
 func (c *getCmd) AfterApply(kongCtx *kong.Context, upCtx *upbound.Context) error {
@@ -43,6 +46,17 @@ func (c *getCmd) Run(printer upterm.ObjectPrinter, cc *cp.Client, upCtx *upbound
 	if err != nil {
 		return err
 	}
+	// All Upbound managed control planes in an account should be associated to a configuration.
+	if ctp.ControlPlane.Configuration == EmptyControlPlaneConfiguration() {
+		return errors.New(errNoConfigurationFound)
+	}
 
 	return printer.Print(*ctp, fieldNames, extractFields)
+}
+
+// EmptyControlPlaneConfiguration returns an empty ControlPlaneConfiguration with default values.
+func EmptyControlPlaneConfiguration() cp.ControlPlaneConfiguration {
+	configuration := cp.ControlPlaneConfiguration{}
+	configuration.Status = cp.ConfigurationInstallationQueued
+	return configuration
 }
