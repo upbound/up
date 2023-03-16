@@ -161,7 +161,7 @@ func (c *connectCmd) getToken(p pterm.TextPrinter, upCtx *upbound.Context) (stri
 				Owner: robots.RobotOwner{
 					Data: robots.RobotOwnerData{
 						Type: "organization",
-						ID:   upCtx.Account,
+						ID:   strconv.Itoa(int(a.Organization.ID)),
 					},
 				},
 			},
