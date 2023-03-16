@@ -31,6 +31,10 @@ const (
 	maxItems = 100
 )
 
+const (
+	notAvailable = "n/a"
+)
+
 var fieldNames = []string{"NAME", "ID", "STATUS", "DEPLOYED CONFIGURATION", "CONFIGURATION STATUS"}
 
 // AfterApply sets default values in command after assignment and validation.
@@ -60,5 +64,15 @@ func (c *listCmd) Run(printer upterm.ObjectPrinter, p pterm.TextPrinter, cc *cp.
 
 func extractFields(obj any) []string {
 	c := obj.(cp.ControlPlaneResponse)
-	return []string{c.ControlPlane.Name, c.ControlPlane.ID.String(), string(c.Status), *c.ControlPlane.Configuration.Name, string(c.ControlPlane.Configuration.Status)}
+	var cfgName string
+	var cfgStatus string
+	// All Upbound managed control planes in an account should be associated to a configuration.
+	// However, we should still list all control planes and indicate where this isn't the case.
+	if c.ControlPlane.Configuration.Name != nil && c.ControlPlane.Configuration != EmptyControlPlaneConfiguration() {
+		cfgName = *c.ControlPlane.Configuration.Name
+		cfgStatus = string(c.ControlPlane.Configuration.Status)
+	} else {
+		cfgName, cfgStatus = notAvailable, notAvailable
+	}
+	return []string{c.ControlPlane.Name, c.ControlPlane.ID.String(), string(c.Status), cfgName, cfgStatus}
 }
