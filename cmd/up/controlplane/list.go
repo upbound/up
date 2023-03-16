@@ -31,6 +31,10 @@ const (
 	maxItems = 100
 )
 
+const (
+	notAvailable = "n/a"
+)
+
 var fieldNames = []string{"NAME", "ID", "STATUS", "DEPLOYED CONFIGURATION", "CONFIGURATION STATUS"}
 
 // AfterApply sets default values in command after assignment and validation.
@@ -68,7 +72,7 @@ func extractFields(obj any) []string {
 		cfgName = *c.ControlPlane.Configuration.Name
 		cfgStatus = string(c.ControlPlane.Configuration.Status)
 	} else {
-		cfgName, cfgStatus = "n/a", "n/a"
+		cfgName, cfgStatus = notAvailable, notAvailable
 	}
 	return []string{c.ControlPlane.Name, c.ControlPlane.ID.String(), string(c.Status), cfgName, cfgStatus}
 }
