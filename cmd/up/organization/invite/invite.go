@@ -1,4 +1,4 @@
-// Copyright 2022 Upbound Inc
+// Copyright 2023 Upbound Inc
 //
 // Licensed under the Apache License, Version 2.0 (the "License");
 // you may not use this file except in compliance with the License.
@@ -12,7 +12,7 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-package user
+package invite
 
 import (
 	"github.com/alecthomas/kong"
@@ -34,6 +34,7 @@ func (c *Cmd) AfterApply(kongCtx *kong.Context, upCtx *upbound.Context) error {
 
 // Cmd contains commands for managing organization users.
 type Cmd struct {
-	List   listCmd   `cmd:"" help:"List members of an organization."`
-	Remove removeCmd `cmd:"" help:"Remove a member from the organization."`
+	Create createCmd `cmd:"" help:"Invite a user to the organization."`
+	Delete deleteCmd `cmd:"" help:"Delete an invitation to the organization."`
+	List   listCmd   `cmd:"" help:"List user invites to an organization."`
 }

@@ -29,18 +29,18 @@ import (
 var listMembersFieldNames = []string{"ID", "NAME", "PERMISSION"}
 
 // AfterApply sets default values in command after assignment and validation.
-func (c *listMembersCmd) AfterApply(kongCtx *kong.Context, upCtx *upbound.Context) error {
+func (c *listCmd) AfterApply(kongCtx *kong.Context, upCtx *upbound.Context) error {
 	kongCtx.Bind(pterm.DefaultTable.WithWriter(kongCtx.Stdout).WithSeparator("   "))
 	return nil
 }
 
-// listMembersCmd lists users in an organization.
-type listMembersCmd struct {
+// listCmd lists users in an organization.
+type listCmd struct {
 	OrgName string `arg:"" required:"" help:"Name of the organization."`
 }
 
 // Run executes the list command.
-func (c *listMembersCmd) Run(printer upterm.ObjectPrinter, p pterm.TextPrinter, oc *organizations.Client, upCtx *upbound.Context) error {
+func (c *listCmd) Run(printer upterm.ObjectPrinter, p pterm.TextPrinter, oc *organizations.Client, upCtx *upbound.Context) error {
 	id, err := oc.GetOrgID(context.Background(), c.OrgName)
 	if err != nil {
 		return err

@@ -26,10 +26,10 @@ import (
 	"github.com/upbound/up/internal/upterm"
 )
 
-// removeMemberCmd removes a user from an organization.
+// removeCmd removes a user from an organization.
 // Ideally it would take the username or email. Today that information
 // isn't available via the API, so the user ID is required.
-type removeMemberCmd struct {
+type removeCmd struct {
 	prompter input.Prompter
 
 	OrgName string `arg:"" required:"" help:"Name of the organization."`
@@ -39,13 +39,13 @@ type removeMemberCmd struct {
 }
 
 // BeforeApply sets default values for the delete command, before assignment and validation.
-func (c *removeMemberCmd) BeforeApply() error {
+func (c *removeCmd) BeforeApply() error {
 	c.prompter = input.NewPrompter()
 	return nil
 }
 
 // AfterApply accepts user input by default to confirm the delete operation.
-func (c *removeMemberCmd) AfterApply(p pterm.TextPrinter) error {
+func (c *removeCmd) AfterApply(p pterm.TextPrinter) error {
 	if c.Force {
 		return nil
 	}
@@ -64,7 +64,7 @@ func (c *removeMemberCmd) AfterApply(p pterm.TextPrinter) error {
 }
 
 // Run executes the remove-member command.
-func (c *removeMemberCmd) Run(printer upterm.ObjectPrinter, p pterm.TextPrinter, oc *organizations.Client, upCtx *upbound.Context) error {
+func (c *removeCmd) Run(printer upterm.ObjectPrinter, p pterm.TextPrinter, oc *organizations.Client, upCtx *upbound.Context) error {
 	orgID, err := oc.GetOrgID(context.Background(), c.OrgName)
 	if err != nil {
 		return err

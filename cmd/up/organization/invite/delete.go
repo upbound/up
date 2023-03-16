@@ -12,7 +12,7 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-package user
+package invite
 
 import (
 	"context"
@@ -26,8 +26,8 @@ import (
 	"github.com/upbound/up/internal/upterm"
 )
 
-// deleteInviteCmd deletes an invitation to a user to join an organization.
-type deleteInviteCmd struct {
+// deleteCmd deletes an invitation to a user to join an organization.
+type deleteCmd struct {
 	prompter input.Prompter
 
 	OrgName     string `arg:"" required:"" help:"Name of the organization."`
@@ -37,13 +37,13 @@ type deleteInviteCmd struct {
 }
 
 // BeforeApply sets default values for the delete command, before assignment and validation.
-func (c *deleteInviteCmd) BeforeApply() error {
+func (c *deleteCmd) BeforeApply() error {
 	c.prompter = input.NewPrompter()
 	return nil
 }
 
 // AfterApply accepts user input by default to confirm the delete operation.
-func (c *deleteInviteCmd) AfterApply(p pterm.TextPrinter) error {
+func (c *deleteCmd) AfterApply(p pterm.TextPrinter) error {
 	if c.Force {
 		return nil
 	}
@@ -61,8 +61,8 @@ func (c *deleteInviteCmd) AfterApply(p pterm.TextPrinter) error {
 	return fmt.Errorf("operation canceled")
 }
 
-// Run executes the invite command.
-func (c *deleteInviteCmd) Run(printer upterm.ObjectPrinter, p pterm.TextPrinter, oc *organizations.Client, upCtx *upbound.Context) error {
+// Run executes the create command.
+func (c *deleteCmd) Run(printer upterm.ObjectPrinter, p pterm.TextPrinter, oc *organizations.Client, upCtx *upbound.Context) error {
 	orgID, err := oc.GetOrgID(context.Background(), c.OrgName)
 	if err != nil {
 		return err

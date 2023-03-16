@@ -22,6 +22,7 @@ import (
 
 	"github.com/upbound/up-sdk-go/service/organizations"
 
+	"github.com/upbound/up/cmd/up/organization/invite"
 	"github.com/upbound/up/cmd/up/organization/user"
 	"github.com/upbound/up/internal/upbound"
 )
@@ -82,7 +83,8 @@ type Cmd struct {
 	List   listCmd   `cmd:"" help:"List organizations."`
 	Get    getCmd    `cmd:"" help:"Get an organization."`
 
-	User user.Cmd `cmd:"" help:"Manage organization users."`
+	User   user.Cmd   `cmd:"" help:"Manage organization users."`
+	Invite invite.Cmd `cmd:"" help:"Manage invites to organizations"`
 
 	// Common Upbound API configuration
 	Flags upbound.Flags `embed:""`
