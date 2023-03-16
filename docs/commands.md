@@ -77,6 +77,31 @@ Format: `up controlplane <cmd> ...` Alias: `up ctp <cmd> ...`
 Commands in the **Control Plane** group are used to manage and interact with
 control planes.
 
+- `create <control plane name>`
+    - Flags:
+        - `--configuration-name = STRING`: (Required) Name of the configuration to
+          use to bootstrap the control plane with.
+        - `--description = STRING`: Description for the control plane.
+    - Behavior: Creates a new control plane.
+- `list`
+    - Behavior: Lists all control planes.
+- `get <control plane name>`
+    - Behavior: Gets a single control plane.
+- `delete <control plane name>`
+    - Behavior: Deletes the specified control plane.
+- `connect <control plane name> <namespace in the control plane>`
+    - Flags:
+        - `--token = STRING`: Optional token for the connector to use. If not
+          provided, a new one will be generated.
+        - `--cluster-name = STRING`: Optional name for the cluster that will be
+          connected to the control plane. If not provided, namespace argument will
+          be used.
+        - `--kubeconfig = STRING`: sets `kubeconfig` path. Same defaults as
+          `kubectl` are used if not provided.
+    - Behavior: Connects the current cluster to the specified control plane's
+      namespace. This means that all claim requests in the cluster will be proxied
+      to the given namespace in the control plane.
+
 **Group Flags**
 
 Group flags can be passed for any command in the **Control Plane** group. Some
@@ -118,6 +143,21 @@ Format: `up controlplane pull-secret <cmd> ...` Alias: `up ctp pull-secret
       ```
       This is the same format emitted by `up robot token create`. Robot tokens
       do not expire.
+
+**Subgroup: Kubeconfig**
+
+Format: `up controlplane kubeconfig <cmd> ...` Alias: `up ctp kubeconfig
+<cmd>...`
+
+- `get <control plane name>`
+    - Flags:
+        - `--token = STRING`: Required token to be used in the generated kubeconfig
+          to access the control plane
+        - `--file = STRING`: Optional file path to write the kubeconfig to. If not
+          provided, the default kubeconfig file will be used.
+    - Behavior: Adds an entry to the default kubeconfig file that can be used to
+      connect to the specified control plane. This kubeconfig file will be
+      configured to use the current cluster as the control plane.
 
 ## Profile
 
@@ -406,6 +446,17 @@ on-disk Crossplane packages.
     - Behavior: Pushes a Crossplane package (`.xpkg`) to an OCI compliant
       registry. The [Upbound Marketplace] (`xpkg.upbound.io`) will be used by
       default if tag does not specify.
+- `xp-extract <package>`
+    - Flags:
+        - `--from-daemon = BOOL`: Indicates that the image should be fetched
+          from the Docker daemon instead of the registry.
+        - `-o, --output = STRING` (Default: `out.gz`): Package output file path.
+          Extension must be .gz or will be replaced
+    - Behavior: Extract package contents into a Crossplane cache compatible
+      format. `package` must be a valid OCI image reference and is fetched from
+      a remote registry unless `--from-daemon` is specified. The [Upbound
+      Registry] (`xpkg.upbound.io`) will be used by default if reference does
+      not specify.
 
 ## XPLS
 
@@ -424,53 +475,6 @@ server.
 
 The **Alpha** group includes commands that are _alpha_ maturity level. These
 commands may or may not be present in subsequent releases of `up`.
-
-### Control Plane
-
-Format: `up alpha controlplane <cmd> ...` Alias: `up alpha ctp <cmd> ...`
-
-Commands in the **Control Plane** group are used to manage and interact with
-control planes.
-
-- `create <name>`
-    - Flags:
-        - `--description = STRING`: Control plane description.
-    - Behavior: Creates a hosted control plane in Upbound.
-- `delete <name>`
-    - Behavior: Deletes a control plane in Upbound.
-- `list`
-    - Behavior: Lists all control planes for the configured account.
-
-**Group Flags**
-
-Group flags can be passed for any command in the **Control Plane** group. Some
-commands may choose not to utilize the group flags when not relevant.
-
-- `-a,--account = STRING` (Env: `UP_ACCOUNT`): Account with which to perform the
-  specified command. Can be either an organization or a personal account.
-- `--endpoint = URL` (Env: `UP_DOMAIN`) (Default: `https://api.upbound.io`):
-  Endpoint to use when communicating with the Upbound API.
-- `--profile = STRING` (Env: `UP_PROFILE`); Profile with which to perform the
-  specified command.
-
-**Subgroup: Kubeconfig**
-
-Format: `up alpha controlplane kubeconfig <cmd> ...` Alias: `up ctp kubeconfig
-<cmd>...`
-
-- `get <control-plane-name>`
-    - Flags:
-        - `--token = STRING` (*Required*): API token for authenticating to
-          control plane. If `-` is given the value will be read from stdin.
-        - `-f,--file = FILE`: File to merge `kubeconfig`.
-        - `--proxy = URL` (Env: `UP_PROXY`) (Default:
-          `https://proxy.upbound.io/env`): Endpoint for Upbound control plane
-          proxy.
-    - Behavior: Merges control plane cluster and authentication data into
-      currently configured `kubeconfig`, or one specified by `--file`. The
-      `--token` flag must be provided and must be a valid Upbound API token. A
-      new context will be created for the cluster and authentication data and it
-      will be set as current.
 
 ### Upbound
 
@@ -536,25 +540,6 @@ commands may choose not to utilize the group flags when not relevant.
 - `-n,--namespace = STRING` (Env: `UPBOUND_NAMESPACE`) (Default:
   `upbound-system`): Kubernetes namespace used for installing and managing
   Upbound.
-
-### XPKG
-
-Format: `up alpha xpkg <cmd> ...`
-
-Commands in the **XPKG** group are used to build, push, and interact with
-on-disk Crossplane packages.
-
-- `xp-extract <package>`
-    - Flags:
-        - `--from-daemon = BOOL`: Indicates that the image should be fetched
-          from the Docker daemon instead of the registry.
-        - `-o, --output = STRING` (Default: `out.gz`): Package output file path.
-          Extension must be .gz or will be replaced
-    - Behavior: Extract package contents into a Crossplane cache compatible
-      format. `package` must be a valid OCI image reference and is fetched from
-      a remote registry unless `--from-daemon` is specified. The [Upbound
-      Registry] (`xpkg.upbound.io`) will be used by default if reference does
-      not specify.
 
 <!-- Named Links -->
 [Upbound Software License]: https://licenses.upbound.io/upbound-software-license.html
