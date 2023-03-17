@@ -16,6 +16,7 @@ package xpkg
 
 import (
 	"context"
+	"io"
 	"path/filepath"
 
 	"github.com/crossplane/crossplane-runtime/pkg/errors"
@@ -36,8 +37,6 @@ const (
 	errBuildPackage    = "failed to build package"
 	errImageDigest     = "failed to get package digest"
 	errCreatePackage   = "failed to create package file"
-
-	examplesDir = "examples/"
 )
 
 // AfterApply constructs and binds Upbound-specific context to any subcommands
@@ -56,6 +55,19 @@ func (c *buildCmd) AfterApply() error {
 		return err
 	}
 
+	var authBE parser.Backend
+	ax, err := filepath.Abs(c.AuthExt)
+	if err == nil {
+		axf, err := c.fs.Open(ax)
+		if err == nil {
+			defer func() { _ = axf.Close() }()
+			b, err := io.ReadAll(axf)
+			if err == nil {
+				authBE = parser.NewEchoBackend(string(b))
+			}
+		}
+	}
+
 	pp, err := yaml.New()
 	if err != nil {
 		return err
@@ -68,8 +80,9 @@ func (c *buildCmd) AfterApply() error {
 			parser.FsFilters(
 				append(
 					buildFilters(root, c.Ignore),
-					xpkg.SkipContains(examplesDir))...),
+					xpkg.SkipContains(c.ExamplesRoot), xpkg.SkipContains(c.AuthExt))...),
 		),
+		authBE,
 		parser.NewFsBackend(
 			c.fs,
 			parser.FsDir(ex),
@@ -99,6 +112,7 @@ type buildCmd struct {
 	Controller   string   `help:"Controller image used as base for package."`
 	PackageRoot  string   `short:"f" help:"Path to package directory." default:"."`
 	ExamplesRoot string   `short:"e" help:"Path to package examples directory." default:"./examples"`
+	AuthExt      string   `short:"a" help:"Path to an authentication extension file." default:"auth.yaml"`
 	Ignore       []string `help:"Paths, specified relative to --package-root, to exclude from the package."`
 }
 
