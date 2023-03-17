@@ -10,3 +10,6 @@ cover.out
 # ignore vscode files (debug config etc...)
 /.vscode
 /.idea
+
+# ignore direnv files
+.envrc
