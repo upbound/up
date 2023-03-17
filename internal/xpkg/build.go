@@ -136,17 +136,17 @@ func WithController(img v1.Image) BuildOpt {
 }
 
 type AuthExtension struct {
-	Version      string `json:"version"`
-	Discriminant string `json:"discriminant"`
+	Version      string `yaml:"version"`
+	Discriminant string `yaml:"discriminant"`
 	Sources      []struct {
-		Name                string `json:"name"`
-		Docs                string `json:"docs"`
+		Name                string `yaml:"name"`
+		Docs                string `yaml:"docs"`
 		AdditionalResources []struct {
-			Type string `json:"type"`
-			Ref  string `json:"ref"`
-		} `json:"additionalResources,omitempty"`
-		ShowFields []string `json:"showFields,omitempty"`
-	} `json:"sources"`
+			Type string `yaml:"type"`
+			Ref  string `yaml:"ref"`
+		} `yaml:"additionalResources"`
+		ShowFields []string `yaml:"showFields"`
+	} `yaml:"sources"`
 }
 
 // Build compiles a Crossplane package from an on-disk package.
