@@ -59,6 +59,13 @@ Format: `up <cmd> ...`
           `UP_INSECURE_SKIP_TLS_VERIFY`): Skip verifying TLS certificates.
     - Behavior: Invalidates the session token for the default profile or one
       specified with `--profile`.
+- `install-completions`
+    - This command outputs shell commands that you can use to configure
+      tab completion in your shell. You can run the output directly, or
+      install it in your shell profile (e.g. .bashrc). Once the completion
+      commands have been installed, you can use the
+      tab key to auto-complete up commands.
+
 
 **Flags:**
 
@@ -158,18 +165,20 @@ Format: `up controlplane kubeconfig <cmd> ...` Alias: `up ctp kubeconfig
       connect to the specified control plane. This kubeconfig file will be
       configured to use the current cluster as the control plane.
 
-## Configurations
+## Configuration
 Format: `up configuration <cmd> ...` Alias: `up cfg <cmd> ...`
 
-Commands in the **Configuratione** group are used to manage and interact with
-configurations.
+Commands in the **Configuration** group are used to manage and interact with
+control plane configurations. A control plane configuration is a Crossplane
+Configuration that satisfies the [xpkg specification] and stores its package
+contents in a GitHub repository that the control plane is aware of.
 
 - `create <configuration name>`
     - Flags:
         - `--template-id = STRING`: (Required) Name of the configuration template
         to use.
         - `--context = STRING`: (Required) Name of the GitHub account or org
-           to use. The configuration tempalte will be forked into this Github org.
+           to use. The configuration template will be clonde into this Github org.
     - Behavior: Creates a new configuration. If you have not previously authorized
       or installed the Upbound GitHub app, your web browser will be opened to do so.
 - `list`
@@ -511,16 +520,9 @@ server.
 
 ## Install Shell Completions
 
-Format: `up install-completions`
-
-This command outputs shell commands that you can use to configure
-tab completion in your shell. You can run the output directly, or
-install it in your shell profile (e.g. .bashrc).
-
-Once the completion commands have been installed, you can use the
-tab key to auto-complete up commands.
 
 <!-- Named Links -->
 [Upbound Software License]: https://licenses.upbound.io/upbound-software-license.html
 [Upbound Marketplace]: https://www.upbound.io/registry
 [up configuration documentation]: configuration.md
+[xpkg specification]: https://docs.crossplane.io/v1.11/concepts/packages/
