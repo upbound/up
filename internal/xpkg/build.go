@@ -56,8 +56,9 @@ const (
 	errBuildObjectScheme = "failed to build object scheme for package parser"
 	errParseAuth         = "an auth extension was supplied but could not be parsed"
 
-	authMetaAnno   = "auth.upbound.io/group"
-	authObjectAnno = "auth.upbound.io/config"
+	authMetaAnno       = "auth.upbound.io/group"
+	authObjectAnno     = "auth.upbound.io/config"
+	ProviderConfigKind = "ProviderConfig"
 )
 
 // annotatedTeeReadCloser is a copy of io.TeeReader that implements
@@ -210,7 +211,7 @@ func (b *Builder) Build(ctx context.Context, opts ...BuildOpt) (v1.Image, runtim
 						if err == nil {
 							for x, o := range pkg.GetObjects() {
 								if c, ok := o.(*crd.CustomResourceDefinition); ok {
-									if c.Spec.Group == group {
+									if c.Spec.Group == group && c.Spec.Names.Kind == ProviderConfigKind {
 										ab := new(bytes.Buffer)
 										if err = yaml.NewEncoder(ab).Encode(auth); err != nil {
 											return nil, nil, errors.Wrap(err, errParseAuth)
