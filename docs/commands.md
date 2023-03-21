@@ -178,7 +178,7 @@ contents in a GitHub repository that the control plane is aware of.
         - `--template-id = STRING`: (Required) Name of the configuration template
         to use.
         - `--context = STRING`: (Required) Name of the GitHub account or org
-           to use. The configuration template will be clonde into this Github org.
+           to use. The configuration template will be cloned into this Github org.
     - Behavior: Creates a new configuration. If you have not previously authorized
       or installed the Upbound GitHub app, your web browser will be opened to do so.
 - `list`
