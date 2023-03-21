@@ -14,7 +14,6 @@ Groups:
 - [UXP](#uxp)
 - [XPKG](#xpkg)
 - [XPLS](#xpls)
-- [Alpha](#upbound)
 
 ## Top-Level
 
@@ -60,6 +59,13 @@ Format: `up <cmd> ...`
           `UP_INSECURE_SKIP_TLS_VERIFY`): Skip verifying TLS certificates.
     - Behavior: Invalidates the session token for the default profile or one
       specified with `--profile`.
+- `install-completions`
+    - This command outputs shell commands that you can use to configure
+      tab completion in your shell. You can run the output directly, or
+      install it in your shell profile (e.g. .bashrc). Once the completion
+      commands have been installed, you can use the
+      tab key to auto-complete up commands.
+
 
 **Flags:**
 
@@ -80,7 +86,7 @@ control planes.
 - `create <control plane name>`
     - Flags:
         - `--configuration-name = STRING`: (Required) Name of the configuration to
-          use to bootstrap the control plane with.
+          use to bootstrap the control plane with. See "Configurations" below.
         - `--description = STRING`: Description for the control plane.
     - Behavior: Creates a new control plane.
 - `list`
@@ -158,6 +164,47 @@ Format: `up controlplane kubeconfig <cmd> ...` Alias: `up ctp kubeconfig
     - Behavior: Adds an entry to the default kubeconfig file that can be used to
       connect to the specified control plane. This kubeconfig file will be
       configured to use the current cluster as the control plane.
+
+## Configuration
+Format: `up configuration <cmd> ...` Alias: `up cfg <cmd> ...`
+
+Commands in the **Configuration** group are used to manage and interact with
+control plane configurations. A control plane configuration is a Crossplane
+Configuration that satisfies the [xpkg specification] and stores its package
+contents in a GitHub repository that the control plane is aware of.
+
+- `create <configuration name>`
+    - Flags:
+        - `--template-id = STRING`: (Required) Name of the configuration template
+        to use.
+        - `--context = STRING`: (Required) Name of the GitHub account or org
+           to use. The configuration template will be cloned into this Github org.
+    - Behavior: Creates a new configuration. If you have not previously authorized
+      or installed the Upbound GitHub app, your web browser will be opened to do so.
+- `list`
+    - Behavior: Lists all configuration.
+- `get <configuration name>`
+    - Behavior: Gets a single configuration
+- `delete <configuration name>`
+    - Behavior: Deletes the specified configuration
+- `template list`
+    - Behavior: List the configuration templates you can specify as a `template-id`
+      to the create command.
+
+**Group Flags**
+
+Group flags can be passed for any command in the **Configuration** group. Some
+commands may choose not to utilize the group flags when not relevant.
+
+- `--domain = URL` (Env: `UP_DOMAIN`) (Default: `https://upbound.io`): Endpoint
+  to use when communicating with the Upbound API.
+- `--profile = STRING` (Env: `UP_PROFILE`); Profile with which to perform the
+  specified command.
+- `-a,--account = STRING` (Env: `UP_ACCOUNT`): Account with which to perform the
+  specified command. Can be either an organization or a personal account.
+- `--insecure-skip-tls-verify = BOOL` (Env: `UP_INSECURE_SKIP_TLS_VERIFY`): Skip
+  verifying TLS certificates.
+
 
 ## Profile
 
@@ -471,77 +518,11 @@ server.
         - `--verbose = BOOL`: Run server with verbose logging.
     - Behavior: Runs the Crossplane language server.
 
-## Alpha
+## Install Shell Completions
 
-The **Alpha** group includes commands that are _alpha_ maturity level. These
-commands may or may not be present in subsequent releases of `up`.
-
-### Upbound
-
-Format: `up upbound <cmd> ...`
-
-Commands in the **Upbound** group are used to install and manage Upbound.
-Installing and upgrading Upbound requires an Upbound customer license. Users
-will be prompted for their License ID and License Key on installation.
-
-- `install <version>`
-    - Flags:
-        - `--license-secret-name = STRING` (Default: `upbound-license`): Allows
-          setting the name of the license `Secret` that is created on
-          installation. The default value is expected, so passing an alternate
-          value for this flag usually requires modifying the installation
-          configuration using one of the following flags.
-        - `--set = KEY=VALUE`: Set install parameters for Upbound. Flag can be
-          passed multiple times and multiple key-value pairs can be provided in
-          a comma-separated list.
-        - `-f,--file = FILE`: YAML file with parameters for Upbound install.
-          Follows format of Helm-style values file.
-        - `-a,--account = STRING` (Env: `UP_ACCOUNT`): Account with which to
-          perform the specified command. Can be either an organization or a
-          personal account.
-        - `--endpoint = URL` (Env: `UP_DOMAIN`) (Default:
-          `https://api.upbound.io`): Endpoint to use when communicating with the
-          Upbound API.
-        - `--profile = STRING` (Env: `UP_PROFILE`); Profile with which to
-          perform the specified command.
-    - Behavior: Installs Upbound into cluster specified by currently configured
-      `kubeconfig`. When using Helm as install engine, the command mirrors the
-      behavior of `helm install`. If `[version]` is not provided, the latest
-      chart version will be used from the either the stable or unstable
-      repository.
-- `upgrade <version>` 
-    - Flags:
-        - `--rollback = BOOL`: Indicates that the upgrade should be rolled back
-          in case of failure.
-        - `--set = KEY=VALUE`: Set install parameters for Upbound. Flag can be
-          passed multiple times and multiple key-value pairs can be provided in
-          a comma-separated list.
-        - `-f,--file = FILE`: YAML file with parameters for Upbound install.
-          Follows format of Helm-style values file.
-    - Behavior: Upgrades Upbound in cluster specified by currently configured
-      `kubeconfig` in the specified namespace.
-- `uninstall` 
-    - Behavior: Uninstalls Upbound from the cluster specified by currently
-      configured `kubeconfig`.
-- `mail`
-    - Flags:
-        - `-p,--port = INT` (Default: `8085`): Port used for mail portal.
-        - `--verbose = BOOL`: Run server with verbose logging.
-    - Behavior: Runs a local mail portal for Upbound when configured to send
-      emails as Kubernetes Secrets.
-
-**Group Flags**
-
-Group flags can be passed for any command in the **Upbound** group. Some
-commands may choose not to utilize the group flags when not relevant.
-
-- `--kubeconfig = STRING`: sets `kubeconfig` path. Same defaults as `kubectl`
-  are used if not provided.
-- `-n,--namespace = STRING` (Env: `UPBOUND_NAMESPACE`) (Default:
-  `upbound-system`): Kubernetes namespace used for installing and managing
-  Upbound.
 
 <!-- Named Links -->
 [Upbound Software License]: https://licenses.upbound.io/upbound-software-license.html
 [Upbound Marketplace]: https://www.upbound.io/registry
-[configuration documentation]: configuration.md
+[up configuration documentation]: configuration.md
+[xpkg specification]: https://docs.crossplane.io/v1.11/concepts/packages/

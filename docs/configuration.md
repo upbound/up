@@ -1,4 +1,4 @@
-# Configuration
+# Up Configuration
 
 `up` interacts with a variety of systems, each of which may have information
 that should be persisted between commands. `up` stores this information in a
