@@ -42,7 +42,7 @@ type createCmd struct {
 	Name       string `arg:"" required:"" help:"Name of configuration."`
 	Context    string `required:"" help:"Name of the GitHub account/org"`
 	TemplateId string `required:"" help:"Name of the configuration template" predictor:"templates"`
-	Private    bool   `default:"false" help:"Should Github repo should be created as private? (Default: false)"`
+	Private    bool   `default:"false" help:"Whether the Github repo should be created as private. (Default: false)"`
 
 	// The repo name is hidden. We'll set it to the name of the configuration, to match the UI's behavior
 	Repo string `optional:"" hidden:"" help:"Name of the repo"`
