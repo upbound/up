@@ -98,15 +98,15 @@ control planes.
 - `connect <control plane name> <namespace in the control plane>`
     - Flags:
         - `--token = STRING`: Optional token for the connector to use. If not
-          provided, a new one will be generated.
+          provided, a new user token will be created.
         - `--cluster-name = STRING`: Optional name for the cluster that will be
           connected to the control plane. If not provided, namespace argument will
           be used.
         - `--kubeconfig = STRING`: sets `kubeconfig` path. Same defaults as
           `kubectl` are used if not provided.
     - Behavior: Connects the current cluster to the specified control plane's
-      namespace. This means that all claim requests in the cluster will be proxied
-      to the given namespace in the control plane.
+      namespace. This means that all claim APIs in your control plane will be
+      available in your cluster for consumption.
 
 **Group Flags**
 

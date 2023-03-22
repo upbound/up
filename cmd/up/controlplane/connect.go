@@ -28,7 +28,6 @@ import (
 	"sigs.k8s.io/yaml"
 
 	"github.com/upbound/up-sdk-go/service/accounts"
-	"github.com/upbound/up-sdk-go/service/robots"
 	"github.com/upbound/up-sdk-go/service/tokens"
 
 	"github.com/upbound/up/internal/install"
@@ -145,57 +144,32 @@ func (c *connectCmd) getToken(p pterm.TextPrinter, upCtx *upbound.Context) (stri
 	if err != nil {
 		return "", errors.Wrap(err, "failed to build SDK config")
 	}
-	a, err := accounts.NewClient(cfg).Get(context.Background(), upCtx.Account)
+	// NOTE(muvaf): We always use the querying user's account to create a token
+	// assuming it has enough privileges. The ideal is to create a robot and a
+	// token when the "--account" flag points to an organization but the robots
+	// don't have default permissions, hence it'd require creation of team,
+	// membership and also control plane permission to make it work.
+	//
+	// This is why this command is currently under alpha because we need to be
+	// able to connect for organizations in a scalable way, i.e. every cluster
+	// should have its own robot account.
+	a, err := accounts.NewClient(cfg).Get(context.Background(), upCtx.Profile.ID)
 	if err != nil {
 		return "", errors.Wrap(err, "failed to get account details")
 	}
-	var tokenOwner tokens.TokenOwner
-	switch a.Account.Type {
-	case accounts.AccountOrganization:
-		r, err := robots.NewClient(cfg).Create(context.Background(), &robots.RobotCreateParameters{
-			Attributes: robots.RobotAttributes{
-				Name:        c.ClusterName,
-				Description: "A robot used by the MCP Connector running in " + c.ClusterName,
-			},
-			Relationships: robots.RobotRelationships{
-				Owner: robots.RobotOwner{
-					Data: robots.RobotOwnerData{
-						Type: "organization",
-						ID:   strconv.Itoa(int(a.Organization.ID)),
-					},
-				},
-			},
-		})
-		if err != nil {
-			return "", errors.Wrap(err, "failed to create robot")
-		}
-		p.Printfln("Created a robot account named %q.", c.ClusterName)
-		tokenOwner = tokens.TokenOwner{
-			Data: tokens.TokenOwnerData{
-				Type: tokens.TokenOwnerRobot,
-				ID:   r.ID.String(),
-			},
-		}
-		p.Println("Creating a token for the robot account. This token will be" +
-			"used to authenticate the cluster.")
-	case accounts.AccountUser:
-		tokenOwner = tokens.TokenOwner{
-			Data: tokens.TokenOwnerData{
-				Type: tokens.TokenOwnerUser,
-				ID:   strconv.Itoa(int(a.User.ID)),
-			},
-		}
-		p.Println("Creating a token for the user account. This token will be" +
-			"used to authenticate the cluster.")
-	default:
-		return "", errors.New("only organization and user accounts are supported")
-	}
+	p.Printfln("Creating an API token for the user %s. This token will be"+
+		"used to authenticate the cluster.", a.User.Username)
 	resp, err := tokens.NewClient(cfg).Create(context.Background(), &tokens.TokenCreateParameters{
 		Attributes: tokens.TokenAttributes{
 			Name: c.ClusterName,
 		},
 		Relationships: tokens.TokenRelationships{
-			Owner: tokenOwner,
+			Owner: tokens.TokenOwner{
+				Data: tokens.TokenOwnerData{
+					Type: tokens.TokenOwnerUser,
+					ID:   strconv.Itoa(int(a.User.ID)),
+				},
+			},
 		},
 	})
 	if err != nil {
