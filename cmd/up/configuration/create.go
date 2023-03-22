@@ -42,6 +42,7 @@ type createCmd struct {
 	Name       string `arg:"" required:"" help:"Name of configuration."`
 	Context    string `required:"" help:"Name of the GitHub account/org"`
 	TemplateId string `required:"" help:"Name of the configuration template" predictor:"templates"`
+	Public     bool   `default:"false" help:"Should Github repo should be created as public? (Default: false)"`
 
 	// The repo name is hidden. We'll set it to the name of the configuration, to match the UI's behavior
 	Repo string `optional:"" hidden:"" help:"Name of the repo"`
@@ -143,6 +144,7 @@ func (c *createCmd) handleCreate(cc *configurations.Client, upCtx *upbound.Conte
 		TemplateID: c.TemplateId,
 		Provider:   configurations.Provider(c.Provider),
 		Repo:       c.Repo,
+		Private:    !c.Public,
 	}
 	_, err := cc.Create(context.Background(), upCtx.Account, &params)
 	return err
