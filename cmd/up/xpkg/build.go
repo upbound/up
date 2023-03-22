@@ -56,13 +56,10 @@ func (c *buildCmd) AfterApply() error {
 	}
 
 	var authBE parser.Backend
-	ax, err := filepath.Abs(c.AuthExt)
-	if err == nil {
-		axf, err := c.fs.Open(ax)
-		if err == nil {
+	if ax, err := filepath.Abs(c.AuthExt); err == nil {
+		if axf, err := c.fs.Open(ax); err == nil {
 			defer func() { _ = axf.Close() }()
-			b, err := io.ReadAll(axf)
-			if err == nil {
+			if b, err := io.ReadAll(axf); err == nil {
 				authBE = parser.NewEchoBackend(string(b))
 			}
 		}

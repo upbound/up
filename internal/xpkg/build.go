@@ -24,13 +24,11 @@ import (
 	"github.com/crossplane/crossplane-runtime/pkg/errors"
 	pkgmetav1 "github.com/crossplane/crossplane/apis/pkg/meta/v1"
 	v1alpha1 "github.com/crossplane/crossplane/apis/pkg/meta/v1alpha1"
-	"gopkg.in/yaml.v2"
-
-	crd "k8s.io/apiextensions-apiserver/pkg/apis/apiextensions/v1"
-
 	v1 "github.com/google/go-containerregistry/pkg/v1"
 	"github.com/google/go-containerregistry/pkg/v1/empty"
 	"github.com/google/go-containerregistry/pkg/v1/mutate"
+	"gopkg.in/yaml.v2"
+	crd "k8s.io/apiextensions-apiserver/pkg/apis/apiextensions/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/runtime/serializer/json"
 
@@ -52,13 +50,12 @@ const (
 	errBuildImage        = "failed to build image from layers"
 	errConfigFile        = "failed to get config file from image"
 	errMutateConfig      = "failed to mutate config for image"
-	errBuildMetaScheme   = "failed to build meta scheme for package parser"
-	errBuildObjectScheme = "failed to build object scheme for package parser"
+	errBuildObjectScheme = "failed to build scheme for package encoder"
 	errParseAuth         = "an auth extension was supplied but could not be parsed"
-
-	authMetaAnno       = "auth.upbound.io/group"
-	authObjectAnno     = "auth.upbound.io/config"
-	ProviderConfigKind = "ProviderConfig"
+	errAuthNotAnnotated  = "an auth extension was supplied but but the " + ProviderConfigKind + " object could not be found"
+	authMetaAnno         = "auth.upbound.io/group"
+	authObjectAnno       = "auth.upbound.io/config"
+	ProviderConfigKind   = "ProviderConfig"
 )
 
 // annotatedTeeReadCloser is a copy of io.TeeReader that implements
@@ -202,28 +199,32 @@ func (b *Builder) Build(ctx context.Context, opts ...BuildOpt) (v1.Image, runtim
 				// and embed the contents of the auth.yaml file
 				if group, ok := p.ObjectMeta.Annotations[authMetaAnno]; ok {
 					ar, err := b.ab.Init(ctx)
-					if err == nil {
-						// validate the auth.yaml file
-						var auth AuthExtension
-						if err = yaml.NewDecoder(ar).Decode(&auth); err != nil {
-							return nil, nil, errors.Wrap(err, errParseAuth)
-						}
-						if err == nil {
-							for x, o := range pkg.GetObjects() {
-								if c, ok := o.(*crd.CustomResourceDefinition); ok {
-									if c.Spec.Group == group && c.Spec.Names.Kind == ProviderConfigKind {
-										ab := new(bytes.Buffer)
-										if err = yaml.NewEncoder(ab).Encode(auth); err != nil {
-											return nil, nil, errors.Wrap(err, errParseAuth)
-										}
-										c.Annotations[authObjectAnno] = ab.String()
-										pkg.GetObjects()[x] = c
-									}
+					if err != nil {
+						return nil, nil, errors.Wrap(err, errParseAuth)
+					}
+
+					// validate the auth.yaml file
+					var auth AuthExtension
+					if err = yaml.NewDecoder(ar).Decode(&auth); err != nil {
+						return nil, nil, errors.Wrap(err, errParseAuth)
+					}
+					annotated := false
+					for x, o := range pkg.GetObjects() {
+						if c, ok := o.(*crd.CustomResourceDefinition); ok {
+							if c.Spec.Group == group && c.Spec.Names.Kind == ProviderConfigKind {
+								ab := new(bytes.Buffer)
+								if err = yaml.NewEncoder(ab).Encode(auth); err != nil {
+									return nil, nil, errors.Wrap(err, errParseAuth)
 								}
+								c.Annotations[authObjectAnno] = ab.String()
+								pkg.GetObjects()[x] = c
+								annotated = true
 							}
 						}
 					}
-
+					if !annotated {
+						return nil, nil, errors.New(errAuthNotAnnotated)
+					}
 				}
 			}
 		}
@@ -286,20 +287,15 @@ func (b *Builder) Build(ctx context.Context, opts ...BuildOpt) (v1.Image, runtim
 // or quantity i.e. it should be linted first to ensure that it is valid.
 func Encode(pkg linter.Package) (*bytes.Buffer, error) {
 	pkgBuf := new(bytes.Buffer)
-	metaScheme, err := scheme.BuildMetaScheme()
-	if err != nil {
-		return nil, errors.New(errBuildMetaScheme)
-	}
 	objScheme, err := scheme.BuildObjectScheme()
 	if err != nil {
 		return nil, errors.New(errBuildObjectScheme)
 	}
 
-	dm := json.NewSerializerWithOptions(json.DefaultMetaFactory, metaScheme, metaScheme, json.SerializerOptions{Yaml: true})
 	do := json.NewSerializerWithOptions(json.DefaultMetaFactory, objScheme, objScheme, json.SerializerOptions{Yaml: true})
 	pkgBuf.WriteString("---\n")
-	if err = dm.Encode(pkg.GetMeta()[0], pkgBuf); err != nil {
-		return nil, errors.Wrap(err, errBuildMetaScheme)
+	if err = do.Encode(pkg.GetMeta()[0], pkgBuf); err != nil {
+		return nil, errors.Wrap(err, errBuildObjectScheme)
 	}
 	pkgBuf.WriteString("---\n")
 	for _, o := range pkg.GetObjects() {
