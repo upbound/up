@@ -205,7 +205,7 @@ func (b *Builder) Build(ctx context.Context, opts ...BuildOpt) (v1.Image, runtim
 
 					// validate the auth.yaml file
 					var auth AuthExtension
-					if err = yaml.NewDecoder(ar).Decode(&auth); err != nil {
+					if err := yaml.NewDecoder(ar).Decode(&auth); err != nil {
 						return nil, nil, errors.Wrap(err, errParseAuth)
 					}
 					annotated := false
@@ -213,12 +213,13 @@ func (b *Builder) Build(ctx context.Context, opts ...BuildOpt) (v1.Image, runtim
 						if c, ok := o.(*crd.CustomResourceDefinition); ok {
 							if c.Spec.Group == group && c.Spec.Names.Kind == ProviderConfigKind {
 								ab := new(bytes.Buffer)
-								if err = yaml.NewEncoder(ab).Encode(auth); err != nil {
+								if err := yaml.NewEncoder(ab).Encode(auth); err != nil {
 									return nil, nil, errors.Wrap(err, errParseAuth)
 								}
 								c.Annotations[authObjectAnno] = ab.String()
 								pkg.GetObjects()[x] = c
 								annotated = true
+								break
 							}
 						}
 					}
@@ -243,7 +244,7 @@ func (b *Builder) Build(ctx context.Context, opts ...BuildOpt) (v1.Image, runtim
 	cfg := cfgFile.Config
 	cfg.Labels = make(map[string]string)
 
-	pkgBytes, err := Encode(pkg)
+	pkgBytes, err := encode(pkg)
 	if err != nil {
 		return nil, nil, errors.Wrap(err, errConfigFile)
 	}
@@ -283,9 +284,9 @@ func (b *Builder) Build(ctx context.Context, opts ...BuildOpt) (v1.Image, runtim
 	return bOpts.base, meta, nil
 }
 
-// Encode encodes a package as a YAML stream.  Does not check meta existence
+// encode encodes a package as a YAML stream.  Does not check meta existence
 // or quantity i.e. it should be linted first to ensure that it is valid.
-func Encode(pkg linter.Package) (*bytes.Buffer, error) {
+func encode(pkg linter.Package) (*bytes.Buffer, error) {
 	pkgBuf := new(bytes.Buffer)
 	objScheme, err := scheme.BuildObjectScheme()
 	if err != nil {

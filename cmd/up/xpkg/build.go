@@ -59,9 +59,11 @@ func (c *buildCmd) AfterApply() error {
 	if ax, err := filepath.Abs(c.AuthExt); err == nil {
 		if axf, err := c.fs.Open(ax); err == nil {
 			defer func() { _ = axf.Close() }()
-			if b, err := io.ReadAll(axf); err == nil {
-				authBE = parser.NewEchoBackend(string(b))
+			b, err := io.ReadAll(axf)
+			if err != nil {
+				return err
 			}
+			authBE = parser.NewEchoBackend(string(b))
 		}
 	}
 
