@@ -23,28 +23,39 @@ import (
 
 	"github.com/crossplane/crossplane-runtime/pkg/errors"
 	pkgmetav1 "github.com/crossplane/crossplane/apis/pkg/meta/v1"
+	v1alpha1 "github.com/crossplane/crossplane/apis/pkg/meta/v1alpha1"
 	v1 "github.com/google/go-containerregistry/pkg/v1"
 	"github.com/google/go-containerregistry/pkg/v1/empty"
 	"github.com/google/go-containerregistry/pkg/v1/mutate"
+	"gopkg.in/yaml.v2"
+	crd "k8s.io/apiextensions-apiserver/pkg/apis/apiextensions/v1"
 	"k8s.io/apimachinery/pkg/runtime"
+	"k8s.io/apimachinery/pkg/runtime/serializer/json"
 
 	"github.com/crossplane/crossplane-runtime/pkg/parser"
 
 	"github.com/upbound/up/internal/xpkg/parser/examples"
 	"github.com/upbound/up/internal/xpkg/parser/linter"
+	"github.com/upbound/up/internal/xpkg/scheme"
 )
 
 const (
-	errParserPackage = "failed to parse package"
-	errParserExample = "failed to parse examples"
-	errLintPackage   = "failed to lint package"
-	errInitBackend   = "failed to initialize package parsing backend"
-	errTarFromStream = "failed to build tarball from stream"
-	errLayerFromTar  = "failed to convert tarball to image layer"
-	errDigestInvalid = "failed to get digest from image layer"
-	errBuildImage    = "failed to build image from layers"
-	errConfigFile    = "failed to get config file from image"
-	errMutateConfig  = "failed to mutate config for image"
+	errParserPackage     = "failed to parse package"
+	errParserExample     = "failed to parse examples"
+	errLintPackage       = "failed to lint package"
+	errInitBackend       = "failed to initialize package parsing backend"
+	errTarFromStream     = "failed to build tarball from stream"
+	errLayerFromTar      = "failed to convert tarball to image layer"
+	errDigestInvalid     = "failed to get digest from image layer"
+	errBuildImage        = "failed to build image from layers"
+	errConfigFile        = "failed to get config file from image"
+	errMutateConfig      = "failed to mutate config for image"
+	errBuildObjectScheme = "failed to build scheme for package encoder"
+	errParseAuth         = "an auth extension was supplied but could not be parsed"
+	errAuthNotAnnotated  = "an auth extension was supplied but but the " + ProviderConfigKind + " object could not be found"
+	authMetaAnno         = "auth.upbound.io/group"
+	authObjectAnno       = "auth.upbound.io/config"
+	ProviderConfigKind   = "ProviderConfig"
 )
 
 // annotatedTeeReadCloser is a copy of io.TeeReader that implements
@@ -90,15 +101,17 @@ func (t *teeReader) Annotate() any {
 type Builder struct {
 	pb parser.Backend
 	eb parser.Backend
+	ab parser.Backend
 
 	pp parser.Parser
 	ep *examples.Parser
 }
 
 // New returns a new Builder.
-func New(pkg, ex parser.Backend, pp parser.Parser, ep *examples.Parser) *Builder {
+func New(pkg, ab, ex parser.Backend, pp parser.Parser, ep *examples.Parser) *Builder {
 	return &Builder{
 		pb: pkg,
+		ab: ab,
 		eb: ex,
 		pp: pp,
 		ep: ep,
@@ -118,6 +131,20 @@ func WithController(img v1.Image) BuildOpt {
 	return func(o *buildOpts) {
 		o.base = img
 	}
+}
+
+type AuthExtension struct {
+	Version      string `yaml:"version"`
+	Discriminant string `yaml:"discriminant"`
+	Sources      []struct {
+		Name                string `yaml:"name"`
+		Docs                string `yaml:"docs"`
+		AdditionalResources []struct {
+			Type string `yaml:"type"`
+			Ref  string `yaml:"ref"`
+		} `yaml:"additionalResources"`
+		ShowFields []string `yaml:"showFields"`
+	} `yaml:"sources"`
 }
 
 // Build compiles a Crossplane package from an on-disk package.
@@ -149,9 +176,7 @@ func (b *Builder) Build(ctx context.Context, opts ...BuildOpt) (v1.Image, runtim
 		examplesExist = false
 	}
 
-	// Copy stream once to parse and once write to tarball.
-	pkgBuf := new(bytes.Buffer)
-	pkg, err := b.pp.Parse(ctx, annotatedTeeReadCloser(pkgReader, pkgBuf))
+	pkg, err := b.pp.Parse(ctx, pkgReader)
 	if err != nil {
 		return nil, nil, errors.Wrap(err, errParserPackage)
 	}
@@ -167,6 +192,43 @@ func (b *Builder) Build(ctx context.Context, opts ...BuildOpt) (v1.Image, runtim
 	if meta.GetObjectKind().GroupVersionKind().Kind == pkgmetav1.ConfigurationKind {
 		linter = NewConfigurationLinter()
 	} else {
+		if b.ab != nil { // if we have an auth.yaml file
+			if p, ok := meta.(*v1alpha1.Provider); ok {
+				// if has annotation auth.upbound.io/group then look for the object
+				// specified there like aws.upbound.io and annotate that with auth.upbound.io/config
+				// and embed the contents of the auth.yaml file
+				if group, ok := p.ObjectMeta.Annotations[authMetaAnno]; ok {
+					ar, err := b.ab.Init(ctx)
+					if err != nil {
+						return nil, nil, errors.Wrap(err, errParseAuth)
+					}
+
+					// validate the auth.yaml file
+					var auth AuthExtension
+					if err := yaml.NewDecoder(ar).Decode(&auth); err != nil {
+						return nil, nil, errors.Wrap(err, errParseAuth)
+					}
+					annotated := false
+					for x, o := range pkg.GetObjects() {
+						if c, ok := o.(*crd.CustomResourceDefinition); ok {
+							if c.Spec.Group == group && c.Spec.Names.Kind == ProviderConfigKind {
+								ab := new(bytes.Buffer)
+								if err := yaml.NewEncoder(ab).Encode(auth); err != nil {
+									return nil, nil, errors.Wrap(err, errParseAuth)
+								}
+								c.Annotations[authObjectAnno] = ab.String()
+								pkg.GetObjects()[x] = c
+								annotated = true
+								break
+							}
+						}
+					}
+					if !annotated {
+						return nil, nil, errors.New(errAuthNotAnnotated)
+					}
+				}
+			}
+		}
 		linter = NewProviderLinter()
 	}
 	if err := linter.Lint(pkg); err != nil {
@@ -182,7 +244,12 @@ func (b *Builder) Build(ctx context.Context, opts ...BuildOpt) (v1.Image, runtim
 	cfg := cfgFile.Config
 	cfg.Labels = make(map[string]string)
 
-	pkgLayer, err := Layer(pkgBuf, StreamFile, PackageAnnotation, int64(pkgBuf.Len()), &cfg)
+	pkgBytes, err := encode(pkg)
+	if err != nil {
+		return nil, nil, errors.Wrap(err, errConfigFile)
+	}
+
+	pkgLayer, err := Layer(pkgBytes, StreamFile, PackageAnnotation, int64(pkgBytes.Len()), &cfg)
 	if err != nil {
 		return nil, nil, err
 	}
@@ -215,6 +282,30 @@ func (b *Builder) Build(ctx context.Context, opts ...BuildOpt) (v1.Image, runtim
 	}
 
 	return bOpts.base, meta, nil
+}
+
+// encode encodes a package as a YAML stream.  Does not check meta existence
+// or quantity i.e. it should be linted first to ensure that it is valid.
+func encode(pkg linter.Package) (*bytes.Buffer, error) {
+	pkgBuf := new(bytes.Buffer)
+	objScheme, err := scheme.BuildObjectScheme()
+	if err != nil {
+		return nil, errors.New(errBuildObjectScheme)
+	}
+
+	do := json.NewSerializerWithOptions(json.DefaultMetaFactory, objScheme, objScheme, json.SerializerOptions{Yaml: true})
+	pkgBuf.WriteString("---\n")
+	if err = do.Encode(pkg.GetMeta()[0], pkgBuf); err != nil {
+		return nil, errors.Wrap(err, errBuildObjectScheme)
+	}
+	pkgBuf.WriteString("---\n")
+	for _, o := range pkg.GetObjects() {
+		if err = do.Encode(o, pkgBuf); err != nil {
+			return nil, errors.Wrap(err, errBuildObjectScheme)
+		}
+		pkgBuf.WriteString("---\n")
+	}
+	return pkgBuf, nil
 }
 
 // SkipContains supplies a FilterFn that skips paths that contain the give pattern.
