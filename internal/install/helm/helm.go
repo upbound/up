@@ -20,6 +20,7 @@ import (
 	"os"
 	"path/filepath"
 	"strings"
+	"time"
 
 	"github.com/Masterminds/semver"
 	"github.com/crossplane/crossplane-runtime/pkg/errors"
@@ -43,6 +44,7 @@ const (
 	defaultCacheDir  = ".cache/up/charts"
 	defaultNamespace = "upbound-system"
 	allVersions      = ">0.0.0-0"
+	waitTimeout      = 10 * time.Minute
 )
 
 const (
@@ -118,6 +120,7 @@ type installer struct {
 	cacheDir        string
 	rollbackOnError bool
 	force           bool
+	wait            bool
 	home            HomeDirFn
 	fs              afero.Fs
 	tempDir         TempDirFn
@@ -207,6 +210,13 @@ func Force(f bool) InstallerModifierFn {
 	}
 }
 
+// Wait will wait operations till they are completed.
+func Wait() InstallerModifierFn {
+	return func(h *installer) {
+		h.wait = true
+	}
+}
+
 // NewManager builds a helm install manager for UXP.
 func NewManager(config *rest.Config, chartName string, repoURL *url.URL, modifiers ...InstallerModifierFn) (install.Manager, error) { // nolint:gocyclo
 	h := &installer{
@@ -276,18 +286,27 @@ func NewManager(config *rest.Config, chartName string, repoURL *url.URL, modifie
 	ic := action.NewInstall(actionConfig)
 	ic.Namespace = h.namespace
 	ic.ReleaseName = h.chartName
+	ic.Wait = h.wait
+	ic.Timeout = waitTimeout
 	h.installClient = ic
 
 	// Upgrade Client
 	uc := action.NewUpgrade(actionConfig)
 	uc.Namespace = h.namespace
+	uc.Wait = h.wait
+	uc.Timeout = waitTimeout
 	h.upgradeClient = uc
 
 	// Uninstall Client
-	h.uninstallClient = action.NewUninstall(actionConfig)
+	unc := action.NewUninstall(actionConfig)
+	unc.Wait = h.wait
+	unc.Timeout = waitTimeout
+	h.uninstallClient = unc
 
 	// Rollback Client
 	rb := action.NewRollback(actionConfig)
+	rb.Wait = h.wait
+	rb.Timeout = waitTimeout
 	h.rollbackClient = rb
 
 	return h, nil
