@@ -60,7 +60,9 @@ func (c *connectCmd) AfterApply(kongCtx *kong.Context, upCtx *upbound.Context) e
 	mgr, err := helm.NewManager(kubeconfig,
 		connectorName,
 		mcpRepoURL,
-		helm.WithNamespace(c.InstallationNamespace))
+		helm.WithNamespace(c.InstallationNamespace),
+		helm.Wait(),
+	)
 	if err != nil {
 		return err
 	}
@@ -124,6 +126,7 @@ func (c *connectCmd) Run(p pterm.TextPrinter, upCtx *upbound.Context) error {
 		"host":      fmt.Sprintf("%s://%s", upCtx.ProxyEndpoint.Scheme, upCtx.ProxyEndpoint.Host),
 		"token":     token,
 	}
+	p.Printfln("Installing %s to kube-system. This may take a few minutes.", connectorName)
 	if err = c.mgr.Install("", params); err != nil {
 		return err
 	}
@@ -132,7 +135,8 @@ func (c *connectCmd) Run(p pterm.TextPrinter, upCtx *upbound.Context) error {
 		return err
 	}
 
-	p.Printfln("Connected to the control plane %q !", c.Name)
+	p.Printfln("Connected to the control plane %s.", c.Name)
+	p.Println("See available APIs with the following command: \n\n$ kubectl api-resources")
 	return nil
 }
 
@@ -157,7 +161,7 @@ func (c *connectCmd) getToken(p pterm.TextPrinter, upCtx *upbound.Context) (stri
 	if err != nil {
 		return "", errors.Wrap(err, "failed to get account details")
 	}
-	p.Printfln("Creating an API token for the user %s. This token will be"+
+	p.Printfln("Creating an API token for the user %s. This token will be "+
 		"used to authenticate the cluster.", a.User.Username)
 	resp, err := tokens.NewClient(cfg).Create(context.Background(), &tokens.TokenCreateParameters{
 		Attributes: tokens.TokenAttributes{
@@ -175,7 +179,7 @@ func (c *connectCmd) getToken(p pterm.TextPrinter, upCtx *upbound.Context) (stri
 	if err != nil {
 		return "", errors.Wrap(err, "failed to create token")
 	}
-	p.Printfln("Created a token named %q", c.ClusterName)
+	p.Printfln("Created a token named %s.", c.ClusterName)
 	return fmt.Sprint(resp.DataSet.Meta["jwt"]), nil
 }
 
