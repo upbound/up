@@ -27,5 +27,5 @@ func (c *Cmd) BeforeReset(p *kong.Path, maturity feature.Maturity) error {
 
 // Cmd contains commands for managing control plane kubeconfig data.
 type Cmd struct {
-	Get getCmd `cmd:"" maturity:"alpha" help:"Get a kubeconfig for a control plane."`
+	Get getCmd `cmd:"" help:"Get a kubeconfig for a control plane."`
 }
