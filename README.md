@@ -156,6 +156,9 @@ credentials when pushing.
 See the documentation on [supported commands] and [common workflows] for more
 information.
 
+## Contributing
+
+See [CONTRIBUTING.md](CONTRIBUTING.md).
 
 <!-- Named Links -->
 [Upbound Cloud]: https://cloud.upbound.io/
