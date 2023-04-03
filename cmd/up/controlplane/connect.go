@@ -21,12 +21,12 @@ import (
 	"net/url"
 	"strconv"
 
-	"github.com/alecthomas/kong"
 	"github.com/crossplane/crossplane-runtime/pkg/errors"
 	"github.com/pterm/pterm"
 	"k8s.io/client-go/kubernetes"
 	"sigs.k8s.io/yaml"
 
+	"github.com/upbound/up-sdk-go"
 	"github.com/upbound/up-sdk-go/service/accounts"
 	"github.com/upbound/up-sdk-go/service/tokens"
 
@@ -48,7 +48,7 @@ const (
 )
 
 // AfterApply sets default values in command after assignment and validation.
-func (c *connectCmd) AfterApply(kongCtx *kong.Context, upCtx *upbound.Context) error {
+func (c *connectCmd) AfterApply() error {
 	if c.ClusterName == "" {
 		c.ClusterName = c.Namespace
 	}
@@ -110,8 +110,8 @@ type connectCmd struct {
 }
 
 // Run executes the connect command.
-func (c *connectCmd) Run(p pterm.TextPrinter, upCtx *upbound.Context) error {
-	token, err := c.getToken(p, upCtx)
+func (c *connectCmd) Run(p pterm.TextPrinter, upCtx *upbound.Context, cfg *up.Config) error {
+	token, err := c.getToken(p, upCtx, cfg)
 	if err != nil {
 		return errors.Wrap(err, "failed to get token")
 	}
@@ -140,13 +140,9 @@ func (c *connectCmd) Run(p pterm.TextPrinter, upCtx *upbound.Context) error {
 	return nil
 }
 
-func (c *connectCmd) getToken(p pterm.TextPrinter, upCtx *upbound.Context) (string, error) {
+func (c *connectCmd) getToken(p pterm.TextPrinter, upCtx *upbound.Context, cfg *up.Config) (string, error) {
 	if c.Token != "" {
 		return c.Token, nil
-	}
-	cfg, err := upCtx.BuildSDKConfig()
-	if err != nil {
-		return "", errors.Wrap(err, "failed to build SDK config")
 	}
 	// NOTE(muvaf): We always use the querying user's account to create a token
 	// assuming it has enough privileges. The ideal is to create a robot and a
@@ -157,12 +153,12 @@ func (c *connectCmd) getToken(p pterm.TextPrinter, upCtx *upbound.Context) (stri
 	// This is why this command is currently under alpha because we need to be
 	// able to connect for organizations in a scalable way, i.e. every cluster
 	// should have its own robot account.
-	a, err := accounts.NewClient(cfg).Get(context.Background(), upCtx.Profile.ID)
+	userAccount, err := accounts.NewClient(cfg).Get(context.Background(), upCtx.Profile.ID)
 	if err != nil {
 		return "", errors.Wrap(err, "failed to get account details")
 	}
 	p.Printfln("Creating an API token for the user %s. This token will be "+
-		"used to authenticate the cluster.", a.User.Username)
+		"used to authenticate the cluster.", userAccount.User.Username)
 	resp, err := tokens.NewClient(cfg).Create(context.Background(), &tokens.TokenCreateParameters{
 		Attributes: tokens.TokenAttributes{
 			Name: c.ClusterName,
@@ -171,7 +167,7 @@ func (c *connectCmd) getToken(p pterm.TextPrinter, upCtx *upbound.Context) (stri
 			Owner: tokens.TokenOwner{
 				Data: tokens.TokenOwnerData{
 					Type: tokens.TokenOwnerUser,
-					ID:   strconv.Itoa(int(a.User.ID)),
+					ID:   strconv.Itoa(int(userAccount.User.ID)),
 				},
 			},
 		},

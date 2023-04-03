@@ -18,10 +18,12 @@ import (
 	"context"
 
 	"github.com/alecthomas/kong"
+	"github.com/crossplane/crossplane-runtime/pkg/errors"
 	"github.com/posener/complete"
 
-	"github.com/upbound/up-sdk-go/service/configurations"
-	cp "github.com/upbound/up-sdk-go/service/controlplanes"
+	"github.com/upbound/up-sdk-go/service/accounts"
+	"github.com/upbound/up-sdk-go/service/controlplanes"
+
 	"github.com/upbound/up/cmd/up/controlplane/kubeconfig"
 	"github.com/upbound/up/cmd/up/controlplane/pkg"
 	"github.com/upbound/up/cmd/up/controlplane/pullsecret"
@@ -45,9 +47,16 @@ func (c *Cmd) AfterApply(kongCtx *kong.Context) error {
 	if err != nil {
 		return err
 	}
+	a, err := accounts.NewClient(cfg).Get(context.Background(), upCtx.Account)
+	if err != nil {
+		return err
+	}
+	if a.Account.Type != accounts.AccountOrganization {
+		return errors.New("control plane commands are only available to organization accounts. use --account flag to provide an organization name")
+	}
 	kongCtx.Bind(upCtx)
-	kongCtx.Bind(cp.NewClient(cfg))
-	kongCtx.Bind(configurations.NewClient(cfg))
+	kongCtx.Bind(a)
+	kongCtx.Bind(cfg)
 	return nil
 }
 
@@ -62,7 +71,7 @@ func PredictControlPlanes() complete.Predictor {
 			return nil
 		}
 
-		cp := cp.NewClient(cfg)
+		cp := controlplanes.NewClient(cfg)
 		if cp == nil {
 			return nil
 		}

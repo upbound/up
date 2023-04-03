@@ -20,10 +20,11 @@ import (
 	"github.com/alecthomas/kong"
 	"github.com/pterm/pterm"
 
+	"github.com/upbound/up-sdk-go"
+	"github.com/upbound/up-sdk-go/service/accounts"
 	"github.com/upbound/up-sdk-go/service/common"
-	cp "github.com/upbound/up-sdk-go/service/controlplanes"
+	"github.com/upbound/up-sdk-go/service/controlplanes"
 
-	"github.com/upbound/up/internal/upbound"
 	"github.com/upbound/up/internal/upterm"
 )
 
@@ -38,7 +39,7 @@ const (
 var fieldNames = []string{"NAME", "ID", "STATUS", "DEPLOYED CONFIGURATION", "CONFIGURATION STATUS"}
 
 // AfterApply sets default values in command after assignment and validation.
-func (c *listCmd) AfterApply(kongCtx *kong.Context, upCtx *upbound.Context) error {
+func (c *listCmd) AfterApply(kongCtx *kong.Context) error {
 	kongCtx.Bind(pterm.DefaultTable.WithWriter(kongCtx.Stdout).WithSeparator("   "))
 	return nil
 }
@@ -47,23 +48,23 @@ func (c *listCmd) AfterApply(kongCtx *kong.Context, upCtx *upbound.Context) erro
 type listCmd struct{}
 
 // Run executes the list command.
-func (c *listCmd) Run(printer upterm.ObjectPrinter, p pterm.TextPrinter, cc *cp.Client, upCtx *upbound.Context) error {
+func (c *listCmd) Run(printer upterm.ObjectPrinter, p pterm.TextPrinter, a *accounts.AccountResponse, cfg *up.Config) error {
 	// TODO(hasheddan): we currently just max out single page size, but we
 	// may opt to support limiting page size and iterating through pages via
 	// flags in the future.
-	cpList, err := cc.List(context.Background(), upCtx.Account, common.WithSize(maxItems))
+	cpList, err := controlplanes.NewClient(cfg).List(context.Background(), a.Account.Name, common.WithSize(maxItems))
 	if err != nil {
 		return err
 	}
 	if len(cpList.ControlPlanes) == 0 {
-		p.Printfln("No control planes found in %s", upCtx.Account)
+		p.Printfln("No control planes found in %s", a.Account.Name)
 		return nil
 	}
 	return printer.Print(cpList.ControlPlanes, fieldNames, extractFields)
 }
 
 func extractFields(obj any) []string {
-	c := obj.(cp.ControlPlaneResponse)
+	c := obj.(controlplanes.ControlPlaneResponse)
 	var cfgName string
 	var cfgStatus string
 	// All Upbound managed control planes in an account should be associated to a configuration.

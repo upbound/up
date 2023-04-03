@@ -27,7 +27,7 @@ import (
 )
 
 // AfterApply sets default values in command after assignment and validation.
-func (c *getCmd) AfterApply(upCtx *upbound.Context) error {
+func (c *getCmd) AfterApply() error {
 	c.stdin = os.Stdin
 	return nil
 }

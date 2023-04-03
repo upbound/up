@@ -21,16 +21,17 @@ import (
 	"github.com/crossplane/crossplane-runtime/pkg/errors"
 	"github.com/pterm/pterm"
 
-	cp "github.com/upbound/up-sdk-go/service/controlplanes"
+	"github.com/upbound/up-sdk-go"
+	"github.com/upbound/up-sdk-go/service/accounts"
+	"github.com/upbound/up-sdk-go/service/controlplanes"
 
-	"github.com/upbound/up/internal/upbound"
 	"github.com/upbound/up/internal/upterm"
 )
 
 const errNoConfigurationFound = "no configuration associated to this control plane"
 
 // AfterApply sets default values in command after assignment and validation.
-func (c *getCmd) AfterApply(kongCtx *kong.Context, upCtx *upbound.Context) error {
+func (c *getCmd) AfterApply(kongCtx *kong.Context) error {
 	kongCtx.Bind(pterm.DefaultTable.WithWriter(kongCtx.Stdout).WithSeparator("   "))
 	return nil
 }
@@ -41,8 +42,8 @@ type getCmd struct {
 }
 
 // Run executes the get command.
-func (c *getCmd) Run(printer upterm.ObjectPrinter, cc *cp.Client, upCtx *upbound.Context) error {
-	ctp, err := cc.Get(context.Background(), upCtx.Account, c.Name)
+func (c *getCmd) Run(printer upterm.ObjectPrinter, a *accounts.AccountResponse, cfg *up.Config) error {
+	ctp, err := controlplanes.NewClient(cfg).Get(context.Background(), a.Account.Name, c.Name)
 	if err != nil {
 		return err
 	}
@@ -55,8 +56,8 @@ func (c *getCmd) Run(printer upterm.ObjectPrinter, cc *cp.Client, upCtx *upbound
 }
 
 // EmptyControlPlaneConfiguration returns an empty ControlPlaneConfiguration with default values.
-func EmptyControlPlaneConfiguration() cp.ControlPlaneConfiguration {
-	configuration := cp.ControlPlaneConfiguration{}
-	configuration.Status = cp.ConfigurationInstallationQueued
+func EmptyControlPlaneConfiguration() controlplanes.ControlPlaneConfiguration {
+	configuration := controlplanes.ControlPlaneConfiguration{}
+	configuration.Status = controlplanes.ConfigurationInstallationQueued
 	return configuration
 }
