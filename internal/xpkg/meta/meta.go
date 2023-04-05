@@ -88,7 +88,7 @@ func NewProviderXPkg(c xpkg.InitContext) ([]byte, error) {
 		},
 		Spec: metav1.ProviderSpec{
 			Controller: metav1.ControllerSpec{
-				Image: c.CtrlImage,
+				Image: &c.CtrlImage,
 			},
 		},
 	}
