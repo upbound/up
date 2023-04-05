@@ -34,9 +34,7 @@ func (c *Cmd) AfterApply(kongCtx *kong.Context, upCtx *upbound.Context) error {
 
 // Cmd contains commands for managing organization users.
 type Cmd struct {
-	Invite       inviteCmd       `cmd:"" help:"Invite a user to the organization."`
-	DeleteInvite deleteInviteCmd `cmd:"" help:"Delete an invitation to the organization."`
-	ListInvites  listInvitesCmd  `cmd:"" help:"List user invites of an organization."`
-	ListMembers  listMembersCmd  `cmd:"" help:"List members of an organization."`
-	RemoveMember removeMemberCmd `cmd:"" help:"Remove a member from the organization."`
+	List   listCmd   `cmd:"" help:"List users of an organization."`
+	Invite inviteCmd `cmd:"" help:"Invite a user to the organization."`
+	Remove removeCmd `cmd:"" help:"Remove a member from the organization."`
 }
