@@ -285,6 +285,21 @@ commands may choose not to utilize the group flags when not relevant.
 - `--insecure-skip-tls-verify = BOOL` (Env: `UP_INSECURE_SKIP_TLS_VERIFY`): Skip
   verifying TLS certificates.
 
+**Subgroup: user**
+
+Format: `up orgnization user <cmd> ...`
+
+- `list`
+    - Behavior: List all users and invited users in the organization
+- `invite <email>`
+    - Behavior: Invite a user to the organizatoin
+- `remove <username|email>`
+    - Behavior: Remove a user from the organization. Either username 
+      or email can be specified, unless the user hasn't accepted their
+      invite. In that case, the email must be specified because they don't
+      yet have a username. 
+
+
 ## Repository
 
 Format: `up repository <cmd> ...` Alias: `up repo <cmd>...`
