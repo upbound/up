@@ -146,7 +146,7 @@ func (c *loginCmd) Run(p pterm.TextPrinter, upCtx *upbound.Context) error { // n
 	if err != nil {
 		return errors.Wrap(err, errLoginFailed)
 	}
-	defer res.Body.Close() // nolint:errcheck
+	defer res.Body.Close() // nolint:gosec,errcheck
 	session, err := extractSession(res, upbound.CookieName)
 	if err != nil {
 		return errors.Wrap(err, errLoginFailed)

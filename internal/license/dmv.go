@@ -110,7 +110,7 @@ func (d *DMV) GetAccessKey(ctx context.Context, token, version string) (*Respons
 	if err != nil {
 		return nil, errors.Wrap(err, errGetAccessKey)
 	}
-	defer res.Body.Close() // nolint:errcheck
+	defer res.Body.Close() // nolint:gosec,errcheck
 
 	b, err := io.ReadAll(res.Body)
 	if err != nil {

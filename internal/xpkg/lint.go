@@ -132,7 +132,7 @@ func IsValidatingWebhookConfiguration(o runtime.Object) error {
 
 // IsXRD checks that an object is a CompositeResourceDefinition.
 func IsXRD(o runtime.Object) error {
-	if _, ok := o.(*v1.CompositeResourceDefinition); ok {
+	if _, ok := o.(*v1.CompositeResourceDefinition); !ok {
 		return errors.New(errNotXRD)
 	}
 	return nil

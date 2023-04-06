@@ -24,7 +24,6 @@ import (
 	"k8s.io/apimachinery/pkg/runtime/schema"
 
 	"github.com/crossplane/crossplane-runtime/pkg/test"
-	xpextv1 "github.com/crossplane/crossplane/apis/apiextensions/v1"
 	"github.com/crossplane/crossplane/apis/pkg/v1beta1"
 
 	"github.com/upbound/up/internal/xpkg/dep/cache"
@@ -83,7 +82,8 @@ func TestWSLoadValidators(t *testing.T) {
 				return fs
 			}()),
 			validators: map[schema.GroupVersionKind]struct{}{
-				xpextv1.CompositeResourceDefinitionGroupVersionKind: {},
+				schema.FromAPIVersionAndKind("apiextensions.crossplane.io/v1", "CompositeResourceDefinition"):      {},
+				schema.FromAPIVersionAndKind("apiextensions.crossplane.io/v1beta1", "CompositeResourceDefinition"): {},
 			},
 		},
 	}
