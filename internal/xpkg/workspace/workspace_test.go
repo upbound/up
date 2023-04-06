@@ -176,7 +176,7 @@ func TestRWMetaFile(t *testing.T) {
 		},
 		Spec: metav1.ProviderSpec{
 			Controller: metav1.ControllerSpec{
-				Image: "crossplane/provider-aws",
+				Image: pointer.String("crossplane/provider-aws"),
 			},
 			MetaSpec: metav1.MetaSpec{
 				Crossplane: &metav1.CrossplaneConstraints{

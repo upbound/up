@@ -99,7 +99,7 @@ func TestFromImage(t *testing.T) {
 						},
 						Spec: xpmetav1alpha1.ProviderSpec{
 							Controller: xpmetav1alpha1.ControllerSpec{
-								Image: "crossplane/provider-aws-controller:v0.20.0",
+								Image: pointer.String("crossplane/provider-aws-controller:v0.20.0"),
 							},
 							MetaSpec: xpmetav1alpha1.MetaSpec{
 								DependsOn: []xpmetav1alpha1.Dependency{
@@ -271,7 +271,7 @@ func TestFromDir(t *testing.T) {
 						},
 						Spec: xpmetav1alpha1.ProviderSpec{
 							Controller: xpmetav1alpha1.ControllerSpec{
-								Image: "crossplane/provider-helm-controller:v0.9.0",
+								Image: pointer.String("crossplane/provider-helm-controller:v0.9.0"),
 							},
 							MetaSpec: xpmetav1alpha1.MetaSpec{
 								DependsOn: []xpmetav1alpha1.Dependency{
@@ -316,7 +316,7 @@ func TestFromDir(t *testing.T) {
 						},
 						Spec: xpmetav1alpha1.ProviderSpec{
 							Controller: xpmetav1alpha1.ControllerSpec{
-								Image: "crossplane/provider-helm-controller:v0.9.0",
+								Image: pointer.String("crossplane/provider-helm-controller:v0.9.0"),
 							},
 							MetaSpec: xpmetav1alpha1.MetaSpec{
 								DependsOn: []xpmetav1alpha1.Dependency{
