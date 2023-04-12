@@ -26,7 +26,7 @@ require (
 	github.com/sourcegraph/jsonrpc2 v0.1.0
 	github.com/spf13/afero v1.6.0
 	github.com/spf13/cobra v1.5.0
-	github.com/upbound/up-sdk-go v0.1.1-0.20230322005625-32b66f6f9569
+	github.com/upbound/up-sdk-go v0.1.1-0.20230405182644-366f20e6aa5f
 	github.com/willabides/kongplete v0.3.0
 	golang.org/x/sync v0.0.0-20220601150217-0de741cfad7f
 	golang.org/x/term v0.0.0-20210927222741-03fcf44c2211
