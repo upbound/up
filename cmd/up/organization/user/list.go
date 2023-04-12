@@ -36,7 +36,7 @@ const (
 	statusInvited = "INVITED"
 )
 
-var listFieldNames = []string{"USERNAMME", "NAME", "EMAIL", "PERMISSION", "STATUS"}
+var listFieldNames = []string{"USERNAME", "NAME", "EMAIL", "PERMISSION", "STATUS"}
 
 // AfterApply sets default values in command after assignment and validation.
 func (c *listCmd) AfterApply(kongCtx *kong.Context, upCtx *upbound.Context) error {
@@ -87,12 +87,12 @@ func (c *listCmd) Run(printer upterm.ObjectPrinter, p pterm.TextPrinter, oc *org
 		return allMembers[i].Invite.Email < allMembers[j].Invite.Email
 	})
 
-	return printer.Print(allMembers, listFieldNames, exractMemberFields)
+	return printer.Print(allMembers, listFieldNames, extractMemberFields)
 }
 
-func exractMemberFields(obj any) []string {
+func extractMemberFields(obj any) []string {
 	m := obj.(Member)
-	// If the user nanme exists, this is a member, not an invite.
+	// If the user name exists, this is a member, not an invite.
 	if m.Member.User.Username != "" {
 		return []string{m.Member.User.Username, m.Member.User.Name, m.Member.User.Email, string(m.Member.Permission), statusActive}
 	}
