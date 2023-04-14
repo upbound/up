@@ -94,7 +94,7 @@ type connectCmd struct {
 	parser  install.ParameterParser
 	kClient kubernetes.Interface
 
-	Name  string `arg:"" required:"" help:"Name of control plane."`
+	Name  string `arg:"" required:"" help:"Name of control plane." predictor:"ctps"`
 	Token string `required:"" help:"API token used to authenticate."`
 
 	Kubeconfig string `type:"existingfile" help:"Override default kubeconfig path."`
