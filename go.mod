@@ -5,8 +5,8 @@ go 1.18
 require (
 	github.com/Masterminds/semver v1.5.0
 	github.com/alecthomas/kong v0.6.1
-	github.com/crossplane/crossplane v1.5.0
-	github.com/crossplane/crossplane-runtime v0.15.1-0.20210930095326-d5661210733b
+	github.com/crossplane/crossplane v1.6.0
+	github.com/crossplane/crossplane-runtime v0.15.1-0.20211029211307-c72bcdd922eb
 	github.com/crossplane/crossplane/controller/apiextensions v0.0.0-00010101000000-000000000000
 	github.com/crossplane/crossplane/xcrd v0.0.0-00010101000000-000000000000
 	github.com/docker/docker-credential-helpers v0.6.4

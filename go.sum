@@ -293,11 +293,10 @@ github.com/creack/pty v1.1.7/go.mod h1:lj5s0c3V2DBrqTV7llrYr5NG6My20zk30Fl46Y7Do
 github.com/creack/pty v1.1.9/go.mod h1:oKZEueFk5CKHvIhNR5MUki03XCEU+Q6VDXinZuGJ33E=
 github.com/creack/pty v1.1.11 h1:07n33Z8lZxZ2qwegKbObQohDhXDQxiMMz1NOUGYlesw=
 github.com/creack/pty v1.1.11/go.mod h1:oKZEueFk5CKHvIhNR5MUki03XCEU+Q6VDXinZuGJ33E=
-github.com/crossplane/crossplane v1.5.0 h1:Aqc8p8uKHvs74VDpqXPtAcrYtJnqhlNJgVeD7AOOWhk=
-github.com/crossplane/crossplane v1.5.0/go.mod h1:ITp98dUSyXQmcHWV+ZtKpnnhbVldgZcQBCa2sEZFU1s=
-github.com/crossplane/crossplane-runtime v0.15.1-0.20210913015452-6a7a44ac50aa/go.mod h1:gKix9Gq5kRzVe/4XOpwlFgG7OurzrYayviJxWZakhw0=
-github.com/crossplane/crossplane-runtime v0.15.1-0.20210930095326-d5661210733b h1:uT3DYSHFvWPilEMNSeR2rcuzPPVf56O0D+NJmnQFXbw=
-github.com/crossplane/crossplane-runtime v0.15.1-0.20210930095326-d5661210733b/go.mod h1:gKix9Gq5kRzVe/4XOpwlFgG7OurzrYayviJxWZakhw0=
+github.com/crossplane/crossplane v1.6.0 h1:F/n3nAGTQY5qktDLUZHhisioFMU4tecsXHXPi1wuVOE=
+github.com/crossplane/crossplane v1.6.0/go.mod h1:V6pjaZ9xRnS6XFesjeBUMs00qqqNN6TnBmHeH1O8sLQ=
+github.com/crossplane/crossplane-runtime v0.15.1-0.20211029211307-c72bcdd922eb h1:l5M88pddkMA4c4UY4isVvfTt9ThzMMasguP9NDerQoM=
+github.com/crossplane/crossplane-runtime v0.15.1-0.20211029211307-c72bcdd922eb/go.mod h1:gKix9Gq5kRzVe/4XOpwlFgG7OurzrYayviJxWZakhw0=
 github.com/cyphar/filepath-securejoin v0.2.3 h1:YX6ebbZCZP7VkM3scTTokDgBL2TY741X51MTk3ycuNI=
 github.com/cyphar/filepath-securejoin v0.2.3/go.mod h1:aPGpWjXOXUn2NCNjFvBE6aRxGGx79pTxQpKOJNYHHl4=
 github.com/daixiang0/gci v0.2.9/go.mod h1:+4dZ7TISfSmqfAGv59ePaHfNzgGtIkHAhhdKggP1JAc=

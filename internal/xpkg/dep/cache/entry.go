@@ -20,16 +20,13 @@ import (
 	"os"
 	"path/filepath"
 
+	"github.com/crossplane/crossplane-runtime/pkg/errors"
+	xpv1 "github.com/crossplane/crossplane/apis/apiextensions/v1"
 	"github.com/spf13/afero"
-
 	v1ext "k8s.io/apiextensions-apiserver/pkg/apis/apiextensions/v1"
 	v1beta1ext "k8s.io/apiextensions-apiserver/pkg/apis/apiextensions/v1beta1"
 	"k8s.io/apimachinery/pkg/runtime"
 	"sigs.k8s.io/yaml"
-
-	"github.com/crossplane/crossplane-runtime/pkg/errors"
-	xpv1 "github.com/crossplane/crossplane/apis/apiextensions/v1"
-	"github.com/crossplane/crossplane/apis/apiextensions/v1beta1"
 
 	"github.com/upbound/up/internal/xpkg"
 	rxpkg "github.com/upbound/up/internal/xpkg/dep/marshaler/xpkg"
@@ -238,15 +235,9 @@ func (e *entry) writeObjects(objs []runtime.Object) (*flushstats, error) { // no
 		case *v1ext.CustomResourceDefinition:
 			name = crd.GetName()
 			inc = stats.incCRDs
-		case *v1beta1.CompositeResourceDefinition:
-			name = crd.GetName()
-			inc = stats.incXRDs
 		case *xpv1.CompositeResourceDefinition:
 			name = crd.GetName()
 			inc = stats.incXRDs
-		case *v1beta1.Composition:
-			name = crd.GetName()
-			inc = stats.incComps
 		case *xpv1.Composition:
 			name = crd.GetName()
 			inc = stats.incComps

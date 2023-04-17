@@ -18,7 +18,6 @@ import (
 	"github.com/Masterminds/semver"
 	"github.com/crossplane/crossplane-runtime/pkg/errors"
 	v1 "github.com/crossplane/crossplane/apis/apiextensions/v1"
-	"github.com/crossplane/crossplane/apis/apiextensions/v1beta1"
 	pkgmetav1 "github.com/crossplane/crossplane/apis/pkg/meta/v1"
 	admv1 "k8s.io/api/admissionregistration/v1"
 	extv1 "k8s.io/apiextensions-apiserver/pkg/apis/apiextensions/v1"
@@ -133,24 +132,16 @@ func IsValidatingWebhookConfiguration(o runtime.Object) error {
 
 // IsXRD checks that an object is a CompositeResourceDefinition.
 func IsXRD(o runtime.Object) error {
-	switch o.(type) {
-	case *v1beta1.CompositeResourceDefinition:
-		return nil
-	case *v1.CompositeResourceDefinition:
-		return nil
-	default:
+	if _, ok := o.(*v1.CompositeResourceDefinition); !ok {
 		return errors.New(errNotXRD)
 	}
+	return nil
 }
 
 // IsComposition checks that an object is a Composition.
 func IsComposition(o runtime.Object) error {
-	switch o.(type) {
-	case *v1beta1.Composition:
-		return nil
-	case *v1.Composition:
-		return nil
-	default:
+	if _, ok := o.(*v1.Composition); !ok {
 		return errors.New(errNotComposition)
 	}
+	return nil
 }
