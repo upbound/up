@@ -98,7 +98,7 @@ type connectCmd struct {
 	parser  install.ParameterParser
 	kClient kubernetes.Interface
 
-	Name      string `arg:"" required:"" help:"Name of control plane."`
+	Name      string `arg:"" required:"" help:"Name of control plane." predictor:"ctps"`
 	Namespace string `arg:"" required:"" help:"Namespace in the control plane where the claims of the cluster will be stored."`
 
 	Token                 string `help:"API token used to authenticate. If not provided, a new robot and a token will be created."`

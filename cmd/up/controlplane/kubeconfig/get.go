@@ -39,7 +39,7 @@ type getCmd struct {
 	File  string `type:"path" short:"f" help:"File to merge kubeconfig."`
 	Token string `required:"" help:"API token used to authenticate."`
 
-	Name string `arg:"" name:"control-plane-name" required:"" help:"Name of control plane."`
+	Name string `arg:"" name:"control-plane-name" required:"" help:"Name of control plane." predictor:"ctps"`
 }
 
 // Run executes the get command.
