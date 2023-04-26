@@ -20,6 +20,8 @@ import (
 	"path"
 	"strings"
 
+	"github.com/crossplane/crossplane-runtime/pkg/errors"
+	"k8s.io/client-go/kubernetes"
 	"k8s.io/client-go/rest"
 	"k8s.io/client-go/tools/clientcmd"
 	"k8s.io/client-go/tools/clientcmd/api"
@@ -36,6 +38,10 @@ const (
 
 	// UpboundK8sResource is appended to the end of the kubeconfig server path.
 	UpboundK8sResource = "k8s"
+)
+
+const (
+	errInvalidContext = "failed to discover crossplane api resources on control plane"
 )
 
 // GetKubeConfig constructs a Kubernetes REST config from the specified
@@ -67,7 +73,7 @@ func BuildControlPlaneKubeconfig(proxy *url.URL, id string, token string) *api.C
 
 // ApplyControlPlaneKubeconfig applies a control plane kubeconfig to an existing
 // kubeconfig file and sets it as the current context.
-func ApplyControlPlaneKubeconfig(mcpConf *api.Config, existingFilePath string) error {
+func ApplyControlPlaneKubeconfigIfValid(mcpConf *api.Config, existingFilePath string) error {
 	po := clientcmd.NewDefaultPathOptions()
 	po.LoadingRules.ExplicitPath = existingFilePath
 	conf, err := po.GetStartingConfig()
@@ -84,5 +90,37 @@ func ApplyControlPlaneKubeconfig(mcpConf *api.Config, existingFilePath string) e
 		conf.Contexts[k] = v
 	}
 	conf.CurrentContext = mcpConf.CurrentContext
+
+	// In the case of user error, for example providing an invalid access token,
+	// we do not want to set it as the current context as it will be invalid.
+	// A client allows us to verify connectivity in addition to a well-formed config.
+	clientConfig := clientcmd.NewDefaultClientConfig(*conf, &clientcmd.ConfigOverrides{})
+
+	// A rest.Config is required for clients.
+	restConfig, err := clientConfig.ClientConfig()
+	if err != nil {
+		return err
+	}
+
+	clientset, err := kubernetes.NewForConfig(restConfig)
+	if err != nil {
+		// For example, an invalid token was passed.
+		return err
+	}
+
+	// We could use any client for this check, but discovery allows us to perform
+	// additional validation, in this case that core Crossplane types are available.
+	resources, err := clientset.DiscoveryClient.ServerResourcesForGroupVersion("apiextensions.crossplane.io/v1")
+
+	if err != nil {
+		// For example, the target cluster does not exist.
+		return err
+	}
+
+	// This check is optional, but provides additional confidence that the control plane is healthy.
+	if coreTypes := len(resources.APIResources); coreTypes == 0 {
+		return errors.New(errInvalidContext)
+	}
+
 	return clientcmd.ModifyConfig(po, *conf, true)
 }
