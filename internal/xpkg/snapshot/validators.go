@@ -31,7 +31,6 @@ import (
 	"k8s.io/apiextensions-apiserver/pkg/apiserver/validation"
 
 	xpextv1 "github.com/crossplane/crossplane/apis/apiextensions/v1"
-	xpextv1beta1 "github.com/crossplane/crossplane/apis/apiextensions/v1beta1"
 	metav1 "github.com/crossplane/crossplane/apis/pkg/meta/v1"
 	metav1alpha1 "github.com/crossplane/crossplane/apis/pkg/meta/v1alpha1"
 	"github.com/crossplane/crossplane/xcrd"
@@ -59,10 +58,6 @@ func ValidatorsForObj(ctx context.Context, o runtime.Object, s *Snapshot) (map[s
 		if err := validatorsFromV1CRD(rd, validators); err != nil {
 			return nil, err
 		}
-	case *xpextv1beta1.CompositeResourceDefinition:
-		if err := validatorsFromV1Beta1XRD(rd, validators); err != nil {
-			return nil, err
-		}
 	case *xpextv1.CompositeResourceDefinition:
 		if err := validatorsFromV1XRD(ctx, rd, validators); err != nil {
 			// XR validators failed we should log this and move on
@@ -73,10 +68,6 @@ func ValidatorsForObj(ctx context.Context, o runtime.Object, s *Snapshot) (map[s
 		}
 	case *xpextv1.Composition:
 		if err := s.validatorsForV1XR(rd, validators); err != nil {
-			return nil, err
-		}
-	case *xpextv1beta1.Composition:
-		if err := s.validatorsForV1Beta1XR(rd, validators); err != nil {
 			return nil, err
 		}
 	case *metav1.Configuration:
@@ -143,30 +134,6 @@ func validatorsFromV1CRD(c *extv1.CustomResourceDefinition, acc map[schema.Group
 	return nil
 }
 
-func validatorsFromV1Beta1XRD(x *xpextv1beta1.CompositeResourceDefinition, acc map[schema.GroupVersionKind]*validator.ObjectValidator) error {
-	for _, v := range x.Spec.Versions {
-		// NOTE(tnthornton) if the version does not have a schema, do not
-		// attempt to create a validator.
-		if v.Schema != nil {
-			schema, err := buildSchema(v.Schema.OpenAPIV3Schema)
-			if err != nil {
-				return err
-			}
-
-			sv, _, err := newV1SchemaValidator(*schema)
-			if err != nil {
-				return err
-			}
-
-			if x.Spec.ClaimNames != nil {
-				appendToValidators(gvk(x.Spec.Group, v.Name, x.Spec.ClaimNames.Kind), acc, validator.NewUsingContext(sv))
-			}
-			appendToValidators(gvk(x.Spec.Group, v.Name, x.Spec.Names.Kind), acc, validator.NewUsingContext(sv))
-		}
-	}
-	return nil
-}
-
 func validatorsFromV1XRD(ctx context.Context, x *xpextv1.CompositeResourceDefinition, acc map[schema.GroupVersionKind]*validator.ObjectValidator) error {
 	errs := validateOpenAPIV3Schema(ctx, x)
 	if len(errs) != 0 {
@@ -210,15 +177,6 @@ func validatorsForV1XRD(x *xpextv1.CompositeResourceDefinition, acc map[schema.G
 }
 
 func (s *Snapshot) validatorsForV1XR(x *xpextv1.Composition, acc map[schema.GroupVersionKind]*validator.ObjectValidator) error {
-	v, err := DefaultCompositionValidators(s)
-	if err != nil {
-		return err
-	}
-	appendToValidators(x.GroupVersionKind(), acc, v)
-	return nil
-}
-
-func (s *Snapshot) validatorsForV1Beta1XR(x *xpextv1beta1.Composition, acc map[schema.GroupVersionKind]*validator.ObjectValidator) error {
 	v, err := DefaultCompositionValidators(s)
 	if err != nil {
 		return err

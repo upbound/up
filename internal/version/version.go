@@ -123,7 +123,7 @@ func (i *Informer) getCurrent(ctx context.Context) (string, error) {
 	if err != nil {
 		return "", err
 	}
-	defer resp.Body.Close() // nolint:errcheck
+	defer resp.Body.Close() // nolint:gosec,errcheck
 
 	v, err := io.ReadAll(resp.Body)
 	if err != nil {

@@ -13,6 +13,12 @@ For users who wish to use other OCI clients for pushing packages,
 protocol] and can be used as an authentication mechanism for pushing packages by
 adding it your Docker config file.
 
+## Minimum Supported Versions
+
+**github.com/crossplane/crossplane**: `v1.6.0`
+
+Notably, this version does not support the `v1beta1` API versions of `CompositeResourceDefinition` and `Composition` from `apiextensions.crossplane.io`. Please update to use the `v1` equivalent if necessary.
+
 ## Install
 
 Both `up` and `docker-credential-up` can be downloaded by using the official

@@ -133,7 +133,7 @@ func (u *UpboundRegistry) GetToken(ctx context.Context) (*Response, error) {
 	if err != nil {
 		return nil, errors.Wrap(err, errAuthFailed)
 	}
-	defer res.Body.Close() // nolint:errcheck
+	defer res.Body.Close() // nolint:gosec,errcheck
 
 	b, err := io.ReadAll(res.Body)
 	if err != nil {
