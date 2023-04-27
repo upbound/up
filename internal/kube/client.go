@@ -20,7 +20,6 @@ import (
 	"path"
 	"strings"
 
-	"github.com/crossplane/crossplane-runtime/pkg/errors"
 	"k8s.io/client-go/kubernetes"
 	"k8s.io/client-go/rest"
 	"k8s.io/client-go/tools/clientcmd"
@@ -38,10 +37,6 @@ const (
 
 	// UpboundK8sResource is appended to the end of the kubeconfig server path.
 	UpboundK8sResource = "k8s"
-)
-
-const (
-	errInvalidContext = "failed to discover crossplane api resources on control plane"
 )
 
 // GetKubeConfig constructs a Kubernetes REST config from the specified
@@ -73,7 +68,7 @@ func BuildControlPlaneKubeconfig(proxy *url.URL, id string, token string) *api.C
 
 // ApplyControlPlaneKubeconfig applies a control plane kubeconfig to an existing
 // kubeconfig file and sets it as the current context.
-func ApplyControlPlaneKubeconfigIfValid(mcpConf *api.Config, existingFilePath string) error {
+func ApplyControlPlaneKubeconfig(mcpConf *api.Config, existingFilePath string) error {
 	po := clientcmd.NewDefaultPathOptions()
 	po.LoadingRules.ExplicitPath = existingFilePath
 	conf, err := po.GetStartingConfig()
@@ -109,17 +104,10 @@ func ApplyControlPlaneKubeconfigIfValid(mcpConf *api.Config, existingFilePath st
 	}
 
 	// We could use any client for this check, but discovery allows us to perform
-	// additional validation, in this case that core Crossplane types are available.
-	resources, err := clientset.DiscoveryClient.ServerResourcesForGroupVersion("apiextensions.crossplane.io/v1")
-
-	if err != nil {
+	// additional validation if so desired. For now we perform a lightweight operation.
+	if _, err := clientset.DiscoveryClient.ServerVersion(); err != nil {
 		// For example, the target cluster does not exist.
 		return err
-	}
-
-	// This check is optional, but provides additional confidence that the control plane is healthy.
-	if coreTypes := len(resources.APIResources); coreTypes == 0 {
-		return errors.New(errInvalidContext)
 	}
 
 	return clientcmd.ModifyConfig(po, *conf, true)
