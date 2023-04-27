@@ -56,6 +56,8 @@ func (c *getCmd) Run(p pterm.TextPrinter, upCtx *upbound.Context) error {
 	if err := kube.ApplyControlPlaneKubeconfig(mcpConf, c.File); err != nil {
 		return err
 	}
-	p.Printfln("Current context set to %s", mcpConf.CurrentContext)
+	if c.File == "" {
+		p.Printfln("Current context set to %s", mcpConf.CurrentContext)
+	}
 	return nil
 }

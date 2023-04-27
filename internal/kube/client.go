@@ -20,6 +20,7 @@ import (
 	"path"
 	"strings"
 
+	"k8s.io/client-go/kubernetes"
 	"k8s.io/client-go/rest"
 	"k8s.io/client-go/tools/clientcmd"
 	"k8s.io/client-go/tools/clientcmd/api"
@@ -84,5 +85,30 @@ func ApplyControlPlaneKubeconfig(mcpConf *api.Config, existingFilePath string) e
 		conf.Contexts[k] = v
 	}
 	conf.CurrentContext = mcpConf.CurrentContext
+
+	// In the case of user error, for example providing an invalid access token,
+	// we do not want to set it as the current context as it will be invalid.
+	// A client allows us to verify connectivity in addition to a well-formed config.
+	clientConfig := clientcmd.NewDefaultClientConfig(*conf, &clientcmd.ConfigOverrides{})
+
+	// A rest.Config is required for clients.
+	restConfig, err := clientConfig.ClientConfig()
+	if err != nil {
+		return err
+	}
+
+	clientset, err := kubernetes.NewForConfig(restConfig)
+	if err != nil {
+		// For example, an invalid token was passed.
+		return err
+	}
+
+	// We could use any client for this check, but discovery allows us to perform
+	// additional validation if so desired. For now we perform a lightweight operation.
+	if _, err := clientset.DiscoveryClient.ServerVersion(); err != nil {
+		// For example, the target cluster does not exist.
+		return err
+	}
+
 	return clientcmd.ModifyConfig(po, *conf, true)
 }
