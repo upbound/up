@@ -17,6 +17,7 @@ package xpkg
 import (
 	"context"
 	"fmt"
+	"github.com/google/go-containerregistry/pkg/v1/tarball"
 	"os"
 	"path/filepath"
 	"strings"
@@ -29,7 +30,6 @@ import (
 	"github.com/google/go-containerregistry/pkg/v1/empty"
 	"github.com/google/go-containerregistry/pkg/v1/mutate"
 	"github.com/google/go-containerregistry/pkg/v1/remote"
-	"github.com/google/go-containerregistry/pkg/v1/tarball"
 	"github.com/pterm/pterm"
 	"github.com/spf13/afero"
 	"golang.org/x/sync/errgroup"
@@ -75,12 +75,48 @@ type pushCmd struct {
 
 // Run runs the push cmd.
 func (c *pushCmd) Run(p pterm.TextPrinter, upCtx *upbound.Context) error { //nolint:gocyclo
-	tag, err := name.NewTag(c.Tag, name.WithDefaultRegistry(upCtx.RegistryEndpoint.Hostname()))
+	// If package is not defined, attempt to find single package in current
+	// directory.
+	if len(c.Package) == 0 {
+		wd, err := os.Getwd()
+		if err != nil {
+			return errors.Wrap(err, errGetwd)
+		}
+		path, err := xpkg.FindXpkgInDir(c.fs, wd)
+		if err != nil {
+			return errors.Wrap(err, errFindPackageinWd)
+		}
+		c.Package = []string{path}
+	}
+
+	imgs := make([]v1.Image, 0, len(c.Package))
+	for _, p := range c.Package {
+		img, err := tarball.ImageFromPath(filepath.Clean(p), nil)
+		if err != nil {
+			return err
+		}
+		imgs = append(imgs, img)
+	}
+	return PushImages(p, upCtx, imgs, c.Tag, c.Create, c.Flags.Profile)
+}
+
+func PushImages(p pterm.TextPrinter, upCtx *upbound.Context, imgs []v1.Image, t string, create bool, profile string) error {
+	tag, err := name.NewTag(t, name.WithDefaultRegistry(upCtx.RegistryEndpoint.Hostname()))
 	if err != nil {
 		return err
 	}
 
-	if c.Create {
+	kc := authn.NewMultiKeychain(
+		authn.NewKeychainFromHelper(
+			credhelper.New(
+				credhelper.WithDomain(upCtx.Domain.Hostname()),
+				credhelper.WithProfile(profile),
+			),
+		),
+		authn.DefaultKeychain,
+	)
+
+	if create {
 		if !strings.Contains(tag.RegistryStr(), upCtx.RegistryEndpoint.Hostname()) {
 			return errors.New(errCreateNotUpbound)
 		}
@@ -97,44 +133,15 @@ func (c *pushCmd) Run(p pterm.TextPrinter, upCtx *upbound.Context) error { //nol
 		}
 	}
 
-	// If package is not defined, attempt to find single package in current
-	// directory.
-	if len(c.Package) == 0 {
-		wd, err := os.Getwd()
-		if err != nil {
-			return errors.Wrap(err, errGetwd)
-		}
-		path, err := xpkg.FindXpkgInDir(c.fs, wd)
-		if err != nil {
-			return errors.Wrap(err, errFindPackageinWd)
-		}
-		c.Package = []string{path}
-	}
-
-	kc := authn.NewMultiKeychain(
-		authn.NewKeychainFromHelper(
-			credhelper.New(
-				credhelper.WithDomain(upCtx.Domain.Hostname()),
-				credhelper.WithProfile(c.Flags.Profile),
-			),
-		),
-		authn.DefaultKeychain,
-	)
-
-	adds := make([]mutate.IndexAddendum, len(c.Package))
+	adds := make([]mutate.IndexAddendum, len(imgs))
 
 	// NOTE(hasheddan): the errgroup context is passed to each image write,
 	// meaning that if one fails it will cancel others that are in progress.
 	g, ctx := errgroup.WithContext(context.Background())
-	for i, x := range c.Package {
+	for i, img := range imgs {
 		// pin range variables for use in go func
-		i, x := i, x
+		i, img := i, img
 		g.Go(func() error {
-			img, err := tarball.ImageFromPath(filepath.Clean(x), nil)
-			if err != nil {
-				return err
-			}
-
 			// annotate image layers
 			aimg, err := annotate(img)
 			if err != nil {
@@ -142,7 +149,7 @@ func (c *pushCmd) Run(p pterm.TextPrinter, upCtx *upbound.Context) error { //nol
 			}
 
 			var t name.Reference = tag
-			if len(c.Package) > 1 {
+			if len(imgs) > 1 {
 				d, err := aimg.Digest()
 				if err != nil {
 					return err
@@ -187,7 +194,7 @@ func (c *pushCmd) Run(p pterm.TextPrinter, upCtx *upbound.Context) error { //nol
 	}
 
 	// If we pushed more than one xpkg then we need to write index.
-	if len(c.Package) > 1 {
+	if len(imgs) > 1 {
 		if err := remote.WriteIndex(tag, mutate.AppendManifests(empty.Index, adds...), remote.WithAuthFromKeychain(kc)); err != nil {
 			return err
 		}

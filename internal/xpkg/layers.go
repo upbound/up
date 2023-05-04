@@ -57,8 +57,10 @@ func Layer(r io.Reader, fileName, annotation string, fileSize int64, cfg *v1.Con
 		return nil, errors.Wrap(err, errDigestInvalid)
 	}
 
-	// add annotation label to config
-	cfg.Labels[Label(d.String())] = annotation
+	// add annotation label to config if a non-empty label is specified
+	if annotation != "" {
+		cfg.Labels[Label(d.String())] = annotation
+	}
 
 	return layer, nil
 }
