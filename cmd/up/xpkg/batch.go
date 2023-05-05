@@ -22,6 +22,7 @@ import (
 	"os"
 	"path/filepath"
 	"strings"
+	"sync"
 	"text/template"
 
 	"github.com/alecthomas/kong"
@@ -67,9 +68,7 @@ func (c *batchCmd) AfterApply(kongCtx *kong.Context) error {
 	// NOTE(aru): we currently only support fetching family base image from
 	// daemon, but may opt to support additional sources in the future.
 	c.fetch = daemonFetch
-	if c.TemplateVar == nil {
-		c.TemplateVar = make(map[string]string)
-	}
+	c.wg = &sync.WaitGroup{}
 
 	upCtx, err := upbound.NewFromFlags(c.Flags)
 	if err != nil {
@@ -108,6 +107,8 @@ type batchCmd struct {
 
 	// Common Upbound API configuration
 	Flags upbound.Flags `embed:""`
+
+	wg *sync.WaitGroup
 }
 
 // Run executes the batch command.
@@ -126,65 +127,78 @@ func (c *batchCmd) Run(p pterm.TextPrinter, upCtx *upbound.Context) error { //no
 		if err != nil {
 			return err
 		}
-		baseImgMap[p] = img // assume correct OS
+		baseImgMap[p] = img // assumes correct OS
 	}
 
 	for _, s := range c.Service {
-		imgs := make([]v1.Image, 0, len(c.Platform))
-		var addendumLayers []v1.Layer
-		var labels [][2]string
-		for _, p := range c.Platform {
-			var img v1.Image
-			var err error
-			switch {
-			case len(addendumLayers) > 0:
-				img = baseImgMap[p]
-				for _, l := range addendumLayers {
-					img, err = mutate.AppendLayers(img, l)
-					if err != nil {
-						return errors.Wrapf(err, errAppendLayersFmt, p, s)
-					}
-				}
-				cfg, err := img.ConfigFile()
+		c.wg.Add(1)
+		s := s
+		go func() {
+			defer c.wg.Done()
+			if err := c.processService(p, upCtx, baseImgMap, s); err != nil {
+				p.PrintOnErrorf("Publishing of service-scoped provider package has filed for service %q: %v", s, err)
+			}
+		}()
+	}
+	c.wg.Wait()
+	return nil
+}
+
+func (c *batchCmd) processService(p pterm.TextPrinter, upCtx *upbound.Context, baseImgMap map[string]v1.Image, s string) error {
+	imgs := make([]v1.Image, 0, len(c.Platform))
+	var addendumLayers []v1.Layer
+	var labels [][2]string
+	for _, p := range c.Platform {
+		var img v1.Image
+		var err error
+		switch {
+		case len(addendumLayers) > 0:
+			img = baseImgMap[p]
+			for _, l := range addendumLayers {
+				img, err = mutate.AppendLayers(img, l)
 				if err != nil {
-					return errors.Wrapf(err, errGetConfigFmt, p, s)
-				}
-				if cfg.Config.Labels == nil {
-					cfg.Config.Labels = make(map[string]string, len(labels))
-				}
-				for _, kv := range labels {
-					if kv[1] == "" {
-						continue
-					}
-					cfg.Config.Labels[kv[0]] = kv[1]
-				}
-				img, err = mutate.Config(img, cfg.Config)
-				if err != nil {
-					return errors.Wrapf(err, errMutateConfigFmt, p, s)
-				}
-				img, err = c.addProviderBinaryLayer(img, p, s)
-				if err != nil {
-					return err
-				}
-			default:
-				img, err = c.buildImage(baseImgMap, p, s)
-				if err != nil {
-					return err
-				}
-				// calculate addendum layers to reuse
-				addendumLayers, labels, err = getAddendumLayers(baseImgMap[p], img, p, s)
-				if err != nil {
-					return err
+					return errors.Wrapf(err, errAppendLayersFmt, p, s)
 				}
 			}
-			imgs = append(imgs, img)
+			cfg, err := img.ConfigFile()
+			if err != nil {
+				return errors.Wrapf(err, errGetConfigFmt, p, s)
+			}
+			if cfg.Config.Labels == nil {
+				cfg.Config.Labels = make(map[string]string, len(labels))
+			}
+			for _, kv := range labels {
+				if kv[1] == "" {
+					continue
+				}
+				cfg.Config.Labels[kv[0]] = kv[1]
+			}
+			img, err = mutate.Config(img, cfg.Config)
+			if err != nil {
+				return errors.Wrapf(err, errMutateConfigFmt, p, s)
+			}
+			img, err = c.addProviderBinaryLayer(img, p, s)
+			if err != nil {
+				return err
+			}
+		default:
+			img, err = c.buildImage(baseImgMap, p, s)
+			if err != nil {
+				return err
+			}
+			// calculate addendum layers to reuse
+			addendumLayers, labels, err = getAddendumLayers(baseImgMap[p], img, p, s)
+			if err != nil {
+				return err
+			}
 		}
+		imgs = append(imgs, img)
+	}
 
-		t := c.getPackageURL(s)
-		p.Printfln("Pushing xpkg to %s", t)
-		if err := PushImages(p, upCtx, imgs, t, c.Create, c.Flags.Profile); err != nil {
-			return errors.Wrapf(err, errPushPackageFmt, s)
-		}
+	t := c.getPackageURL(s)
+	p.Printfln("Pushing xpkg to %s", t)
+	if err := PushImages(p, upCtx, imgs, t, c.Create, c.Flags.Profile); err != nil {
+		return errors.Wrapf(err, errPushPackageFmt, s)
 	}
 	return nil
 }
@@ -257,7 +271,7 @@ func (c *batchCmd) addProviderBinaryLayer(img v1.Image, p, s string) (v1.Image, 
 	if err != nil {
 		return nil, errors.Wrapf(err, errReadProviderBinFmt, s, p, binPath)
 	}
-	l, err := xpkg.Layer(bytes.NewBuffer(buff), "/usr/local/bin/provider", "", int64(len(buff)), &configFile.Config)
+	l, err := xpkg.Layer(bytes.NewBuffer(buff), "/usr/local/bin/provider", "", int64(len(buff)), 0o755, &configFile.Config)
 	if err != nil {
 		return nil, errors.Wrapf(err, errNewLayerFmt, p, s)
 	}
@@ -344,14 +358,19 @@ func (c *batchCmd) getPackageMetadata(service string) (string, error) {
 		return "", errors.Wrap(err, errInvalidTemplate)
 	}
 
-	// add template var substitutions
-	c.TemplateVar["Service"] = service
-	c.TemplateVar["Name"] = c.getPackageRepo(service)
+	// prepare template var substitutions
+	data := make(map[string]string, len(c.TemplateVar)+2)
+	data["Service"] = service
+	data["Name"] = c.getPackageRepo(service)
+	// copy substitutions passed from the command-line
+	for k, v := range c.TemplateVar {
+		data[k] = v
+	}
 
 	buff := &bytes.Buffer{}
-	err = tmpl.Execute(buff, c.TemplateVar)
+	err = tmpl.Execute(buff, data)
 	if err != nil {
-		return "", errors.Wrapf(err, errTemplateFmt, c.TemplateVar)
+		return "", errors.Wrapf(err, errTemplateFmt, data)
 	}
 	return buff.String(), nil
 }
