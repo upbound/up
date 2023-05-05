@@ -61,6 +61,10 @@ const (
 	errPushPackageFmt     = "failed to push service-scoped provider package: %s"
 )
 
+const (
+	wildcard = "*"
+)
+
 // AfterApply constructs and binds Upbound-specific context to any subcommands
 // that have Run() methods that receive it.
 func (c *batchCmd) AfterApply(kongCtx *kong.Context) error {
@@ -136,7 +140,7 @@ func (c *batchCmd) Run(p pterm.TextPrinter, upCtx *upbound.Context) error { //no
 		go func() {
 			defer c.wg.Done()
 			if err := c.processService(p, upCtx, baseImgMap, s); err != nil {
-				p.PrintOnErrorf("Publishing of service-scoped provider package has filed for service %q: %v", s, err)
+				p.PrintOnErrorf("Publishing of service-scoped provider package has failed for service %q: %v", s, err)
 			}
 		}()
 	}
@@ -281,7 +285,9 @@ func (c *batchCmd) addProviderBinaryLayer(img v1.Image, p, s string) (v1.Image, 
 
 func (c *batchCmd) getExamplesGroup(service string) string {
 	p := c.ExamplesGroupOverride[service]
-	if p == "" {
+	if p == wildcard {
+		p = ""
+	} else if p == "" {
 		p = service
 	}
 	return filepath.Join(c.ExamplesRoot, p)
@@ -346,6 +352,9 @@ func (c *batchCmd) getBuilder(service string) (*xpkg.Builder, error) {
 
 func (c *batchCmd) getCRDPrefix(service string) string {
 	o := c.CRDGroupOverride[service]
+	if o == wildcard {
+		return ""
+	}
 	if o == "" {
 		o = service
 	}
