@@ -102,6 +102,7 @@ type batchCmd struct {
 	ExamplesGroupOverride map[string]string `help:"Overrides for the location of the example manifests folder of a service-scoped provider." optional:""`
 	CRDGroupOverride      map[string]string `help:"Overrides for the locations of the CRD folders of the service-scoped providers." optional:""`
 	PackageRepoOverride   map[string]string `help:"Overrides for the package repository names of the service-scoped providers." optional:""`
+	AuthExtService        []string          `help:"Service name to add the authentication extension for." default:"monolith,config"`
 
 	ExamplesRoot string   `short:"e" help:"Path to package examples directory." default:"./examples" type:"path"`
 	CRDRoot      string   `help:"Path to package CRDs directory." default:"./package/crds" type:"path"`
@@ -300,15 +301,21 @@ func (c *batchCmd) getBuilder(service string) (*xpkg.Builder, error) {
 	}
 
 	var authBE parser.Backend
-	if ax, err := filepath.Abs(c.AuthExt); err == nil {
-		if axf, err := c.fs.Open(ax); err == nil {
-			defer func() { _ = axf.Close() }()
-			b, err := io.ReadAll(axf)
-			if err != nil {
-				return nil, err
-			}
-			authBE = parser.NewEchoBackend(string(b))
+	for _, s := range c.AuthExtService {
+		if service != s {
+			continue
 		}
+		if ax, err := filepath.Abs(c.AuthExt); err == nil {
+			if axf, err := c.fs.Open(ax); err == nil {
+				defer func() { _ = axf.Close() }()
+				b, err := io.ReadAll(axf)
+				if err != nil {
+					return nil, err
+				}
+				authBE = parser.NewEchoBackend(string(b))
+			}
+		}
+		break
 	}
 
 	pp, err := yaml.New()
