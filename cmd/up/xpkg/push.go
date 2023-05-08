@@ -17,7 +17,6 @@ package xpkg
 import (
 	"context"
 	"fmt"
-	"github.com/google/go-containerregistry/pkg/v1/tarball"
 	"os"
 	"path/filepath"
 	"strings"
@@ -30,6 +29,7 @@ import (
 	"github.com/google/go-containerregistry/pkg/v1/empty"
 	"github.com/google/go-containerregistry/pkg/v1/mutate"
 	"github.com/google/go-containerregistry/pkg/v1/remote"
+	"github.com/google/go-containerregistry/pkg/v1/tarball"
 	"github.com/pterm/pterm"
 	"github.com/spf13/afero"
 	"golang.org/x/sync/errgroup"
@@ -100,7 +100,7 @@ func (c *pushCmd) Run(p pterm.TextPrinter, upCtx *upbound.Context) error { //nol
 	return PushImages(p, upCtx, imgs, c.Tag, c.Create, c.Flags.Profile)
 }
 
-func PushImages(p pterm.TextPrinter, upCtx *upbound.Context, imgs []v1.Image, t string, create bool, profile string) error {
+func PushImages(p pterm.TextPrinter, upCtx *upbound.Context, imgs []v1.Image, t string, create bool, profile string) error { //nolint:gocyclo
 	tag, err := name.NewTag(t, name.WithDefaultRegistry(upCtx.RegistryEndpoint.Hostname()))
 	if err != nil {
 		return err

@@ -92,6 +92,7 @@ type batchCmd struct {
 	ProviderName           string   `help:"Provider name, such as provider-aws to be used while formatting service-scoped provider package repositories." required:""`
 	FamilyPackageURLFormat string   `help:"Family package URL format to be used for the service-scoped provider packages. Must be a valid OCI image URL with the format specifier \"%s\", which will be substituted with <provider name>-<service name>." required:""`
 	Service                []string `help:"Services to build the scoped provider packages for." default:"monolith"`
+	Concurrency            uint     `help:"Maximum number of packages to process concurrently. Setting it to 0 puts no limit on the concurrency, i.e., all packages are processed in parallel." default:"0"`
 
 	Platform        []string `help:"Platforms to build the packages for. Each platform should use the <OS>_<arch> syntax. An example is: linux_arm64." default:"linux_amd64,linux_arm64"`
 	ProviderBinRoot string   `short:"p" help:"Provider binary paths root. Service-scoped provider binaries should reside under the platform directories in this folder." type:"existingdir"`
@@ -135,21 +136,33 @@ func (c *batchCmd) Run(p pterm.TextPrinter, upCtx *upbound.Context) error { //no
 		baseImgMap[p] = img // assumes correct OS
 	}
 
+	concurrency := make(chan struct{}, c.Concurrency)
+	for i := uint(0); i < c.Concurrency; i++ {
+		concurrency <- struct{}{}
+	}
 	for _, s := range c.Service {
 		c.wg.Add(1)
 		s := s
 		go func() {
 			defer c.wg.Done()
+			// if concurrency is limited
+			if c.Concurrency != 0 {
+				<-concurrency
+				defer func() {
+					concurrency <- struct{}{}
+				}()
+			}
 			if err := c.processService(p, upCtx, baseImgMap, s); err != nil {
 				p.PrintOnErrorf("Publishing of service-scoped provider package has failed for service %q: %v", s, err)
 			}
 		}()
 	}
 	c.wg.Wait()
+	close(concurrency)
 	return nil
 }
 
-func (c *batchCmd) processService(p pterm.TextPrinter, upCtx *upbound.Context, baseImgMap map[string]v1.Image, s string) error {
+func (c *batchCmd) processService(p pterm.TextPrinter, upCtx *upbound.Context, baseImgMap map[string]v1.Image, s string) error { //nolint:gocyclo
 	imgs := make([]v1.Image, 0, len(c.Platform))
 	var addendumLayers []v1.Layer
 	var labels [][2]string
@@ -272,7 +285,7 @@ func (c *batchCmd) addProviderBinaryLayer(img v1.Image, p, s string) (v1.Image, 
 		return nil, errors.Wrapf(err, errGetConfigFmt, p, s)
 	}
 	binPath := filepath.Join(c.ProviderBinRoot, p, s)
-	buff, err := os.ReadFile(binPath)
+	buff, err := os.ReadFile(filepath.Clean(binPath))
 	if err != nil {
 		return nil, errors.Wrapf(err, errReadProviderBinFmt, s, p, binPath)
 	}
