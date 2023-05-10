@@ -59,6 +59,7 @@ const (
 	errNewLayerFmt        = "failed to initialize a new image layer for %s platform for service %q"
 	errAddLayerFmt        = "failed to add the service-scoped provider binary layer for %s platform for service %q"
 	errPushPackageFmt     = "failed to push service-scoped provider package: %s"
+	errReadAuthExtFmt     = "failed to read the authentication extension file at: %s"
 )
 
 const (
@@ -307,6 +308,21 @@ func (c *batchCmd) getExamplesGroup(service string) string {
 	return filepath.Join(c.ExamplesRoot, p)
 }
 
+func (c *batchCmd) getAuthBackend(ax string) (parser.Backend, error) {
+	axf, err := c.fs.Open(ax)
+	// configuring an auth extension is optional as before
+	if err != nil {
+		return nil, nil
+	}
+
+	defer func() { _ = axf.Close() }()
+	b, err := io.ReadAll(axf)
+	if err != nil {
+		return nil, errors.Wrapf(err, errReadAuthExtFmt, ax)
+	}
+	return parser.NewEchoBackend(string(b)), nil
+}
+
 func (c *batchCmd) getBuilder(service string) (*xpkg.Builder, error) {
 	ex, err := filepath.Abs(c.getExamplesGroup(service))
 	if err != nil {
@@ -314,21 +330,17 @@ func (c *batchCmd) getBuilder(service string) (*xpkg.Builder, error) {
 	}
 
 	var authBE parser.Backend
-	for _, s := range c.AuthExtService {
-		if service != s {
-			continue
-		}
-		if ax, err := filepath.Abs(c.AuthExt); err == nil {
-			if axf, err := c.fs.Open(ax); err == nil {
-				defer func() { _ = axf.Close() }()
-				b, err := io.ReadAll(axf)
-				if err != nil {
-					return nil, err
-				}
-				authBE = parser.NewEchoBackend(string(b))
+	if ax, err := filepath.Abs(c.AuthExt); err == nil {
+		for _, s := range c.AuthExtService {
+			if service != s {
+				continue
 			}
+			authBE, err = c.getAuthBackend(ax)
+			if err != nil {
+				return nil, err
+			}
+			break
 		}
-		break
 	}
 
 	pp, err := yaml.New()
