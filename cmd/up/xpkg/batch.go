@@ -94,6 +94,7 @@ type batchCmd struct {
 	FamilyPackageURLFormat string   `help:"Family package URL format to be used for the service-scoped provider packages. Must be a valid OCI image URL with the format specifier \"%s\", which will be substituted with <provider name>-<service name>." required:""`
 	Service                []string `help:"Services to build the scoped provider packages for." default:"monolith"`
 	Concurrency            uint     `help:"Maximum number of packages to process concurrently. Setting it to 0 puts no limit on the concurrency, i.e., all packages are processed in parallel." default:"0"`
+	PushRetry              uint     `help:"Number of retries when pushing a provider package fails." default:"3"`
 
 	Platform        []string `help:"Platforms to build the packages for. Each platform should use the <OS>_<arch> syntax. An example is: linux_arm64." default:"linux_amd64,linux_arm64"`
 	ProviderBinRoot string   `short:"p" help:"Provider binary paths root. Service-scoped provider binaries should reside under the platform directories in this folder." type:"existingdir"`
@@ -220,11 +221,25 @@ func (c *batchCmd) processService(p pterm.TextPrinter, upCtx *upbound.Context, b
 		}
 		imgs = append(imgs, img)
 	}
+	return c.pushWithRetry(p, upCtx, imgs, s)
+}
 
+func (c *batchCmd) pushWithRetry(p pterm.TextPrinter, upCtx *upbound.Context, imgs []v1.Image, s string) error {
 	t := c.getPackageURL(s)
-	p.Printfln("Pushing xpkg to %s", t)
-	if err := PushImages(p, upCtx, imgs, t, c.Create, c.Flags.Profile); err != nil {
-		return errors.Wrapf(err, errPushPackageFmt, s)
+	tries := c.PushRetry + 1
+	retryMsg := ""
+	for i := uint(0); i < tries; i++ {
+		p.Printfln("Pushing xpkg to %s.%s", t, retryMsg)
+		err := PushImages(p, upCtx, imgs, t, c.Create, c.Flags.Profile)
+		if err == nil {
+			break
+		}
+		if i == tries-1 { // no more retries
+			p.Printfln("Failed to push xpkg to %s.", t)
+			return errors.Wrapf(err, errPushPackageFmt, s)
+		}
+		p.PrintOnErrorf(fmt.Sprintf("Failed to push xpkg to %s. Will retry...: %%v", t), err)
+		retryMsg = fmt.Sprintf(" Retry count: %d", i+1)
 	}
 	return nil
 }
@@ -317,9 +332,10 @@ func (c *batchCmd) getExamplesGroup(service string) string {
 
 func (c *batchCmd) getAuthBackend(ax string) (parser.Backend, error) {
 	axf, err := c.fs.Open(ax)
-	// configuring an auth extension is optional as before
+	// we silently skip if a valid authentication extension
+	// is not specified as before
 	if err != nil {
-		return nil, nil
+		return nil, nil //nolint:nilerr
 	}
 
 	defer func() { _ = axf.Close() }()
