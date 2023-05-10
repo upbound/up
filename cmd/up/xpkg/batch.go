@@ -22,7 +22,6 @@ import (
 	"os"
 	"path/filepath"
 	"strings"
-	"sync"
 	"text/template"
 
 	"github.com/alecthomas/kong"
@@ -48,7 +47,7 @@ const (
 	errCRDBackend         = "failed to initialize the CRD parser backend"
 	errTemplateFmt        = "failed to execute the provider metadata template using: %v"
 	errInvalidPlatformFmt = "failed to parse platform name. Expected syntax is <OS>_<arch>: %s"
-	errBuildPackageFmt    = "failed to service-scoped provider package: %s"
+	errBuildPackageFmt    = "failed to build service-scoped provider package: %s"
 	errGetConfigFmt       = "failed to get config file from %s image for service %q"
 	errMutateConfigFmt    = "failed to mutate config file from %s image for service %q"
 	errGetLayersFmt       = "failed to get layers from %s image for service %q"
@@ -60,6 +59,8 @@ const (
 	errAddLayerFmt        = "failed to add the service-scoped provider binary layer for %s platform for service %q"
 	errPushPackageFmt     = "failed to push service-scoped provider package: %s"
 	errReadAuthExtFmt     = "failed to read the authentication extension file at: %s"
+	errProcessFmt         = "\nfailed to process service-scoped provider package for %q"
+	errBatch              = "processing of at least one service-scoped provider has failed"
 )
 
 const (
@@ -73,7 +74,6 @@ func (c *batchCmd) AfterApply(kongCtx *kong.Context) error {
 	// NOTE(aru): we currently only support fetching family base image from
 	// daemon, but may opt to support additional sources in the future.
 	c.fetch = daemonFetch
-	c.wg = &sync.WaitGroup{}
 
 	upCtx, err := upbound.NewFromFlags(c.Flags)
 	if err != nil {
@@ -114,8 +114,6 @@ type batchCmd struct {
 
 	// Common Upbound API configuration
 	Flags upbound.Flags `embed:""`
-
-	wg *sync.WaitGroup
 }
 
 // Run executes the batch command.
@@ -137,15 +135,16 @@ func (c *batchCmd) Run(p pterm.TextPrinter, upCtx *upbound.Context) error { //no
 		baseImgMap[p] = img // assumes correct OS
 	}
 
+	chErr := make(chan error, len(c.Service))
+	defer close(chErr)
 	concurrency := make(chan struct{}, c.Concurrency)
+	defer close(concurrency)
 	for i := uint(0); i < c.Concurrency; i++ {
 		concurrency <- struct{}{}
 	}
 	for _, s := range c.Service {
-		c.wg.Add(1)
 		s := s
 		go func() {
-			defer c.wg.Done()
 			// if concurrency is limited
 			if c.Concurrency != 0 {
 				<-concurrency
@@ -153,14 +152,22 @@ func (c *batchCmd) Run(p pterm.TextPrinter, upCtx *upbound.Context) error { //no
 					concurrency <- struct{}{}
 				}()
 			}
-			if err := c.processService(p, upCtx, baseImgMap, s); err != nil {
-				p.PrintOnErrorf("Publishing of service-scoped provider package has failed for service %q: %v", s, err)
-			}
+			err := c.processService(p, upCtx, baseImgMap, s)
+			p.PrintOnErrorf(fmt.Sprintf("Publishing of service-scoped provider package has failed for service %q: %%v", s), err)
+			chErr <- errors.WithMessagef(err, errProcessFmt, s)
 		}()
 	}
-	c.wg.Wait()
-	close(concurrency)
-	return nil
+	var result error
+	for range c.Service {
+		err := <-chErr
+		switch {
+		case result == nil:
+			result = err
+		case err != nil:
+			result = errors.Wrap(result, err.Error())
+		}
+	}
+	return errors.WithMessage(result, errBatch)
 }
 
 func (c *batchCmd) processService(p pterm.TextPrinter, upCtx *upbound.Context, baseImgMap map[string]v1.Image, s string) error { //nolint:gocyclo
