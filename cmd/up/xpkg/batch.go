@@ -25,29 +25,27 @@ import (
 	"text/template"
 
 	"github.com/alecthomas/kong"
-	v1 "github.com/google/go-containerregistry/pkg/v1"
-	"github.com/google/go-containerregistry/pkg/v1/mutate"
-
-	"github.com/upbound/up/internal/upbound"
-
 	"github.com/crossplane/crossplane-runtime/pkg/errors"
 	"github.com/crossplane/crossplane-runtime/pkg/parser"
 	"github.com/google/go-containerregistry/pkg/name"
+	v1 "github.com/google/go-containerregistry/pkg/v1"
+	"github.com/google/go-containerregistry/pkg/v1/mutate"
 	"github.com/pterm/pterm"
 	"github.com/spf13/afero"
 
+	"github.com/upbound/up/internal/upbound"
 	"github.com/upbound/up/internal/xpkg"
 	"github.com/upbound/up/internal/xpkg/parser/examples"
 	"github.com/upbound/up/internal/xpkg/parser/yaml"
 )
 
 const (
-	errInvalidTemplate    = "service-scoped provider template is not valid"
+	errInvalidTemplate    = "smaller provider metadata template is not valid"
 	errMetadataBackend    = "failed to initialize the package metadata parser backend"
 	errCRDBackend         = "failed to initialize the CRD parser backend"
 	errTemplateFmt        = "failed to execute the provider metadata template using: %v"
 	errInvalidPlatformFmt = "failed to parse platform name. Expected syntax is <OS>_<arch>: %s"
-	errBuildPackageFmt    = "failed to build service-scoped provider package: %s"
+	errBuildPackageFmt    = "failed to build smaller provider package: %s"
 	errGetConfigFmt       = "failed to get config file from %s image for service %q"
 	errMutateConfigFmt    = "failed to mutate config file from %s image for service %q"
 	errGetLayersFmt       = "failed to get layers from %s image for service %q"
@@ -56,11 +54,12 @@ const (
 	errAppendLayersFmt    = "failed to append layers to %s image for service %q"
 	errReadProviderBinFmt = "failed to read %q provider binary for %s platform from path: %s"
 	errNewLayerFmt        = "failed to initialize a new image layer for %s platform for service %q"
-	errAddLayerFmt        = "failed to add the service-scoped provider binary layer for %s platform for service %q"
-	errPushPackageFmt     = "failed to push service-scoped provider package: %s"
+	errAddLayerFmt        = "failed to add the smaller provider binary layer for %s platform for service %q"
+	errPushPackageFmt     = "failed to push smaller provider package: %s"
+	errAbsAuthExtFmt      = "failed to get the absolute path for the authentication extension file: %s"
 	errReadAuthExtFmt     = "failed to read the authentication extension file at: %s"
-	errProcessFmt         = "\nfailed to process service-scoped provider package for %q"
-	errBatch              = "processing of at least one service-scoped provider has failed"
+	errProcessFmt         = "\nfailed to process smaller provider package for %q"
+	errBatch              = "processing of at least one smaller provider has failed"
 )
 
 const (
@@ -89,28 +88,28 @@ type batchCmd struct {
 	fs    afero.Fs
 	fetch fetchFn
 
-	FamilyBaseImage        string   `help:"Family image used as the base for the service-scoped provider packages." required:""`
-	ProviderName           string   `help:"Provider name, such as provider-aws to be used while formatting service-scoped provider package repositories." required:""`
-	FamilyPackageURLFormat string   `help:"Family package URL format to be used for the service-scoped provider packages. Must be a valid OCI image URL with the format specifier \"%s\", which will be substituted with <provider name>-<service name>." required:""`
-	Service                []string `help:"Services to build the scoped provider packages for." default:"monolith"`
+	FamilyBaseImage        string   `help:"Family image used as the base for the smaller provider packages." required:""`
+	ProviderName           string   `help:"Provider name, such as provider-aws to be used while formatting smaller provider package repositories." required:""`
+	FamilyPackageURLFormat string   `help:"Family package URL format to be used for the smaller provider packages. Must be a valid OCI image URL with the format specifier \"%s\", which will be substituted with <provider name>-<service name>." required:""`
+	Services               []string `help:"Services to build the scoped provider packages for." default:"monolith"`
 	Concurrency            uint     `help:"Maximum number of packages to process concurrently. Setting it to 0 puts no limit on the concurrency, i.e., all packages are processed in parallel." default:"0"`
 	PushRetry              uint     `help:"Number of retries when pushing a provider package fails." default:"3"`
 
 	Platform        []string `help:"Platforms to build the packages for. Each platform should use the <OS>_<arch> syntax. An example is: linux_arm64." default:"linux_amd64,linux_arm64"`
-	ProviderBinRoot string   `short:"p" help:"Provider binary paths root. Service-scoped provider binaries should reside under the platform directories in this folder." type:"existingdir"`
+	ProviderBinRoot string   `short:"p" help:"Provider binary paths root. Smaller provider binaries should reside under the platform directories in this folder." type:"existingdir"`
 
-	PackageMetadataTemplate string            `help:"Service-scoped provider metadata template. The template variables {{ .Service }} and {{ .Name }} will be substituted when the template is executed among with the supplied template variable substitutions." default:"./package/crossplane.yaml.tmpl" type:"path"`
-	TemplateVar             map[string]string `help:"Service-scoped provider metadata template variables to be used for the specified template."`
+	PackageMetadataTemplate string            `help:"Smaller provider metadata template. The template variables {{ .Service }} and {{ .Name }} will be substituted when the template is executed among with the supplied template variable substitutions." default:"./package/crossplane.yaml.tmpl" type:"path"`
+	TemplateVar             map[string]string `help:"Smaller provider metadata template variables to be used for the specified template."`
 
-	ExamplesGroupOverride map[string]string `help:"Overrides for the location of the example manifests folder of a service-scoped provider." optional:""`
-	CRDGroupOverride      map[string]string `help:"Overrides for the locations of the CRD folders of the service-scoped providers." optional:""`
-	PackageRepoOverride   map[string]string `help:"Overrides for the package repository names of the service-scoped providers." optional:""`
+	ExamplesGroupOverride map[string]string `help:"Overrides for the location of the example manifests folder of a smaller provider." optional:""`
+	CRDGroupOverride      map[string]string `help:"Overrides for the locations of the CRD folders of the smaller providers." optional:""`
+	PackageRepoOverride   map[string]string `help:"Overrides for the package repository names of the smaller providers." optional:""`
 	AuthExtService        []string          `help:"Service name to add the authentication extension for." default:"monolith,config"`
 
 	ExamplesRoot string   `short:"e" help:"Path to package examples directory." default:"./examples" type:"path"`
 	CRDRoot      string   `help:"Path to package CRDs directory." default:"./package/crds" type:"path"`
 	AuthExt      string   `help:"Path to an authentication extension file." default:"./package/auth.yaml" type:"path"`
-	Ignore       []string `help:"Paths to exclude from the service-scoped provider packages."`
+	Ignore       []string `help:"Paths to exclude from the smaller provider packages."`
 	Create       bool     `help:"Create repository on push if it does not exist."`
 
 	// Common Upbound API configuration
@@ -136,14 +135,14 @@ func (c *batchCmd) Run(p pterm.TextPrinter, upCtx *upbound.Context) error { //no
 		baseImgMap[p] = img // assumes correct OS
 	}
 
-	chErr := make(chan error, len(c.Service))
+	chErr := make(chan error, len(c.Services))
 	defer close(chErr)
 	concurrency := make(chan struct{}, c.Concurrency)
 	defer close(concurrency)
 	for i := uint(0); i < c.Concurrency; i++ {
 		concurrency <- struct{}{}
 	}
-	for _, s := range c.Service {
+	for _, s := range c.Services {
 		s := s
 		go func() {
 			// if concurrency is limited
@@ -154,12 +153,12 @@ func (c *batchCmd) Run(p pterm.TextPrinter, upCtx *upbound.Context) error { //no
 				}()
 			}
 			err := c.processService(p, upCtx, baseImgMap, s)
-			p.PrintOnErrorf(fmt.Sprintf("Publishing of service-scoped provider package has failed for service %q: %%v", s), err)
+			p.PrintOnErrorf(fmt.Sprintf("Publishing of smaller provider package has failed for service %q: %%v", s), err)
 			chErr <- errors.WithMessagef(err, errProcessFmt, s)
 		}()
 	}
 	var result error
-	for range c.Service {
+	for range c.Services {
 		err := <-chErr
 		switch {
 		case result == nil:
@@ -171,14 +170,29 @@ func (c *batchCmd) Run(p pterm.TextPrinter, upCtx *upbound.Context) error { //no
 	return errors.WithMessage(result, errBatch)
 }
 
+// processService builds and pushes the smaller provider package
+// associated with the specified service `s` and for the specified platforms.
+// Each smaller provider package share a common (platform specific) base
+// image specified in the `baseImgMap` keyed by the platform name
+// (e.g., linux_arm64). The addendum layers (i.e., the layers
+// added by xpkg push on top of the base image) are shared across platforms,
+// and thus is computed only once. `processService` also adds
+// the smaller provider controller binary (which is platform specific) on top
+// of the addendum layers and then pushes the built multi-arch package
+// (if `len(c.Platforms) > 1`) to the specified package repository.
 func (c *batchCmd) processService(p pterm.TextPrinter, upCtx *upbound.Context, baseImgMap map[string]v1.Image, s string) error { //nolint:gocyclo
 	imgs := make([]v1.Image, 0, len(c.Platform))
+	// image layers added on top of the base image by xpkg push to be reused
+	// across the platforms so that they are computed only once.
 	var addendumLayers []v1.Layer
+	// labels in the image configuration associated with these addendum layers.
 	var labels [][2]string
 	for _, p := range c.Platform {
 		var img v1.Image
 		var err error
 		switch {
+		// if the addendum layers have already been computed,
+		// use them instead of recomputing.
 		case len(addendumLayers) > 0:
 			img = baseImgMap[p]
 			for _, l := range addendumLayers {
@@ -187,6 +201,8 @@ func (c *batchCmd) processService(p pterm.TextPrinter, upCtx *upbound.Context, b
 					return errors.Wrapf(err, errAppendLayersFmt, p, s)
 				}
 			}
+			// add any already computed addendum layer labels
+			// into the image configuration.
 			cfg, err := img.ConfigFile()
 			if err != nil {
 				return errors.Wrapf(err, errGetConfigFmt, p, s)
@@ -204,10 +220,13 @@ func (c *batchCmd) processService(p pterm.TextPrinter, upCtx *upbound.Context, b
 			if err != nil {
 				return errors.Wrapf(err, errMutateConfigFmt, p, s)
 			}
+			// add the smaller provider controller binary as a layer.
 			img, err = c.addProviderBinaryLayer(img, p, s)
 			if err != nil {
 				return err
 			}
+		// then we need to compute the provider metadata "base" layer,
+		// and the upbound extensions layer ("upbound").
 		default:
 			img, err = c.buildImage(baseImgMap, p, s)
 			if err != nil {
@@ -221,6 +240,7 @@ func (c *batchCmd) processService(p pterm.TextPrinter, upCtx *upbound.Context, b
 		}
 		imgs = append(imgs, img)
 	}
+	// now try to push the package with the specified retry configuration.
 	return c.pushWithRetry(p, upCtx, imgs, s)
 }
 
@@ -235,7 +255,7 @@ func (c *batchCmd) pushWithRetry(p pterm.TextPrinter, upCtx *upbound.Context, im
 			break
 		}
 		if i == tries-1 { // no more retries
-			p.Printfln("Failed to push xpkg to %s.", t)
+			p.Printfln("Failed to push xpkg to %s. Total number of attempts: %d. Last error: %s", t, tries, err.Error())
 			return errors.Wrapf(err, errPushPackageFmt, s)
 		}
 		p.PrintOnErrorf(fmt.Sprintf("Failed to push xpkg to %s. Will retry...: %%v", t), err)
@@ -256,26 +276,30 @@ func (c *batchCmd) getPackageURL(s string) string {
 	return fmt.Sprintf(c.FamilyPackageURLFormat, c.getPackageRepo(s))
 }
 
-func getAddendumLayers(baseImg, img v1.Image, p, s string) ([]v1.Layer, [][2]string, error) {
+// getAddendumLayers returns the diff layers between the specified
+// `baseImg` and the specified `img`. For each of these addendum layers,
+// it also returns labels associated with that layer
+// in the image configuration as a slice of (key, value) pairs.
+func getAddendumLayers(baseImg, img v1.Image, platform, service string) (addendumLayers []v1.Layer, layerLabels [][2]string, err error) {
 	baseLayers, err := baseImg.Layers()
 	if err != nil {
-		return nil, nil, errors.Wrapf(err, errGetBaseLayersFmt, p, s)
+		return nil, nil, errors.Wrapf(err, errGetBaseLayersFmt, platform, service)
 	}
 	layers, err := img.Layers()
 	if err != nil {
-		return nil, nil, errors.Wrapf(err, errGetLayersFmt, p, s)
+		return nil, nil, errors.Wrapf(err, errGetLayersFmt, platform, service)
 	}
-	addendumLayers := layers[len(baseLayers) : len(layers)-1]
+	addendumLayers = layers[len(baseLayers) : len(layers)-1]
 	// get associated labels from image config
 	cfg, err := img.ConfigFile()
 	if err != nil {
-		return nil, nil, errors.Wrapf(err, errGetConfigFmt, p, s)
+		return nil, nil, errors.Wrapf(err, errGetConfigFmt, platform, service)
 	}
-	labels := make([][2]string, 0, len(addendumLayers))
+	layerLabels = make([][2]string, 0, len(addendumLayers))
 	for _, l := range addendumLayers {
 		d, err := l.Digest()
 		if err != nil {
-			return nil, nil, errors.Wrapf(err, errGetDigestFmt, p, s)
+			return nil, nil, errors.Wrapf(err, errGetDigestFmt, platform, service)
 		}
 		label := ""
 		key := xpkg.Label(d.String())
@@ -285,9 +309,9 @@ func getAddendumLayers(baseImg, img v1.Image, p, s string) ([]v1.Layer, [][2]str
 				break
 			}
 		}
-		labels = append(labels, [2]string{key, label})
+		layerLabels = append(layerLabels, [2]string{key, label})
 	}
-	return addendumLayers, labels, nil
+	return addendumLayers, layerLabels, nil
 }
 
 func (c *batchCmd) buildImage(baseImgMap map[string]v1.Image, p, s string) (v1.Image, error) {
@@ -353,17 +377,19 @@ func (c *batchCmd) getBuilder(service string) (*xpkg.Builder, error) {
 	}
 
 	var authBE parser.Backend
-	if ax, err := filepath.Abs(c.AuthExt); err == nil {
-		for _, s := range c.AuthExtService {
-			if service != s {
-				continue
-			}
-			authBE, err = c.getAuthBackend(ax)
-			if err != nil {
-				return nil, err
-			}
-			break
+	ax, err := filepath.Abs(c.AuthExt)
+	if err != nil {
+		return nil, errors.Wrapf(err, errAbsAuthExtFmt, c.AuthExt)
+	}
+	for _, s := range c.AuthExtService {
+		if service != s {
+			continue
 		}
+		authBE, err = c.getAuthBackend(ax)
+		if err != nil {
+			return nil, err
+		}
+		break
 	}
 
 	pp, err := yaml.New()
