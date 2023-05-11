@@ -32,5 +32,5 @@ type Cmd struct {
 	Init      initCmd      `cmd:"" help:"Initialize a package."`
 	Dep       depCmd       `cmd:"" help:"Manage package dependencies."`
 	Push      pushCmd      `cmd:"" help:"Push a package."`
-	Batch     batchCmd     `cmd:"" help:"Batch build and push a family of service-scoped provider packages."`
+	Batch     batchCmd     `cmd:"" help:"Batch build and push a family of service-scoped provider packages." hidden:""`
 }
