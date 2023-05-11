@@ -30,6 +30,7 @@ import (
 	"github.com/google/go-containerregistry/pkg/name"
 	v1 "github.com/google/go-containerregistry/pkg/v1"
 	"github.com/google/go-containerregistry/pkg/v1/mutate"
+	"github.com/google/go-containerregistry/pkg/v1/tarball"
 	"github.com/pterm/pterm"
 	"github.com/spf13/afero"
 
@@ -59,11 +60,15 @@ const (
 	errAbsAuthExtFmt      = "failed to get the absolute path for the authentication extension file: %s"
 	errReadAuthExtFmt     = "failed to read the authentication extension file at: %s"
 	errProcessFmt         = "\nfailed to process smaller provider package for %q"
+	errOutputAbsFmt       = "failed to get the absolute path for the package archive to store: %s/%s/%s"
+	errOpenPackageFmt     = "failed to open package file for writing: %s"
+	errWritePackageFmt    = "failed to store package archive in: %s"
 	errBatch              = "processing of at least one smaller provider has failed"
 )
 
 const (
-	wildcard = "*"
+	wildcard  = "*"
+	tagLatest = "latest"
 )
 
 // AfterApply constructs and binds Upbound-specific context to any subcommands
@@ -91,12 +96,14 @@ type batchCmd struct {
 	FamilyBaseImage        string   `help:"Family image used as the base for the smaller provider packages." required:""`
 	ProviderName           string   `help:"Provider name, such as provider-aws to be used while formatting smaller provider package repositories." required:""`
 	FamilyPackageURLFormat string   `help:"Family package URL format to be used for the smaller provider packages. Must be a valid OCI image URL with the format specifier \"%s\", which will be substituted with <provider name>-<service name>." required:""`
-	Services               []string `help:"Services to build the scoped provider packages for." default:"monolith"`
+	SmallerProviders       []string `help:"Smaller provider names to build and push, such as ec2, eks or config." default:"monolith"`
 	Concurrency            uint     `help:"Maximum number of packages to process concurrently. Setting it to 0 puts no limit on the concurrency, i.e., all packages are processed in parallel." default:"0"`
 	PushRetry              uint     `help:"Number of retries when pushing a provider package fails." default:"3"`
 
 	Platform        []string `help:"Platforms to build the packages for. Each platform should use the <OS>_<arch> syntax. An example is: linux_arm64." default:"linux_amd64,linux_arm64"`
 	ProviderBinRoot string   `short:"p" help:"Provider binary paths root. Smaller provider binaries should reside under the platform directories in this folder." type:"existingdir"`
+	OutputDir       string   `short:"o" help:"Path of the package output directory." optional:""`
+	StorePackages   []string `help:"Smaller provider names whose provider package should be stored under the package output directory specified with the --output-dir option." optional:""`
 
 	PackageMetadataTemplate string            `help:"Smaller provider metadata template. The template variables {{ .Service }} and {{ .Name }} will be substituted when the template is executed among with the supplied template variable substitutions." default:"./package/crossplane.yaml.tmpl" type:"path"`
 	TemplateVar             map[string]string `help:"Smaller provider metadata template variables to be used for the specified template."`
@@ -104,13 +111,14 @@ type batchCmd struct {
 	ExamplesGroupOverride map[string]string `help:"Overrides for the location of the example manifests folder of a smaller provider." optional:""`
 	CRDGroupOverride      map[string]string `help:"Overrides for the locations of the CRD folders of the smaller providers." optional:""`
 	PackageRepoOverride   map[string]string `help:"Overrides for the package repository names of the smaller providers." optional:""`
-	AuthExtService        []string          `help:"Service name to add the authentication extension for." default:"monolith,config"`
+	ProvidersWithAuthExt  []string          `help:"Smaller provider names for which we need to configure the authentication extension." default:"monolith,config"`
 
 	ExamplesRoot string   `short:"e" help:"Path to package examples directory." default:"./examples" type:"path"`
 	CRDRoot      string   `help:"Path to package CRDs directory." default:"./package/crds" type:"path"`
 	AuthExt      string   `help:"Path to an authentication extension file." default:"./package/auth.yaml" type:"path"`
 	Ignore       []string `help:"Paths to exclude from the smaller provider packages."`
 	Create       bool     `help:"Create repository on push if it does not exist."`
+	BuildOnly    bool     `help:"Only build the smaller provider packages and do not attempt to push them to a package repository." default:"false"`
 
 	// Common Upbound API configuration
 	Flags upbound.Flags `embed:""`
@@ -135,14 +143,14 @@ func (c *batchCmd) Run(p pterm.TextPrinter, upCtx *upbound.Context) error { //no
 		baseImgMap[p] = img // assumes correct OS
 	}
 
-	chErr := make(chan error, len(c.Services))
+	chErr := make(chan error, len(c.SmallerProviders))
 	defer close(chErr)
 	concurrency := make(chan struct{}, c.Concurrency)
 	defer close(concurrency)
 	for i := uint(0); i < c.Concurrency; i++ {
 		concurrency <- struct{}{}
 	}
-	for _, s := range c.Services {
+	for _, s := range c.SmallerProviders {
 		s := s
 		go func() {
 			// if concurrency is limited
@@ -158,7 +166,7 @@ func (c *batchCmd) Run(p pterm.TextPrinter, upCtx *upbound.Context) error { //no
 		}()
 	}
 	var result error
-	for range c.Services {
+	for range c.SmallerProviders {
 		err := <-chErr
 		switch {
 		case result == nil:
@@ -240,8 +248,61 @@ func (c *batchCmd) processService(p pterm.TextPrinter, upCtx *upbound.Context, b
 		}
 		imgs = append(imgs, img)
 	}
+	if err := c.storePackage(p, s, imgs); err != nil {
+		return err
+	}
+	if c.BuildOnly {
+		return nil
+	}
 	// now try to push the package with the specified retry configuration.
 	return c.pushWithRetry(p, upCtx, imgs, s)
+}
+
+// Optionally stores the provider package under the configured directory,
+// if the service name exists in the c.StorePackage slice.
+func (c *batchCmd) storePackage(tp pterm.TextPrinter, s string, imgs []v1.Image) error {
+	found := false
+	for _, pkg := range c.StorePackages {
+		if pkg == s {
+			found = true
+			break
+		}
+	}
+	if !found {
+		return nil
+	}
+	for i, p := range c.Platform {
+		if err := c.writePackage(tp, s, p, imgs[i]); err != nil {
+			return err
+		}
+	}
+	return nil
+}
+
+func (c *batchCmd) writePackage(tp pterm.TextPrinter, service, platform string, img v1.Image) error {
+	fName := fmt.Sprintf("%s-%s-%s.xpkg", c.ProviderName, service, c.getPackageVersion())
+	pkgPath, err := filepath.Abs(filepath.Join(c.OutputDir, platform, fName))
+	if err != nil {
+		return errors.Wrapf(err, errOutputAbsFmt, c.OutputDir, platform, fName)
+	}
+	pkg, err := c.fs.Create(pkgPath)
+	if err != nil {
+		return errors.Wrapf(err, errOpenPackageFmt, pkgPath)
+	}
+	defer func() { _ = pkg.Close() }()
+	if err := tarball.Write(nil, img, pkg); err != nil {
+		return errors.Wrapf(err, errWritePackageFmt, pkgPath)
+	}
+	tp.Printfln("xpkg for service %q saved to %s", service, pkgPath)
+	return nil
+}
+
+func (c *batchCmd) getPackageVersion() string {
+	tokens := strings.Split(c.FamilyPackageURLFormat, ":")
+	if len(tokens) < 2 {
+		return tagLatest
+	}
+	return tokens[len(tokens)-1]
 }
 
 func (c *batchCmd) pushWithRetry(p pterm.TextPrinter, upCtx *upbound.Context, imgs []v1.Image, s string) error {
@@ -381,7 +442,7 @@ func (c *batchCmd) getBuilder(service string) (*xpkg.Builder, error) {
 	if err != nil {
 		return nil, errors.Wrapf(err, errAbsAuthExtFmt, c.AuthExt)
 	}
-	for _, s := range c.AuthExtService {
+	for _, s := range c.ProvidersWithAuthExt {
 		if service != s {
 			continue
 		}
