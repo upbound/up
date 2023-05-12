@@ -249,7 +249,7 @@ func (b *Builder) Build(ctx context.Context, opts ...BuildOpt) (v1.Image, runtim
 		return nil, nil, errors.Wrap(err, errConfigFile)
 	}
 
-	pkgLayer, err := Layer(pkgBytes, StreamFile, PackageAnnotation, int64(pkgBytes.Len()), &cfg)
+	pkgLayer, err := Layer(pkgBytes, StreamFile, PackageAnnotation, int64(pkgBytes.Len()), StreamFileMode, &cfg)
 	if err != nil {
 		return nil, nil, err
 	}
@@ -262,7 +262,7 @@ func (b *Builder) Build(ctx context.Context, opts ...BuildOpt) (v1.Image, runtim
 			return nil, nil, errors.Wrap(err, errParserExample)
 		}
 
-		exLayer, err := Layer(exBuf, XpkgExamplesFile, ExamplesAnnotation, int64(exBuf.Len()), &cfg)
+		exLayer, err := Layer(exBuf, XpkgExamplesFile, ExamplesAnnotation, int64(exBuf.Len()), StreamFileMode, &cfg)
 		if err != nil {
 			return nil, nil, err
 		}

@@ -19,6 +19,7 @@ import (
 	"bytes"
 	"fmt"
 	"io"
+	"os"
 
 	"github.com/crossplane/crossplane-runtime/pkg/errors"
 	v1 "github.com/google/go-containerregistry/pkg/v1"
@@ -27,13 +28,13 @@ import (
 
 // Layer creates a v1.Layer that represetns the layer contents for the xpkg and
 // adds a corresponding label to the image Config for the layer.
-func Layer(r io.Reader, fileName, annotation string, fileSize int64, cfg *v1.Config) (v1.Layer, error) {
+func Layer(r io.Reader, fileName, annotation string, fileSize int64, mode os.FileMode, cfg *v1.Config) (v1.Layer, error) {
 	tarBuf := new(bytes.Buffer)
 	tw := tar.NewWriter(tarBuf)
 
 	exHdr := &tar.Header{
 		Name: fileName,
-		Mode: int64(StreamFileMode),
+		Mode: int64(mode),
 		Size: fileSize,
 	}
 
@@ -57,8 +58,10 @@ func Layer(r io.Reader, fileName, annotation string, fileSize int64, cfg *v1.Con
 		return nil, errors.Wrap(err, errDigestInvalid)
 	}
 
-	// add annotation label to config
-	cfg.Labels[Label(d.String())] = annotation
+	// add annotation label to config if a non-empty label is specified
+	if annotation != "" {
+		cfg.Labels[Label(d.String())] = annotation
+	}
 
 	return layer, nil
 }
