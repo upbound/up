@@ -168,6 +168,12 @@ func main() {
 		kongplete.WithPredictor("templates", template.PredictTemplates()),
 	)
 
+	if len(os.Args) == 1 {
+		_, err := parser.Parse([]string{"--help"})
+		parser.FatalIfErrorf(err)
+		return
+	}
+
 	ctx, err := parser.Parse(os.Args[1:])
 	parser.FatalIfErrorf(err)
 	ctx.FatalIfErrorf(ctx.Run())
