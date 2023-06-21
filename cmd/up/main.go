@@ -100,6 +100,7 @@ type cli struct {
 
 	License licenseCmd `cmd:"" help:"Print Up license information."`
 
+	Help               helpCmd                      `cmd:"" help:"Show help."`
 	Login              loginCmd                     `cmd:"" help:"Login to Upbound."`
 	Logout             logoutCmd                    `cmd:"" help:"Logout of Upbound."`
 	Configuration      configuration.Cmd            `cmd:"" name:"configuration" aliases:"cfg" help:"Interact with configurations."`
@@ -113,6 +114,13 @@ type cli struct {
 	XPLS               xpls.Cmd                     `cmd:"" help:"Start xpls language server."`
 	Alpha              alpha                        `cmd:"" help:"Alpha features. Commands may be removed in future releases."`
 	InstallCompletions kongplete.InstallCompletions `cmd:"" help:"Install shell completions"`
+}
+
+type helpCmd struct{}
+
+func (h *helpCmd) Run(ctx *kong.Context) error {
+	_, err := ctx.Parse([]string{"--help"})
+	return err
 }
 
 // BeforeReset runs before all other hooks. If command has alpha as an ancestor,
@@ -159,6 +167,12 @@ func main() {
 		kongplete.WithPredictor("configs", configuration.PredictConfigurations()),
 		kongplete.WithPredictor("templates", template.PredictTemplates()),
 	)
+
+	if len(os.Args) == 1 {
+		_, err := parser.Parse([]string{"--help"})
+		parser.FatalIfErrorf(err)
+		return
+	}
 
 	ctx, err := parser.Parse(os.Args[1:])
 	parser.FatalIfErrorf(err)
