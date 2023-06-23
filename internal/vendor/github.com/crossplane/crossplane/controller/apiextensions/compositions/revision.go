@@ -28,10 +28,10 @@ import (
 )
 
 // NewCompositionRevision creates a new revision of the supplied Composition.
-func NewCompositionRevision(c *v1.Composition, revision int64) *v1beta1.CompositionRevision {
+func NewCompositionRevision(c *v1.Composition, revision int64) *v1.CompositionRevision {
 	hash := c.Hash()
 
-	cr := &v1beta1.CompositionRevision{
+	cr := &v1.CompositionRevision{
 		ObjectMeta: metav1.ObjectMeta{
 			Name: fmt.Sprintf("%s-%s", c.GetName(), hash[0:7]),
 			Labels: map[string]string{
@@ -56,7 +56,7 @@ func NewCompositionRevision(c *v1.Composition, revision int64) *v1beta1.Composit
 
 // NewCompositionRevisionSpec translates a composition's spec to a composition
 // revision spec.
-func NewCompositionRevisionSpec(cs v1.CompositionSpec, revision int64) v1beta1.CompositionRevisionSpec {
+func NewCompositionRevisionSpec(cs v1.CompositionSpec, revision int64) v1.CompositionRevisionSpec {
 	conv := v1.GeneratedRevisionSpecConverter{}
 	rs := conv.ToRevisionSpec(cs)
 	rs.Revision = revision
