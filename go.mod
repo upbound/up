@@ -4,8 +4,8 @@ go 1.20
 
 require (
 	github.com/Masterminds/semver v1.5.0
-	github.com/alecthomas/kong v0.6.1
-	github.com/crossplane/crossplane v1.9.0-rc.0
+	github.com/alecthomas/kong v0.7.2-0.20221130112736-919e70103f7a
+	github.com/crossplane/crossplane v1.10.0
 	github.com/crossplane/crossplane-runtime v0.20.0-rc.0.0.20230622073604-c52ef3ac58c6
 	github.com/crossplane/crossplane/controller/apiextensions v0.0.0-00010101000000-000000000000
 	github.com/crossplane/crossplane/xcrd v0.0.0-00010101000000-000000000000
