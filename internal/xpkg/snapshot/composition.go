@@ -92,7 +92,7 @@ func (c *CompositionValidator) Validate(ctx context.Context, data any) *validate
 	if len(errs) == 0 {
 		for i, cd := range cds {
 			for _, v := range c.validators {
-				errs = append(errs, v.validate(ctx, i, cd)...)
+				errs = append(errs, v.validate(ctx, i, cd.Resource)...)
 			}
 		}
 	}
@@ -122,7 +122,7 @@ func (c *CompositionValidator) marshal(data any) (*xpextv1.Composition, error) {
 	// convert v1.Composition to v1alpha1.CompositionRevision back to
 	// v1.Composition to take advantage of default fields being set for various
 	// sub objects within the v1.Composition definition.
-	crev := icompositions.NewCompositionRevision(&mcomp, 1, "")
+	crev := icompositions.NewCompositionRevision(&mcomp, 1)
 	comp := icomposite.AsComposition(crev)
 
 	return comp, nil

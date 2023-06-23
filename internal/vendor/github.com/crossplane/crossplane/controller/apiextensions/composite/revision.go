@@ -21,15 +21,6 @@ import (
 	"github.com/crossplane/crossplane/apis/apiextensions/v1alpha1"
 )
 
-// AsComposition creates a new composition from the supplied revision. It
-// exists only as a temporary translation layer to allow us to introduce the
-// alpha CompositionRevision type with minimal changes to the XR reconciler.
-// Once CompositionRevision leaves alpha this code should be removed and the XR
-// reconciler should operate on CompositionRevisions instead.
-func AsComposition(cr *v1alpha1.CompositionRevision) *v1.Composition {
-	return &v1.Composition{Spec: AsCompositionSpec(cr.Spec)}
-}
-
 // AsCompositionSpec translates a composition revision's spec to a composition
 // spec.
 func AsCompositionSpec(crs v1alpha1.CompositionRevisionSpec) v1.CompositionSpec {
