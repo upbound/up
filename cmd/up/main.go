@@ -17,9 +17,7 @@ package main
 import (
 	"fmt"
 	"io"
-	"math/rand"
 	"os"
-	"time"
 
 	"github.com/alecthomas/kong"
 	"github.com/pterm/pterm"
@@ -139,8 +137,6 @@ type alpha struct {
 }
 
 func main() {
-	// We don't need this choice to be cryptographically random.
-	rand.New(rand.NewSource(time.Now().UTC().UnixNano())) // nolint:gosec
 	c := cli{}
 
 	parser := kong.Must(&c,
