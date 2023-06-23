@@ -139,7 +139,8 @@ type alpha struct {
 }
 
 func main() {
-	rand.Seed(time.Now().UTC().UnixNano())
+	// We don't need this choice to be cryptographically random.
+	rand.New(rand.NewSource(time.Now().UTC().UnixNano())) // nolint:gosec
 	c := cli{}
 
 	parser := kong.Must(&c,
