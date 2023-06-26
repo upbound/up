@@ -267,7 +267,7 @@ func TestUpsertDeps(t *testing.T) {
 			want: want{
 				deps: []metav1.Dependency{
 					{
-						Provider: pointer.StringPtr("crossplane/provider-aws"),
+						Provider: pointer.String("crossplane/provider-aws"),
 						Version:  "v1.0.0",
 					},
 				},
@@ -291,7 +291,7 @@ func TestUpsertDeps(t *testing.T) {
 			want: want{
 				deps: []metav1.Dependency{
 					{
-						Provider: pointer.StringPtr("crossplane/provider-aws"),
+						Provider: pointer.String("crossplane/provider-aws"),
 						Version:  "v1.0.0",
 					},
 				},

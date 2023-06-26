@@ -17,9 +17,7 @@ package main
 import (
 	"fmt"
 	"io"
-	"math/rand"
 	"os"
-	"time"
 
 	"github.com/alecthomas/kong"
 	"github.com/pterm/pterm"
@@ -139,7 +137,6 @@ type alpha struct {
 }
 
 func main() {
-	rand.Seed(time.Now().UTC().UnixNano())
 	c := cli{}
 
 	parser := kong.Must(&c,

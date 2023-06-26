@@ -27,10 +27,10 @@ import (
 	"github.com/crossplane/crossplane-runtime/pkg/logging"
 	"github.com/crossplane/crossplane-runtime/pkg/reconciler/managed"
 	"github.com/crossplane/crossplane-runtime/pkg/resource"
-	"github.com/crossplane/crossplane-runtime/pkg/resource/unstructured/composed"
 	"github.com/crossplane/crossplane-runtime/pkg/resource/unstructured/composite"
 
 	v1 "github.com/crossplane/crossplane/apis/apiextensions/v1"
+	env "github.com/crossplane/crossplane/internal/controller/apiextensions/composite/environment"
 )
 
 const (
@@ -49,12 +49,12 @@ const (
 	errConfigure    = "cannot configure composite resource"
 	errPublish      = "cannot publish connection details"
 	errRenderCD     = "cannot render composed resource"
-	errRenderCR     = "cannot render composite resource"
 	errValidate     = "refusing to use invalid Composition"
-	errInline       = "cannot inline Composition patch sets"
 	errAssociate    = "cannot associate composed resources with Composition resource templates"
 
 	errFmtRender = "cannot render composed resource from resource template at index %d"
+
+	errFmtPatchEnvironment = "cannot apply environment patch at index %d"
 )
 
 // Event reasons.
@@ -138,30 +138,16 @@ func (fn ConfiguratorFn) Configure(ctx context.Context, cr resource.Composite, c
 
 // A Renderer is used to render a composed resource.
 type Renderer interface {
-	Render(ctx context.Context, cp resource.Composite, cd resource.Composed, t v1.ComposedTemplate) error
+	Render(ctx context.Context, cp resource.Composite, cd resource.Composed, t v1.ComposedTemplate, env *env.Environment) error
 }
 
 // A RendererFn may be used to render a composed resource.
-type RendererFn func(ctx context.Context, cp resource.Composite, cd resource.Composed, t v1.ComposedTemplate) error
+type RendererFn func(ctx context.Context, cp resource.Composite, cd resource.Composed, t v1.ComposedTemplate, env *env.Environment) error
 
 // Render the supplied composed resource using the supplied composite resource
 // and template as inputs.
-func (fn RendererFn) Render(ctx context.Context, cp resource.Composite, cd resource.Composed, t v1.ComposedTemplate) error {
-	return fn(ctx, cp, cd, t)
-}
-
-// ConnectionDetailsFetcher fetches the connection details of the Composed resource.
-type ConnectionDetailsFetcher interface {
-	FetchConnectionDetails(ctx context.Context, cd resource.Composed, t v1.ComposedTemplate) (managed.ConnectionDetails, error)
-}
-
-// A ConnectionDetailsFetcherFn fetches the connection details of the supplied
-// composed resource, if any.
-type ConnectionDetailsFetcherFn func(ctx context.Context, cd resource.Composed, t v1.ComposedTemplate) (managed.ConnectionDetails, error)
-
-// FetchConnectionDetails calls the FetchConnectionDetailsFn.
-func (f ConnectionDetailsFetcherFn) FetchConnectionDetails(ctx context.Context, cd resource.Composed, t v1.ComposedTemplate) (managed.ConnectionDetails, error) {
-	return f(ctx, cd, t)
+func (fn RendererFn) Render(ctx context.Context, cp resource.Composite, cd resource.Composed, t v1.ComposedTemplate, env *env.Environment) error {
+	return fn(ctx, cp, cd, t, env)
 }
 
 // A ReadinessChecker checks whether a composed resource is ready or not.
@@ -175,6 +161,34 @@ type ReadinessCheckerFn func(ctx context.Context, cd resource.Composed, t v1.Com
 // IsReady reports whether a composed resource is ready or not.
 func (fn ReadinessCheckerFn) IsReady(ctx context.Context, cd resource.Composed, t v1.ComposedTemplate) (ready bool, err error) {
 	return fn(ctx, cd, t)
+}
+
+// A CompositionRequest is a request to compose resources.
+// It should be treated as immutable.
+type CompositionRequest struct {
+	Composition *v1.Composition
+	Environment *env.Environment
+}
+
+// A CompositionResult is the result of the composition process.
+type CompositionResult struct {
+	Composed          []ComposedResource
+	ConnectionDetails managed.ConnectionDetails
+	Events            []event.Event
+}
+
+// A Composer composes (i.e. creates, updates, or deletes) resources given the
+// supplied composite resource and composition request.
+type Composer interface {
+	Compose(ctx context.Context, xr resource.Composite, req CompositionRequest) ([]ComposedResourceState, error)
+}
+
+// A ComposerFn composes resources.
+type ComposerFn func(ctx context.Context, xr resource.Composite, req CompositionRequest) ([]ComposedResourceState, error)
+
+// Compose resources.
+func (fn ComposerFn) Compose(ctx context.Context, xr resource.Composite, req CompositionRequest) ([]ComposedResourceState, error) {
+	return fn(ctx, xr, req)
 }
 
 // ReconcilerOption is used to configure the Reconciler.
@@ -203,10 +217,10 @@ func WithCompositionTemplateAssociator(a CompositionTemplateAssociator) Reconcil
 	}
 }
 
-// WithRenderer specifies how the Reconciler should render composed resources.
-func WithRenderer(rd Renderer) ReconcilerOption {
+// WithComposer specifies how the Reconciler should compose resources.
+func WithComposer(c Composer) ReconcilerOption {
 	return func(r *Reconciler) {
-		r.composed.Renderer = rd
+		r.resource = c
 	}
 }
 
@@ -225,10 +239,6 @@ type composition struct {
 
 type compositeResource struct {
 	Configurator
-}
-
-type composedResource struct {
-	Renderer
 }
 
 // NewReconciler returns a new Reconciler of composite resources.
@@ -252,9 +262,8 @@ func NewReconciler(of resource.CompositeKind, opts ...ReconcilerOption) *Reconci
 			Configurator: NewConfiguratorChain(NewAPINamingConfigurator(), NewAPIConfigurator()),
 		},
 
-		composed: composedResource{
-			Renderer: NewAPIDryRunRenderer(),
-		},
+		resource: NewPTComposer(),
+
 		log: logging.NewNopLogger(),
 	}
 
@@ -270,8 +279,10 @@ type Reconciler struct {
 
 	composition composition
 	composite   compositeResource
-	composed    composedResource
-	log         logging.Logger
+
+	resource Composer
+
+	log logging.Logger
 }
 
 // composedRenderState is a wrapper around a composed resource that tracks whether
@@ -284,7 +295,7 @@ type composedRenderState struct {
 }
 
 // Reconcile a composite resource.
-func (r *Reconciler) Reconcile(ctx context.Context, comp *v1.Composition) ([]resource.Composed, error) { //nolint:gocyclo
+func (r *Reconciler) Reconcile(ctx context.Context, comp *v1.Composition) ([]ComposedResourceState, error) { //nolint:gocyclo
 	// NOTE(negz): Like most Reconcile methods, this one is over our cyclomatic
 	// complexity goal. Be wary when adding branches, and look for functionality
 	// that could be reasonably moved into an injected dependency.
@@ -305,26 +316,11 @@ func (r *Reconciler) Reconcile(ctx context.Context, comp *v1.Composition) ([]res
 		return nil, err
 	}
 
-	// Inline PatchSets from Composition Spec before composing resources.
-	ct, err := comp.Spec.ComposedTemplates()
-	if err != nil {
-		r.log.Debug(errInline, "error", err)
-		return nil, err
-	}
+	// Inline PatchSets from Composition Spec before composing resources
 
-	tas, err := r.composition.AssociateTemplates(ctx, cr, ct)
+	cds, err := r.resource.Compose(ctx, cr, CompositionRequest{Composition: comp, Environment: nil})
 	if err != nil {
-		r.log.Debug(errAssociate, "error", err)
-		return nil, err
-	}
-
-	cds := make([]resource.Composed, len(tas))
-	for i, ta := range tas {
-		cd := composed.New(composed.FromReference(ta.Reference))
-		if err := r.composed.Render(ctx, cr, cd, ta.Template); err != nil {
-			r.log.Debug(errRenderCD, "error", err, "index", i)
-		}
-		cds[i] = cd
+		r.log.Debug(errRenderCD, "error", err)
 	}
 
 	return cds, nil
@@ -338,20 +334,6 @@ func filterToXRPatches(tas []TemplateAssociation) []v1.Patch {
 	for _, ta := range tas {
 		filtered = append(filtered, filterPatches(ta.Template.Patches,
 			patchTypesToXR()...)...)
-	}
-	return filtered
-}
-
-// filterPatches selects patches whose type belong to the list onlyTypes
-func filterPatches(pas []v1.Patch, onlyTypes ...v1.PatchType) []v1.Patch {
-	filtered := make([]v1.Patch, 0, len(pas))
-	for _, p := range pas {
-		for _, t := range onlyTypes {
-			if t == p.Type {
-				filtered = append(filtered, p)
-				break
-			}
-		}
 	}
 	return filtered
 }

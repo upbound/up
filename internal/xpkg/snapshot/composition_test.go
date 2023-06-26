@@ -331,7 +331,7 @@ func TestCompositionValidation(t *testing.T) {
 					Errors: []error{
 						&validator.Validation{
 							TypeCode: validator.ErrorTypeCode,
-							Message:  "cannot mix named and anonymous resource templates",
+							Message:  "cannot mix named and anonymous resource templates - ensure all resource templates are named",
 							Name:     "spec.resources",
 						},
 					},
