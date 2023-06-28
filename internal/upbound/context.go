@@ -25,6 +25,7 @@ import (
 	"github.com/alecthomas/kong"
 	"github.com/crossplane/crossplane-runtime/pkg/errors"
 	"github.com/spf13/afero"
+	"k8s.io/client-go/transport"
 
 	"github.com/upbound/up-sdk-go"
 
@@ -63,6 +64,7 @@ type Flags struct {
 
 	// Insecure
 	InsecureSkipTLSVerify bool `env:"UP_INSECURE_SKIP_TLS_VERIFY" help:"[INSECURE] Skip verifying TLS certificates." json:"insecureSkipTLSVerify,omitempty"`
+	Debug                 int  `short:"d" env:"UP_DEBUG" name:"debug" type:"counter" help:"[INSECURE] Run with debug logging. Repeat to increase verbosity. Output might contain confidential data like tokens." json:"debug,omitempty"`
 
 	// Hidden
 	APIEndpoint      *url.URL `env:"OVERRIDE_API_ENDPOINT" hidden:"" name:"override-api-endpoint" help:"Overrides the default API endpoint." json:"apiEndpoint,omitempty"`
@@ -85,6 +87,9 @@ type Context struct {
 	RegistryEndpoint *url.URL
 	Cfg              *config.Config
 	CfgSrc           config.Source
+
+	DebugLevel    int
+	WrapTransport func(rt http.RoundTripper) http.RoundTripper
 
 	allowMissingProfile bool
 	cfgPath             string
@@ -187,6 +192,23 @@ func NewFromFlags(f Flags, opts ...Option) (*Context, error) { //nolint:gocyclo
 
 	c.InsecureSkipTLSVerify = of.InsecureSkipTLSVerify
 
+	c.DebugLevel = of.Debug
+	switch {
+	case of.Debug >= 3:
+		c.WrapTransport = func(rt http.RoundTripper) http.RoundTripper {
+			return transport.NewDebuggingRoundTripper(rt, transport.DebugCurlCommand, transport.DebugURLTiming, transport.DebugDetailedTiming, transport.DebugResponseHeaders)
+		}
+	case of.Debug >= 2:
+		c.WrapTransport = func(rt http.RoundTripper) http.RoundTripper {
+			return transport.NewDebuggingRoundTripper(rt, transport.DebugJustURL, transport.DebugRequestHeaders, transport.DebugResponseStatus, transport.DebugResponseHeaders)
+		}
+	case of.Debug >= 1:
+		c.WrapTransport = func(rt http.RoundTripper) http.RoundTripper {
+			return transport.NewDebuggingRoundTripper(rt, transport.DebugURLTiming)
+		}
+	default:
+	}
+
 	return c, nil
 }
 
@@ -204,10 +226,13 @@ func (c *Context) BuildSDKConfig() (*up.Config, error) {
 		},
 		})
 	}
-	tr := &http.Transport{
+	var tr http.RoundTripper = &http.Transport{
 		TLSClientConfig: &tls.Config{
 			InsecureSkipVerify: c.InsecureSkipTLSVerify, //nolint:gosec
 		},
+	}
+	if c.WrapTransport != nil {
+		tr = c.WrapTransport(tr)
 	}
 	client := up.NewClient(func(u *up.HTTPClient) {
 		u.BaseURL = c.APIEndpoint
@@ -265,6 +290,7 @@ func (f Flags) MarshalJSON() ([]byte, error) {
 		Profile               string `json:"profile,omitempty"`
 		Account               string `json:"account,omitempty"`
 		InsecureSkipTLSVerify bool   `json:"insecure_skip_tls_verify,omitempty"`
+		Debug                 int    `json:"debug,omitempty"`
 		APIEndpoint           string `json:"override_api_endpoint,omitempty"`
 		ProxyEndpoint         string `json:"override_proxy_endpoint,omitempty"`
 		RegistryEndpoint      string `json:"override_registry_endpoint,omitempty"`
@@ -273,6 +299,7 @@ func (f Flags) MarshalJSON() ([]byte, error) {
 		Profile:               f.Profile,
 		Account:               f.Account,
 		InsecureSkipTLSVerify: f.InsecureSkipTLSVerify,
+		Debug:                 f.Debug,
 		APIEndpoint:           nullableURL(f.APIEndpoint),
 		ProxyEndpoint:         nullableURL(f.ProxyEndpoint),
 		RegistryEndpoint:      nullableURL(f.RegistryEndpoint),

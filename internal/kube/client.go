@@ -24,6 +24,7 @@ import (
 	"k8s.io/client-go/rest"
 	"k8s.io/client-go/tools/clientcmd"
 	"k8s.io/client-go/tools/clientcmd/api"
+	"k8s.io/client-go/transport"
 )
 
 const (
@@ -68,7 +69,7 @@ func BuildControlPlaneKubeconfig(proxy *url.URL, id string, token string) *api.C
 
 // ApplyControlPlaneKubeconfig applies a control plane kubeconfig to an existing
 // kubeconfig file and sets it as the current context.
-func ApplyControlPlaneKubeconfig(mcpConf *api.Config, existingFilePath string) error {
+func ApplyControlPlaneKubeconfig(mcpConf *api.Config, existingFilePath string, wrapTransport transport.WrapperFunc) error {
 	po := clientcmd.NewDefaultPathOptions()
 	po.LoadingRules.ExplicitPath = existingFilePath
 	conf, err := po.GetStartingConfig()
@@ -95,6 +96,9 @@ func ApplyControlPlaneKubeconfig(mcpConf *api.Config, existingFilePath string) e
 	restConfig, err := clientConfig.ClientConfig()
 	if err != nil {
 		return err
+	}
+	if wrapTransport != nil {
+		restConfig.Wrap(wrapTransport)
 	}
 
 	clientset, err := kubernetes.NewForConfig(restConfig)
