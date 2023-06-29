@@ -189,9 +189,12 @@ func (b *Builder) Build(ctx context.Context, opts ...BuildOpt) (v1.Image, runtim
 	// TODO(hasheddan): make linter selection logic configurable.
 	meta := metas[0]
 	var linter linter.Linter
-	if meta.GetObjectKind().GroupVersionKind().Kind == pkgmetav1.ConfigurationKind {
+	switch meta.GetObjectKind().GroupVersionKind().Kind {
+	case pkgmetav1.ConfigurationKind:
 		linter = NewConfigurationLinter()
-	} else {
+	case v1alpha1.FunctionKind:
+		linter = NewFunctionLinter()
+	case pkgmetav1.ProviderKind:
 		if b.ab != nil { // if we have an auth.yaml file
 			if p, ok := meta.(*v1alpha1.Provider); ok {
 				// if has annotation auth.upbound.io/group then look for the object

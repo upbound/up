@@ -19,6 +19,7 @@ import (
 	"github.com/crossplane/crossplane-runtime/pkg/errors"
 	v1 "github.com/crossplane/crossplane/apis/apiextensions/v1"
 	pkgmetav1 "github.com/crossplane/crossplane/apis/pkg/meta/v1"
+	pkgmetav1alpha1 "github.com/crossplane/crossplane/apis/pkg/meta/v1alpha1"
 	admv1 "k8s.io/api/admissionregistration/v1"
 	extv1 "k8s.io/apiextensions-apiserver/pkg/apis/apiextensions/v1"
 	extv1beta1 "k8s.io/apiextensions-apiserver/pkg/apis/apiextensions/v1beta1"
@@ -33,6 +34,7 @@ const (
 	errNotMeta                           = "meta type is not a package"
 	errNotMetaProvider                   = "package meta type is not Provider"
 	errNotMetaConfiguration              = "package meta type is not Configuration"
+	errNotMetaFunction                   = "package meta type is not Function"
 	errNotCRD                            = "object is not a CRD"
 	errNotMutatingWebhookConfiguration   = "object is not a MutatingWebhookConfiguration"
 	errNotValidatingWebhookConfiguration = "object is not a ValidatingWebhookConfiguration"
@@ -58,6 +60,12 @@ func NewConfigurationLinter() linter.Linter {
 	return linter.NewPackageLinter(linter.PackageLinterFns(OneMeta), linter.ObjectLinterFns(IsConfiguration, PackageValidSemver), linter.ObjectLinterFns(linter.Or(IsXRD, IsComposition)))
 }
 
+// NewFunctionLinter is a convenience function for creating a package linter for
+// functions.
+func NewFunctionLinter() linter.Linter {
+	return linter.NewPackageLinter(linter.PackageLinterFns(OneMeta), linter.ObjectLinterFns(IsFunction, PackageValidSemver), linter.ObjectLinterFns())
+}
+
 // OneMeta checks that there is only one meta object in the package.
 func OneMeta(pkg linter.Package) error {
 	if len(pkg.GetMeta()) != 1 {
@@ -80,6 +88,15 @@ func IsConfiguration(o runtime.Object) error {
 	po, _ := scheme.TryConvert(o, &pkgmetav1.Configuration{})
 	if _, ok := po.(*pkgmetav1.Configuration); !ok {
 		return errors.New(errNotMetaConfiguration)
+	}
+	return nil
+}
+
+// IsFunction checks that an object is a Function meta type.
+func IsFunction(o runtime.Object) error {
+	po, _ := scheme.TryConvert(o, &pkgmetav1alpha1.Function{})
+	if _, ok := po.(*pkgmetav1alpha1.Function); !ok {
+		return errors.New(errNotMetaFunction)
 	}
 	return nil
 }
