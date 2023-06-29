@@ -76,6 +76,9 @@ func (c *installCmd) AfterApply(kongCtx *kong.Context, upCtx *upbound.Context) e
 	if err != nil {
 		return err
 	}
+	if upCtx.WrapTransport != nil {
+		kubeconfig.Wrap(upCtx.WrapTransport)
+	}
 
 	client, err := dynamic.NewForConfig(kubeconfig)
 	if err != nil {

@@ -110,8 +110,9 @@ func TestNewFromFlags(t *testing.T) {
 		opts  []Option
 	}
 	type want struct {
-		err error
-		c   *Context
+		err           error
+		c             *Context
+		wrapTransport bool
 	}
 
 	cases := map[string]struct {
@@ -273,6 +274,28 @@ func TestNewFromFlags(t *testing.T) {
 				},
 			},
 		},
+		"DebugCounterFlag": {
+			reason: "Multiple debug flags should increase debug level.",
+			args: args{
+				flags: []string{"-d", "--debug", "-d"},
+				opts: []Option{
+					withFS(afero.NewMemMapFs()),
+				},
+			},
+			want: want{
+				c: &Context{
+					Account:          "",
+					APIEndpoint:      withURL("https://api.upbound.io"),
+					Cfg:              &config.Config{},
+					Domain:           withURL("https://upbound.io"),
+					Profile:          config.Profile{},
+					ProxyEndpoint:    withURL("https://proxy.upbound.io/v1/controlPlanes"),
+					RegistryEndpoint: withURL("https://xpkg.upbound.io"),
+					DebugLevel:       3,
+				},
+				wrapTransport: true,
+			},
+		},
 	}
 
 	for name, tc := range cases {
@@ -287,6 +310,14 @@ func TestNewFromFlags(t *testing.T) {
 				t.Errorf("\n%s\nNewFromFlags(...): -want error, +got error:\n%s", tc.reason, diff)
 			}
 
+			if c != nil {
+				if c.WrapTransport != nil && !tc.want.wrapTransport {
+					t.Errorf("\n%s\nNewFromFlags(...): -want wrapTransport, +got wrapTransport\n", tc.reason)
+				} else if c.WrapTransport == nil && tc.want.wrapTransport {
+					t.Errorf("\n%s\nNewFromFlags(...): +want wrapTransport, -got wrapTransport\n", tc.reason)
+				}
+			}
+
 			if diff := cmp.Diff(tc.want.c, c,
 				cmpopts.IgnoreUnexported(Context{}),
 				// NOTE(tnthornton): we're not concerned about the FSSource's
@@ -295,6 +326,9 @@ func TestNewFromFlags(t *testing.T) {
 				// NOTE(tnthornton) we're not concerned about the Cfg's
 				// internal components.
 				cmpopts.IgnoreFields(Context{}, "Cfg"),
+				// NOTE(sttts) we compare check it before
+				// a function pointer we cannot compare
+				cmpopts.IgnoreFields(Context{}, "WrapTransport"),
 			); diff != "" {
 				t.Errorf("\n%s\nNewFromFlags(...): -want error, +got error:\n%s", tc.reason, diff)
 			}

@@ -43,16 +43,16 @@ func JSON(base, overlay io.Reader) (kong.Resolver, error) {
 		oRaw, oOk := resolveValue(name, flag.Env, overlayValues)
 
 		// if found in base and in overlay AND is not the defaultValue for overlay
-		if bOk && oOk && flag.Default != oRaw {
+		if bOk && oOk && stringify(oRaw) != flag.Default {
 			return oRaw, nil
 		}
 
 		if bOk {
-			return bRaw, nil
+			return stringify(bRaw), nil
 		}
 
 		if oOk {
-			return oRaw, nil
+			return stringify(oRaw), nil
 		}
 
 		return nil, nil
@@ -72,4 +72,18 @@ func resolveValue(fieldName, envVarName string, vals map[string]interface{}) (in
 		}
 	}
 	return raw, true
+}
+
+func stringify(v interface{}) string {
+	if v == nil {
+		return ""
+	}
+	if s, ok := v.(string); ok {
+		return s
+	}
+	bs, err := json.Marshal(v)
+	if err != nil {
+		return ""
+	}
+	return string(bs)
 }
