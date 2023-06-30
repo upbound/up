@@ -66,12 +66,16 @@ func (c *loginCmd) AfterApply(kongCtx *kong.Context) error {
 	// TODO(hasheddan): we can't use the typical up-sdk-go client here because
 	// we need to read session cookie from body. We should add support in the
 	// SDK so that we can be consistent across all commands.
-	c.client = &http.Client{
-		Transport: &http.Transport{
-			TLSClientConfig: &tls.Config{
-				InsecureSkipVerify: upCtx.InsecureSkipTLSVerify, //nolint:gosec
-			},
+	var tr http.RoundTripper = &http.Transport{
+		TLSClientConfig: &tls.Config{
+			InsecureSkipVerify: upCtx.InsecureSkipTLSVerify, //nolint:gosec
 		},
+	}
+	if upCtx.WrapTransport != nil {
+		tr = upCtx.WrapTransport(tr)
+	}
+	c.client = &http.Client{
+		Transport: tr,
 	}
 	kongCtx.Bind(upCtx)
 	if c.Token != "" {

@@ -51,8 +51,6 @@ type createCmd struct {
 	// We can expose it in the future.
 	Provider string `hidden:"" default:"github" help:"Name of provider (e.g. github)"`
 
-	Debug bool `hidden:"" help:"Debug auth workflow"`
-
 	// Common Upbound API configuration
 	Flags upbound.Flags `embed:""`
 }
@@ -81,9 +79,9 @@ func (c *createCmd) Run(p pterm.TextPrinter, cc *configurations.Client, gc *gits
 // handleLogin uses the gitsources login API to authorize and install the GitHub app
 func (c *createCmd) handleLogin(gc *gitsources.Client, upCtx *upbound.Context) error { //nolint:gocyclo
 	s := authServer{
-		debug:    c.Debug,
-		session:  upCtx.Profile.Session,
-		authDone: false,
+		debugLevel: upCtx.DebugLevel,
+		session:    upCtx.Profile.Session,
+		authDone:   false,
 	}
 	port, err := s.startHttpServer()
 	if err != nil {
@@ -96,7 +94,7 @@ func (c *createCmd) handleLogin(gc *gitsources.Client, upCtx *upbound.Context) e
 		return err
 	}
 
-	if c.Debug {
+	if s.debugLevel > 0 {
 		fmt.Printf("Login response:\nStatus: %d\nAuth Redirect: %s\n\n",
 			r.StatusCode,
 			r.RedirectURL.String())
@@ -152,12 +150,12 @@ func (c *createCmd) handleCreate(cc *configurations.Client, upCtx *upbound.Conte
 
 // authServer is used to track state for the web server we create
 type authServer struct {
-	debug    bool
-	session  string
-	server   http.Server
-	context  context.Context
-	cancel   context.CancelFunc
-	authDone bool
+	debugLevel int
+	session    string
+	server     http.Server
+	context    context.Context
+	cancel     context.CancelFunc
+	authDone   bool
 }
 
 // startHttpServer creates the HTTP server we use to wait for the
@@ -176,7 +174,7 @@ func (s *authServer) startHttpServer() (int, error) {
 	}
 	port = listener.Addr().(*net.TCPAddr).Port
 	localUrl := fmt.Sprintf("http://127.0.0.1:%d/", port)
-	if s.debug {
+	if s.debugLevel > 0 {
 		fmt.Printf("Starting web server: %s", localUrl)
 	}
 	http.HandleFunc("/", s.handleAuthCompletion)
@@ -211,7 +209,7 @@ func (s *authServer) shutdown() error {
 // Therefore by default we'll just prompt the user to hit the return key.
 // This is lame, but we'll iterate and get it right.
 func (s *authServer) handleAuthCompletion(w http.ResponseWriter, r *http.Request) {
-	if s.debug {
+	if s.debugLevel > 0 {
 		dump, _ := httputil.DumpRequest(r, true)
 		fmt.Printf("Request:\n%s\n", string(dump))
 	}
@@ -221,5 +219,4 @@ func (s *authServer) handleAuthCompletion(w http.ResponseWriter, r *http.Request
 
 	// Inform the other goroutine that the process is done.
 	s.cancel()
-
 }

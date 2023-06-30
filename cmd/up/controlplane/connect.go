@@ -56,6 +56,9 @@ func (c *connectCmd) AfterApply(kongCtx *kong.Context, upCtx *upbound.Context) e
 	if err != nil {
 		return err
 	}
+	if upCtx.WrapTransport != nil {
+		kubeconfig.Wrap(upCtx.WrapTransport)
+	}
 
 	mgr, err := helm.NewManager(kubeconfig,
 		connectorName,

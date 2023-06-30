@@ -40,6 +40,9 @@ func (c *createCmd) AfterApply(kongCtx *kong.Context, upCtx *upbound.Context) er
 	if err != nil {
 		return err
 	}
+	if upCtx.WrapTransport != nil {
+		kubeconfig.Wrap(upCtx.WrapTransport)
+	}
 	client, err := kubernetes.NewForConfig(kubeconfig)
 	if err != nil {
 		return err
