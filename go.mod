@@ -4,8 +4,8 @@ go 1.20
 
 require (
 	github.com/Masterminds/semver v1.5.0
-	github.com/alecthomas/kong v0.7.2-0.20221130112736-919e70103f7a
-	github.com/crossplane/crossplane v1.12.0
+	github.com/alecthomas/kong v0.8.0
+	github.com/crossplane/crossplane v1.13.0-rc.0.0.20230701053013-444267e84783
 	github.com/crossplane/crossplane-runtime v0.20.0-rc.0.0.20230622073604-c52ef3ac58c6
 	github.com/crossplane/crossplane/controller/apiextensions v0.0.0-00010101000000-000000000000
 	github.com/crossplane/crossplane/xcrd v0.0.0-00010101000000-000000000000
@@ -212,7 +212,7 @@ require (
 	google.golang.org/genproto/googleapis/api v0.0.0-20230530153820-e85fd2cbaebc // indirect
 	google.golang.org/genproto/googleapis/rpc v0.0.0-20230530153820-e85fd2cbaebc // indirect
 	google.golang.org/grpc v1.56.1 // indirect
-	google.golang.org/protobuf v1.30.0 // indirect
+	google.golang.org/protobuf v1.31.0 // indirect
 	gopkg.in/inf.v0 v0.9.1 // indirect
 	gopkg.in/warnings.v0 v0.1.2 // indirect
 	k8s.io/apiserver v0.27.3 // indirect
