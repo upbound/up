@@ -63,7 +63,7 @@ func NewConfigurationLinter() linter.Linter {
 // NewFunctionLinter is a convenience function for creating a package linter for
 // functions.
 func NewFunctionLinter() linter.Linter {
-	return linter.NewPackageLinter(linter.PackageLinterFns(OneMeta), linter.ObjectLinterFns(IsFunction, PackageValidSemver), linter.ObjectLinterFns())
+	return linter.NewPackageLinter(linter.PackageLinterFns(OneMeta), linter.ObjectLinterFns(IsFunction), linter.ObjectLinterFns())
 }
 
 // OneMeta checks that there is only one meta object in the package.
@@ -94,8 +94,7 @@ func IsConfiguration(o runtime.Object) error {
 
 // IsFunction checks that an object is a Function meta type.
 func IsFunction(o runtime.Object) error {
-	po, _ := scheme.TryConvert(o, &pkgmetav1alpha1.Function{})
-	if _, ok := po.(*pkgmetav1alpha1.Function); !ok {
+	if _, ok := o.(*pkgmetav1alpha1.Function); !ok {
 		return errors.New(errNotMetaFunction)
 	}
 	return nil
