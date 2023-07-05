@@ -39,8 +39,8 @@ func JSON(base, overlay io.Reader) (kong.Resolver, error) {
 
 	var f kong.ResolverFunc = func(context *kong.Context, parent *kong.Path, flag *kong.Flag) (interface{}, error) {
 		name := strings.ReplaceAll(flag.Name, "-", "_")
-		bRaw, bOk := resolveValue(name, flag.Env, baseValues)
-		oRaw, oOk := resolveValue(name, flag.Env, overlayValues)
+		bRaw, bOk := resolveValue(name, flag.Envs, baseValues)
+		oRaw, oOk := resolveValue(name, flag.Envs, overlayValues)
 
 		// if found in base and in overlay AND is not the defaultValue for overlay
 		if bOk && oOk && stringify(oRaw) != flag.Default {
@@ -61,15 +61,18 @@ func JSON(base, overlay io.Reader) (kong.Resolver, error) {
 	return f, nil
 }
 
-func resolveValue(fieldName, envVarName string, vals map[string]interface{}) (interface{}, bool) {
+func resolveValue(fieldName string, envVarNames []string, vals map[string]interface{}) (interface{}, bool) {
 	// attempt to lookup by field name first
 	raw, ok := vals[fieldName]
 	if !ok {
 		// fall back to env var name
-		raw, ok = vals[envVarName]
-		if !ok {
-			return nil, false
+		for _, envVarName := range envVarNames {
+			raw, ok = vals[envVarName]
+			if ok {
+				return raw, true
+			}
 		}
+		return nil, false
 	}
 	return raw, true
 }
