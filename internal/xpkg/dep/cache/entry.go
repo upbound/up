@@ -36,10 +36,11 @@ const (
 	crdNameFmt = "%s.yaml"
 	delim      = "\n"
 
-	errFailedToCreateMeta      = "failed to create meta file in entry"
-	errFailedToCreateImageMeta = "faile to create image meta entry"
-	errFailedToCreateCRD       = "failed to create crd"
-	errNoObjectsToFlushToDisk  = "no objects to flush"
+	errFailedToCreateMeta          = "failed to create meta file in entry"
+	errFailedToCreateImageMeta     = "failed to create image meta entry"
+	errFailedToCreateCacheEntryFmt = "failed to create a cache entry for the CRD at path %s"
+	errFailedToAppendCRDFmt        = "failed to add CRD %q to package"
+	errNoObjectsToFlushToDisk      = "no objects to flush"
 )
 
 // entry is the internal representation of the cache at a given directory
@@ -246,23 +247,13 @@ func (e *entry) writeObjects(objs []runtime.Object) (*flushstats, error) { // no
 			continue
 		}
 
-		f, err := e.fs.Create(filepath.Join(e.location(), fmt.Sprintf(crdNameFmt, name)))
-		if err != nil {
-			return stats, err
-		}
-		defer f.Close() // nolint:errcheck
-
-		fb, err := f.Write(yb)
-		if err != nil {
-			return stats, err
-		}
-
-		if fb == 0 {
-			return stats, errors.New(errFailedToCreateCRD)
+		entryLocation := filepath.Join(e.location(), fmt.Sprintf(crdNameFmt, name))
+		if err := afero.WriteFile(e.fs, entryLocation, yb, 0o600); err != nil {
+			return stats, errors.Wrapf(err, errFailedToCreateCacheEntryFmt, entryLocation)
 		}
 
 		if err := e.appendToPackageJSON(jb); err != nil {
-			return stats, errors.New(errFailedToCreateCRD)
+			return stats, errors.Wrapf(err, errFailedToAppendCRDFmt, name)
 		}
 
 		inc()
