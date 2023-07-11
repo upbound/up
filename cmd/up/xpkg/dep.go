@@ -110,8 +110,8 @@ in the current directory. It caches package information in a local file system
 cache (by default in ~/.up/cache), to be used e.g. for the Crossplane language
 server.
 
-If a package is specified, it will be added to the crossplane.yaml file
-in the current directory.
+If a package (e.g. provider-foo@v0.42.0 or provider-foo for latest) is specified,
+it will be added to the crossplane.yaml file in the current directory as dependency. 
 `
 }
 

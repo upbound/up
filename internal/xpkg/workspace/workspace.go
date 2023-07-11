@@ -164,7 +164,8 @@ func (w *Workspace) Parse(ctx context.Context) error {
 	w.mu.Lock()
 	defer w.mu.Unlock()
 
-	return afero.Walk(w.fs, w.root, func(p string, info fs.FileInfo, err error) error {
+	var errs []error
+	if err := afero.Walk(w.fs, w.root, func(p string, info fs.FileInfo, err error) error {
 		if err != nil {
 			return err
 		}
@@ -191,8 +192,15 @@ func (w *Workspace) Parse(ctx context.Context) error {
 			NodeIDs: make(map[NodeIdentifier]struct{}),
 		}
 
-		return w.view.ParseFile(ctx, p)
-	})
+		if err := w.view.ParseFile(ctx, p); err != nil {
+			errs = append(errs, err)
+		}
+		return nil
+	}); err != nil {
+		return err
+	}
+
+	return kerrors.NewAggregate(errs)
 }
 
 // View returns the Workspace's View. Note: this will only exist _after_
