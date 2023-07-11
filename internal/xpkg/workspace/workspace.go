@@ -149,6 +149,15 @@ func WithPrinter(p pterm.TextPrinter) Option {
 	}
 }
 
+// WithPermissiveParser lets the workspace parser just print warnings when
+// a file or a document in a file cannot be parsed. This can be used when
+// partial results are more important than correctness.
+func WithPermissiveParser() Option {
+	return func(w *Workspace) {
+		w.view.permissiveParser = true
+	}
+}
+
 // Write writes the supplied Meta details to the fs.
 func (w *Workspace) Write(m *meta.Meta) error {
 	b, err := m.Bytes()
@@ -219,11 +228,17 @@ func (v *View) ParseFile(ctx context.Context, path string) error {
 
 	f, err := parser.ParseBytes(details.Body, parser.ParseComments)
 	if err != nil {
+		if v.permissiveParser {
+			if v.printer != nil {
+				v.printer.Printfln("WARNING: ignoring file %s: %v", path, err)
+			}
+			return nil
+		}
 		return errors.Wrapf(err, "failed to parse file %s", v.relativePath(path))
 	}
 
 	var errs []error
-	for _, doc := range f.Docs {
+	for i, doc := range f.Docs {
 		if doc.Body != nil {
 			pCtx := parseContext{
 				node:     doc,
@@ -231,6 +246,19 @@ func (v *View) ParseFile(ctx context.Context, path string) error {
 				rootNode: true,
 			}
 			if _, err := v.parseDoc(ctx, pCtx); err != nil {
+				if v.permissiveParser {
+					if len(f.Docs) > 1 {
+						if v.printer != nil {
+							v.printer.Printfln("WARNING: ignoring document %d in file %s: %v", i+1, path, err)
+						}
+						continue
+					}
+					if v.printer != nil {
+						v.printer.Printfln("WARNING: ignoring file %s: %v", path, err)
+					}
+					continue
+				}
+
 				// We attempt to parse subsequent documents if we encounter an error
 				// in a preceding one.
 				errs = append(errs, err)
@@ -251,6 +279,7 @@ type parseContext struct {
 	node     ast.Node
 	obj      unstructured.Unstructured
 	path     string
+	doc      int
 	rootNode bool
 }
 
@@ -278,7 +307,7 @@ func (v *View) parseDoc(ctx context.Context, pCtx parseContext) (NodeIdentifier,
 	// to do so.
 	if err := k8syaml.Unmarshal(b, &obj); err != nil {
 		if v.printer != nil {
-			v.printer.Printfln("WARNING: ignoring file %s: missing 'kind' field, not a Kubernetes object", v.relativePath(pCtx.path))
+			v.printer.Printfln("WARNING: ignoring document %d in file %s: missing 'kind' field, not a Kubernetes object", pCtx.doc+1, v.relativePath(pCtx.path))
 		}
 		return NodeIdentifier{}, nil
 	}
@@ -478,6 +507,8 @@ type View struct {
 	// root is the path of the workspace root.
 	root    string
 	printer pterm.TextPrinter
+	// permissiveParser indicates whether to skip files or documents with parse errors.
+	permissiveParser bool
 }
 
 // FileDetails returns the map of file details found within the parsed workspace.

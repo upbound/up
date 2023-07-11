@@ -156,7 +156,7 @@ func (f *Factory) New(ctx context.Context, opts ...Option) (*Snapshot, error) {
 
 	// TODO(@tnthornton) see about moving workspace up to Factory
 	// and have the workspace's view returned from the Parse call.
-	w, err := workspace.New(f.workdir, workspace.WithLogger(s.log))
+	w, err := workspace.New(f.workdir, workspace.WithLogger(s.log), workspace.WithPermissiveParser())
 	if err != nil {
 		return nil, err
 	}

@@ -60,19 +60,24 @@ func TestParse(t *testing.T) {
 	ctx := context.Background()
 	cases := map[string]struct {
 		reason    string
-		opt       Option
+		opts      []Option
 		nodes     map[NodeIdentifier]struct{}
 		err       error
 		errString string
 	}{
 		"ErrorRootNotExist": {
 			reason: "Should return an error if the workspace root does not exist.",
-			opt:    WithFS(afero.NewMemMapFs()),
+			opts:   []Option{WithFS(afero.NewMemMapFs())},
+			err:    &os.PathError{Op: "open", Path: "/ws", Err: afero.ErrFileNotFound},
+		},
+		"ErrorRootNotExistPermissive": {
+			reason: "Should return an error if the workspace root does not exist.",
+			opts:   []Option{WithFS(afero.NewMemMapFs()), WithPermissiveParser()},
 			err:    &os.PathError{Op: "open", Path: "/ws", Err: afero.ErrFileNotFound},
 		},
 		"SuccessfulEmpty": {
 			reason: "Should not return an error if the workspace is empty.",
-			opt: WithFS(func() afero.Fs {
+			opts: []Option{WithFS(func() afero.Fs {
 				fs := afero.NewMemMapFs()
 
 				// NOTE(tnthornton) we're currently seeing `internal compiler error: OCALLMETH missed by typecheck`
@@ -82,7 +87,7 @@ func TestParse(t *testing.T) {
 				_ = mem.Mkdir("/ws", os.ModePerm)
 
 				return fs
-			}()),
+			}())},
 		},
 		"SuccessfulNoKubernetesObjects": {
 			// NOTE(hasheddan): this test reflects current behavior, but we
@@ -91,28 +96,36 @@ func TestParse(t *testing.T) {
 			// likely also want skip any non-YAML files by default as we do in
 			// package parsing.
 			reason: "Should have no package nodes if no Kubernetes objects are present.",
-			opt: WithFS(func() afero.Fs {
+			opts: []Option{WithFS(func() afero.Fs {
 				fs := afero.NewMemMapFs()
 				_ = afero.WriteFile(fs, "/ws/somerandom.yaml", []byte(`{"some non kube":"yaml"}`), os.ModePerm)
 				return fs
-			}()),
+			}())},
 		},
-		"SuccessfulInvalidYAML": {
+		"ErrorInvalidYAML": {
 			reason: "Should have no package nodes if no Kubernetes objects are present.",
-			opt: WithFS(func() afero.Fs {
+			opts: []Option{WithFS(func() afero.Fs {
 				fs := afero.NewMemMapFs()
 				_ = afero.WriteFile(fs, "/ws/invalid.yaml", []byte(`{some invalid yaml}`), os.ModePerm)
 				return fs
-			}()),
+			}())},
 			errString: "failed to parse file invalid.yaml: [1:1] unterminated flow mapping\n    >  1 | {some invalid yaml}\n           ^",
+		},
+		"SuccessfulInvalidYAMLPermissive": {
+			reason: "Should have no package nodes if no Kubernetes objects are present.",
+			opts: []Option{WithFS(func() afero.Fs {
+				fs := afero.NewMemMapFs()
+				_ = afero.WriteFile(fs, "/ws/invalid.yaml", []byte(`{some invalid yaml}`), os.ModePerm)
+				return fs
+			}()), WithPermissiveParser()},
 		},
 		"SuccessfulParseComposition": {
 			reason: "Should add a package node for Composition and every embedded resource.",
-			opt: WithFS(func() afero.Fs {
+			opts: []Option{WithFS(func() afero.Fs {
 				fs := afero.NewMemMapFs()
 				_ = afero.WriteFile(fs, "/ws/composition.yaml", testComposition, os.ModePerm)
 				return fs
-			}()),
+			}())},
 			nodes: map[NodeIdentifier]struct{}{
 				nodeID("", schema.FromAPIVersionAndKind("ec2.aws.crossplane.io/v1beta1", "VPC")):               {},
 				nodeID("", schema.FromAPIVersionAndKind("ec2.aws.crossplane.io/v1beta1", "Subnet")):            {},
@@ -121,11 +134,11 @@ func TestParse(t *testing.T) {
 		},
 		"SuccessfulParseMultipleSameFile": {
 			reason: "Should add a package node for every resource when multiple objects exist in single file.",
-			opt: WithFS(func() afero.Fs {
+			opts: []Option{WithFS(func() afero.Fs {
 				fs := afero.NewMemMapFs()
 				_ = afero.WriteFile(fs, "/ws/multiple.yaml", testMultipleObject, os.ModePerm)
 				return fs
-			}()),
+			}())},
 			nodes: map[NodeIdentifier]struct{}{
 				nodeID("compositepostgresqlinstances.database.example.org", xpextv1.CompositeResourceDefinitionGroupVersionKind): {},
 				nodeID("some.other.xrd", xpextv1.CompositeResourceDefinitionGroupVersionKind):                                    {},
@@ -134,7 +147,7 @@ func TestParse(t *testing.T) {
 	}
 	for name, tc := range cases {
 		t.Run(name, func(t *testing.T) {
-			ws, _ := New("/ws", tc.opt)
+			ws, _ := New("/ws", tc.opts...)
 			err := ws.Parse(ctx)
 
 			if tc.errString != "" {
