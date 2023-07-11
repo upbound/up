@@ -33,7 +33,7 @@ import (
 )
 
 const (
-	errGetNameFromMeta = "failed to get name from crossplane.yaml"
+	errGetNameFromMeta = "failed to get package name from crossplane.yaml"
 	errBuildPackage    = "failed to build package"
 	errImageDigest     = "failed to get package digest"
 	errCreatePackage   = "failed to create package file"

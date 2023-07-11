@@ -30,8 +30,8 @@ import (
 )
 
 const (
-	errAlreadyExists      = "directory contains pre-existing meta file"
-	errInvalidPackageType = "the provided package type is invalid"
+	errAlreadyExistsFmt   = "directory contains pre-existing meta file: %s"
+	errInvalidPackageType = "the provided package type %q is invalid; valid types: configuration,provider"
 )
 
 // BeforeApply sets default values in init before assignment and validation.
@@ -56,7 +56,7 @@ func (c *initCmd) AfterApply() error {
 
 	// validate provided package type
 	if !xpkg.Package(c.Type).IsValid() {
-		return errors.New(errInvalidPackageType)
+		return errors.Errorf(errInvalidPackageType, c.Type)
 	}
 
 	// common init
@@ -204,7 +204,7 @@ func (c *initCmd) metaFileInRoot() error {
 	}
 
 	if exists {
-		return errors.New(errAlreadyExists)
+		return errors.Errorf(errAlreadyExistsFmt, xpkg.MetaFile)
 	}
 	return nil
 }

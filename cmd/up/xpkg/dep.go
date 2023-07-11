@@ -158,7 +158,7 @@ func (c *depCmd) userSuppliedDep(ctx context.Context) error {
 
 	ud, _, err := c.m.AddAll(ctx, d)
 	if err != nil {
-		return err
+		return errors.Wrapf(err, "in %s", c.Package)
 	}
 
 	meta := c.ws.View().Meta()

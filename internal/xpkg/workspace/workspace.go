@@ -58,7 +58,7 @@ const (
 
 	errCompositionResources = "resources in Composition are malformed"
 	errInvalidFileURI       = "invalid path supplied"
-	errInvalidPackage       = "invalid package; more than one meta file supplied"
+	errInvalidPackage       = "invalid package; more than one meta (configuration or provider) file supplied"
 )
 
 // builds static YAML path strings ahead of usage.
@@ -101,6 +101,8 @@ func New(root string, opts ...Option) (*Workspace, error) {
 			nodes:        make(map[NodeIdentifier]Node),
 			uriToDetails: make(map[span.URI]*Details),
 			xrClaimRefs:  make(map[schema.GroupVersionKind]schema.GroupVersionKind),
+
+			root: root,
 		},
 	}
 
@@ -200,7 +202,7 @@ func (v *View) ParseFile(ctx context.Context, path string) error {
 
 	f, err := parser.ParseBytes(details.Body, parser.ParseComments)
 	if err != nil {
-		return err
+		return errors.Wrapf(err, "failed to parse file %s", v.relativePath(path))
 	}
 	for _, doc := range f.Docs {
 		if doc.Body != nil {
@@ -374,10 +376,16 @@ func (v *View) parseMeta(ctx context.Context, pCtx parseContext) error {
 	}
 
 	if len(p.GetMeta()) != 1 {
-		return errors.New(errInvalidPackage)
+		return errors.Errorf("%s in %s", errInvalidPackage, v.relativePath(pCtx.path))
+	}
+
+	if v.meta != nil {
+		return errors.Errorf("%s: %s, %s and maybe more", errInvalidPackage, v.relativePath(v.metaPath), v.relativePath(pCtx.path))
 	}
 
 	v.meta = meta.New(p.GetMeta()[0])
+	v.metaPath = pCtx.path
+
 	return nil
 }
 
@@ -426,10 +434,13 @@ type View struct {
 	// workspace was created.
 	metaLocation string
 	meta         *meta.Meta
+	metaPath     string
 	uriToDetails map[span.URI]*Details
 	nodes        map[NodeIdentifier]Node
 	// xrClaimRefs defines an look up from XR GVK -> Claim GVK (if one is defined).
 	xrClaimRefs map[schema.GroupVersionKind]schema.GroupVersionKind
+	// root is the path of the workspace root.
+	root    string
 }
 
 // FileDetails returns the map of file details found within the parsed workspace.
@@ -461,6 +472,17 @@ func (v *View) Examples() map[schema.GroupVersionKind][]Node {
 // XRClaimsRefs returns a map of XR GVK -> XRC GVK.
 func (v *View) XRClaimsRefs() map[schema.GroupVersionKind]schema.GroupVersionKind {
 	return v.xrClaimRefs
+}
+
+func (v *View) relativePath(path string) string {
+	if !filepath.IsAbs(path) {
+		return path
+	}
+	rel, err := filepath.Rel(v.root, path)
+	if err != nil {
+		return path
+	}
+	return rel
 }
 
 // Details represent file specific details.

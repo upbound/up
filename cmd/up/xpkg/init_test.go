@@ -123,7 +123,7 @@ func TestMetaFileInRoot(t *testing.T) {
 				fs:         afero.NewMemMapFs(),
 			},
 			want: want{
-				err: errors.New(errAlreadyExists),
+				err: errors.Errorf(errAlreadyExistsFmt, xpkg.MetaFile),
 			},
 		},
 	}
