@@ -59,10 +59,11 @@ func init() {
 func TestParse(t *testing.T) {
 	ctx := context.Background()
 	cases := map[string]struct {
-		reason string
-		opt    Option
-		nodes  map[NodeIdentifier]struct{}
-		err    error
+		reason    string
+		opt       Option
+		nodes     map[NodeIdentifier]struct{}
+		err       error
+		errString string
 	}{
 		"ErrorRootNotExist": {
 			reason: "Should return an error if the workspace root does not exist.",
@@ -92,9 +93,18 @@ func TestParse(t *testing.T) {
 			reason: "Should have no package nodes if no Kubernetes objects are present.",
 			opt: WithFS(func() afero.Fs {
 				fs := afero.NewMemMapFs()
-				_ = afero.WriteFile(fs, "/ws/somerandom.yaml", []byte("some invalid ::: yaml"), os.ModePerm)
+				_ = afero.WriteFile(fs, "/ws/somerandom.yaml", []byte(`{"some non kube":"yaml"}`), os.ModePerm)
 				return fs
 			}()),
+		},
+		"SuccessfulInvalidYAML": {
+			reason: "Should have no package nodes if no Kubernetes objects are present.",
+			opt: WithFS(func() afero.Fs {
+				fs := afero.NewMemMapFs()
+				_ = afero.WriteFile(fs, "/ws/invalid.yaml", []byte(`{some invalid yaml}`), os.ModePerm)
+				return fs
+			}()),
+			errString: "failed to parse file invalid.yaml: [1:1] unterminated flow mapping\n    >  1 | {some invalid yaml}\n           ^",
 		},
 		"SuccessfulParseComposition": {
 			reason: "Should add a package node for Composition and every embedded resource.",
@@ -125,8 +135,17 @@ func TestParse(t *testing.T) {
 	for name, tc := range cases {
 		t.Run(name, func(t *testing.T) {
 			ws, _ := New("/ws", tc.opt)
+			err := ws.Parse(ctx)
 
-			if diff := cmp.Diff(tc.err, ws.Parse(ctx), test.EquateErrors()); diff != "" {
+			if tc.errString != "" {
+				var errString string
+				if err != nil {
+					errString = err.Error()
+				}
+				if diff := cmp.Diff(tc.errString, errString); diff != "" {
+					t.Errorf("\n%s\nParse(...): -want error, +got error:\n%s", tc.reason, diff)
+				}
+			} else if diff := cmp.Diff(tc.err, err, test.EquateErrors()); diff != "" {
 				t.Errorf("\n%s\nParse(...): -want error, +got error:\n%s", tc.reason, diff)
 			}
 			if len(tc.nodes) != len(ws.view.nodes) {

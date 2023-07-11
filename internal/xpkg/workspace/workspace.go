@@ -34,6 +34,7 @@ import (
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/runtime/schema"
+	kerrors "k8s.io/apimachinery/pkg/util/errors"
 	k8syaml "sigs.k8s.io/yaml"
 
 	"github.com/crossplane/crossplane-runtime/pkg/errors"
@@ -190,8 +191,7 @@ func (w *Workspace) Parse(ctx context.Context) error {
 			NodeIDs: make(map[NodeIdentifier]struct{}),
 		}
 
-		_ = w.view.ParseFile(ctx, p)
-		return nil
+		return w.view.ParseFile(ctx, p)
 	})
 }
 
@@ -213,6 +213,8 @@ func (v *View) ParseFile(ctx context.Context, path string) error {
 	if err != nil {
 		return errors.Wrapf(err, "failed to parse file %s", v.relativePath(path))
 	}
+
+	var errs []error
 	for _, doc := range f.Docs {
 		if doc.Body != nil {
 			pCtx := parseContext{
@@ -223,12 +225,16 @@ func (v *View) ParseFile(ctx context.Context, path string) error {
 			if _, err := v.parseDoc(ctx, pCtx); err != nil {
 				// We attempt to parse subsequent documents if we encounter an error
 				// in a preceding one.
-				// TODO(hasheddan): errors should be aggregated and returned as
-				// diagnostics.
+				errs = append(errs, err)
 				continue
 			}
 		}
 	}
+
+	if len(errs) > 0 {
+		return errors.Wrapf(kerrors.NewAggregate(errs), "failed to parse file %s", path)
+	}
+
 	return nil
 }
 
@@ -249,15 +255,24 @@ func (v *View) parseDoc(ctx context.Context, pCtx parseContext) (NodeIdentifier,
 	}
 	pCtx.docBytes = b
 
+	// first try to unmarshal as pure YAML, not expecting this to be a Kubernetes object.
+	var value interface{}
+	if err := k8syaml.Unmarshal(b, &value); err != nil {
+		return NodeIdentifier{}, err
+	}
+
+	// then try to unmarshal as a Kubernetes object. Ignore if errors which means it's not a Kubernetes object.
 	var obj unstructured.Unstructured
-	// NOTE(hasheddan): unmarshal returns an error if Kind is not defined.
 	// TODO(hasheddan): we cannot make use of strict unmarshal to identify
 	// extraneous fields because we don't have the underlying Go types. In
 	// the future, we would like to provide warnings on fields that are
 	// extraneous, but we will likely need to augment the OpenAPI validation
 	// to do so.
 	if err := k8syaml.Unmarshal(b, &obj); err != nil {
-		return NodeIdentifier{}, err
+		if v.printer != nil {
+			v.printer.Printfln("WARNING: ignoring file %s: missing 'kind' field, not a Kubernetes object", v.relativePath(pCtx.path))
+		}
+		return NodeIdentifier{}, nil
 	}
 	pCtx.obj = obj
 	// NOTE(hasheddan): if we are at document root (i.e. this is a
