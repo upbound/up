@@ -103,6 +103,18 @@ type depCmd struct {
 	Package string `arg:"" optional:"" help:"Package to be added."`
 }
 
+func (c *depCmd) Help() string {
+	return `
+The dep command manages crossplane package dependencies of the package 
+in the current directory. It caches package information in a local file system
+cache (by default in ~/.up/cache), to be used e.g. for the Crossplane language
+server.
+
+If a package is specified, it will be added to the crossplane.yaml file
+in the current directory.
+`
+}
+
 // Run executes the dep command.
 func (c *depCmd) Run(ctx context.Context, p pterm.TextPrinter, pb *pterm.BulletListPrinter) error {
 	// no need to do anything else if clean cache was called.
