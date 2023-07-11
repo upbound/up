@@ -105,6 +105,8 @@ func New(root string, opts ...Option) (*Workspace, error) {
 			xrClaimRefs:  make(map[schema.GroupVersionKind]schema.GroupVersionKind),
 
 			root: root,
+
+			printer: &pterm.BasicTextPrinter{Writer: io.Discard},
 		},
 	}
 
@@ -229,9 +231,7 @@ func (v *View) ParseFile(ctx context.Context, path string) error {
 	f, err := parser.ParseBytes(details.Body, parser.ParseComments)
 	if err != nil {
 		if v.permissiveParser {
-			if v.printer != nil {
-				v.printer.Printfln("WARNING: ignoring file %s: %v", path, err)
-			}
+			v.printer.Printfln("WARNING: ignoring file %s: %v", path, err)
 			return nil
 		}
 		return errors.Wrapf(err, "failed to parse file %s", v.relativePath(path))
@@ -248,12 +248,8 @@ func (v *View) ParseFile(ctx context.Context, path string) error {
 			if _, err := v.parseDoc(ctx, pCtx); err != nil {
 				if v.permissiveParser {
 					if len(f.Docs) > 1 {
-						if v.printer != nil {
-							v.printer.Printfln("WARNING: ignoring document %d in file %s: %v", i+1, path, err)
-						}
-						continue
-					}
-					if v.printer != nil {
+						v.printer.Printfln("WARNING: ignoring document %d in file %s: %v", i+1, path, err)
+					} else {
 						v.printer.Printfln("WARNING: ignoring file %s: %v", path, err)
 					}
 					continue
@@ -306,10 +302,8 @@ func (v *View) parseDoc(ctx context.Context, pCtx parseContext) (NodeIdentifier,
 	// extraneous, but we will likely need to augment the OpenAPI validation
 	// to do so.
 	if err := k8syaml.Unmarshal(b, &obj); err != nil {
-		if v.printer != nil {
-			v.printer.Printfln("WARNING: ignoring document %d in file %s: missing 'kind' field, not a Kubernetes object", pCtx.doc+1, v.relativePath(pCtx.path))
-		}
-		return NodeIdentifier{}, nil
+		v.printer.Printfln("WARNING: ignoring document %d in file %s: missing 'kind' field, not a Kubernetes object", pCtx.doc+1, v.relativePath(pCtx.path))
+		return NodeIdentifier{}, nil //nolint:nilerr
 	}
 	pCtx.obj = obj
 	// NOTE(hasheddan): if we are at document root (i.e. this is a
@@ -447,9 +441,7 @@ func (v *View) parseMeta(ctx context.Context, pCtx parseContext) error {
 	v.meta = meta.New(p.GetMeta()[0])
 	v.metaPath = pCtx.path
 
-	if v.printer != nil {
-		v.printer.Printf("xpkg loaded package meta information from %s\n", v.relativePath(pCtx.path))
-	}
+	v.printer.Printf("xpkg loaded package meta information from %s\n", v.relativePath(pCtx.path))
 
 	return nil
 }
