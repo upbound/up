@@ -39,7 +39,7 @@ const (
 
 // AfterApply constructs and binds Upbound-specific context to any subcommands
 // that have Run() methods that receive it.
-func (c *depCmd) AfterApply(kongCtx *kong.Context) error {
+func (c *depCmd) AfterApply(kongCtx *kong.Context, p pterm.TextPrinter) error {
 	kongCtx.Bind(pterm.DefaultBulletList.WithWriter(kongCtx.Stdout))
 	ctx := context.Background()
 	fs := afero.NewOsFs()
@@ -72,7 +72,7 @@ func (c *depCmd) AfterApply(kongCtx *kong.Context) error {
 			return err
 		}
 
-		ws, err := workspace.New(wd, workspace.WithFS(fs))
+		ws, err := workspace.New(wd, workspace.WithFS(fs), workspace.WithPrinter(p))
 		if err != nil {
 			return err
 		}

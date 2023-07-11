@@ -28,6 +28,7 @@ import (
 	"github.com/goccy/go-yaml/ast"
 	"github.com/goccy/go-yaml/parser"
 	"github.com/golang/tools/span"
+	"github.com/pterm/pterm"
 	"github.com/spf13/afero"
 
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
@@ -136,6 +137,14 @@ func WithFS(fs afero.Fs) Option {
 func WithLogger(l logging.Logger) Option {
 	return func(w *Workspace) {
 		w.log = l
+	}
+}
+
+// WithPrinter overrides the printer of the Workspace with the supplied
+// printer. By default a Workspace has no printer.
+func WithPrinter(p pterm.TextPrinter) Option {
+	return func(w *Workspace) {
+		w.view.printer = p
 	}
 }
 
@@ -386,6 +395,10 @@ func (v *View) parseMeta(ctx context.Context, pCtx parseContext) error {
 	v.meta = meta.New(p.GetMeta()[0])
 	v.metaPath = pCtx.path
 
+	if v.printer != nil {
+		v.printer.Printf("xpkg loaded package meta information from %s\n", v.relativePath(pCtx.path))
+	}
+
 	return nil
 }
 
@@ -441,6 +454,7 @@ type View struct {
 	xrClaimRefs map[schema.GroupVersionKind]schema.GroupVersionKind
 	// root is the path of the workspace root.
 	root    string
+	printer pterm.TextPrinter
 }
 
 // FileDetails returns the map of file details found within the parsed workspace.
