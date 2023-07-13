@@ -345,7 +345,7 @@ func (m *Manager) retrievePkg(ctx context.Context, d v1beta1.Dependency) (*xpkg.
 func (m *Manager) retrieveAndStorePkg(ctx context.Context, d v1beta1.Dependency) (*xpkg.ParsedPackage, error) {
 	// resolve version prior to Get
 	if err := m.finalizeExtDepVersion(ctx, &d); err != nil {
-		return nil, err
+		return nil, fmt.Errorf("failed to resolve %s:%s: %w", d.Package, d.Constraints, err)
 	}
 
 	p, err := m.c.Get(d)

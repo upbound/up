@@ -39,7 +39,7 @@ const (
 
 // AfterApply constructs and binds Upbound-specific context to any subcommands
 // that have Run() methods that receive it.
-func (c *depCmd) AfterApply(kongCtx *kong.Context) error {
+func (c *depCmd) AfterApply(kongCtx *kong.Context, p pterm.TextPrinter) error {
 	kongCtx.Bind(pterm.DefaultBulletList.WithWriter(kongCtx.Stdout))
 	ctx := context.Background()
 	fs := afero.NewOsFs()
@@ -72,7 +72,7 @@ func (c *depCmd) AfterApply(kongCtx *kong.Context) error {
 			return err
 		}
 
-		ws, err := workspace.New(wd, workspace.WithFS(fs))
+		ws, err := workspace.New(wd, workspace.WithFS(fs), workspace.WithPrinter(p))
 		if err != nil {
 			return err
 		}
@@ -101,6 +101,18 @@ type depCmd struct {
 	CleanCache bool   `short:"c" help:"Clean dep cache."`
 
 	Package string `arg:"" optional:"" help:"Package to be added."`
+}
+
+func (c *depCmd) Help() string {
+	return `
+The dep command manages crossplane package dependencies of the package 
+in the current directory. It caches package information in a local file system
+cache (by default in ~/.up/cache), to be used e.g. for the Crossplane language
+server.
+
+If a package (e.g. provider-foo@v0.42.0 or provider-foo for latest) is specified,
+it will be added to the crossplane.yaml file in the current directory as dependency. 
+`
 }
 
 // Run executes the dep command.
@@ -158,7 +170,7 @@ func (c *depCmd) userSuppliedDep(ctx context.Context) error {
 
 	ud, _, err := c.m.AddAll(ctx, d)
 	if err != nil {
-		return err
+		return errors.Wrapf(err, "in %s", c.Package)
 	}
 
 	meta := c.ws.View().Meta()

@@ -52,7 +52,7 @@ func TestNewMetaFile(t *testing.T) {
 				WithFs(fs),
 			),
 			want: want{
-				err: errors.New(errAlreadyExists),
+				err: errors.Errorf(errAlreadyExistsFmt, "crossplane.yaml"),
 			},
 		},
 		"Successful": {

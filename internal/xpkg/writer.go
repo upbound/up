@@ -23,7 +23,7 @@ import (
 )
 
 const (
-	errAlreadyExists = "directory contains pre-existing meta file"
+	errAlreadyExistsFmt = "directory contains pre-existing meta file: %s"
 )
 
 // Writer defines a writer that is used for creating package meta files.
@@ -79,7 +79,7 @@ func (w *Writer) NewMetaFile() error {
 		return err
 	}
 	if exists {
-		return errors.New(errAlreadyExists)
+		return errors.Errorf(errAlreadyExistsFmt, w.relativePath(targetFile))
 	}
 
 	exists, err = afero.DirExists(w.fs, w.root)
@@ -95,4 +95,15 @@ func (w *Writer) NewMetaFile() error {
 	}
 
 	return afero.WriteFile(w.fs, targetFile, w.fileBody, StreamFileMode)
+}
+
+func (w *Writer) relativePath(path string) string {
+	if !filepath.IsAbs(path) {
+		return path
+	}
+	rel, err := filepath.Rel(w.root, path)
+	if err != nil {
+		return path
+	}
+	return rel
 }

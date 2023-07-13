@@ -33,7 +33,7 @@ import (
 )
 
 const (
-	errGetNameFromMeta = "failed to get name from crossplane.yaml"
+	errGetNameFromMeta = "failed to get package name from crossplane.yaml"
 	errBuildPackage    = "failed to build package"
 	errImageDigest     = "failed to get package digest"
 	errCreatePackage   = "failed to create package file"
@@ -113,6 +113,25 @@ type buildCmd struct {
 	ExamplesRoot string   `short:"e" help:"Path to package examples directory." default:"./examples"`
 	AuthExt      string   `short:"a" help:"Path to an authentication extension file." default:"auth.yaml"`
 	Ignore       []string `help:"Paths, specified relative to --package-root, to exclude from the package."`
+}
+
+func (c *buildCmd) Help() string {
+	return `
+The build command creates a xpkg compatible OCI image for a Crossplane package
+from the local file system. It packages the found YAML files containing Kubernetes-like
+object manifests into the meta data layer of the OCI image. The package manager
+will use this information to install the package into a Crossplane instance.
+
+Only configuration and provider packages are supported at this time. 
+
+Example claims can be specified in the examples directory.
+
+For more generic information, see the xpkg parent command help. Also see the
+Crossplane documentation for more information on building packages:
+
+  https://docs.crossplane.io/latest/concepts/packages/#building-a-package
+
+Even more details can be found in the xpkg reference document.`
 }
 
 // Run executes the build command.

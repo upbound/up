@@ -28,11 +28,13 @@ import (
 	"github.com/goccy/go-yaml/ast"
 	"github.com/goccy/go-yaml/parser"
 	"github.com/golang/tools/span"
+	"github.com/pterm/pterm"
 	"github.com/spf13/afero"
 
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/runtime/schema"
+	kerrors "k8s.io/apimachinery/pkg/util/errors"
 	k8syaml "sigs.k8s.io/yaml"
 
 	"github.com/crossplane/crossplane-runtime/pkg/errors"
@@ -58,7 +60,7 @@ const (
 
 	errCompositionResources = "resources in Composition are malformed"
 	errInvalidFileURI       = "invalid path supplied"
-	errInvalidPackage       = "invalid package; more than one meta file supplied"
+	errInvalidPackage       = "invalid package; more than one meta (configuration or provider) file supplied"
 )
 
 // builds static YAML path strings ahead of usage.
@@ -101,6 +103,10 @@ func New(root string, opts ...Option) (*Workspace, error) {
 			nodes:        make(map[NodeIdentifier]Node),
 			uriToDetails: make(map[span.URI]*Details),
 			xrClaimRefs:  make(map[schema.GroupVersionKind]schema.GroupVersionKind),
+
+			root: root,
+
+			printer: &pterm.BasicTextPrinter{Writer: io.Discard},
 		},
 	}
 
@@ -137,6 +143,23 @@ func WithLogger(l logging.Logger) Option {
 	}
 }
 
+// WithPrinter overrides the printer of the Workspace with the supplied
+// printer. By default a Workspace has no printer.
+func WithPrinter(p pterm.TextPrinter) Option {
+	return func(w *Workspace) {
+		w.view.printer = p
+	}
+}
+
+// WithPermissiveParser lets the workspace parser just print warnings when
+// a file or a document in a file cannot be parsed. This can be used when
+// partial results are more important than correctness.
+func WithPermissiveParser() Option {
+	return func(w *Workspace) {
+		w.view.permissiveParser = true
+	}
+}
+
 // Write writes the supplied Meta details to the fs.
 func (w *Workspace) Write(m *meta.Meta) error {
 	b, err := m.Bytes()
@@ -152,7 +175,8 @@ func (w *Workspace) Parse(ctx context.Context) error {
 	w.mu.Lock()
 	defer w.mu.Unlock()
 
-	return afero.Walk(w.fs, w.root, func(p string, info fs.FileInfo, err error) error {
+	var errs []error
+	if err := afero.Walk(w.fs, w.root, func(p string, info fs.FileInfo, err error) error {
 		if err != nil {
 			return err
 		}
@@ -179,9 +203,15 @@ func (w *Workspace) Parse(ctx context.Context) error {
 			NodeIDs: make(map[NodeIdentifier]struct{}),
 		}
 
-		_ = w.view.ParseFile(ctx, p)
+		if err := w.view.ParseFile(ctx, p); err != nil {
+			errs = append(errs, err)
+		}
 		return nil
-	})
+	}); err != nil {
+		return err
+	}
+
+	return kerrors.NewAggregate(errs)
 }
 
 // View returns the Workspace's View. Note: this will only exist _after_
@@ -200,9 +230,15 @@ func (v *View) ParseFile(ctx context.Context, path string) error {
 
 	f, err := parser.ParseBytes(details.Body, parser.ParseComments)
 	if err != nil {
-		return err
+		if v.permissiveParser {
+			v.printer.Printfln("WARNING: ignoring file %s: %v", path, err)
+			return nil
+		}
+		return errors.Wrapf(err, "failed to parse file %s", v.relativePath(path))
 	}
-	for _, doc := range f.Docs {
+
+	var errs []error
+	for i, doc := range f.Docs {
 		if doc.Body != nil {
 			pCtx := parseContext{
 				node:     doc,
@@ -210,14 +246,27 @@ func (v *View) ParseFile(ctx context.Context, path string) error {
 				rootNode: true,
 			}
 			if _, err := v.parseDoc(ctx, pCtx); err != nil {
+				if v.permissiveParser {
+					if len(f.Docs) > 1 {
+						v.printer.Printfln("WARNING: ignoring document %d in file %s: %v", i+1, path, err)
+					} else {
+						v.printer.Printfln("WARNING: ignoring file %s: %v", path, err)
+					}
+					continue
+				}
+
 				// We attempt to parse subsequent documents if we encounter an error
 				// in a preceding one.
-				// TODO(hasheddan): errors should be aggregated and returned as
-				// diagnostics.
+				errs = append(errs, err)
 				continue
 			}
 		}
 	}
+
+	if len(errs) > 0 {
+		return errors.Wrapf(kerrors.NewAggregate(errs), "failed to parse file %s", path)
+	}
+
 	return nil
 }
 
@@ -226,6 +275,7 @@ type parseContext struct {
 	node     ast.Node
 	obj      unstructured.Unstructured
 	path     string
+	doc      int
 	rootNode bool
 }
 
@@ -238,15 +288,22 @@ func (v *View) parseDoc(ctx context.Context, pCtx parseContext) (NodeIdentifier,
 	}
 	pCtx.docBytes = b
 
+	// first try to unmarshal as pure YAML, not expecting this to be a Kubernetes object.
+	var value interface{}
+	if err := k8syaml.Unmarshal(b, &value); err != nil {
+		return NodeIdentifier{}, err
+	}
+
+	// then try to unmarshal as a Kubernetes object. Ignore if errors which means it's not a Kubernetes object.
 	var obj unstructured.Unstructured
-	// NOTE(hasheddan): unmarshal returns an error if Kind is not defined.
 	// TODO(hasheddan): we cannot make use of strict unmarshal to identify
 	// extraneous fields because we don't have the underlying Go types. In
 	// the future, we would like to provide warnings on fields that are
 	// extraneous, but we will likely need to augment the OpenAPI validation
 	// to do so.
 	if err := k8syaml.Unmarshal(b, &obj); err != nil {
-		return NodeIdentifier{}, err
+		v.printer.Printfln("WARNING: ignoring document %d in file %s: missing 'kind' field, not a Kubernetes object", pCtx.doc+1, v.relativePath(pCtx.path))
+		return NodeIdentifier{}, nil //nolint:nilerr
 	}
 	pCtx.obj = obj
 	// NOTE(hasheddan): if we are at document root (i.e. this is a
@@ -374,10 +431,18 @@ func (v *View) parseMeta(ctx context.Context, pCtx parseContext) error {
 	}
 
 	if len(p.GetMeta()) != 1 {
-		return errors.New(errInvalidPackage)
+		return errors.Errorf("%s in %s", errInvalidPackage, v.relativePath(pCtx.path))
+	}
+
+	if v.meta != nil {
+		return errors.Errorf("%s: %s, %s and maybe more", errInvalidPackage, v.relativePath(v.metaPath), v.relativePath(pCtx.path))
 	}
 
 	v.meta = meta.New(p.GetMeta()[0])
+	v.metaPath = pCtx.path
+
+	v.printer.Printf("xpkg loaded package meta information from %s\n", v.relativePath(pCtx.path))
+
 	return nil
 }
 
@@ -426,10 +491,16 @@ type View struct {
 	// workspace was created.
 	metaLocation string
 	meta         *meta.Meta
+	metaPath     string
 	uriToDetails map[span.URI]*Details
 	nodes        map[NodeIdentifier]Node
 	// xrClaimRefs defines an look up from XR GVK -> Claim GVK (if one is defined).
 	xrClaimRefs map[schema.GroupVersionKind]schema.GroupVersionKind
+	// root is the path of the workspace root.
+	root    string
+	printer pterm.TextPrinter
+	// permissiveParser indicates whether to skip files or documents with parse errors.
+	permissiveParser bool
 }
 
 // FileDetails returns the map of file details found within the parsed workspace.
@@ -461,6 +532,17 @@ func (v *View) Examples() map[schema.GroupVersionKind][]Node {
 // XRClaimsRefs returns a map of XR GVK -> XRC GVK.
 func (v *View) XRClaimsRefs() map[schema.GroupVersionKind]schema.GroupVersionKind {
 	return v.xrClaimRefs
+}
+
+func (v *View) relativePath(path string) string {
+	if !filepath.IsAbs(path) {
+		return path
+	}
+	rel, err := filepath.Rel(v.root, path)
+	if err != nil {
+		return path
+	}
+	return rel
 }
 
 // Details represent file specific details.
