@@ -112,6 +112,7 @@ type cli struct {
 	XPLS               xpls.Cmd                     `cmd:"" help:"Start xpls language server."`
 	Alpha              alpha                        `cmd:"" help:"Alpha features. Commands may be removed in future releases."`
 	InstallCompletions kongplete.InstallCompletions `cmd:"" help:"Install shell completions"`
+	XP                 xpCmd                        `cmd:"" name:"crossplane" aliases:"xp" help:"Interact with Crossplane."`
 }
 
 type helpCmd struct{}
