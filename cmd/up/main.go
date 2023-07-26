@@ -30,6 +30,7 @@ import (
 	"github.com/upbound/up/cmd/up/profile"
 	"github.com/upbound/up/cmd/up/repository"
 	"github.com/upbound/up/cmd/up/robot"
+	"github.com/upbound/up/cmd/up/space"
 	"github.com/upbound/up/cmd/up/upbound"
 	"github.com/upbound/up/cmd/up/uxp"
 	"github.com/upbound/up/cmd/up/xpkg"
@@ -112,6 +113,7 @@ type cli struct {
 	XPLS               xpls.Cmd                     `cmd:"" help:"Start xpls language server."`
 	Alpha              alpha                        `cmd:"" help:"Alpha features. Commands may be removed in future releases."`
 	InstallCompletions kongplete.InstallCompletions `cmd:"" help:"Install shell completions"`
+	Space              space.Cmd                    `cmd:"" help:"Interact with spaces."`
 }
 
 type helpCmd struct{}
