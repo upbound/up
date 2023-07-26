@@ -43,7 +43,7 @@ const (
 	providerGCP   = "gcp"
 	providerAzure = "azure"
 
-	errFmtProviderNotSupported = "\"%s\" is not supported"
+	errFmtProviderNotSupported = "%q is not supported"
 )
 
 type dateRange usage.TimeRange
@@ -78,14 +78,13 @@ func (d *dateRange) Decode(ctx *kong.DecodeContext) error {
 type provider string
 
 func (p provider) Validate() error {
-	// TODO(branden): Add support for these providers.
+	// TODO(branden): Add support for AWS and Azure.
 	switch p {
-	case providerAWS:
-		return fmt.Errorf(errFmtProviderNotSupported, p)
-	case providerAzure:
+	case providerGCP:
+		return nil
+	default:
 		return fmt.Errorf(errFmtProviderNotSupported, p)
 	}
-	return nil
 }
 
 type getCmd struct {
