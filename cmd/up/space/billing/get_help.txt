@@ -1,0 +1,29 @@
+The storage location for the billing data used to create the report is supplied
+using the optional --provider, --bucket, and --endpoint flags. If these flags
+are missing, their values will be retrieved from the Spaces cluster from your
+kubeconfig. Set --endpoint="" to use the storage provider's default endpoint
+without checking your Spaces cluster for a custom endpoint.
+
+Credentials and other storage provider configuration are supplied according to
+the instructions for each provider below.
+
+AWS S3
+
+Supply configuration by setting these environment variables: AWS_REGION,
+AWS_ACCESS_KEY_ID, and AWS_SECRET_ACCESS_KEY. For more options, see the
+documentation at
+https://docs.aws.amazon.com/sdk-for-go/v1/developer-guide/configuring-sdk.html.
+
+GCP Cloud Storage
+
+Supply credentials by setting the environment variable
+GOOGLE_APPLICATION_CREDENTIALS with the location of a credential JSON file. For
+more options, see the documentation at
+https://cloud.google.com/docs/authentication/application-default-credentials.
+
+Azure Blob Storage
+
+Supply configuration by setting these environment variables: AZURE_TENANT_ID,
+AZURE_CLIENT_ID, and AZURE_CLIENT_SECRET. For more options, see the
+documentation at
+https://learn.microsoft.com/en-us/azure/developer/go/azure-sdk-authentication.
