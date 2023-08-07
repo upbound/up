@@ -24,7 +24,7 @@ func (c *teardownCmd) AfterApply(insCtx *install.Context) error {
 	mgr, err := helm.NewManager(insCtx.Kubeconfig,
 		spacesChart,
 		c.Repo,
-		helm.WithNamespace(insCtx.Namespace),
+		helm.WithNamespace(ns),
 		helm.IsOCI())
 	if err != nil {
 		return err
