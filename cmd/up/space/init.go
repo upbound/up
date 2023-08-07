@@ -201,7 +201,11 @@ func (c *initCmd) Run(insCtx *install.Context, upCtx *upbound.Context) error {
 	// At least 1 prerequisite is not installed, check if we should install the
 	// missing for the client.
 	if len(status.NotInstalled) > 0 {
-		pterm.Warning.Printfln("One or more required prerequisites are not installed.")
+		pterm.Warning.Printfln("One or more required prerequisites are not installed:")
+		pterm.Println()
+		for _, p := range status.NotInstalled {
+			pterm.Println(fmt.Sprintf("❌ %s", p.GetName()))
+		}
 		pterm.DefaultInteractiveConfirm.DefaultText = "Would you like to install them now?"
 		pterm.Println() // Blank line
 		result, _ := pterm.DefaultInteractiveConfirm.Show()
