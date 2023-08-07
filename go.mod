@@ -6,6 +6,7 @@ require (
 	cloud.google.com/go/storage v1.28.1
 	github.com/Masterminds/semver v1.5.0
 	github.com/alecthomas/kong v0.8.0
+	github.com/aws/aws-sdk-go v1.44.313
 	github.com/crossplane/crossplane v1.13.0-rc.0.0.20230701053013-444267e84783
 	github.com/crossplane/crossplane-runtime v0.20.0-rc.0.0.20230622073604-c52ef3ac58c6
 	github.com/crossplane/crossplane/controller/apiextensions v0.0.0-00010101000000-000000000000
@@ -136,6 +137,7 @@ require (
 	github.com/imdario/mergo v0.3.16 // indirect
 	github.com/inconshreveable/mousetrap v1.1.0 // indirect
 	github.com/jbenet/go-context v0.0.0-20150711004518-d14ea06fba99 // indirect
+	github.com/jmespath/go-jmespath v0.4.0 // indirect
 	github.com/jmoiron/sqlx v1.3.5 // indirect
 	github.com/josharian/intern v1.0.0 // indirect
 	github.com/json-iterator/go v1.1.12 // indirect
