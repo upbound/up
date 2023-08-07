@@ -19,12 +19,14 @@ import (
 
 	"github.com/upbound/up/internal/install"
 	"github.com/upbound/up/internal/install/helm"
+	"github.com/upbound/up/internal/upterm"
 )
 
 // AfterApply sets default values in command after assignment and validation.
 func (c *destroyCmd) AfterApply(insCtx *install.Context) error {
 	// NOTE(tnthornton) we currently only have support for stylized output.
 	pterm.EnableStyling()
+	upterm.DefaultObjPrinter.Pretty = true
 
 	mgr, err := helm.NewManager(insCtx.Kubeconfig,
 		spacesChart,

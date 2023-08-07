@@ -101,6 +101,7 @@ func (c *initCmd) BeforeApply() error {
 func (c *initCmd) AfterApply(insCtx *install.Context, kongCtx *kong.Context, quiet config.QuietFlag) error { //nolint:gocyclo
 	// NOTE(tnthornton) we currently only have support for stylized output.
 	pterm.EnableStyling()
+	upterm.DefaultObjPrinter.Pretty = true
 
 	upCtx, err := upbound.NewFromFlags(c.Flags)
 	if err != nil {

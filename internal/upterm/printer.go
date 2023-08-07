@@ -40,7 +40,7 @@ type ObjectPrinter struct {
 var (
 	DefaultObjPrinter = ObjectPrinter{
 		Quiet:        false,
-		Pretty:       true,
+		Pretty:       false,
 		Format:       config.Default,
 		TablePrinter: pterm.DefaultTable.WithSeparator("   "),
 	}

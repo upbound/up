@@ -46,6 +46,7 @@ func (c *upgradeCmd) BeforeApply() error {
 func (c *upgradeCmd) AfterApply(insCtx *install.Context, quiet config.QuietFlag) error {
 	// NOTE(tnthornton) we currently only have support for stylized output.
 	pterm.EnableStyling()
+	upterm.DefaultObjPrinter.Pretty = true
 
 	b, err := io.ReadAll(c.TokenFile)
 	defer c.TokenFile.Close() // nolint:errcheck
