@@ -98,7 +98,7 @@ func (c *initCmd) BeforeApply() error {
 
 // AfterApply sets default values in command after assignment and validation.
 func (c *initCmd) AfterApply(insCtx *install.Context, kongCtx *kong.Context, quiet config.QuietFlag) error { //nolint:gocyclo
-	// NOTE(tnthornton) we currently only support for stylized output.
+	// NOTE(tnthornton) we currently only have support for stylized output.
 	pterm.EnableStyling()
 
 	upCtx, err := upbound.NewFromFlags(c.Flags)

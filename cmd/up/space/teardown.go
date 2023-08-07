@@ -23,7 +23,7 @@ import (
 
 // AfterApply sets default values in command after assignment and validation.
 func (c *teardownCmd) AfterApply(insCtx *install.Context) error {
-	// NOTE(tnthornton) we currently only support for stylized output.
+	// NOTE(tnthornton) we currently only have support for stylized output.
 	pterm.EnableStyling()
 
 	mgr, err := helm.NewManager(insCtx.Kubeconfig,

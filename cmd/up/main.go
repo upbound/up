@@ -73,7 +73,7 @@ func (c *cli) AfterApply(ctx *kong.Context) error { //nolint:unparam
 
 	printer := upterm.DefaultObjPrinter
 	printer.Format = c.Format
-	printer.Pretty = true
+	printer.Pretty = c.Pretty
 	printer.Quiet = c.Quiet
 
 	ctx.Bind(printer)
@@ -114,7 +114,6 @@ type cli struct {
 	Alpha              alpha                        `cmd:"" help:"Alpha features. Commands may be removed in future releases."`
 	InstallCompletions kongplete.InstallCompletions `cmd:"" help:"Install shell completions"`
 	Space              space.Cmd                    `cmd:"" help:"Interact with spaces."`
-	Upbound            upbound.Cmd                  `cmd:"" maturity:"alpha" help:"Interact with Upbound."`
 }
 
 type helpCmd struct{}
@@ -135,6 +134,7 @@ type alpha struct {
 	// For now, we maintain compatibility for systems that may still use the alpha variant.
 	// This nudges users towards the stable variant when they attempt to emit help.
 	ControlPlane controlplane.Cmd `cmd:"" hidden:"" name:"controlplane" aliases:"ctp" help:"Interact with control planes."`
+	Upbound      upbound.Cmd      `cmd:"" maturity:"alpha" help:"Interact with Upbound."`
 	XPKG         xpkg.Cmd         `cmd:"" maturity:"alpha" help:"Interact with UXP packages."`
 }
 

@@ -112,7 +112,7 @@ func (c *CertManager) Install() error {
 	return c.mgr.Install(version, values)
 }
 
-// IsInstalled checks if cert-managed has been installed in the target cluster.
+// IsInstalled checks if cert-manager has been installed in the target cluster.
 func (c *CertManager) IsInstalled() bool {
 	_, err := c.crdclient.
 		CustomResourceDefinitions().
