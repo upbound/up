@@ -205,10 +205,9 @@ func (c *initCmd) Run(insCtx *install.Context, upCtx *upbound.Context) error {
 		pterm.Println() // Blank line
 		result, _ := pterm.DefaultInteractiveConfirm.Show()
 		pterm.Println() // Blank line
-		// pterm.Info.Printfln("You answered: %s", boolToText(result))
 
 		if !result {
-			pterm.Error.Println("prerequisites must be met inorder to proceed with installation")
+			pterm.Error.Println("prerequisites must be met in order to proceed with installation")
 			return nil
 		}
 
