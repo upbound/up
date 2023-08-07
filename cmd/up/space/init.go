@@ -200,7 +200,7 @@ func (c *initCmd) Run(insCtx *install.Context, upCtx *upbound.Context) error {
 	status := c.prereqs.Check()
 
 	// At least 1 prerequisite is not installed, check if we should install the
-	// missing for the client.
+	// missing ones for the client.
 	if len(status.NotInstalled) > 0 {
 		pterm.Warning.Printfln("One or more required prerequisites are not installed:")
 		pterm.Println()
