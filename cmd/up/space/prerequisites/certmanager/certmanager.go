@@ -44,10 +44,9 @@ var (
 
 	certificatesCRD = "certificates.cert-manager.io"
 
-	errCreateNamespace = "failed to create namespace"
-
 	errFmtCreateHelmManager = "failed to create helm manager for %s"
 	errFmtCreateK8sClient   = "failed to create kubernetes client for helm chart %s"
+	errFmtCreateNamespace   = "failed to create namespace %s"
 )
 
 // CertManager represents a Helm manager
@@ -106,7 +105,7 @@ func (c *CertManager) Install() error {
 				},
 			}, metav1.CreateOptions{})
 	if err != nil && !kerrors.IsAlreadyExists(err) {
-		return errors.Wrap(err, errCreateNamespace)
+		return errors.Wrap(err, fmt.Sprintf(errFmtCreateNamespace, chartName))
 	}
 
 	return c.mgr.Install(version, values)

@@ -79,9 +79,10 @@ const (
 	errGetAccessKey           = "failed to acquire access key"
 	errCreateImagePullSecret  = "failed to create image pull secret"
 	errCreateLicenseSecret    = "failed to create license secret"
-	errCreateNamespace        = "failed to create namespace"
 	errTimoutExternalIP       = "timed out waiting for externalIP to resolve"
 	errUpdateConfig           = "unable to update config"
+
+	errFmtCreateNamespace = "failed to create namespace %s"
 )
 
 func init() {
@@ -273,7 +274,7 @@ func (c *initCmd) applySecret(ctx context.Context, namespace string) error {
 		},
 	}, metav1.CreateOptions{})
 	if err != nil && !kerrors.IsAlreadyExists(err) {
-		return errors.Wrap(err, errCreateNamespace)
+		return errors.Wrap(err, fmt.Sprintf(errFmtCreateNamespace, ns))
 	}
 
 	if err := upterm.WrapWithSuccessSpinner(

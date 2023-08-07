@@ -40,8 +40,7 @@ var (
 
 	xrdCRD = "compositeresourcedefinitions.apiextensions.crossplane.io"
 
-	errCreateNamespace = "failed to create namespace"
-
+	errFmtCreateNamespace   = "failed to create namespace %s"
 	errFmtCreateHelmManager = "failed to create helm manager for %s"
 	errFmtCreateK8sClient   = "failed to create kubernetes client for helm chart %s"
 )
@@ -104,7 +103,7 @@ func (u *UXP) Install() error {
 				},
 			}, metav1.CreateOptions{})
 	if err != nil && !kerrors.IsAlreadyExists(err) {
-		return errors.Wrap(err, errCreateNamespace)
+		return errors.Wrap(err, fmt.Sprintf(errFmtCreateNamespace, ns))
 	}
 	return u.mgr.Install(version, map[string]any{})
 }
