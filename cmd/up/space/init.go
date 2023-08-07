@@ -164,7 +164,7 @@ func (c *initCmd) AfterApply(insCtx *install.Context, kongCtx *kong.Context, qui
 	return nil
 }
 
-// initCmd installs Upbound.
+// initCmd installs Upbound Spaces.
 type initCmd struct {
 	helmMgr    install.Manager
 	prereqs    *prerequisites.Manager
