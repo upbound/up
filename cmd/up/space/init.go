@@ -18,7 +18,6 @@ import (
 	"context"
 	"fmt"
 	"io"
-	"os"
 	"strings"
 	"time"
 
@@ -51,6 +50,7 @@ import (
 const (
 	hcGroup          = "internal.spaces.upbound.io"
 	hcVersion        = "v1alpha1"
+	hcKind           = "XHostCluster"
 	hcResourcePlural = "hostclusters"
 )
 
@@ -66,17 +66,17 @@ var (
 	hostclusterGVK = schema.GroupVersionKind{
 		Group:   hcGroup,
 		Version: hcVersion,
-		Kind:    "XHostCluster",
+		Kind:    hcKind,
 	}
 )
 
 const (
 	defaultTimeout = 30 * time.Second
 
-	defaultSecretAccessKey = "access_key"
-	defaultSecretSignature = "signature"
 	defaultImagePullSecret = "upbound-pull-secret"
-	localhost              = "127.0.0.1"
+	ns                     = "upbound-system"
+
+	jsonKey = "_json_key"
 
 	errReadTokenFile          = "unable to read token file"
 	errReadParametersFile     = "unable to read parameters file"
@@ -119,8 +119,7 @@ func (c *initCmd) AfterApply(insCtx *install.Context, kongCtx *kong.Context, qui
 		return err
 	}
 	c.prereqs = prereqs
-	// TODO(tnthornton) change this to work with key.json
-	c.id = `oauth2accesstoken`
+	c.id = jsonKey
 	kClient, err := kubernetes.NewForConfig(insCtx.Kubeconfig)
 	if err != nil {
 		return err
@@ -133,10 +132,10 @@ func (c *initCmd) AfterApply(insCtx *install.Context, kongCtx *kong.Context, qui
 		return err
 	}
 	c.dClient = dClient
-	mxemgr, err := helm.NewManager(insCtx.Kubeconfig,
-		mxeChart,
+	mgr, err := helm.NewManager(insCtx.Kubeconfig,
+		spacesChart,
 		c.Repo,
-		helm.WithNamespace(insCtx.Namespace),
+		helm.WithNamespace(ns),
 		helm.WithBasicAuth(c.id, c.token),
 		helm.IsOCI(),
 		helm.WithChart(c.Bundle),
@@ -145,7 +144,7 @@ func (c *initCmd) AfterApply(insCtx *install.Context, kongCtx *kong.Context, qui
 	if err != nil {
 		return err
 	}
-	c.mxemgr = mxemgr
+	c.helmMgr = mgr
 
 	base := map[string]any{}
 	if c.File != nil {
@@ -168,7 +167,7 @@ func (c *initCmd) AfterApply(insCtx *install.Context, kongCtx *kong.Context, qui
 
 // initCmd installs Upbound.
 type initCmd struct {
-	mxemgr     install.Manager
+	helmMgr    install.Manager
 	prereqs    *prerequistes.Manager
 	parser     install.ParameterParser
 	kClient    kubernetes.Interface
@@ -179,13 +178,12 @@ type initCmd struct {
 	token      string
 	quiet      config.QuietFlag
 
-	Version string `arg:"" help:"Upbound version to install."`
+	Version string `arg:"" help:"Upbound Spaces version to install."`
 
 	commonParams
 	install.CommonParams
 
-	Flags     upbound.Flags `embed:""`
-	TokenFile *os.File      `name:"token-file" required:"" help:"File containing authentication token."`
+	Flags upbound.Flags `embed:""`
 }
 
 // Run executes the install command.
@@ -223,7 +221,7 @@ func (c *initCmd) Run(insCtx *install.Context, upCtx *upbound.Context) error {
 	pterm.Info.Printfln("Required prerequistes met!")
 	pterm.Info.Printfln("Proceeding with Upbound Spaces installation...")
 
-	if err := c.applySecret(ctx, insCtx.Namespace); err != nil {
+	if err := c.applySecret(ctx, ns); err != nil {
 		return err
 	}
 
@@ -256,7 +254,7 @@ func (c *initCmd) installPrereqs(ctx context.Context) error {
 	return nil
 }
 
-func (c *initCmd) applySecret(ctx context.Context, namespace string) error { //nolint:gocyclo
+func (c *initCmd) applySecret(ctx context.Context, namespace string) error {
 	creatPullSecret := func() error {
 		if err := c.pullSecret.Apply(
 			ctx,
@@ -292,7 +290,7 @@ func (c *initCmd) applySecret(ctx context.Context, namespace string) error { //n
 
 func (c *initCmd) deploySpace(ctx context.Context, params map[string]any) error {
 	install := func() error {
-		if err := c.mxemgr.Install(strings.TrimPrefix(c.Version, "v"), params); err != nil {
+		if err := c.helmMgr.Install(strings.TrimPrefix(c.Version, "v"), params); err != nil {
 			return err
 		}
 		return nil
@@ -333,5 +331,5 @@ func outputNextSteps() {
 	pterm.Println()
 	pterm.Info.WithPrefix(upterm.EyesPrefix).Println("Next Steps 👇")
 	pterm.Println()
-	pterm.Println("👉 Checkout installation docs @ https://upbound.io/docs")
+	pterm.Println("👉 Check out spaces docs @ https://docs.upbound.io")
 }

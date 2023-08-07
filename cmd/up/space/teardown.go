@@ -22,7 +22,7 @@ import (
 // AfterApply sets default values in command after assignment and validation.
 func (c *teardownCmd) AfterApply(insCtx *install.Context) error {
 	mgr, err := helm.NewManager(insCtx.Kubeconfig,
-		mxeChart,
+		spacesChart,
 		c.Repo,
 		helm.WithNamespace(insCtx.Namespace),
 		helm.IsOCI())
@@ -41,8 +41,6 @@ type teardownCmd struct {
 	token string
 
 	commonParams
-
-	Name string `arg:"" optional:"" default:"install" help:"Name of Upbound install."`
 }
 
 // Run executes the uninstall command.

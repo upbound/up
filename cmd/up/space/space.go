@@ -17,18 +17,42 @@ package space
 import (
 	"net/url"
 
+	"github.com/alecthomas/kong"
 	"github.com/upbound/up/cmd/up/space/billing"
+	"github.com/upbound/up/internal/feature"
+	"github.com/upbound/up/internal/install"
+	"github.com/upbound/up/internal/kube"
 )
 
-const mxeChart = "spaces"
+const spacesChart = "spaces"
+
+// BeforeReset is the first hook to run.
+func (c *Cmd) BeforeReset(p *kong.Path, maturity feature.Maturity) error {
+	return feature.HideMaturity(p, maturity)
+}
+
+// AfterApply constructs and binds Upbound-specific context to any subcommands
+// that have Run() methods that receive it.
+func (c *Cmd) AfterApply(kongCtx *kong.Context) error {
+	kubeconfig, err := kube.GetKubeConfig(c.Kubeconfig)
+	if err != nil {
+		return err
+	}
+
+	kongCtx.Bind(&install.Context{
+		Kubeconfig: kubeconfig,
+	})
+	return nil
+}
 
 // Cmd contains commands for interacting with spaces.
 type Cmd struct {
-	Billing billing.Cmd `cmd:""`
+	Billing    billing.Cmd `cmd:""`
+	Kubeconfig string      `type:"existingfile" help:"Override default kubeconfig path."`
 
-	Init    initCmd     `cmd:"" maturity:"alpha" help:"Initialize an Upbound Space deployment."`
-	Destroy teardownCmd `cmd:"" maturity:"alpha" help:"Remove the Upbound Space deployment."`
-	Upgrade upgradeCmd  `cmd:"" maturity:"alpha" help:"Upgrade the Upbound Space deployment."`
+	Init     initCmd     `cmd:"" maturity:"alpha" help:"Initialize an Upbound Spaces deployment."`
+	Teardown teardownCmd `cmd:"" maturity:"alpha" help:"Remove the Upbound Spaces deployment."`
+	Upgrade  upgradeCmd  `cmd:"" maturity:"alpha" help:"Upgrade the Upbound Spaces deployment."`
 }
 
 type commonParams struct {
