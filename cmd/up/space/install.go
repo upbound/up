@@ -12,7 +12,7 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-package upbound
+package space
 
 import (
 	"context"
@@ -37,7 +37,7 @@ import (
 	"k8s.io/client-go/kubernetes"
 	"sigs.k8s.io/yaml"
 
-	"github.com/upbound/up/cmd/up/upbound/prerequistes"
+	"github.com/upbound/up/cmd/up/space/prerequistes"
 	"github.com/upbound/up/internal/config"
 	"github.com/upbound/up/internal/input"
 	"github.com/upbound/up/internal/install"
@@ -327,21 +327,6 @@ func (c *installCmd) deploySpace(ctx context.Context, params map[string]any) err
 	}
 	hcSpinner.Success()
 	return nil
-}
-
-func updateProfile(upCtx *upbound.Context) error {
-	// apply selfhosted config
-	profileName, config := getSelfHostedProfile(resources.Domain)
-	if err := upCtx.Cfg.AddOrUpdateUpboundProfile(profileName, config); err != nil {
-		return err
-	}
-
-	// switch default profile to selfhosted
-	if err := upCtx.Cfg.SetDefaultUpboundProfile(profileName); err != nil {
-		return err
-	}
-
-	return errors.Wrap(upCtx.CfgSrc.UpdateConfig(upCtx.Cfg), errUpdateConfig)
 }
 
 func outputNextSteps() {

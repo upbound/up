@@ -19,16 +19,12 @@
 package upbound
 
 import (
-	"net/url"
-
 	"github.com/alecthomas/kong"
 
 	"github.com/upbound/up/internal/feature"
 	"github.com/upbound/up/internal/install"
 	"github.com/upbound/up/internal/kube"
 )
-
-const mxeChart = "spaces"
 
 // BeforeReset is the first hook to run.
 func (c *Cmd) BeforeReset(p *kong.Path, maturity feature.Maturity) error {
@@ -52,10 +48,6 @@ func (c *Cmd) AfterApply(kongCtx *kong.Context) error {
 
 // Cmd contains commands for managing Upbound.
 type Cmd struct {
-	Install   installCmd   `cmd:"" maturity:"alpha" help:"Install Upbound."`
-	Uninstall uninstallCmd `cmd:"" maturity:"alpha" help:"Uninstall Upbound."`
-	Upgrade   upgradeCmd   `cmd:"" maturity:"alpha" help:"Upgrade Upbound."`
-
 	Kubeconfig string `type:"existingfile" help:"Override default kubeconfig path."`
 	Namespace  string `short:"n" env:"UPBOUND_NAMESPACE" default:"upbound-system" help:"Kubernetes namespace for Upbound."`
 }
@@ -66,8 +58,6 @@ type commonParams struct {
 	LicenseSecretName string `default:"upbound-license" help:"Name of secret that will be populated with license data."`
 	SkipLicense       bool   `hidden:"" help:"Skip providing a license for Upbound install."`
 
-	Repo      *url.URL `hidden:"" env:"UPBOUND_REPO" default:"us-west1-docker.pkg.dev/orchestration-build/upbound-environments" help:"Set repo for Upbound."`
-	Registry  *url.URL `hidden:"" env:"UPBOUND_REGISTRY_ENDPOINT" default:"https://us-west1-docker.pkg.dev" help:"Set registry for authentication."`
-	OrgID     string   `hidden:"" env:"UPBOUND_ORG_ID" default:"upbound" help:"Set orgID for Upbound."`
-	ProductID string   `hidden:"" env:"UPBOUND_PRODUCT_ID" default:"upbound" help:"Set productID for Upbound."`
+	OrgID     string `hidden:"" env:"UPBOUND_ORG_ID" default:"upbound" help:"Set orgID for Upbound."`
+	ProductID string `hidden:"" env:"UPBOUND_PRODUCT_ID" default:"upbound" help:"Set productID for Upbound."`
 }

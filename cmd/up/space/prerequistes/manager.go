@@ -4,8 +4,8 @@ import (
 	"github.com/crossplane/crossplane-runtime/pkg/errors"
 	"k8s.io/client-go/rest"
 
-	"github.com/upbound/up/cmd/up/upbound/prerequistes/certmanager"
-	"github.com/upbound/up/cmd/up/upbound/prerequistes/uxp"
+	"github.com/upbound/up/cmd/up/space/prerequistes/certmanager"
+	"github.com/upbound/up/cmd/up/space/prerequistes/uxp"
 )
 
 var (

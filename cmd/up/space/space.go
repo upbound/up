@@ -14,9 +14,25 @@
 
 package space
 
-import "github.com/upbound/up/cmd/up/space/billing"
+import (
+	"net/url"
+
+	"github.com/upbound/up/cmd/up/space/billing"
+)
+
+const mxeChart = "spaces"
 
 // Cmd contains commands for interacting with spaces.
 type Cmd struct {
 	Billing billing.Cmd `cmd:""`
+
+	Install   installCmd   `cmd:"" maturity:"alpha" help:"Install Upbound."`
+	Uninstall uninstallCmd `cmd:"" maturity:"alpha" help:"Uninstall Upbound."`
+	Upgrade   upgradeCmd   `cmd:"" maturity:"alpha" help:"Upgrade Upbound."`
+}
+
+type commonParams struct {
+	Repo *url.URL `hidden:"" env:"UPBOUND_REPO" default:"us-west1-docker.pkg.dev/orchestration-build/upbound-environments" help:"Set repo for Upbound."`
+
+	Registry *url.URL `hidden:"" env:"UPBOUND_REGISTRY_ENDPOINT" default:"https://us-west1-docker.pkg.dev" help:"Set registry for authentication."`
 }
