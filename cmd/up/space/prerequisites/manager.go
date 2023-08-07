@@ -12,53 +12,53 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-package prerequistes
+package prerequisites
 
 import (
 	"github.com/crossplane/crossplane-runtime/pkg/errors"
 	"k8s.io/client-go/rest"
 
-	"github.com/upbound/up/cmd/up/space/prerequistes/certmanager"
-	"github.com/upbound/up/cmd/up/space/prerequistes/uxp"
+	"github.com/upbound/up/cmd/up/space/prerequisites/certmanager"
+	"github.com/upbound/up/cmd/up/space/prerequisites/uxp"
 )
 
 var (
-	errCreatePrerequiste = "failed to instantiate prerequiste manager"
+	errCreatePrerequisite = "failed to instantiate prerequisite manager"
 )
 
-// Prerequiste defines the API that is used to interogate an installation
-// prerequiste.
-type Prerequiste interface {
+// Prerequisite defines the API that is used to interogate an installation
+// prerequisite.
+type Prerequisite interface {
 	GetName() string
 
 	Install() error
 	IsInstalled() bool
 }
 
-// Manager provides APIs for interacting with Prerequistes within the target
+// Manager provides APIs for interacting with Prerequisites within the target
 // cluster.
 type Manager struct {
-	prereqs []Prerequiste
+	prereqs []Prerequisite
 }
 
-// Status represents the the overall status of the Prerequistes within the
+// Status represents the the overall status of the Prerequisite within the
 // target cluster.
 type Status struct {
-	NotInstalled []Prerequiste
+	NotInstalled []Prerequisite
 }
 
-// New constructs a new Manager for working with installation Prerequistes.
+// New constructs a new Manager for working with installation Prerequisites.
 func New(config *rest.Config) (*Manager, error) {
-	prereqs := []Prerequiste{}
+	prereqs := []Prerequisite{}
 	certmanager, err := certmanager.New(config)
 	if err != nil {
-		return nil, errors.Wrap(err, errCreatePrerequiste)
+		return nil, errors.Wrap(err, errCreatePrerequisite)
 	}
 	prereqs = append(prereqs, certmanager)
 
 	uxp, err := uxp.New(config)
 	if err != nil {
-		return nil, errors.Wrap(err, errCreatePrerequiste)
+		return nil, errors.Wrap(err, errCreatePrerequisite)
 	}
 	prereqs = append(prereqs, uxp)
 
@@ -67,10 +67,10 @@ func New(config *rest.Config) (*Manager, error) {
 	}, nil
 }
 
-// Check performs IsInstalled checks for each of the Prerequistes against the
+// Check performs IsInstalled checks for each of the Prerequisites against the
 // target cluster.
 func (m *Manager) Check() *Status {
-	notInstalled := []Prerequiste{}
+	notInstalled := []Prerequisite{}
 	for _, p := range m.prereqs {
 		if !p.IsInstalled() {
 			notInstalled = append(notInstalled, p)

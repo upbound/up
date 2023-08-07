@@ -15,12 +15,17 @@
 package space
 
 import (
+	"github.com/pterm/pterm"
+
 	"github.com/upbound/up/internal/install"
 	"github.com/upbound/up/internal/install/helm"
 )
 
 // AfterApply sets default values in command after assignment and validation.
 func (c *teardownCmd) AfterApply(insCtx *install.Context) error {
+	// NOTE(tnthornton) we currently only support for stylized output.
+	pterm.EnableStyling()
+
 	mgr, err := helm.NewManager(insCtx.Kubeconfig,
 		spacesChart,
 		c.Repo,
@@ -36,9 +41,6 @@ func (c *teardownCmd) AfterApply(insCtx *install.Context) error {
 // teardownCmd uninstalls Upbound.
 type teardownCmd struct {
 	mgr install.Manager
-
-	id    string
-	token string
 
 	commonParams
 }

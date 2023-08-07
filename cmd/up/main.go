@@ -68,7 +68,7 @@ func (c *cli) AfterApply(ctx *kong.Context) error { //nolint:unparam
 	if !c.Pretty {
 		// NOTE(hasheddan): enabling styling can make processing output with
 		// other tooling difficult.
-		// pterm.DisableStyling()
+		pterm.DisableStyling()
 	}
 
 	printer := upterm.DefaultObjPrinter

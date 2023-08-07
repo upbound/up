@@ -47,8 +47,7 @@ var (
 )
 
 func init() {
-	// pterm.DisableStyling()
-	pterm.EnableStyling()
+	pterm.DisableStyling()
 }
 
 // Print will print a single option or an array/slice of objects.

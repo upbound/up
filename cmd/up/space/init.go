@@ -36,7 +36,7 @@ import (
 	"k8s.io/client-go/kubernetes"
 	"sigs.k8s.io/yaml"
 
-	"github.com/upbound/up/cmd/up/space/prerequistes"
+	"github.com/upbound/up/cmd/up/space/prerequisites"
 	"github.com/upbound/up/internal/config"
 	"github.com/upbound/up/internal/input"
 	"github.com/upbound/up/internal/install"
@@ -62,12 +62,6 @@ var (
 		Version:  hcVersion,
 		Resource: hcResourcePlural,
 	}
-
-	hostclusterGVK = schema.GroupVersionKind{
-		Group:   hcGroup,
-		Version: hcVersion,
-		Kind:    hcKind,
-	}
 )
 
 const (
@@ -91,7 +85,9 @@ const (
 )
 
 func init() {
-	runtime.ErrorHandlers = []func(error){}
+	// NOTE(tnthornton) we override the runtime.ErrorHandlers so that Helm
+	// doesn't leak Println logs.
+	runtime.ErrorHandlers = []func(error){} //nolint:reassign
 }
 
 // BeforeApply sets default values in login before assignment and validation.
@@ -102,6 +98,9 @@ func (c *initCmd) BeforeApply() error {
 
 // AfterApply sets default values in command after assignment and validation.
 func (c *initCmd) AfterApply(insCtx *install.Context, kongCtx *kong.Context, quiet config.QuietFlag) error { //nolint:gocyclo
+	// NOTE(tnthornton) we currently only support for stylized output.
+	pterm.EnableStyling()
+
 	upCtx, err := upbound.NewFromFlags(c.Flags)
 	if err != nil {
 		return err
@@ -109,12 +108,12 @@ func (c *initCmd) AfterApply(insCtx *install.Context, kongCtx *kong.Context, qui
 	kongCtx.Bind(upCtx)
 
 	b, err := io.ReadAll(c.TokenFile)
-	defer c.TokenFile.Close()
+	defer c.TokenFile.Close() // nolint:errcheck
 	if err != nil {
 		return errors.Wrap(err, errReadTokenFile)
 	}
 	c.token = string(b)
-	prereqs, err := prerequistes.New(insCtx.Kubeconfig)
+	prereqs, err := prerequisites.New(insCtx.Kubeconfig)
 	if err != nil {
 		return err
 	}
@@ -168,7 +167,7 @@ func (c *initCmd) AfterApply(insCtx *install.Context, kongCtx *kong.Context, qui
 // initCmd installs Upbound.
 type initCmd struct {
 	helmMgr    install.Manager
-	prereqs    *prerequistes.Manager
+	prereqs    *prerequisites.Manager
 	parser     install.ParameterParser
 	kClient    kubernetes.Interface
 	dClient    dynamic.Interface
@@ -198,10 +197,10 @@ func (c *initCmd) Run(insCtx *install.Context, upCtx *upbound.Context) error {
 	// check if required prerequisites are installed
 	status := c.prereqs.Check()
 
-	// At least 1 prerequiste is not installed, check if we should install the
+	// At least 1 prerequisite is not installed, check if we should install the
 	// missing for the client.
 	if len(status.NotInstalled) > 0 {
-		pterm.Warning.Printfln("One or more required prerequistes are not installed.")
+		pterm.Warning.Printfln("One or more required prerequisites are not installed.")
 		pterm.DefaultInteractiveConfirm.DefaultText = "Would you like to install them now?"
 		pterm.Println() // Blank line
 		result, _ := pterm.DefaultInteractiveConfirm.Show()
@@ -209,16 +208,16 @@ func (c *initCmd) Run(insCtx *install.Context, upCtx *upbound.Context) error {
 		// pterm.Info.Printfln("You answered: %s", boolToText(result))
 
 		if !result {
-			pterm.Error.Println("prerequistes must be met inorder to proceed with installation")
+			pterm.Error.Println("prerequisites must be met inorder to proceed with installation")
 			return nil
 		}
 
-		if err := c.installPrereqs(ctx); err != nil {
+		if err := c.installPrereqs(); err != nil {
 			return err
 		}
 	}
 
-	pterm.Info.Printfln("Required prerequistes met!")
+	pterm.Info.Printfln("Required prerequisites met!")
 	pterm.Info.Printfln("Proceeding with Upbound Spaces installation...")
 
 	if err := c.applySecret(ctx, ns); err != nil {
@@ -235,7 +234,7 @@ func (c *initCmd) Run(insCtx *install.Context, upCtx *upbound.Context) error {
 	return nil
 }
 
-func (c *initCmd) installPrereqs(ctx context.Context) error {
+func (c *initCmd) installPrereqs() error {
 
 	status := c.prereqs.Check()
 	for i, p := range status.NotInstalled {

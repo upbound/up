@@ -51,13 +51,3 @@ type Cmd struct {
 	Kubeconfig string `type:"existingfile" help:"Override default kubeconfig path."`
 	Namespace  string `short:"n" env:"UPBOUND_NAMESPACE" default:"upbound-system" help:"Kubernetes namespace for Upbound."`
 }
-
-// commonParams are common parameters used across Upbound install and upgrade
-// commands.
-type commonParams struct {
-	LicenseSecretName string `default:"upbound-license" help:"Name of secret that will be populated with license data."`
-	SkipLicense       bool   `hidden:"" help:"Skip providing a license for Upbound install."`
-
-	OrgID     string `hidden:"" env:"UPBOUND_ORG_ID" default:"upbound" help:"Set orgID for Upbound."`
-	ProductID string `hidden:"" env:"UPBOUND_PRODUCT_ID" default:"upbound" help:"Set productID for Upbound."`
-}

@@ -20,6 +20,7 @@ import (
 	"strings"
 
 	"github.com/crossplane/crossplane-runtime/pkg/errors"
+	"github.com/pterm/pterm"
 	"k8s.io/client-go/kubernetes"
 	"sigs.k8s.io/yaml"
 
@@ -43,8 +44,11 @@ func (c *upgradeCmd) BeforeApply() error {
 
 // AfterApply sets default values in command after assignment and validation.
 func (c *upgradeCmd) AfterApply(insCtx *install.Context, quiet config.QuietFlag) error {
+	// NOTE(tnthornton) we currently only support for stylized output.
+	pterm.EnableStyling()
+
 	b, err := io.ReadAll(c.TokenFile)
-	defer c.TokenFile.Close()
+	defer c.TokenFile.Close() // nolint:errcheck
 	if err != nil {
 		return errors.Wrap(err, errReadTokenFile)
 	}
@@ -126,14 +130,14 @@ func (c *upgradeCmd) Run(insCtx *install.Context) error {
 		return errors.Wrap(err, errCreateImagePullSecret)
 	}
 
-	if err := c.upgradeUpbound(context.Background(), params); err != nil {
+	if err := c.upgradeUpbound(params); err != nil {
 		return err
 	}
 
 	return nil
 }
 
-func (c *upgradeCmd) upgradeUpbound(ctx context.Context, params map[string]any) error {
+func (c *upgradeCmd) upgradeUpbound(params map[string]any) error {
 	upgrade := func() error {
 		if err := c.helmMgr.Upgrade(strings.TrimPrefix(c.Version, "v"), params); err != nil {
 			return err
