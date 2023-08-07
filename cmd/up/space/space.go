@@ -51,9 +51,9 @@ type Cmd struct {
 	Billing    billing.Cmd `cmd:""`
 	Kubeconfig string      `type:"existingfile" help:"Override default kubeconfig path."`
 
-	Init     initCmd     `cmd:"" maturity:"alpha" help:"Initialize an Upbound Spaces deployment."`
-	Teardown teardownCmd `cmd:"" maturity:"alpha" help:"Remove the Upbound Spaces deployment."`
-	Upgrade  upgradeCmd  `cmd:"" maturity:"alpha" help:"Upgrade the Upbound Spaces deployment."`
+	Init    initCmd    `cmd:"" maturity:"alpha" help:"Initialize an Upbound Spaces deployment."`
+	Destroy destroyCmd `cmd:"" maturity:"alpha" help:"Remove the Upbound Spaces deployment."`
+	Upgrade upgradeCmd `cmd:"" maturity:"alpha" help:"Upgrade the Upbound Spaces deployment."`
 }
 
 type commonParams struct {

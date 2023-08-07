@@ -22,7 +22,7 @@ import (
 )
 
 // AfterApply sets default values in command after assignment and validation.
-func (c *teardownCmd) AfterApply(insCtx *install.Context) error {
+func (c *destroyCmd) AfterApply(insCtx *install.Context) error {
 	// NOTE(tnthornton) we currently only have support for stylized output.
 	pterm.EnableStyling()
 
@@ -38,14 +38,14 @@ func (c *teardownCmd) AfterApply(insCtx *install.Context) error {
 	return nil
 }
 
-// teardownCmd uninstalls Upbound.
-type teardownCmd struct {
+// destroyCmd uninstalls Upbound.
+type destroyCmd struct {
 	mgr install.Manager
 
 	commonParams
 }
 
 // Run executes the uninstall command.
-func (c *teardownCmd) Run(insCtx *install.Context) error {
+func (c *destroyCmd) Run(insCtx *install.Context) error {
 	return c.mgr.Uninstall()
 }
