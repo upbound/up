@@ -37,7 +37,7 @@ const (
 
 // AfterApply sets default values in command after assignment and validation.
 func (c *installCmd) AfterApply(insCtx *install.Context) error {
-	repo := uxpRepoURL
+	repo := RepoURL
 	if c.Unstable {
 		repo = uxpUnstableRepoURL
 	}

@@ -19,7 +19,6 @@ import (
 	"net/url"
 	"os"
 	"path/filepath"
-	"strings"
 	"time"
 
 	"github.com/Masterminds/semver"
@@ -414,7 +413,7 @@ func (h *installer) pullAndLoad(version string) (*chart.Chart, error) { //nolint
 	if version != "" {
 		// helm strips versions with leading v, which can cause issues when fetching
 		// the chart from the cache.
-		version = strings.TrimPrefix(version, "v")
+		// version = strings.TrimPrefix(version, "v")
 		fileName := filepath.Join(h.cacheDir, fmt.Sprintf("%s-%s.tgz", h.chartName, version))
 		if _, err := h.fs.Stat(filepath.Join(h.cacheDir, fileName)); err != nil {
 			h.pullClient.SetDestDir(h.cacheDir)

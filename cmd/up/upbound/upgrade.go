@@ -27,13 +27,11 @@ import (
 	"k8s.io/client-go/kubernetes"
 	"sigs.k8s.io/yaml"
 
-	"github.com/upbound/up/internal/auth"
 	"github.com/upbound/up/internal/config"
 	"github.com/upbound/up/internal/input"
 	"github.com/upbound/up/internal/install"
 	"github.com/upbound/up/internal/install/helm"
 	"github.com/upbound/up/internal/kube"
-	"github.com/upbound/up/internal/license"
 	"github.com/upbound/up/internal/resources"
 	"github.com/upbound/up/internal/upterm"
 )
@@ -50,15 +48,15 @@ func (c *upgradeCmd) BeforeApply() error {
 
 // AfterApply sets default values in command after assignment and validation.
 func (c *upgradeCmd) AfterApply(insCtx *install.Context, quiet config.QuietFlag) error {
-	id, err := c.prompter.Prompt("License ID", false)
-	if err != nil {
-		return err
-	}
+	// id, err := c.prompter.Prompt("License ID", false)
+	// if err != nil {
+	// 	return err
+	// }
 	token, err := c.prompter.Prompt("License Key", true)
 	if err != nil {
 		return err
 	}
-	c.id = id
+	c.id = `oauth2accesstoken`
 	c.token = token
 	kClient, err := kubernetes.NewForConfig(insCtx.Kubeconfig)
 	if err != nil {
@@ -72,23 +70,24 @@ func (c *upgradeCmd) AfterApply(insCtx *install.Context, quiet config.QuietFlag)
 		return err
 	}
 	c.dClient = dClient
-	auth := auth.NewProvider(
-		auth.WithBasicAuth(id, token),
-		auth.WithEndpoint(c.Registry),
-		auth.WithOrgID(c.OrgID),
-		auth.WithProductID(c.ProductID),
-	)
-	license := license.NewProvider(
-		license.WithEndpoint(c.DMV),
-		license.WithOrgID(c.OrgID),
-		license.WithProductID(c.ProductID),
-	)
-	c.access = newAccessKeyApplicator(auth, license, secret)
+	// auth := auth.NewProvider(
+	// 	auth.WithBasicAuth(id, token),
+	// 	auth.WithEndpoint(c.Registry),
+	// 	auth.WithOrgID(c.OrgID),
+	// 	auth.WithProductID(c.ProductID),
+	// )
+	// license := license.NewProvider(
+	// 	license.WithEndpoint(c.DMV),
+	// 	license.WithOrgID(c.OrgID),
+	// 	license.WithProductID(c.ProductID),
+	// )
+	// c.access = newAccessKeyApplicator(auth, license, secret)
+	// c.access = newAccessKeyApplicator(secret, c.id, c.token, c.Registry.String())
 	ins, err := helm.NewManager(insCtx.Kubeconfig,
-		upboundChart,
+		mxeChart,
 		c.Repo,
 		helm.WithNamespace(insCtx.Namespace),
-		helm.WithBasicAuth(id, token),
+		helm.WithBasicAuth(c.id, c.token),
 		helm.IsOCI(),
 		helm.WithChart(c.Bundle),
 		helm.RollbackOnError(c.Rollback))
@@ -120,7 +119,6 @@ type upgradeCmd struct {
 	mgr        install.Manager
 	parser     install.ParameterParser
 	prompter   input.Prompter
-	access     *accessKeyApplicator
 	pullSecret *kube.ImagePullApplicator
 	id         string
 	token      string
@@ -154,15 +152,15 @@ func (c *upgradeCmd) Run(insCtx *install.Context) error {
 	}
 
 	// Create or update access key secret unless skip license is specified.
-	if !c.SkipLicense {
-		keyVersion := c.Version
-		if c.KeyVersionOverride != "" {
-			keyVersion = c.KeyVersionOverride
-		}
-		if err := c.access.apply(ctx, c.LicenseSecretName, insCtx.Namespace, keyVersion); err != nil {
-			return errors.Wrap(err, errCreateLicenseSecret)
-		}
-	}
+	// if !c.SkipLicense {
+	// 	keyVersion := c.Version
+	// 	if c.KeyVersionOverride != "" {
+	// 		keyVersion = c.KeyVersionOverride
+	// 	}
+	// 	if err := c.access.apply(ctx, c.LicenseSecretName, insCtx.Namespace, keyVersion); err != nil {
+	// 		return errors.Wrap(err, errCreateLicenseSecret)
+	// 	}
+	// }
 
 	if err := c.upgradeUpbound(context.Background(), params); err != nil {
 		return err
@@ -207,7 +205,7 @@ func (c *upgradeCmd) upgradeUpbound(ctx context.Context, params map[string]any) 
 	// TODO(hasheddan): consider using DynamicWatch and cancelling via context.
 	go watchDeployments(ctx, c.kClient, ccancel, stopped) //nolint:errcheck
 
-	errC, err := kube.DynamicWatch(ctx, c.dClient.Resource(upboundGVR), &watcherTimeout, func(u *unstructured.Unstructured) (bool, error) {
+	errC, err := kube.DynamicWatch(ctx, c.dClient.Resource(hostclusterGVR), &watcherTimeout, func(u *unstructured.Unstructured) (bool, error) {
 		up := resources.Upbound{Unstructured: *u}
 		if resource.IsConditionTrue(up.GetCondition(xpv1.TypeReady)) {
 			return true, nil

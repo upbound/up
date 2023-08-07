@@ -40,14 +40,15 @@ type ObjectPrinter struct {
 var (
 	DefaultObjPrinter = ObjectPrinter{
 		Quiet:        false,
-		Pretty:       false,
+		Pretty:       true,
 		Format:       config.Default,
 		TablePrinter: pterm.DefaultTable.WithSeparator("   "),
 	}
 )
 
 func init() {
-	pterm.DisableStyling()
+	// pterm.DisableStyling()
+	pterm.EnableStyling()
 }
 
 // Print will print a single option or an array/slice of objects.

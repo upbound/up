@@ -18,7 +18,8 @@ import (
 	"context"
 	"fmt"
 	"io"
-	"net"
+	"os"
+	"strings"
 	"time"
 
 	"github.com/alecthomas/kong"
@@ -31,29 +32,41 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 	"k8s.io/apimachinery/pkg/runtime/schema"
+	"k8s.io/apimachinery/pkg/util/runtime"
 	"k8s.io/client-go/dynamic"
 	"k8s.io/client-go/kubernetes"
 	"sigs.k8s.io/yaml"
 
-	"github.com/upbound/up/internal/auth"
+	"github.com/upbound/up/cmd/up/upbound/prerequistes"
 	"github.com/upbound/up/internal/config"
 	"github.com/upbound/up/internal/input"
 	"github.com/upbound/up/internal/install"
 	"github.com/upbound/up/internal/install/helm"
 	"github.com/upbound/up/internal/kube"
-	"github.com/upbound/up/internal/license"
 	"github.com/upbound/up/internal/resources"
 	"github.com/upbound/up/internal/upbound"
 	"github.com/upbound/up/internal/upterm"
 )
 
+const (
+	hcGroup          = "internal.spaces.upbound.io"
+	hcVersion        = "v1alpha1"
+	hcResourcePlural = "hostclusters"
+)
+
 var (
 	watcherTimeout int64 = 600
 
-	upboundGVR = schema.GroupVersionResource{
-		Group:    upboundGroup,
-		Version:  upboundVersion,
-		Resource: upboundResourcePlural,
+	hostclusterGVR = schema.GroupVersionResource{
+		Group:    hcGroup,
+		Version:  hcVersion,
+		Resource: hcResourcePlural,
+	}
+
+	hostclusterGVK = schema.GroupVersionKind{
+		Group:   hcGroup,
+		Version: hcVersion,
+		Kind:    "XHostCluster",
 	}
 )
 
@@ -65,6 +78,7 @@ const (
 	defaultImagePullSecret = "upbound-pull-secret"
 	localhost              = "127.0.0.1"
 
+	errReadTokenFile          = "unable to read token file"
 	errReadParametersFile     = "unable to read parameters file"
 	errParseInstallParameters = "unable to parse install parameters"
 	errGetRegistryToken       = "failed to acquire auth token"
@@ -75,6 +89,10 @@ const (
 	errTimoutExternalIP       = "timed out waiting for externalIP to resolve"
 	errUpdateConfig           = "unable to update config"
 )
+
+func init() {
+	runtime.ErrorHandlers = []func(error){}
+}
 
 // BeforeApply sets default values in login before assignment and validation.
 func (c *installCmd) BeforeApply() error {
@@ -90,16 +108,19 @@ func (c *installCmd) AfterApply(insCtx *install.Context, kongCtx *kong.Context, 
 	}
 	kongCtx.Bind(upCtx)
 
-	id, err := c.prompter.Prompt("License ID", false)
+	b, err := io.ReadAll(c.TokenFile)
+	defer c.TokenFile.Close()
+	if err != nil {
+		return errors.Wrap(err, errReadTokenFile)
+	}
+	c.token = string(b)
+	prereqs, err := prerequistes.New(insCtx.Kubeconfig)
 	if err != nil {
 		return err
 	}
-	token, err := c.prompter.Prompt("License Key", true)
-	if err != nil {
-		return err
-	}
-	c.id = id
-	c.token = token
+	c.prereqs = prereqs
+	// TODO(tnthornton) change this to work with key.json
+	c.id = `oauth2accesstoken`
 	kClient, err := kubernetes.NewForConfig(insCtx.Kubeconfig)
 	if err != nil {
 		return err
@@ -112,29 +133,20 @@ func (c *installCmd) AfterApply(insCtx *install.Context, kongCtx *kong.Context, 
 		return err
 	}
 	c.dClient = dClient
-	auth := auth.NewProvider(
-		auth.WithBasicAuth(c.id, c.token),
-		auth.WithEndpoint(c.Registry),
-		auth.WithOrgID(c.OrgID),
-		auth.WithProductID(c.ProductID),
-	)
-	license := license.NewProvider(
-		license.WithEndpoint(c.DMV),
-		license.WithOrgID(c.OrgID),
-		license.WithProductID(c.ProductID),
-	)
-	c.access = newAccessKeyApplicator(auth, license, secret)
-	mgr, err := helm.NewManager(insCtx.Kubeconfig,
-		upboundChart,
+	mxemgr, err := helm.NewManager(insCtx.Kubeconfig,
+		mxeChart,
 		c.Repo,
 		helm.WithNamespace(insCtx.Namespace),
 		helm.WithBasicAuth(c.id, c.token),
 		helm.IsOCI(),
-		helm.WithChart(c.Bundle))
+		helm.WithChart(c.Bundle),
+		helm.Wait(),
+	)
 	if err != nil {
 		return err
 	}
-	c.mgr = mgr
+	c.mxemgr = mxemgr
+
 	base := map[string]any{}
 	if c.File != nil {
 		defer c.File.Close() //nolint:errcheck,gosec
@@ -156,12 +168,12 @@ func (c *installCmd) AfterApply(insCtx *install.Context, kongCtx *kong.Context, 
 
 // installCmd installs Upbound.
 type installCmd struct {
-	mgr        install.Manager
+	mxemgr     install.Manager
+	prereqs    *prerequistes.Manager
 	parser     install.ParameterParser
 	kClient    kubernetes.Interface
 	dClient    dynamic.Interface
 	prompter   input.Prompter
-	access     *accessKeyApplicator
 	pullSecret *kube.ImagePullApplicator
 	id         string
 	token      string
@@ -172,61 +184,79 @@ type installCmd struct {
 	commonParams
 	install.CommonParams
 
-	Flags upbound.Flags `embed:""`
+	Flags     upbound.Flags `embed:""`
+	TokenFile *os.File      `name:"token-file" required:"" help:"File containing authentication token."`
 }
 
 // Run executes the install command.
 func (c *installCmd) Run(insCtx *install.Context, upCtx *upbound.Context) error {
-
-	ctx, cancel := context.WithTimeout(context.Background(), defaultTimeout)
-	defer cancel()
+	ctx := context.Background()
 
 	params, err := c.parser.Parse()
 	if err != nil {
 		return errors.Wrap(err, errParseInstallParameters)
 	}
 
-	if err := c.applySecrets(ctx, insCtx.Namespace); err != nil {
-		return err
-	}
+	// check if required prerequisites are installed
+	status := c.prereqs.Check()
 
-	if err := c.installUpbound(context.Background(), params); err != nil {
-		return err
-	}
+	// At least 1 prerequiste is not installed, check if we should install the
+	// missing for the client.
+	if len(status.NotInstalled) > 0 {
+		pterm.Warning.Printfln("One or more required prerequistes are not installed.")
+		pterm.DefaultInteractiveConfirm.DefaultText = "Would you like to install them now?"
+		pterm.Println() // Blank line
+		result, _ := pterm.DefaultInteractiveConfirm.Show()
+		pterm.Println() // Blank line
+		// pterm.Info.Printfln("You answered: %s", boolToText(result))
 
-	if !c.quiet {
-		spinnerIngress, _ := upterm.CheckmarkSuccessSpinner.Start(upterm.StepCounter("Gathering ingress information", 5, 5))
-		// Sleep for 1s to ensure pterm has enough time for 1 spin. Without this
-		// line, the operation can complete too quick resulting in two lines
-		// written for the "Gathering" spinner.
-		time.Sleep(1 * time.Second)
-		ipAddress, err := c.getExternalIP(params)
-		if err != nil {
+		if !result {
+			pterm.Error.Println("prerequistes must be met inorder to proceed with installation")
+			return nil
+		}
+
+		if err := c.installPrereqs(ctx); err != nil {
 			return err
 		}
-		spinnerIngress.Success()
-
-		pterm.Info.WithPrefix(upterm.RaisedPrefix).Println("Upbound ready")
-		time.Sleep(2 * time.Second)
-
-		outputConnectingInfo(ipAddress, hostNames)
 	}
 
-	return updateProfile(upCtx)
+	pterm.Info.Printfln("Required prerequistes met!")
+	pterm.Info.Printfln("Proceeding with Upbound Spaces installation...")
+
+	if err := c.applySecret(ctx, insCtx.Namespace); err != nil {
+		return err
+	}
+
+	if err := c.deploySpace(context.Background(), params); err != nil {
+		return err
+	}
+
+	pterm.Info.WithPrefix(upterm.RaisedPrefix).Println("Your Upbound Space is Ready!")
+
+	outputNextSteps()
+	return nil
 }
 
-func (c *installCmd) applySecrets(ctx context.Context, namespace string) error { //nolint:gocyclo
-	createNs := func() error {
-		_, err := c.kClient.CoreV1().Namespaces().Create(ctx, &corev1.Namespace{
-			ObjectMeta: metav1.ObjectMeta{
-				Name: namespace,
-			},
-		}, metav1.CreateOptions{})
-		if err != nil && !kerrors.IsAlreadyExists(err) {
-			return errors.Wrap(err, errCreateNamespace)
+func (c *installCmd) installPrereqs(ctx context.Context) error {
+
+	status := c.prereqs.Check()
+	for i, p := range status.NotInstalled {
+		if err := upterm.WrapWithSuccessSpinner(
+			upterm.StepCounter(
+				fmt.Sprintf("Installing %s", p.GetName()),
+				i+1,
+				len(status.NotInstalled),
+			),
+			upterm.CheckmarkSuccessSpinner,
+			p.Install,
+		); err != nil {
+			return err
 		}
-		return nil
 	}
+	return nil
+}
+
+func (c *installCmd) applySecret(ctx context.Context, namespace string) error { //nolint:gocyclo
 	creatPullSecret := func() error {
 		if err := c.pullSecret.Apply(
 			ctx,
@@ -241,45 +271,28 @@ func (c *installCmd) applySecrets(ctx context.Context, namespace string) error {
 		return nil
 	}
 
-	if c.quiet {
-		if err := createNs(); err != nil {
-			return err
-		}
-		return creatPullSecret()
+	_, err := c.kClient.CoreV1().Namespaces().Create(ctx, &corev1.Namespace{
+		ObjectMeta: metav1.ObjectMeta{
+			Name: namespace,
+		},
+	}, metav1.CreateOptions{})
+	if err != nil && !kerrors.IsAlreadyExists(err) {
+		return errors.Wrap(err, errCreateNamespace)
 	}
 
 	if err := upterm.WrapWithSuccessSpinner(
-		upterm.StepCounter(fmt.Sprintf("Creating namespace %s", namespace), 1, 5),
-		upterm.CheckmarkSuccessSpinner,
-		createNs,
-	); err != nil {
-		return err
-	}
-
-	if err := upterm.WrapWithSuccessSpinner(
-		upterm.StepCounter(fmt.Sprintf("Creating secret %s", defaultImagePullSecret), 2, 5),
+		upterm.StepCounter(fmt.Sprintf("Creating pull secret %s", defaultImagePullSecret), 1, 3),
 		upterm.CheckmarkSuccessSpinner,
 		creatPullSecret,
 	); err != nil {
 		return err
 	}
-
-	// Create or update access key secret unless skip license is specified.
-	if !c.SkipLicense {
-		keyVersion := c.Version
-		if c.KeyVersionOverride != "" {
-			keyVersion = c.KeyVersionOverride
-		}
-		if err := c.access.apply(ctx, c.LicenseSecretName, namespace, keyVersion); err != nil {
-			return errors.Wrap(err, errCreateLicenseSecret)
-		}
-	}
 	return nil
 }
 
-func (c *installCmd) installUpbound(ctx context.Context, params map[string]any) error {
+func (c *installCmd) deploySpace(ctx context.Context, params map[string]any) error {
 	install := func() error {
-		if err := c.mgr.Install(c.Version, params); err != nil {
+		if err := c.mxemgr.Install(strings.TrimPrefix(c.Version, "v"), params); err != nil {
 			return err
 		}
 		return nil
@@ -290,27 +303,17 @@ func (c *installCmd) installUpbound(ctx context.Context, params map[string]any) 
 	}
 
 	if err := upterm.WrapWithSuccessSpinner(
-		upterm.StepCounter("Initializing Upbound", 3, 5),
+		upterm.StepCounter("Initializing Space components", 2, 3),
 		upterm.CheckmarkSuccessSpinner,
 		install,
 	); err != nil {
 		return err
 	}
 
-	// Print Info message to indicate next large step
-	spinnerStart, _ := upterm.EyesInfoSpinner.Start(upterm.StepCounter("Starting Upbound", 4, 5))
-	spinnerStart.Info()
+	hcSpinner, _ := upterm.CheckmarkSuccessSpinner.Start(upterm.StepCounter("Starting Space Components", 3, 3))
 
-	ccancel := make(chan bool)
-	stopped := make(chan bool)
-	// NOTE(tnthornton) we spin off the deployment watching so that we can
-	// watch both the custom resource as well as the deployment events at
-	// the same time.
-	// TODO(hasheddan): consider using DynamicWatch and cancelling via context.
-	go watchDeployments(ctx, c.kClient, ccancel, stopped) //nolint:errcheck
-
-	errC, err := kube.DynamicWatch(ctx, c.dClient.Resource(upboundGVR), &watcherTimeout, func(u *unstructured.Unstructured) (bool, error) {
-		up := resources.Upbound{Unstructured: *u}
+	errC, err := kube.DynamicWatch(ctx, c.dClient.Resource(hostclusterGVR), &watcherTimeout, func(u *unstructured.Unstructured) (bool, error) {
+		up := resources.HostCluster{Unstructured: *u}
 		if resource.IsConditionTrue(up.GetCondition(xpv1.TypeReady)) {
 			return true, nil
 		}
@@ -322,73 +325,8 @@ func (c *installCmd) installUpbound(ctx context.Context, params map[string]any) 
 	if err := <-errC; err != nil {
 		return err
 	}
-	ccancel <- true
-	close(ccancel)
-	<-stopped
+	hcSpinner.Success()
 	return nil
-}
-
-// getExternalIP returns the externalIP of the Upbound installation. At its
-// core it's doing two things:
-//  1. If the provider is not specified, the kind install is assumed which means
-//     localhost is assumed.
-//  2. If the provider is specified, the externalIP is derived from the
-//     ingress-nginx-controller.
-//
-// NOTE(tnthornton) this function is a temporary measure to calculate the
-// externalIP for the Upbound install until the Upbound Custom Resource exposes
-// this information on its status.externalIP field.
-func (c *installCmd) getExternalIP(params map[string]any) (string, error) { //nolint:gocyclo
-	provider, ok := params["provider"]
-	if !ok {
-		// default provider (kind) is used, return localhost
-		return localhost, nil
-	}
-
-	// retry until we have an externalIP or timeout
-	timeout := time.After(120 * time.Second)
-	ticker := time.NewTicker(500 * time.Millisecond)
-
-	for {
-		select {
-		case <-timeout:
-			return "", errors.New(errTimoutExternalIP)
-		case <-ticker.C:
-			svc, err := c.kClient.
-				CoreV1().
-				Services("ingress-nginx").
-				Get(context.Background(), "ingress-nginx-controller", metav1.GetOptions{})
-			if err != nil {
-				return "", err
-			}
-
-			lbs := svc.Status.LoadBalancer.Ingress
-			// if ELB IP is still empty, skip and retry
-			if len(lbs) < 1 {
-				continue
-			}
-
-			switch provider {
-			case "aws":
-				record := lbs[0].Hostname
-				ips, err := net.LookupIP(record)
-				if err != nil {
-					// NOTE(tnthornton) we explicitly ignore the error here to
-					// force a retry. Most commonly an error will occur when
-					// DNS has yet to propagate.
-					continue
-				}
-				if len(ips) >= 1 {
-					return ips[0].String(), nil
-				}
-			default:
-				ip := lbs[0].IP
-				if ip != "" {
-					return ip, nil
-				}
-			}
-		}
-	}
 }
 
 func updateProfile(upCtx *upbound.Context) error {
@@ -404,4 +342,11 @@ func updateProfile(upCtx *upbound.Context) error {
 	}
 
 	return errors.Wrap(upCtx.CfgSrc.UpdateConfig(upCtx.Cfg), errUpdateConfig)
+}
+
+func outputNextSteps() {
+	pterm.Println()
+	pterm.Info.WithPrefix(upterm.EyesPrefix).Println("Next Steps 👇")
+	pterm.Println()
+	pterm.Println("👉 Checkout installation docs @ https://upbound.io/docs")
 }
