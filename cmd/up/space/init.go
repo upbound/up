@@ -95,13 +95,13 @@ func init() {
 }
 
 // BeforeApply sets default values in login before assignment and validation.
-func (c *installCmd) BeforeApply() error {
+func (c *initCmd) BeforeApply() error {
 	c.prompter = input.NewPrompter()
 	return nil
 }
 
 // AfterApply sets default values in command after assignment and validation.
-func (c *installCmd) AfterApply(insCtx *install.Context, kongCtx *kong.Context, quiet config.QuietFlag) error { //nolint:gocyclo
+func (c *initCmd) AfterApply(insCtx *install.Context, kongCtx *kong.Context, quiet config.QuietFlag) error { //nolint:gocyclo
 	upCtx, err := upbound.NewFromFlags(c.Flags)
 	if err != nil {
 		return err
@@ -166,8 +166,8 @@ func (c *installCmd) AfterApply(insCtx *install.Context, kongCtx *kong.Context, 
 	return nil
 }
 
-// installCmd installs Upbound.
-type installCmd struct {
+// initCmd installs Upbound.
+type initCmd struct {
 	mxemgr     install.Manager
 	prereqs    *prerequistes.Manager
 	parser     install.ParameterParser
@@ -189,7 +189,7 @@ type installCmd struct {
 }
 
 // Run executes the install command.
-func (c *installCmd) Run(insCtx *install.Context, upCtx *upbound.Context) error {
+func (c *initCmd) Run(insCtx *install.Context, upCtx *upbound.Context) error {
 	ctx := context.Background()
 
 	params, err := c.parser.Parse()
@@ -237,7 +237,7 @@ func (c *installCmd) Run(insCtx *install.Context, upCtx *upbound.Context) error 
 	return nil
 }
 
-func (c *installCmd) installPrereqs(ctx context.Context) error {
+func (c *initCmd) installPrereqs(ctx context.Context) error {
 
 	status := c.prereqs.Check()
 	for i, p := range status.NotInstalled {
@@ -256,7 +256,7 @@ func (c *installCmd) installPrereqs(ctx context.Context) error {
 	return nil
 }
 
-func (c *installCmd) applySecret(ctx context.Context, namespace string) error { //nolint:gocyclo
+func (c *initCmd) applySecret(ctx context.Context, namespace string) error { //nolint:gocyclo
 	creatPullSecret := func() error {
 		if err := c.pullSecret.Apply(
 			ctx,
@@ -290,7 +290,7 @@ func (c *installCmd) applySecret(ctx context.Context, namespace string) error { 
 	return nil
 }
 
-func (c *installCmd) deploySpace(ctx context.Context, params map[string]any) error {
+func (c *initCmd) deploySpace(ctx context.Context, params map[string]any) error {
 	install := func() error {
 		if err := c.mxemgr.Install(strings.TrimPrefix(c.Version, "v"), params); err != nil {
 			return err

@@ -20,7 +20,7 @@ import (
 )
 
 // AfterApply sets default values in command after assignment and validation.
-func (c *uninstallCmd) AfterApply(insCtx *install.Context) error {
+func (c *teardownCmd) AfterApply(insCtx *install.Context) error {
 	mgr, err := helm.NewManager(insCtx.Kubeconfig,
 		mxeChart,
 		c.Repo,
@@ -33,8 +33,8 @@ func (c *uninstallCmd) AfterApply(insCtx *install.Context) error {
 	return nil
 }
 
-// uninstallCmd uninstalls Upbound.
-type uninstallCmd struct {
+// teardownCmd uninstalls Upbound.
+type teardownCmd struct {
 	mgr install.Manager
 
 	id    string
@@ -46,6 +46,6 @@ type uninstallCmd struct {
 }
 
 // Run executes the uninstall command.
-func (c *uninstallCmd) Run(insCtx *install.Context) error {
+func (c *teardownCmd) Run(insCtx *install.Context) error {
 	return c.mgr.Uninstall()
 }

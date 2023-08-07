@@ -26,9 +26,9 @@ const mxeChart = "spaces"
 type Cmd struct {
 	Billing billing.Cmd `cmd:""`
 
-	Install   installCmd   `cmd:"" maturity:"alpha" help:"Install Upbound."`
-	Uninstall uninstallCmd `cmd:"" maturity:"alpha" help:"Uninstall Upbound."`
-	Upgrade   upgradeCmd   `cmd:"" maturity:"alpha" help:"Upgrade Upbound."`
+	Init    initCmd     `cmd:"" maturity:"alpha" help:"Initialize an Upbound Space deployment."`
+	Destroy teardownCmd `cmd:"" maturity:"alpha" help:"Remove the Upbound Space deployment."`
+	Upgrade upgradeCmd  `cmd:"" maturity:"alpha" help:"Upgrade the Upbound Space deployment."`
 }
 
 type commonParams struct {
