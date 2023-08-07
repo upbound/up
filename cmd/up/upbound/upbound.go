@@ -53,7 +53,6 @@ func (c *Cmd) AfterApply(kongCtx *kong.Context) error {
 // Cmd contains commands for managing Upbound.
 type Cmd struct {
 	Install   installCmd   `cmd:"" maturity:"alpha" help:"Install Upbound."`
-	Mail      mailCmd      `cmd:"" maturity:"alpha" help:"Run a local mail portal."`
 	Uninstall uninstallCmd `cmd:"" maturity:"alpha" help:"Uninstall Upbound."`
 	Upgrade   upgradeCmd   `cmd:"" maturity:"alpha" help:"Upgrade Upbound."`
 
