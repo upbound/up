@@ -27,13 +27,8 @@ import (
 	"strings"
 	"time"
 
-	gcs "cloud.google.com/go/storage"
 	"github.com/alecthomas/kong"
-	"github.com/aws/aws-sdk-go/aws"
-	"github.com/aws/aws-sdk-go/aws/session"
-	"github.com/aws/aws-sdk-go/service/s3"
 	"github.com/crossplane/crossplane-runtime/pkg/errors"
-	gcpopt "google.golang.org/api/option"
 
 	"github.com/upbound/up/internal/usage"
 	"github.com/upbound/up/internal/usage/report"
@@ -174,7 +169,7 @@ func (c *getCmd) cleanupOnError() {
 	}
 }
 
-func (c *getCmd) collectReport() error { //nolint:gocyclo
+func (c *getCmd) collectReport() error {
 	f, err := os.Create(c.outAbs)
 	if err != nil {
 		return errors.Wrap(err, "error creating report")
@@ -199,32 +194,11 @@ func (c *getCmd) collectReport() error { //nolint:gocyclo
 	// TODO(branden): Add support for Azure.
 	switch {
 	case c.Provider == providerGCP:
-		opts := []gcpopt.ClientOption{}
-		if c.Endpoint != "" {
-			opts = append(opts, gcpopt.WithEndpoint(c.Endpoint))
-		}
-		gcsCli, err := gcs.NewClient(ctx, opts...)
-		if err != nil {
-			return errors.Wrap(err, "error creating storage client")
-		}
-		bkt := gcsCli.Bucket(c.Bucket)
-		if err := reportgcs.MaxResourceCountPerGVKPerMCP(ctx, c.Account, bkt, c.billingPeriod, time.Hour, rw); err != nil {
+		if err := reportgcs.GenerateReport(ctx, c.Account, c.Endpoint, c.Bucket, c.billingPeriod, time.Hour, rw); err != nil {
 			return err
 		}
 	case c.Provider == providerAWS:
-		sess, err := session.NewSession(&aws.Config{})
-		if err != nil {
-			return errors.Wrap(err, "error creating aws session")
-		}
-		config := &aws.Config{}
-		if c.Endpoint != "" {
-			config = &aws.Config{
-				Endpoint: aws.String(c.Endpoint),
-			}
-		}
-		s3client := s3.New(sess, config)
-
-		if err := reportaws.MaxResourceCountPerGVKPerMCP(ctx, c.Account, c.Bucket, s3client, c.billingPeriod, rw); err != nil {
+		if err := reportaws.GenerateReport(ctx, c.Account, c.Endpoint, c.Bucket, c.billingPeriod, rw); err != nil {
 			return err
 		}
 	default:

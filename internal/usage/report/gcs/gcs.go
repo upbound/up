@@ -23,6 +23,7 @@ import (
 	"github.com/crossplane/crossplane-runtime/pkg/errors"
 	"golang.org/x/sync/errgroup"
 	"google.golang.org/api/iterator"
+	gcpopt "google.golang.org/api/option"
 
 	"github.com/upbound/up/internal/usage"
 	"github.com/upbound/up/internal/usage/aggregate"
@@ -39,10 +40,27 @@ const (
 	errWriteEvents = "error writing events"
 )
 
-// MaxResourceCountPerGVKPerMCP reads usage data for an account and time range
+// GenerateReport initializes the client code and generates a usage report based on given inputs
+func GenerateReport(ctx context.Context, account, endpoint, bucket string, billingPeriod usage.TimeRange, window time.Duration, w report.MCPGVKEventWriter) error {
+	opts := []gcpopt.ClientOption{}
+	if endpoint != "" {
+		opts = append(opts, gcpopt.WithEndpoint(endpoint))
+	}
+	gcsCli, err := storage.NewClient(ctx, opts...)
+	if err != nil {
+		return errors.Wrap(err, "error creating storage client")
+	}
+	bkt := gcsCli.Bucket(bucket)
+	if err := maxResourceCountPerGVKPerMCP(ctx, account, bkt, billingPeriod, time.Hour, w); err != nil {
+		return err
+	}
+	return nil
+}
+
+// maxResourceCountPerGVKPerMCP reads usage data for an account and time range
 // from bkt and writes aggregated usage events to w. Events are aggregated
 // across each window of the time range.
-func MaxResourceCountPerGVKPerMCP(ctx context.Context, account string, bkt *storage.BucketHandle, tr usage.TimeRange, window time.Duration, w report.MCPGVKEventWriter) error {
+func maxResourceCountPerGVKPerMCP(ctx context.Context, account string, bkt *storage.BucketHandle, tr usage.TimeRange, window time.Duration, w report.MCPGVKEventWriter) error {
 	// TODO(branden): Extract provider-generic upbound event reader interface so
 	// that this function can be reused across providers.
 	iter, err := gcs.NewUsageQueryIterator(account, tr.Start, tr.End, window)

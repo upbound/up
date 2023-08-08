@@ -20,6 +20,7 @@ import (
 	"time"
 
 	"github.com/aws/aws-sdk-go/aws"
+	"github.com/aws/aws-sdk-go/aws/session"
 	"github.com/aws/aws-sdk-go/service/s3"
 	"github.com/crossplane/crossplane-runtime/pkg/errors"
 	"golang.org/x/sync/errgroup"
@@ -40,10 +41,30 @@ const (
 	errWriteEvents = "error writing events"
 )
 
-// MaxResourceCountPerGVKPerMCP reads usage data for an account and time range
+// GenerateReport initializes the client code and generates a usage report based on given inputs
+func GenerateReport(ctx context.Context, account, endpoint, bucket string, billingPeriod usage.TimeRange, w report.MCPGVKEventWriter) error {
+	sess, err := session.NewSession(&aws.Config{})
+	if err != nil {
+		return errors.Wrap(err, "error creating aws session")
+	}
+	config := &aws.Config{}
+	if endpoint != "" {
+		config = &aws.Config{
+			Endpoint: aws.String(endpoint),
+		}
+	}
+	s3client := s3.New(sess, config)
+
+	if err := maxResourceCountPerGVKPerMCP(ctx, account, bucket, s3client, billingPeriod, w); err != nil {
+		return err
+	}
+	return nil
+}
+
+// maxResourceCountPerGVKPerMCP reads usage data for an account and time range
 // from bkt and writes aggregated usage events to w. Events are aggregated
 // across 1hr windows of the time range.
-func MaxResourceCountPerGVKPerMCP(ctx context.Context, account, bucket string, client *s3.S3, tr usage.TimeRange, w report.MCPGVKEventWriter) error {
+func maxResourceCountPerGVKPerMCP(ctx context.Context, account, bucket string, client *s3.S3, tr usage.TimeRange, w report.MCPGVKEventWriter) error {
 	// TODO: Add support for aggregation windows other than 1 hour.
 	iter, err := clientutil.NewUsageQueryIterator(account, tr.Start, tr.End, time.Hour)
 	if err != nil {
