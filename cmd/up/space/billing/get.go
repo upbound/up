@@ -27,13 +27,12 @@ import (
 	"strings"
 	"time"
 
-	gcs "cloud.google.com/go/storage"
 	"github.com/alecthomas/kong"
 	"github.com/crossplane/crossplane-runtime/pkg/errors"
-	gcpopt "google.golang.org/api/option"
 
 	"github.com/upbound/up/internal/usage"
 	"github.com/upbound/up/internal/usage/report"
+	reportaws "github.com/upbound/up/internal/usage/report/aws"
 	reporttar "github.com/upbound/up/internal/usage/report/file/tar"
 	reportgcs "github.com/upbound/up/internal/usage/report/gcs"
 )
@@ -78,9 +77,11 @@ func (d *dateRange) Decode(ctx *kong.DecodeContext) error {
 type provider string
 
 func (p provider) Validate() error {
-	// TODO(branden): Add support for AWS and Azure.
+	// TODO(branden): Add support Azure.
 	switch p {
 	case providerGCP:
+		return nil
+	case providerAWS:
 		return nil
 	default:
 		return fmt.Errorf(errFmtProviderNotSupported, p)
@@ -190,21 +191,17 @@ func (c *getCmd) collectReport() error {
 	ctx, stop := signal.NotifyContext(context.Background(), os.Interrupt)
 	defer stop()
 
-	// TODO(branden): Add support for AWS and Azure.
-	if c.Provider == providerGCP {
-		opts := []gcpopt.ClientOption{}
-		if c.Endpoint != "" {
-			opts = append(opts, gcpopt.WithEndpoint(c.Endpoint))
-		}
-		gcsCli, err := gcs.NewClient(ctx, opts...)
-		if err != nil {
-			return errors.Wrap(err, "error creating storage client")
-		}
-		bkt := gcsCli.Bucket(c.Bucket)
-		if err := reportgcs.MaxResourceCountPerGVKPerMCP(ctx, c.Account, bkt, c.billingPeriod, time.Hour, rw); err != nil {
+	// TODO(branden): Add support for Azure.
+	switch {
+	case c.Provider == providerGCP:
+		if err := reportgcs.GenerateReport(ctx, c.Account, c.Endpoint, c.Bucket, c.billingPeriod, time.Hour, rw); err != nil {
 			return err
 		}
-	} else {
+	case c.Provider == providerAWS:
+		if err := reportaws.GenerateReport(ctx, c.Account, c.Endpoint, c.Bucket, c.billingPeriod, rw); err != nil {
+			return err
+		}
+	default:
 		return fmt.Errorf(errFmtProviderNotSupported, c.Provider)
 	}
 

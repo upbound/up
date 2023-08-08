@@ -12,22 +12,22 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-package gcs
+package aws
 
 import (
 	"context"
 	"sync"
 	"time"
 
-	"cloud.google.com/go/storage"
+	"github.com/aws/aws-sdk-go/aws"
+	"github.com/aws/aws-sdk-go/aws/session"
+	"github.com/aws/aws-sdk-go/service/s3"
 	"github.com/crossplane/crossplane-runtime/pkg/errors"
 	"golang.org/x/sync/errgroup"
-	"google.golang.org/api/iterator"
-	gcpopt "google.golang.org/api/option"
 
 	"github.com/upbound/up/internal/usage"
 	"github.com/upbound/up/internal/usage/aggregate"
-	"github.com/upbound/up/internal/usage/clientutil/gcs"
+	"github.com/upbound/up/internal/usage/clientutil"
 	"github.com/upbound/up/internal/usage/encoding/json"
 	"github.com/upbound/up/internal/usage/report"
 )
@@ -36,22 +36,26 @@ const (
 	// Number of objects to read concurrently.
 	concurrency = 10
 
+	errGetObject   = "error retrieving object from AWS S3"
 	errReadEvents  = "error reading events"
 	errWriteEvents = "error writing events"
 )
 
 // GenerateReport initializes the client code and generates a usage report based on given inputs
-func GenerateReport(ctx context.Context, account, endpoint, bucket string, billingPeriod usage.TimeRange, window time.Duration, w report.MCPGVKEventWriter) error {
-	opts := []gcpopt.ClientOption{}
-	if endpoint != "" {
-		opts = append(opts, gcpopt.WithEndpoint(endpoint))
-	}
-	gcsCli, err := storage.NewClient(ctx, opts...)
+func GenerateReport(ctx context.Context, account, endpoint, bucket string, billingPeriod usage.TimeRange, w report.MCPGVKEventWriter) error {
+	sess, err := session.NewSession(&aws.Config{})
 	if err != nil {
-		return errors.Wrap(err, "error creating storage client")
+		return errors.Wrap(err, "error creating aws session")
 	}
-	bkt := gcsCli.Bucket(bucket)
-	if err := maxResourceCountPerGVKPerMCP(ctx, account, bkt, billingPeriod, time.Hour, w); err != nil {
+	config := &aws.Config{}
+	if endpoint != "" {
+		config = &aws.Config{
+			Endpoint: aws.String(endpoint),
+		}
+	}
+	s3client := s3.New(sess, config)
+
+	if err := maxResourceCountPerGVKPerMCP(ctx, account, bucket, s3client, billingPeriod, w); err != nil {
 		return err
 	}
 	return nil
@@ -59,36 +63,43 @@ func GenerateReport(ctx context.Context, account, endpoint, bucket string, billi
 
 // maxResourceCountPerGVKPerMCP reads usage data for an account and time range
 // from bkt and writes aggregated usage events to w. Events are aggregated
-// across each window of the time range.
-func maxResourceCountPerGVKPerMCP(ctx context.Context, account string, bkt *storage.BucketHandle, tr usage.TimeRange, window time.Duration, w report.MCPGVKEventWriter) error {
-	// TODO(branden): Extract provider-generic upbound event reader interface so
-	// that this function can be reused across providers.
-	iter, err := gcs.NewUsageQueryIterator(account, tr.Start, tr.End, window)
+// across 1hr windows of the time range.
+func maxResourceCountPerGVKPerMCP(ctx context.Context, account, bucket string, client *s3.S3, tr usage.TimeRange, w report.MCPGVKEventWriter) error {
+	// TODO: Add support for aggregation windows other than 1 hour.
+	iter, err := clientutil.NewUsageQueryIterator(account, tr.Start, tr.End, time.Hour)
 	if err != nil {
 		return errors.Wrap(err, errReadEvents)
 	}
 
 	for iter.More() {
-		query, start, end, err := iter.Next()
+		startPrefix, _, start, end, err := iter.Next()
 		if err != nil {
 			return errors.Wrap(err, errReadEvents)
 		}
-		objects := bkt.Objects(ctx, query)
+		objects, err := client.ListObjectsV2(&s3.ListObjectsV2Input{
+			Bucket: aws.String(bucket),
+			Prefix: aws.String(startPrefix),
+		})
+		if err != nil {
+			return errors.Wrap(err, errReadEvents)
+		}
 
 		g, ctx := errgroup.WithContext(ctx)
 		g.SetLimit(concurrency)
 		ag := &aggregate.MaxResourceCountPerGVKPerMCP{}
 		agMu := &sync.Mutex{}
 
-		for {
-			attrs, err := objects.Next()
-			if errors.Is(err, iterator.Done) {
-				break
-			}
-
-			obj := bkt.Object(attrs.Name)
+		for _, obj := range objects.Contents {
+			currObject := obj
 			g.Go(func() error {
-				return readObject(ctx, ag, agMu, obj)
+				resp, err := client.GetObjectWithContext(ctx, &s3.GetObjectInput{
+					Bucket: aws.String(bucket),
+					Key:    currObject.Key,
+				})
+				if err != nil {
+					return errors.Wrap(err, errGetObject)
+				}
+				return readObject(ag, agMu, resp)
 			})
 		}
 		if err := g.Wait(); err != nil {
@@ -107,14 +118,8 @@ func maxResourceCountPerGVKPerMCP(ctx context.Context, account string, bkt *stor
 }
 
 // readObject() decodes MCP GVK events from an object and adds them to an aggregate.
-func readObject(ctx context.Context, ag *aggregate.MaxResourceCountPerGVKPerMCP, agMu sync.Locker, obj *storage.ObjectHandle) error {
-	r, err := obj.NewReader(ctx)
-	if err != nil {
-		return err
-	}
-	defer r.Close() // nolint:errcheck
-
-	d, err := json.NewMCPGVKEventDecoder(r)
+func readObject(ag *aggregate.MaxResourceCountPerGVKPerMCP, agMu sync.Locker, obj *s3.GetObjectOutput) error {
+	d, err := json.NewMCPGVKEventDecoder(obj.Body)
 	if err != nil {
 		return err
 	}
