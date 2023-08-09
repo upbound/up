@@ -51,7 +51,7 @@ const (
 	hcGroup          = "internal.spaces.upbound.io"
 	hcVersion        = "v1alpha1"
 	hcKind           = "XHostCluster"
-	hcResourcePlural = "hostclusters"
+	hcResourcePlural = "xhostclusters"
 )
 
 var (
