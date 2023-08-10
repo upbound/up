@@ -17,20 +17,22 @@ package clientutil
 import (
 	"fmt"
 	"time"
+
+	usagetime "github.com/upbound/up/internal/usage/time"
 )
 
-func usageQueryValues(account string, startTime, endTime time.Time) (startPrefix, endPrefix string) {
+func usageQueryValues(account string, tr usagetime.Range) (startPrefix, endPrefix string) {
 	return fmt.Sprintf(
 			"account=%s/date=%s/hour=%02d/",
 			account,
-			formatDateUTC(startTime),
-			startTime.Hour(),
+			usagetime.FormatDateUTC(tr.Start),
+			tr.Start.Hour(),
 		),
 		fmt.Sprintf(
 			"account=%s/date=%s/hour=%02d/",
 			account,
-			formatDateUTC(endTime),
-			endTime.Hour(),
+			usagetime.FormatDateUTC(tr.End),
+			tr.End.Hour(),
 		)
 }
 
@@ -39,53 +41,34 @@ func usageQueryValues(account string, startTime, endTime time.Time) (startPrefix
 // time range. Must be initialized with NewUsageQueryIterator().
 type UsageQueryIterator struct {
 	Account string
-	Cursor  time.Time
-	EndTime time.Time
-	Window  time.Duration
+	Iter    *usagetime.WindowIterator
 }
 
 // NewUsageQueryIterator() returns an initialized *UsageQueryIterator.
-// startTime is inclusive and endTime is exclusive to the hour. startTime,
-// endTime, and window are truncated to the hour.
-func NewUsageQueryIterator(account string, startTime, endTime time.Time, window time.Duration) (*UsageQueryIterator, error) {
-	if window < time.Hour {
-		return nil, fmt.Errorf("window must be 1h or greater")
+func NewUsageQueryIterator(account string, tr usagetime.Range, window time.Duration) (*UsageQueryIterator, error) {
+	iter, err := usagetime.NewWindowIterator(tr, window)
+	if err != nil {
+		return nil, err
 	}
-	if endTime.Before(startTime.Add(time.Hour)) {
-		return nil, fmt.Errorf("endTime must occur at least 1h after startTime")
-	}
-	startTime = startTime.Truncate(time.Hour)
-	endTime = endTime.Truncate(time.Hour)
-	window = window.Truncate(time.Hour)
 	return &UsageQueryIterator{
 		Account: account,
-		Cursor:  startTime,
-		EndTime: endTime,
-		Window:  window,
+		Iter:    iter,
 	}, nil
 }
 
 // More() returns true if Next() has more queries to return.
 func (i *UsageQueryIterator) More() bool {
-	return i.Cursor.Before(i.EndTime)
+	return i.Iter.More()
 }
 
-// Next() returns a query covering the next window of time, as well as a pair
-// of times marking the start and end of the window.
-func (i *UsageQueryIterator) Next() (string, string, time.Time, time.Time, error) {
-	if !i.More() {
-		return "", "", time.Time{}, time.Time{}, fmt.Errorf("iterator is done")
+// Next() returns a query covering the next window of time, as well as a time
+// range marking the window.
+func (i *UsageQueryIterator) Next() (string, string, usagetime.Range, error) {
+	window, err := i.Iter.Next()
+	if err != nil {
+		return "", "", usagetime.Range{}, err
 	}
-	start := i.Cursor
-	i.Cursor = i.Cursor.Add(i.Window)
-	if i.Cursor.After(i.EndTime) {
-		i.Cursor = i.EndTime
-	}
-	startPrefix, endPrefix := usageQueryValues(i.Account, start, i.Cursor)
-	return startPrefix, endPrefix, start, i.Cursor, nil
-}
 
-// formatDateUTC returns t in UTC as a string with the format YYYY-MM-DD.
-func formatDateUTC(t time.Time) string {
-	return t.UTC().Format(time.DateOnly)
+	startPrefix, endPrefix := usageQueryValues(i.Account, window)
+	return startPrefix, endPrefix, window, nil
 }

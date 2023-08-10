@@ -66,13 +66,13 @@ func GenerateReport(ctx context.Context, account, endpoint, bucket string, billi
 // across 1hr windows of the time range.
 func maxResourceCountPerGVKPerMCP(ctx context.Context, account, bucket string, client *s3.S3, tr usagetime.Range, w event.Writer) error {
 	// TODO: Add support for aggregation windows other than 1 hour.
-	iter, err := clientutil.NewUsageQueryIterator(account, tr.Start, tr.End, time.Hour)
+	iter, err := clientutil.NewUsageQueryIterator(account, tr, time.Hour)
 	if err != nil {
 		return errors.Wrap(err, errReadEvents)
 	}
 
 	for iter.More() {
-		startPrefix, _, start, end, err := iter.Next()
+		startPrefix, _, window, err := iter.Next()
 		if err != nil {
 			return errors.Wrap(err, errReadEvents)
 		}
@@ -117,8 +117,8 @@ func maxResourceCountPerGVKPerMCP(ctx context.Context, account, bucket string, c
 		}
 
 		for _, e := range ag.UpboundEvents() {
-			e.Timestamp = start
-			e.TimestampEnd = end
+			e.Timestamp = window.Start
+			e.TimestampEnd = window.End
 			if err := w.Write(e); err != nil {
 				return errors.Wrap(err, errWriteEvents)
 			}
