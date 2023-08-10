@@ -27,17 +27,19 @@ import (
 	"strings"
 	"time"
 
+	"cloud.google.com/go/storage"
 	"github.com/Azure/azure-sdk-for-go/sdk/azidentity"
 	"github.com/Azure/azure-sdk-for-go/sdk/storage/azblob"
 	"github.com/alecthomas/kong"
 	"github.com/crossplane/crossplane-runtime/pkg/errors"
+	gcpopt "google.golang.org/api/option"
 
 	"github.com/upbound/up/internal/usage/azure"
 	"github.com/upbound/up/internal/usage/event"
+	"github.com/upbound/up/internal/usage/gcp"
 	"github.com/upbound/up/internal/usage/report"
 	reportaws "github.com/upbound/up/internal/usage/report/aws"
 	reporttar "github.com/upbound/up/internal/usage/report/file/tar"
-	reportgcs "github.com/upbound/up/internal/usage/report/gcs"
 	usagetime "github.com/upbound/up/internal/usage/time"
 )
 
@@ -208,7 +210,7 @@ func (c *getCmd) collectReport() error {
 
 	switch c.Provider {
 	case providerGCP:
-		err = reportgcs.GenerateReport(ctx, c.Account, c.Endpoint, c.Bucket, c.billingPeriod, time.Hour, rw)
+		err = c.collectReportGCP(ctx, rw)
 	case providerAWS:
 		err = reportaws.GenerateReport(ctx, c.Account, c.Endpoint, c.Bucket, c.billingPeriod, rw)
 	case providerAzure:
@@ -227,6 +229,23 @@ func (c *getCmd) collectReport() error {
 		return err
 	}
 	return gw.Close()
+}
+
+func (c *getCmd) collectReportGCP(ctx context.Context, w event.Writer) error {
+	opts := []gcpopt.ClientOption{}
+	if c.Endpoint != "" {
+		opts = append(opts, gcpopt.WithEndpoint(c.Endpoint))
+	}
+	gcsCli, err := storage.NewClient(ctx, opts...)
+	if err != nil {
+		return errors.Wrap(err, "error creating storage client")
+	}
+	bkt := gcsCli.Bucket(c.Bucket)
+	ewi, err := gcp.NewWindowIterator(bkt, c.Account, c.billingPeriod, time.Hour)
+	if err != nil {
+		return err
+	}
+	return report.MaxResourceCountPerGVKPerMCP(ctx, ewi, w)
 }
 
 func (c *getCmd) collectReportAzure(ctx context.Context, w event.Writer) error {

@@ -12,7 +12,7 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-package gcs
+package gcp
 
 import (
 	"testing"
@@ -27,7 +27,7 @@ import (
 	usagetime "github.com/upbound/up/internal/usage/time"
 )
 
-func TestUsageQuery(t *testing.T) {
+func TestQuery(t *testing.T) {
 	type args struct {
 		account string
 		tr      usagetime.Range
@@ -122,18 +122,18 @@ func TestUsageQuery(t *testing.T) {
 
 	for name, tc := range cases {
 		t.Run(name, func(t *testing.T) {
-			query, err := UsageQuery(tc.args.account, tc.args.tr)
+			query, err := Query(tc.args.account, tc.args.tr)
 			if diff := cmp.Diff(tc.want.err, err, test.EquateErrors()); diff != "" {
-				t.Errorf("\n%s\nUsageQuery(...): -want err, +got err:\n%s", tc.reason, diff)
+				t.Errorf("\n%s\nQuery(...): -want err, +got err:\n%s", tc.reason, diff)
 			}
 			if diff := cmp.Diff(tc.want.query, query, cmpopts.IgnoreUnexported(storage.Query{})); diff != "" {
-				t.Errorf("\n%s\nUsageQuery(...): -want, +got:\n%s", tc.reason, diff)
+				t.Errorf("\n%s\nQuery(...): -want, +got:\n%s", tc.reason, diff)
 			}
 		})
 	}
 }
 
-func TestUsageQueryIterator(t *testing.T) {
+func TestQueryIterator(t *testing.T) {
 	type args struct {
 		account string
 		tr      usagetime.Range
@@ -296,9 +296,9 @@ func TestUsageQueryIterator(t *testing.T) {
 
 	for name, tc := range cases {
 		t.Run(name, func(t *testing.T) {
-			iter, err := NewUsageQueryIterator(tc.args.account, tc.args.tr, tc.args.window)
+			iter, err := NewQueryIterator(tc.args.account, tc.args.tr, tc.args.window)
 			if err != nil {
-				t.Fatalf("NewUsageQueryIterator() error: %s", err)
+				t.Fatalf("NewQueryIterator() error: %s", err)
 			}
 
 			got := []iteration{}
@@ -308,7 +308,7 @@ func TestUsageQueryIterator(t *testing.T) {
 			}
 
 			if diff := cmp.Diff(tc.want, got, test.EquateErrors(), cmpopts.IgnoreUnexported(storage.Query{})); diff != "" {
-				t.Errorf("\n%s\nUsageQueryIterator output: -want err, +got err:\n%s", tc.reason, diff)
+				t.Errorf("\n%s\nQueryIterator output: -want err, +got err:\n%s", tc.reason, diff)
 			}
 		})
 	}
