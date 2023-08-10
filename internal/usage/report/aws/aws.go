@@ -26,7 +26,7 @@ import (
 	"golang.org/x/sync/errgroup"
 
 	"github.com/upbound/up/internal/usage/aggregate"
-	"github.com/upbound/up/internal/usage/clientutil"
+	usageaws "github.com/upbound/up/internal/usage/aws"
 	"github.com/upbound/up/internal/usage/encoding/json"
 	"github.com/upbound/up/internal/usage/event"
 	usagetime "github.com/upbound/up/internal/usage/time"
@@ -66,13 +66,13 @@ func GenerateReport(ctx context.Context, account, endpoint, bucket string, billi
 // across 1hr windows of the time range.
 func maxResourceCountPerGVKPerMCP(ctx context.Context, account, bucket string, client *s3.S3, tr usagetime.Range, w event.Writer) error {
 	// TODO: Add support for aggregation windows other than 1 hour.
-	iter, err := clientutil.NewUsageQueryIterator(account, tr, time.Hour)
+	iter, err := usageaws.NewListObjectsV2InputIterator(bucket, account, tr, time.Hour)
 	if err != nil {
 		return errors.Wrap(err, errReadEvents)
 	}
 
 	for iter.More() {
-		startPrefix, _, window, err := iter.Next()
+		loi, window, err := iter.Next()
 		if err != nil {
 			return errors.Wrap(err, errReadEvents)
 		}
@@ -80,10 +80,7 @@ func maxResourceCountPerGVKPerMCP(ctx context.Context, account, bucket string, c
 		pages := []*s3.ListObjectsV2Output{}
 		if err := client.ListObjectsV2PagesWithContext(
 			ctx,
-			&s3.ListObjectsV2Input{
-				Bucket: aws.String(bucket),
-				Prefix: aws.String(startPrefix),
-			},
+			loi,
 			func(page *s3.ListObjectsV2Output, _ bool) bool {
 				pages = append(pages, page)
 				return true

@@ -12,30 +12,32 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-package clientutil
+package aws
 
 import (
 	"testing"
 	"time"
 
+	"github.com/aws/aws-sdk-go/aws"
+	"github.com/aws/aws-sdk-go/service/s3"
 	"github.com/crossplane/crossplane-runtime/pkg/test"
 	"github.com/google/go-cmp/cmp"
 
 	usagetime "github.com/upbound/up/internal/usage/time"
 )
 
-func TestUsageQueryIterator(t *testing.T) {
+func TestListObjectsV2InputIterator(t *testing.T) {
 	type args struct {
+		bucket  string
 		account string
 		tr      usagetime.Range
 		window  time.Duration
 	}
 	type iteration struct {
 		// These fields are exported for cmp.Diff().
-		StartOffset string
-		EndOffset   string
-		Window      usagetime.Range
-		Err         error
+		ListObjectsV2Input *s3.ListObjectsV2Input
+		Window             usagetime.Range
+		Err                error
 	}
 	cases := map[string]struct {
 		reason string
@@ -45,6 +47,7 @@ func TestUsageQueryIterator(t *testing.T) {
 		"3HourRange1HourWindow": {
 			reason: "3h range divided into 1h windows.",
 			args: args{
+				bucket:  "test-bucket",
 				account: "test-account",
 				tr: usagetime.Range{
 					Start: time.Date(2006, 5, 4, 3, 0, 0, 0, time.UTC),
@@ -54,24 +57,30 @@ func TestUsageQueryIterator(t *testing.T) {
 			},
 			want: []iteration{
 				{
-					StartOffset: "account=test-account/date=2006-05-04/hour=03/",
-					EndOffset:   "account=test-account/date=2006-05-04/hour=04/",
+					ListObjectsV2Input: &s3.ListObjectsV2Input{
+						Bucket: aws.String("test-bucket"),
+						Prefix: aws.String("account=test-account/date=2006-05-04/hour=03/"),
+					},
 					Window: usagetime.Range{
 						Start: time.Date(2006, 5, 4, 3, 0, 0, 0, time.UTC),
 						End:   time.Date(2006, 5, 4, 4, 0, 0, 0, time.UTC),
 					},
 				},
 				{
-					StartOffset: "account=test-account/date=2006-05-04/hour=04/",
-					EndOffset:   "account=test-account/date=2006-05-04/hour=05/",
+					ListObjectsV2Input: &s3.ListObjectsV2Input{
+						Bucket: aws.String("test-bucket"),
+						Prefix: aws.String("account=test-account/date=2006-05-04/hour=04/"),
+					},
 					Window: usagetime.Range{
 						Start: time.Date(2006, 5, 4, 4, 0, 0, 0, time.UTC),
 						End:   time.Date(2006, 5, 4, 5, 0, 0, 0, time.UTC),
 					},
 				},
 				{
-					StartOffset: "account=test-account/date=2006-05-04/hour=05/",
-					EndOffset:   "account=test-account/date=2006-05-04/hour=06/",
+					ListObjectsV2Input: &s3.ListObjectsV2Input{
+						Bucket: aws.String("test-bucket"),
+						Prefix: aws.String("account=test-account/date=2006-05-04/hour=05/"),
+					},
 					Window: usagetime.Range{
 						Start: time.Date(2006, 5, 4, 5, 0, 0, 0, time.UTC),
 						End:   time.Date(2006, 5, 4, 6, 0, 0, 0, time.UTC),
@@ -82,6 +91,7 @@ func TestUsageQueryIterator(t *testing.T) {
 		"3HourRange2HourWindow": {
 			reason: "3h range divided into 2h windows.",
 			args: args{
+				bucket:  "test-bucket",
 				account: "test-account",
 				tr: usagetime.Range{
 					Start: time.Date(2006, 5, 4, 3, 0, 0, 0, time.UTC),
@@ -91,16 +101,20 @@ func TestUsageQueryIterator(t *testing.T) {
 			},
 			want: []iteration{
 				{
-					StartOffset: "account=test-account/date=2006-05-04/hour=03/",
-					EndOffset:   "account=test-account/date=2006-05-04/hour=05/",
+					ListObjectsV2Input: &s3.ListObjectsV2Input{
+						Bucket: aws.String("test-bucket"),
+						Prefix: aws.String("account=test-account/date=2006-05-04/hour=03/"),
+					},
 					Window: usagetime.Range{
 						Start: time.Date(2006, 5, 4, 3, 0, 0, 0, time.UTC),
 						End:   time.Date(2006, 5, 4, 5, 0, 0, 0, time.UTC),
 					},
 				},
 				{
-					StartOffset: "account=test-account/date=2006-05-04/hour=05/",
-					EndOffset:   "account=test-account/date=2006-05-04/hour=06/",
+					ListObjectsV2Input: &s3.ListObjectsV2Input{
+						Bucket: aws.String("test-bucket"),
+						Prefix: aws.String("account=test-account/date=2006-05-04/hour=05/"),
+					},
 					Window: usagetime.Range{
 						Start: time.Date(2006, 5, 4, 5, 0, 0, 0, time.UTC),
 						End:   time.Date(2006, 5, 4, 6, 0, 0, 0, time.UTC),
@@ -111,6 +125,7 @@ func TestUsageQueryIterator(t *testing.T) {
 		"3HourRange4HourWindow": {
 			reason: "3h range divided into 4h windows.",
 			args: args{
+				bucket:  "test-bucket",
 				account: "test-account",
 				tr: usagetime.Range{
 					Start: time.Date(2006, 5, 4, 3, 0, 0, 0, time.UTC),
@@ -120,8 +135,10 @@ func TestUsageQueryIterator(t *testing.T) {
 			},
 			want: []iteration{
 				{
-					StartOffset: "account=test-account/date=2006-05-04/hour=03/",
-					EndOffset:   "account=test-account/date=2006-05-04/hour=06/",
+					ListObjectsV2Input: &s3.ListObjectsV2Input{
+						Bucket: aws.String("test-bucket"),
+						Prefix: aws.String("account=test-account/date=2006-05-04/hour=03/"),
+					},
 					Window: usagetime.Range{
 						Start: time.Date(2006, 5, 4, 3, 0, 0, 0, time.UTC),
 						End:   time.Date(2006, 5, 4, 6, 0, 0, 0, time.UTC),
@@ -132,6 +149,7 @@ func TestUsageQueryIterator(t *testing.T) {
 		"3DayRange1DayWindow": {
 			reason: "3-day range divided into 1-day windows.",
 			args: args{
+				bucket:  "test-bucket",
 				account: "test-account",
 				tr: usagetime.Range{
 					Start: time.Date(2006, 5, 4, 3, 0, 0, 0, time.UTC),
@@ -141,24 +159,30 @@ func TestUsageQueryIterator(t *testing.T) {
 			},
 			want: []iteration{
 				{
-					StartOffset: "account=test-account/date=2006-05-04/hour=03/",
-					EndOffset:   "account=test-account/date=2006-05-05/hour=03/",
+					ListObjectsV2Input: &s3.ListObjectsV2Input{
+						Bucket: aws.String("test-bucket"),
+						Prefix: aws.String("account=test-account/date=2006-05-04/hour=03/"),
+					},
 					Window: usagetime.Range{
 						Start: time.Date(2006, 5, 4, 3, 0, 0, 0, time.UTC),
 						End:   time.Date(2006, 5, 5, 3, 0, 0, 0, time.UTC),
 					},
 				},
 				{
-					StartOffset: "account=test-account/date=2006-05-05/hour=03/",
-					EndOffset:   "account=test-account/date=2006-05-06/hour=03/",
+					ListObjectsV2Input: &s3.ListObjectsV2Input{
+						Bucket: aws.String("test-bucket"),
+						Prefix: aws.String("account=test-account/date=2006-05-05/hour=03/"),
+					},
 					Window: usagetime.Range{
 						Start: time.Date(2006, 5, 5, 3, 0, 0, 0, time.UTC),
 						End:   time.Date(2006, 5, 6, 3, 0, 0, 0, time.UTC),
 					},
 				},
 				{
-					StartOffset: "account=test-account/date=2006-05-06/hour=03/",
-					EndOffset:   "account=test-account/date=2006-05-07/hour=03/",
+					ListObjectsV2Input: &s3.ListObjectsV2Input{
+						Bucket: aws.String("test-bucket"),
+						Prefix: aws.String("account=test-account/date=2006-05-06/hour=03/"),
+					},
 					Window: usagetime.Range{
 						Start: time.Date(2006, 5, 6, 3, 0, 0, 0, time.UTC),
 						End:   time.Date(2006, 5, 7, 3, 0, 0, 0, time.UTC),
@@ -170,19 +194,19 @@ func TestUsageQueryIterator(t *testing.T) {
 
 	for name, tc := range cases {
 		t.Run(name, func(t *testing.T) {
-			iter, err := NewUsageQueryIterator(tc.args.account, tc.args.tr, tc.args.window)
+			iter, err := NewListObjectsV2InputIterator(tc.args.bucket, tc.args.account, tc.args.tr, tc.args.window)
 			if err != nil {
-				t.Fatalf("NewUsageQueryIterator() error: %s", err)
+				t.Fatalf("NewListObjectsV2InputIterator() error: %s", err)
 			}
 
 			got := []iteration{}
 			for iter.More() {
-				startOffset, endOffset, window, err := iter.Next()
-				got = append(got, iteration{StartOffset: startOffset, EndOffset: endOffset, Window: window, Err: err})
+				loi, window, err := iter.Next()
+				got = append(got, iteration{ListObjectsV2Input: loi, Window: window, Err: err})
 			}
 
 			if diff := cmp.Diff(tc.want, got, test.EquateErrors()); diff != "" {
-				t.Errorf("\n%s\nUsageQueryIterator output: -want err, +got err:\n%s", tc.reason, diff)
+				t.Errorf("\n%s\nListObjectsV2InputIterator output: -want, +got:\n%s", tc.reason, diff)
 			}
 		})
 	}
