@@ -15,21 +15,63 @@
 package report
 
 import (
+	"context"
 	"time"
 
-	"github.com/upbound/up/internal/usage"
-	"github.com/upbound/up/internal/usage/model"
+	"github.com/crossplane/crossplane-runtime/pkg/errors"
+
+	"github.com/upbound/up/internal/usage/aggregate"
+	"github.com/upbound/up/internal/usage/event"
+	usagetime "github.com/upbound/up/internal/usage/time"
+)
+
+const (
+	errReadEvents  = "error reading events"
+	errWriteEvents = "error writing events"
 )
 
 // Meta contains metadata for a usage report.
 type Meta struct {
 	UpboundAccount string          `json:"account"`
-	TimeRange      usage.TimeRange `json:"time_range"`
+	TimeRange      usagetime.Range `json:"time_range"`
 	CollectedAt    time.Time       `json:"collected_at"`
 }
 
-// MCPGVKEventWriter is the interface that wraps a Write method for MCP GVK
-// events.
-type MCPGVKEventWriter interface {
-	Write(model.MCPGVKEvent) error
+// MaxResourceCountPerGVKPerMCP reads events from i and writes aggregated events
+// to w. Events are aggregated across each window of time returned by i. An
+// aggregated event records the largest observed count of instances of a GVK on
+// an MCP during a window. The order of written events is not stable.
+func MaxResourceCountPerGVKPerMCP(ctx context.Context, i event.WindowIterator, w event.Writer) error {
+	for i.More() {
+		r, window, err := i.Next()
+		if err != nil {
+			return errors.Wrap(err, errReadEvents)
+		}
+
+		ag := &aggregate.MaxResourceCountPerGVKPerMCP{}
+		for {
+			e, err := r.Read(ctx)
+			if errors.Is(err, event.EOF) {
+				break
+			}
+			if err != nil {
+				return err
+			}
+			if err := ag.Add(e); err != nil {
+				return err
+			}
+		}
+		if err := r.Close(); err != nil {
+			return errors.Wrap(err, errReadEvents)
+		}
+
+		for _, e := range ag.UpboundEvents() {
+			e.Timestamp = window.Start
+			e.TimestampEnd = window.End
+			if err := w.Write(e); err != nil {
+				return errors.Wrap(err, errWriteEvents)
+			}
+		}
+	}
+	return nil
 }

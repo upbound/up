@@ -25,9 +25,9 @@ import (
 	"github.com/crossplane/crossplane-runtime/pkg/test"
 	"github.com/google/go-cmp/cmp"
 
-	"github.com/upbound/up/internal/usage"
 	"github.com/upbound/up/internal/usage/model"
 	"github.com/upbound/up/internal/usage/report"
+	usagetime "github.com/upbound/up/internal/usage/time"
 )
 
 // makeTestData creates the test data used by TestWriter(). This function is
@@ -42,7 +42,7 @@ func makeTestData() { // nolint:unused
 
 	meta := report.Meta{
 		UpboundAccount: "test-account",
-		TimeRange: usage.TimeRange{
+		TimeRange: usagetime.Range{
 			Start: time.Date(2006, 5, 4, 3, 2, 1, 0, time.UTC),
 			End:   time.Date(2006, 5, 4, 4, 2, 1, 0, time.UTC),
 		},
@@ -106,7 +106,7 @@ func TestWriter(t *testing.T) {
 			args: args{
 				meta: report.Meta{
 					UpboundAccount: "test-account",
-					TimeRange: usage.TimeRange{
+					TimeRange: usagetime.Range{
 						Start: time.Date(2006, 5, 4, 3, 2, 1, 0, time.UTC),
 						End:   time.Date(2006, 5, 4, 4, 2, 1, 0, time.UTC),
 					},
@@ -123,7 +123,7 @@ func TestWriter(t *testing.T) {
 			args: args{
 				meta: report.Meta{
 					UpboundAccount: "test-account",
-					TimeRange: usage.TimeRange{
+					TimeRange: usagetime.Range{
 						Start: time.Date(2006, 5, 4, 3, 2, 1, 0, time.UTC),
 						End:   time.Date(2006, 5, 4, 4, 2, 1, 0, time.UTC),
 					},
