@@ -33,7 +33,7 @@ const (
 
 	// HelmChartContentLayerMediaType is the reserved media type for Helm chart
 	// package content.
-	HelmChartContentLayerMediaType = "application/tar+gzip"
+	HelmChartContentLayerMediaType = "application/vnd.cncf.helm.chart.content.v1.tar+gzip"
 )
 
 const (
@@ -87,9 +87,7 @@ func newRegistryPuller(opts ...registryPullerOpt) *registryPuller {
 }
 
 func (p *registryPuller) Run(chartName string) (string, error) {
-	// NOTE(hasheddan): we append v to tag as the helm manager will strip it
-	// from version before running the pull client.
-	ref, err := name.ParseReference(fmt.Sprintf("%s/%s:v%s", p.repoURL.String(), chartName, p.version))
+	ref, err := name.ParseReference(fmt.Sprintf("%s/%s:%s", p.repoURL.String(), chartName, p.version))
 	if err != nil {
 		return "", errors.Wrap(err, errImageReference)
 	}

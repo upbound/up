@@ -30,7 +30,7 @@ const (
 )
 
 var (
-	uxpRepoURL, _         = url.Parse("https://charts.upbound.io/stable")
+	RepoURL, _            = url.Parse("https://charts.upbound.io/stable")
 	uxpUnstableRepoURL, _ = url.Parse("https://charts.upbound.io/main")
 )
 
