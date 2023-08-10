@@ -76,11 +76,19 @@ func maxResourceCountPerGVKPerMCP(ctx context.Context, account, bucket string, c
 		if err != nil {
 			return errors.Wrap(err, errReadEvents)
 		}
-		objects, err := client.ListObjectsV2(&s3.ListObjectsV2Input{
-			Bucket: aws.String(bucket),
-			Prefix: aws.String(startPrefix),
-		})
-		if err != nil {
+
+		pages := []*s3.ListObjectsV2Output{}
+		if err := client.ListObjectsV2PagesWithContext(
+			ctx,
+			&s3.ListObjectsV2Input{
+				Bucket: aws.String(bucket),
+				Prefix: aws.String(startPrefix),
+			},
+			func(page *s3.ListObjectsV2Output, _ bool) bool {
+				pages = append(pages, page)
+				return true
+			},
+		); err != nil {
 			return errors.Wrap(err, errReadEvents)
 		}
 
@@ -89,18 +97,20 @@ func maxResourceCountPerGVKPerMCP(ctx context.Context, account, bucket string, c
 		ag := &aggregate.MaxResourceCountPerGVKPerMCP{}
 		agMu := &sync.Mutex{}
 
-		for _, obj := range objects.Contents {
-			currObject := obj
-			g.Go(func() error {
-				resp, err := client.GetObjectWithContext(ctx, &s3.GetObjectInput{
-					Bucket: aws.String(bucket),
-					Key:    currObject.Key,
+		for _, page := range pages {
+			for _, obj := range page.Contents {
+				currObject := obj
+				g.Go(func() error {
+					resp, err := client.GetObjectWithContext(ctx, &s3.GetObjectInput{
+						Bucket: aws.String(bucket),
+						Key:    currObject.Key,
+					})
+					if err != nil {
+						return errors.Wrap(err, errGetObject)
+					}
+					return readObject(ag, agMu, resp)
 				})
-				if err != nil {
-					return errors.Wrap(err, errGetObject)
-				}
-				return readObject(ag, agMu, resp)
-			})
+			}
 		}
 		if err := g.Wait(); err != nil {
 			return errors.Wrap(err, errReadEvents)
