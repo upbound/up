@@ -20,12 +20,13 @@ import (
 
 	"github.com/aws/aws-sdk-go/aws"
 	"github.com/aws/aws-sdk-go/service/s3"
+	clock "k8s.io/utils/clock/testing"
 
 	usagetime "github.com/upbound/up/internal/usage/time"
 )
 
-// ListObjectsV2InputIterator iterates through a *s3.ListObjectsV2Input for each
-// window of time in a time range. Must be initialized with
+// ListObjectsV2InputIterator iterates through a []*s3.ListObjectsV2Input for
+// each window of time in a time range. Must be initialized with
 // NewListObjectsV2InputIterator().
 type ListObjectsV2InputIterator struct {
 	Bucket  string
@@ -51,21 +52,33 @@ func (i *ListObjectsV2InputIterator) More() bool {
 	return i.Iter.More()
 }
 
-// Next returns a *s3.ListObjectsV2Input covering the next window of time, as
+// Next returns a []*s3.ListObjectsV2Input covering the next window of time, as
 // well as a time range marking the window.
-func (i *ListObjectsV2InputIterator) Next() (*s3.ListObjectsV2Input, usagetime.Range, error) {
+func (i *ListObjectsV2InputIterator) Next() ([]*s3.ListObjectsV2Input, usagetime.Range, error) {
 	window, err := i.Iter.Next()
 	if err != nil {
 		return nil, usagetime.Range{}, err
 	}
-	// TODO(branden): Return []ListObjectsV2Input covering the complete window.
-	return &s3.ListObjectsV2Input{
-		Bucket: aws.String(i.Bucket),
-		Prefix: aws.String(fmt.Sprintf(
-			"account=%s/date=%s/hour=%02d/",
-			i.Account,
-			usagetime.FormatDateUTC(window.Start),
-			window.Start.Hour(),
-		)),
-	}, window, nil
+
+	// Create a *ListObjectsV2Input for each hour prefix in the window.
+	inputs := []*s3.ListObjectsV2Input{}
+	c := clock.SimpleIntervalClock{Time: window.Start, Duration: time.Hour}
+	now := window.Start
+	for {
+		if now.Equal(window.End) || now.After(window.End) {
+			break
+		}
+		inputs = append(inputs, &s3.ListObjectsV2Input{
+			Bucket: aws.String(i.Bucket),
+			Prefix: aws.String(fmt.Sprintf(
+				"account=%s/date=%s/hour=%02d/",
+				i.Account,
+				usagetime.FormatDateUTC(now),
+				now.Hour(),
+			)),
+		})
+		now = c.Now()
+	}
+
+	return inputs, window, nil
 }

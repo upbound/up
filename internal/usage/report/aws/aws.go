@@ -42,7 +42,7 @@ const (
 )
 
 // GenerateReport initializes the client code and generates a usage report based on given inputs
-func GenerateReport(ctx context.Context, account, endpoint, bucket string, billingPeriod usagetime.Range, w event.Writer) error {
+func GenerateReport(ctx context.Context, account, endpoint, bucket string, billingPeriod usagetime.Range, w event.Writer, window time.Duration) error {
 	sess, err := session.NewSession(&aws.Config{})
 	if err != nil {
 		return errors.Wrap(err, "error creating aws session")
@@ -55,7 +55,7 @@ func GenerateReport(ctx context.Context, account, endpoint, bucket string, billi
 	}
 	s3client := s3.New(sess, config)
 
-	if err := maxResourceCountPerGVKPerMCP(ctx, account, bucket, s3client, billingPeriod, w); err != nil {
+	if err := maxResourceCountPerGVKPerMCP(ctx, account, bucket, s3client, billingPeriod, w, window); err != nil {
 		return err
 	}
 	return nil
@@ -63,30 +63,31 @@ func GenerateReport(ctx context.Context, account, endpoint, bucket string, billi
 
 // maxResourceCountPerGVKPerMCP reads usage data for an account and time range
 // from bkt and writes aggregated usage events to w. Events are aggregated
-// across 1hr windows of the time range.
-func maxResourceCountPerGVKPerMCP(ctx context.Context, account, bucket string, client *s3.S3, tr usagetime.Range, w event.Writer) error {
-	// TODO: Add support for aggregation windows other than 1 hour.
-	iter, err := usageaws.NewListObjectsV2InputIterator(bucket, account, tr, time.Hour)
+// across each window of the time range.
+func maxResourceCountPerGVKPerMCP(ctx context.Context, account, bucket string, client *s3.S3, tr usagetime.Range, w event.Writer, window time.Duration) error {
+	iter, err := usageaws.NewListObjectsV2InputIterator(bucket, account, tr, window)
 	if err != nil {
 		return errors.Wrap(err, errReadEvents)
 	}
 
 	for iter.More() {
-		loi, window, err := iter.Next()
+		inputs, window, err := iter.Next()
 		if err != nil {
 			return errors.Wrap(err, errReadEvents)
 		}
 
 		pages := []*s3.ListObjectsV2Output{}
-		if err := client.ListObjectsV2PagesWithContext(
-			ctx,
-			loi,
-			func(page *s3.ListObjectsV2Output, _ bool) bool {
-				pages = append(pages, page)
-				return true
-			},
-		); err != nil {
-			return errors.Wrap(err, errReadEvents)
+		for _, loi := range inputs {
+			if err := client.ListObjectsV2PagesWithContext(
+				ctx,
+				loi,
+				func(page *s3.ListObjectsV2Output, _ bool) bool {
+					pages = append(pages, page)
+					return true
+				},
+			); err != nil {
+				return errors.Wrap(err, errReadEvents)
+			}
 		}
 
 		g, ctx := errgroup.WithContext(ctx)

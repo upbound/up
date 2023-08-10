@@ -35,9 +35,9 @@ func TestListObjectsV2InputIterator(t *testing.T) {
 	}
 	type iteration struct {
 		// These fields are exported for cmp.Diff().
-		ListObjectsV2Input *s3.ListObjectsV2Input
-		Window             usagetime.Range
-		Err                error
+		ListObjectsV2Inputs []*s3.ListObjectsV2Input
+		Window              usagetime.Range
+		Err                 error
 	}
 	cases := map[string]struct {
 		reason string
@@ -57,9 +57,11 @@ func TestListObjectsV2InputIterator(t *testing.T) {
 			},
 			want: []iteration{
 				{
-					ListObjectsV2Input: &s3.ListObjectsV2Input{
-						Bucket: aws.String("test-bucket"),
-						Prefix: aws.String("account=test-account/date=2006-05-04/hour=03/"),
+					ListObjectsV2Inputs: []*s3.ListObjectsV2Input{
+						{
+							Bucket: aws.String("test-bucket"),
+							Prefix: aws.String("account=test-account/date=2006-05-04/hour=03/"),
+						},
 					},
 					Window: usagetime.Range{
 						Start: time.Date(2006, 5, 4, 3, 0, 0, 0, time.UTC),
@@ -67,9 +69,11 @@ func TestListObjectsV2InputIterator(t *testing.T) {
 					},
 				},
 				{
-					ListObjectsV2Input: &s3.ListObjectsV2Input{
-						Bucket: aws.String("test-bucket"),
-						Prefix: aws.String("account=test-account/date=2006-05-04/hour=04/"),
+					ListObjectsV2Inputs: []*s3.ListObjectsV2Input{
+						{
+							Bucket: aws.String("test-bucket"),
+							Prefix: aws.String("account=test-account/date=2006-05-04/hour=04/"),
+						},
 					},
 					Window: usagetime.Range{
 						Start: time.Date(2006, 5, 4, 4, 0, 0, 0, time.UTC),
@@ -77,9 +81,11 @@ func TestListObjectsV2InputIterator(t *testing.T) {
 					},
 				},
 				{
-					ListObjectsV2Input: &s3.ListObjectsV2Input{
-						Bucket: aws.String("test-bucket"),
-						Prefix: aws.String("account=test-account/date=2006-05-04/hour=05/"),
+					ListObjectsV2Inputs: []*s3.ListObjectsV2Input{
+						{
+							Bucket: aws.String("test-bucket"),
+							Prefix: aws.String("account=test-account/date=2006-05-04/hour=05/"),
+						},
 					},
 					Window: usagetime.Range{
 						Start: time.Date(2006, 5, 4, 5, 0, 0, 0, time.UTC),
@@ -101,9 +107,15 @@ func TestListObjectsV2InputIterator(t *testing.T) {
 			},
 			want: []iteration{
 				{
-					ListObjectsV2Input: &s3.ListObjectsV2Input{
-						Bucket: aws.String("test-bucket"),
-						Prefix: aws.String("account=test-account/date=2006-05-04/hour=03/"),
+					ListObjectsV2Inputs: []*s3.ListObjectsV2Input{
+						{
+							Bucket: aws.String("test-bucket"),
+							Prefix: aws.String("account=test-account/date=2006-05-04/hour=03/"),
+						},
+						{
+							Bucket: aws.String("test-bucket"),
+							Prefix: aws.String("account=test-account/date=2006-05-04/hour=04/"),
+						},
 					},
 					Window: usagetime.Range{
 						Start: time.Date(2006, 5, 4, 3, 0, 0, 0, time.UTC),
@@ -111,9 +123,11 @@ func TestListObjectsV2InputIterator(t *testing.T) {
 					},
 				},
 				{
-					ListObjectsV2Input: &s3.ListObjectsV2Input{
-						Bucket: aws.String("test-bucket"),
-						Prefix: aws.String("account=test-account/date=2006-05-04/hour=05/"),
+					ListObjectsV2Inputs: []*s3.ListObjectsV2Input{
+						{
+							Bucket: aws.String("test-bucket"),
+							Prefix: aws.String("account=test-account/date=2006-05-04/hour=05/"),
+						},
 					},
 					Window: usagetime.Range{
 						Start: time.Date(2006, 5, 4, 5, 0, 0, 0, time.UTC),
@@ -135,9 +149,19 @@ func TestListObjectsV2InputIterator(t *testing.T) {
 			},
 			want: []iteration{
 				{
-					ListObjectsV2Input: &s3.ListObjectsV2Input{
-						Bucket: aws.String("test-bucket"),
-						Prefix: aws.String("account=test-account/date=2006-05-04/hour=03/"),
+					ListObjectsV2Inputs: []*s3.ListObjectsV2Input{
+						{
+							Bucket: aws.String("test-bucket"),
+							Prefix: aws.String("account=test-account/date=2006-05-04/hour=03/"),
+						},
+						{
+							Bucket: aws.String("test-bucket"),
+							Prefix: aws.String("account=test-account/date=2006-05-04/hour=04/"),
+						},
+						{
+							Bucket: aws.String("test-bucket"),
+							Prefix: aws.String("account=test-account/date=2006-05-04/hour=05/"),
+						},
 					},
 					Window: usagetime.Range{
 						Start: time.Date(2006, 5, 4, 3, 0, 0, 0, time.UTC),
@@ -159,9 +183,103 @@ func TestListObjectsV2InputIterator(t *testing.T) {
 			},
 			want: []iteration{
 				{
-					ListObjectsV2Input: &s3.ListObjectsV2Input{
-						Bucket: aws.String("test-bucket"),
-						Prefix: aws.String("account=test-account/date=2006-05-04/hour=03/"),
+					ListObjectsV2Inputs: []*s3.ListObjectsV2Input{
+						{
+							Bucket: aws.String("test-bucket"),
+							Prefix: aws.String("account=test-account/date=2006-05-04/hour=03/"),
+						},
+						{
+							Bucket: aws.String("test-bucket"),
+							Prefix: aws.String("account=test-account/date=2006-05-04/hour=04/"),
+						},
+						{
+							Bucket: aws.String("test-bucket"),
+							Prefix: aws.String("account=test-account/date=2006-05-04/hour=05/"),
+						},
+						{
+							Bucket: aws.String("test-bucket"),
+							Prefix: aws.String("account=test-account/date=2006-05-04/hour=06/"),
+						},
+						{
+							Bucket: aws.String("test-bucket"),
+							Prefix: aws.String("account=test-account/date=2006-05-04/hour=07/"),
+						},
+						{
+							Bucket: aws.String("test-bucket"),
+							Prefix: aws.String("account=test-account/date=2006-05-04/hour=08/"),
+						},
+						{
+							Bucket: aws.String("test-bucket"),
+							Prefix: aws.String("account=test-account/date=2006-05-04/hour=09/"),
+						},
+						{
+							Bucket: aws.String("test-bucket"),
+							Prefix: aws.String("account=test-account/date=2006-05-04/hour=10/"),
+						},
+						{
+							Bucket: aws.String("test-bucket"),
+							Prefix: aws.String("account=test-account/date=2006-05-04/hour=11/"),
+						},
+						{
+							Bucket: aws.String("test-bucket"),
+							Prefix: aws.String("account=test-account/date=2006-05-04/hour=12/"),
+						},
+						{
+							Bucket: aws.String("test-bucket"),
+							Prefix: aws.String("account=test-account/date=2006-05-04/hour=13/"),
+						},
+						{
+							Bucket: aws.String("test-bucket"),
+							Prefix: aws.String("account=test-account/date=2006-05-04/hour=14/"),
+						},
+						{
+							Bucket: aws.String("test-bucket"),
+							Prefix: aws.String("account=test-account/date=2006-05-04/hour=15/"),
+						},
+						{
+							Bucket: aws.String("test-bucket"),
+							Prefix: aws.String("account=test-account/date=2006-05-04/hour=16/"),
+						},
+						{
+							Bucket: aws.String("test-bucket"),
+							Prefix: aws.String("account=test-account/date=2006-05-04/hour=17/"),
+						},
+						{
+							Bucket: aws.String("test-bucket"),
+							Prefix: aws.String("account=test-account/date=2006-05-04/hour=18/"),
+						},
+						{
+							Bucket: aws.String("test-bucket"),
+							Prefix: aws.String("account=test-account/date=2006-05-04/hour=19/"),
+						},
+						{
+							Bucket: aws.String("test-bucket"),
+							Prefix: aws.String("account=test-account/date=2006-05-04/hour=20/"),
+						},
+						{
+							Bucket: aws.String("test-bucket"),
+							Prefix: aws.String("account=test-account/date=2006-05-04/hour=21/"),
+						},
+						{
+							Bucket: aws.String("test-bucket"),
+							Prefix: aws.String("account=test-account/date=2006-05-04/hour=22/"),
+						},
+						{
+							Bucket: aws.String("test-bucket"),
+							Prefix: aws.String("account=test-account/date=2006-05-04/hour=23/"),
+						},
+						{
+							Bucket: aws.String("test-bucket"),
+							Prefix: aws.String("account=test-account/date=2006-05-05/hour=00/"),
+						},
+						{
+							Bucket: aws.String("test-bucket"),
+							Prefix: aws.String("account=test-account/date=2006-05-05/hour=01/"),
+						},
+						{
+							Bucket: aws.String("test-bucket"),
+							Prefix: aws.String("account=test-account/date=2006-05-05/hour=02/"),
+						},
 					},
 					Window: usagetime.Range{
 						Start: time.Date(2006, 5, 4, 3, 0, 0, 0, time.UTC),
@@ -169,9 +287,103 @@ func TestListObjectsV2InputIterator(t *testing.T) {
 					},
 				},
 				{
-					ListObjectsV2Input: &s3.ListObjectsV2Input{
-						Bucket: aws.String("test-bucket"),
-						Prefix: aws.String("account=test-account/date=2006-05-05/hour=03/"),
+					ListObjectsV2Inputs: []*s3.ListObjectsV2Input{
+						{
+							Bucket: aws.String("test-bucket"),
+							Prefix: aws.String("account=test-account/date=2006-05-05/hour=03/"),
+						},
+						{
+							Bucket: aws.String("test-bucket"),
+							Prefix: aws.String("account=test-account/date=2006-05-05/hour=04/"),
+						},
+						{
+							Bucket: aws.String("test-bucket"),
+							Prefix: aws.String("account=test-account/date=2006-05-05/hour=05/"),
+						},
+						{
+							Bucket: aws.String("test-bucket"),
+							Prefix: aws.String("account=test-account/date=2006-05-05/hour=06/"),
+						},
+						{
+							Bucket: aws.String("test-bucket"),
+							Prefix: aws.String("account=test-account/date=2006-05-05/hour=07/"),
+						},
+						{
+							Bucket: aws.String("test-bucket"),
+							Prefix: aws.String("account=test-account/date=2006-05-05/hour=08/"),
+						},
+						{
+							Bucket: aws.String("test-bucket"),
+							Prefix: aws.String("account=test-account/date=2006-05-05/hour=09/"),
+						},
+						{
+							Bucket: aws.String("test-bucket"),
+							Prefix: aws.String("account=test-account/date=2006-05-05/hour=10/"),
+						},
+						{
+							Bucket: aws.String("test-bucket"),
+							Prefix: aws.String("account=test-account/date=2006-05-05/hour=11/"),
+						},
+						{
+							Bucket: aws.String("test-bucket"),
+							Prefix: aws.String("account=test-account/date=2006-05-05/hour=12/"),
+						},
+						{
+							Bucket: aws.String("test-bucket"),
+							Prefix: aws.String("account=test-account/date=2006-05-05/hour=13/"),
+						},
+						{
+							Bucket: aws.String("test-bucket"),
+							Prefix: aws.String("account=test-account/date=2006-05-05/hour=14/"),
+						},
+						{
+							Bucket: aws.String("test-bucket"),
+							Prefix: aws.String("account=test-account/date=2006-05-05/hour=15/"),
+						},
+						{
+							Bucket: aws.String("test-bucket"),
+							Prefix: aws.String("account=test-account/date=2006-05-05/hour=16/"),
+						},
+						{
+							Bucket: aws.String("test-bucket"),
+							Prefix: aws.String("account=test-account/date=2006-05-05/hour=17/"),
+						},
+						{
+							Bucket: aws.String("test-bucket"),
+							Prefix: aws.String("account=test-account/date=2006-05-05/hour=18/"),
+						},
+						{
+							Bucket: aws.String("test-bucket"),
+							Prefix: aws.String("account=test-account/date=2006-05-05/hour=19/"),
+						},
+						{
+							Bucket: aws.String("test-bucket"),
+							Prefix: aws.String("account=test-account/date=2006-05-05/hour=20/"),
+						},
+						{
+							Bucket: aws.String("test-bucket"),
+							Prefix: aws.String("account=test-account/date=2006-05-05/hour=21/"),
+						},
+						{
+							Bucket: aws.String("test-bucket"),
+							Prefix: aws.String("account=test-account/date=2006-05-05/hour=22/"),
+						},
+						{
+							Bucket: aws.String("test-bucket"),
+							Prefix: aws.String("account=test-account/date=2006-05-05/hour=23/"),
+						},
+						{
+							Bucket: aws.String("test-bucket"),
+							Prefix: aws.String("account=test-account/date=2006-05-06/hour=00/"),
+						},
+						{
+							Bucket: aws.String("test-bucket"),
+							Prefix: aws.String("account=test-account/date=2006-05-06/hour=01/"),
+						},
+						{
+							Bucket: aws.String("test-bucket"),
+							Prefix: aws.String("account=test-account/date=2006-05-06/hour=02/"),
+						},
 					},
 					Window: usagetime.Range{
 						Start: time.Date(2006, 5, 5, 3, 0, 0, 0, time.UTC),
@@ -179,9 +391,103 @@ func TestListObjectsV2InputIterator(t *testing.T) {
 					},
 				},
 				{
-					ListObjectsV2Input: &s3.ListObjectsV2Input{
-						Bucket: aws.String("test-bucket"),
-						Prefix: aws.String("account=test-account/date=2006-05-06/hour=03/"),
+					ListObjectsV2Inputs: []*s3.ListObjectsV2Input{
+						{
+							Bucket: aws.String("test-bucket"),
+							Prefix: aws.String("account=test-account/date=2006-05-06/hour=03/"),
+						},
+						{
+							Bucket: aws.String("test-bucket"),
+							Prefix: aws.String("account=test-account/date=2006-05-06/hour=04/"),
+						},
+						{
+							Bucket: aws.String("test-bucket"),
+							Prefix: aws.String("account=test-account/date=2006-05-06/hour=05/"),
+						},
+						{
+							Bucket: aws.String("test-bucket"),
+							Prefix: aws.String("account=test-account/date=2006-05-06/hour=06/"),
+						},
+						{
+							Bucket: aws.String("test-bucket"),
+							Prefix: aws.String("account=test-account/date=2006-05-06/hour=07/"),
+						},
+						{
+							Bucket: aws.String("test-bucket"),
+							Prefix: aws.String("account=test-account/date=2006-05-06/hour=08/"),
+						},
+						{
+							Bucket: aws.String("test-bucket"),
+							Prefix: aws.String("account=test-account/date=2006-05-06/hour=09/"),
+						},
+						{
+							Bucket: aws.String("test-bucket"),
+							Prefix: aws.String("account=test-account/date=2006-05-06/hour=10/"),
+						},
+						{
+							Bucket: aws.String("test-bucket"),
+							Prefix: aws.String("account=test-account/date=2006-05-06/hour=11/"),
+						},
+						{
+							Bucket: aws.String("test-bucket"),
+							Prefix: aws.String("account=test-account/date=2006-05-06/hour=12/"),
+						},
+						{
+							Bucket: aws.String("test-bucket"),
+							Prefix: aws.String("account=test-account/date=2006-05-06/hour=13/"),
+						},
+						{
+							Bucket: aws.String("test-bucket"),
+							Prefix: aws.String("account=test-account/date=2006-05-06/hour=14/"),
+						},
+						{
+							Bucket: aws.String("test-bucket"),
+							Prefix: aws.String("account=test-account/date=2006-05-06/hour=15/"),
+						},
+						{
+							Bucket: aws.String("test-bucket"),
+							Prefix: aws.String("account=test-account/date=2006-05-06/hour=16/"),
+						},
+						{
+							Bucket: aws.String("test-bucket"),
+							Prefix: aws.String("account=test-account/date=2006-05-06/hour=17/"),
+						},
+						{
+							Bucket: aws.String("test-bucket"),
+							Prefix: aws.String("account=test-account/date=2006-05-06/hour=18/"),
+						},
+						{
+							Bucket: aws.String("test-bucket"),
+							Prefix: aws.String("account=test-account/date=2006-05-06/hour=19/"),
+						},
+						{
+							Bucket: aws.String("test-bucket"),
+							Prefix: aws.String("account=test-account/date=2006-05-06/hour=20/"),
+						},
+						{
+							Bucket: aws.String("test-bucket"),
+							Prefix: aws.String("account=test-account/date=2006-05-06/hour=21/"),
+						},
+						{
+							Bucket: aws.String("test-bucket"),
+							Prefix: aws.String("account=test-account/date=2006-05-06/hour=22/"),
+						},
+						{
+							Bucket: aws.String("test-bucket"),
+							Prefix: aws.String("account=test-account/date=2006-05-06/hour=23/"),
+						},
+						{
+							Bucket: aws.String("test-bucket"),
+							Prefix: aws.String("account=test-account/date=2006-05-07/hour=00/"),
+						},
+						{
+							Bucket: aws.String("test-bucket"),
+							Prefix: aws.String("account=test-account/date=2006-05-07/hour=01/"),
+						},
+						{
+							Bucket: aws.String("test-bucket"),
+							Prefix: aws.String("account=test-account/date=2006-05-07/hour=02/"),
+						},
 					},
 					Window: usagetime.Range{
 						Start: time.Date(2006, 5, 6, 3, 0, 0, 0, time.UTC),
@@ -201,8 +507,8 @@ func TestListObjectsV2InputIterator(t *testing.T) {
 
 			got := []iteration{}
 			for iter.More() {
-				loi, window, err := iter.Next()
-				got = append(got, iteration{ListObjectsV2Input: loi, Window: window, Err: err})
+				inputs, window, err := iter.Next()
+				got = append(got, iteration{ListObjectsV2Inputs: inputs, Window: window, Err: err})
 			}
 
 			if diff := cmp.Diff(tc.want, got, test.EquateErrors()); diff != "" {

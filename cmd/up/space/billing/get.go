@@ -212,7 +212,7 @@ func (c *getCmd) collectReport() error {
 	case providerGCP:
 		err = c.collectReportGCP(ctx, rw)
 	case providerAWS:
-		err = reportaws.GenerateReport(ctx, c.Account, c.Endpoint, c.Bucket, c.billingPeriod, rw)
+		err = reportaws.GenerateReport(ctx, c.Account, c.Endpoint, c.Bucket, c.billingPeriod, rw, time.Hour)
 	case providerAzure:
 		err = c.collectReportAzure(ctx, rw)
 	default:
