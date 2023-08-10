@@ -19,30 +19,33 @@ import (
 	"time"
 
 	"cloud.google.com/go/storage"
+
+	usagetime "github.com/upbound/up/internal/usage/time"
 )
 
 // UsageQuery() returns a query for usage data for an Upbound account across a
-// range of time. startTime is inclusive and endTime is exclusive to the hour.
-func UsageQuery(account string, startTime, endTime time.Time) (*storage.Query, error) {
-	if endTime.Before(startTime) {
-		return nil, fmt.Errorf("endTime must occur after startTime")
+// range of time. The start of the range is inclusive and the end is exclusive
+// to the hour.
+func UsageQuery(account string, tr usagetime.Range) (*storage.Query, error) {
+	if tr.End.Before(tr.Start) {
+		return nil, fmt.Errorf("time range must start before it ends")
 	}
-	return usageQuery(account, startTime, endTime), nil
+	return usageQuery(account, tr), nil
 }
 
-func usageQuery(account string, startTime, endTime time.Time) *storage.Query {
+func usageQuery(account string, tr usagetime.Range) *storage.Query {
 	return &storage.Query{
 		StartOffset: fmt.Sprintf(
 			"account=%s/date=%s/hour=%02d/",
 			account,
-			formatDateUTC(startTime),
-			startTime.Hour(),
+			usagetime.FormatDateUTC(tr.Start),
+			tr.Start.Hour(),
 		),
 		EndOffset: fmt.Sprintf(
 			"account=%s/date=%s/hour=%02d/",
 			account,
-			formatDateUTC(endTime),
-			endTime.Hour(),
+			usagetime.FormatDateUTC(tr.End),
+			tr.End.Hour(),
 		),
 	}
 }
@@ -52,52 +55,34 @@ func usageQuery(account string, startTime, endTime time.Time) *storage.Query {
 // time range. Must be initialized with NewUsageQueryIterator().
 type UsageQueryIterator struct {
 	Account string
-	Cursor  time.Time
-	EndTime time.Time
-	Window  time.Duration
+	Iter    *usagetime.WindowIterator
 }
 
-// NewUsageQueryIterator() returns an initialized *UsageQueryIterator.
-// startTime is inclusive and endTime is exclusive to the hour. startTime,
-// endTime, and window are truncated to the hour.
-func NewUsageQueryIterator(account string, startTime, endTime time.Time, window time.Duration) (*UsageQueryIterator, error) {
-	if window < time.Hour {
-		return nil, fmt.Errorf("window must be 1h or greater")
+// NewUsageQueryIterator() returns an initialized *UsageQueryIterator. The
+// start of the time range is inclusive and the end is exclusive to the hour.
+// The time range and window are truncated to the hour.
+func NewUsageQueryIterator(account string, tr usagetime.Range, window time.Duration) (*UsageQueryIterator, error) {
+	iter, err := usagetime.NewWindowIterator(tr, window)
+	if err != nil {
+		return nil, err
 	}
-	if endTime.Before(startTime.Add(time.Hour)) {
-		return nil, fmt.Errorf("endTime must occur at least 1h after startTime")
-	}
-	startTime = startTime.Truncate(time.Hour)
-	endTime = endTime.Truncate(time.Hour)
-	window = window.Truncate(time.Hour)
 	return &UsageQueryIterator{
 		Account: account,
-		Cursor:  startTime,
-		EndTime: endTime,
-		Window:  window,
+		Iter:    iter,
 	}, nil
 }
 
 // More() returns true if Next() has more queries to return.
 func (i *UsageQueryIterator) More() bool {
-	return i.Cursor.Before(i.EndTime)
+	return i.Iter.More()
 }
 
 // Next() returns a query covering the next window of time, as well as a pair
 // of times marking the start and end of the window.
-func (i *UsageQueryIterator) Next() (*storage.Query, time.Time, time.Time, error) {
-	if !i.More() {
-		return nil, time.Time{}, time.Time{}, fmt.Errorf("iterator is done")
+func (i *UsageQueryIterator) Next() (*storage.Query, usagetime.Range, error) {
+	window, err := i.Iter.Next()
+	if err != nil {
+		return nil, usagetime.Range{}, err
 	}
-	start := i.Cursor
-	i.Cursor = i.Cursor.Add(i.Window)
-	if i.Cursor.After(i.EndTime) {
-		i.Cursor = i.EndTime
-	}
-	return usageQuery(i.Account, start, i.Cursor), start, i.Cursor, nil
-}
-
-// formatDateUTC returns t in UTC as a string with the format YYYY-MM-DD.
-func formatDateUTC(t time.Time) string {
-	return t.UTC().Format(time.DateOnly)
+	return usageQuery(i.Account, window), window, nil
 }

@@ -63,13 +63,13 @@ func GenerateReport(ctx context.Context, account, endpoint, bucket string, billi
 func maxResourceCountPerGVKPerMCP(ctx context.Context, account string, bkt *storage.BucketHandle, tr usagetime.Range, window time.Duration, w event.Writer) error {
 	// TODO(branden): Extract provider-generic upbound event reader interface so
 	// that this function can be reused across providers.
-	iter, err := gcs.NewUsageQueryIterator(account, tr.Start, tr.End, window)
+	iter, err := gcs.NewUsageQueryIterator(account, tr, window)
 	if err != nil {
 		return errors.Wrap(err, errReadEvents)
 	}
 
 	for iter.More() {
-		query, start, end, err := iter.Next()
+		query, window, err := iter.Next()
 		if err != nil {
 			return errors.Wrap(err, errReadEvents)
 		}
@@ -96,8 +96,8 @@ func maxResourceCountPerGVKPerMCP(ctx context.Context, account string, bkt *stor
 		}
 
 		for _, e := range ag.UpboundEvents() {
-			e.Timestamp = start
-			e.TimestampEnd = end
+			e.Timestamp = window.Start
+			e.TimestampEnd = window.End
 			if err := w.Write(e); err != nil {
 				return errors.Wrap(err, errWriteEvents)
 			}
