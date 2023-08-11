@@ -19,6 +19,9 @@ import (
 	"k8s.io/client-go/rest"
 
 	"github.com/upbound/up/cmd/up/space/prerequisites/certmanager"
+	"github.com/upbound/up/cmd/up/space/prerequisites/ingressnginx"
+	"github.com/upbound/up/cmd/up/space/prerequisites/providers/helm"
+	"github.com/upbound/up/cmd/up/space/prerequisites/providers/kubernetes"
 	"github.com/upbound/up/cmd/up/space/prerequisites/uxp"
 )
 
@@ -61,6 +64,24 @@ func New(config *rest.Config) (*Manager, error) {
 		return nil, errors.Wrap(err, errCreatePrerequisite)
 	}
 	prereqs = append(prereqs, uxp)
+
+	ingress, err := ingressnginx.New(config)
+	if err != nil {
+		return nil, errors.Wrap(err, errCreatePrerequisite)
+	}
+	prereqs = append(prereqs, ingress)
+
+	pk8s, err := kubernetes.New(config)
+	if err != nil {
+		return nil, errors.Wrap(err, errCreatePrerequisite)
+	}
+	prereqs = append(prereqs, pk8s)
+
+	phelm, err := helm.New(config)
+	if err != nil {
+		return nil, errors.Wrap(err, errCreatePrerequisite)
+	}
+	prereqs = append(prereqs, phelm)
 
 	return &Manager{
 		prereqs: prereqs,

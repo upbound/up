@@ -18,11 +18,18 @@ import (
 	xpv1 "github.com/crossplane/crossplane-runtime/apis/common/v1"
 	"github.com/crossplane/crossplane-runtime/pkg/fieldpath"
 	"github.com/crossplane/crossplane-runtime/pkg/resource"
+	xppkgv1 "github.com/crossplane/crossplane/apis/pkg/v1"
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 )
 
+// Package represents a Crossplane Package.
 type Package struct {
 	unstructured.Unstructured
+}
+
+// GetUnstructured returns the unstructured representation of the package.
+func (p *Package) GetUnstructured() *unstructured.Unstructured {
+	return &p.Unstructured
 }
 
 // GetInstalled checks whether a package is installed. If installation status
@@ -45,4 +52,14 @@ func (p *Package) GetHealthy() bool {
 		return false
 	}
 	return resource.IsConditionTrue(conditioned.GetCondition("Healthy"))
+}
+
+// SetPackage sets the package reference.
+func (p *Package) SetPackage(pkg string) {
+	_ = fieldpath.Pave(p.Object).SetValue("spec.package", pkg)
+}
+
+// SetControllerConfigRef sets the controllerConfigRef on the package.
+func (p *Package) SetControllerConfigRef(ref xppkgv1.ControllerConfigReference) {
+	_ = fieldpath.Pave(p.Object).SetValue("spec.controllerConfigRef", ref)
 }
