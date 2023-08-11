@@ -169,7 +169,7 @@ func (k *Kubernetes) Install() error { //nolint:gocyclo
 		if _, err := k.crdclient.
 			CustomResourceDefinitions().
 			Get(
-				context.Background(),
+				ctx,
 				"providerconfigs.kubernetes.crossplane.io",
 				metav1.GetOptions{},
 			); err == nil {

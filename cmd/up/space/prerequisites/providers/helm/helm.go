@@ -169,7 +169,7 @@ func (h *Helm) Install() error { //nolint:gocyclo
 		if _, err := h.crdclient.
 			CustomResourceDefinitions().
 			Get(
-				context.Background(),
+				ctx,
 				"providerconfigs.helm.crossplane.io",
 				metav1.GetOptions{},
 			); err == nil {
