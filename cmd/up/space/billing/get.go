@@ -190,15 +190,35 @@ func (c *getCmd) cleanupOnError() {
 }
 
 func (c *getCmd) collectReport() error {
+	ctx, stop := signal.NotifyContext(context.Background(), os.Interrupt)
+	defer stop()
+
+	// Make event window iterator.
+	window := time.Hour
+	var iter event.WindowIterator
+	var err error
+	switch c.Provider {
+	case providerGCP:
+		iter, err = c.getGCPIter(ctx, window)
+	case providerAWS:
+		iter, err = c.getAWSIter(window)
+	case providerAzure:
+		iter, err = c.getAzureIter(window)
+	default:
+		return fmt.Errorf(errFmtProviderNotSupported, c.Provider)
+	}
+	if err != nil {
+		return err
+	}
+
+	// Make report writer.
 	f, err := os.Create(c.outAbs)
 	if err != nil {
 		return errors.Wrap(err, "error creating report")
 	}
 	defer f.Close() // nolint:errcheck
-
 	gw := gzip.NewWriter(f)
 	tw := tar.NewWriter(gw)
-
 	rw, err := reporttar.NewWriter(tw, report.Meta{
 		UpboundAccount: c.Account,
 		TimeRange:      c.billingPeriod,
@@ -208,23 +228,10 @@ func (c *getCmd) collectReport() error {
 		return errors.Wrap(err, "error creating report")
 	}
 
-	ctx, stop := signal.NotifyContext(context.Background(), os.Interrupt)
-	defer stop()
-
-	switch c.Provider {
-	case providerGCP:
-		err = c.collectReportGCP(ctx, rw)
-	case providerAWS:
-		err = c.collectReportAWS(ctx, rw)
-	case providerAzure:
-		err = c.collectReportAzure(ctx, rw)
-	default:
-		return fmt.Errorf(errFmtProviderNotSupported, c.Provider)
-	}
-	if err != nil {
+	// Write report.
+	if err := report.MaxResourceCountPerGVKPerMCP(ctx, iter, rw); err != nil {
 		return err
 	}
-
 	if err := rw.Close(); err != nil {
 		return err
 	}
@@ -234,27 +241,23 @@ func (c *getCmd) collectReport() error {
 	return gw.Close()
 }
 
-func (c *getCmd) collectReportGCP(ctx context.Context, w event.Writer) error {
+func (c *getCmd) getGCPIter(ctx context.Context, window time.Duration) (event.WindowIterator, error) {
 	opts := []gcpopt.ClientOption{}
 	if c.Endpoint != "" {
 		opts = append(opts, gcpopt.WithEndpoint(c.Endpoint))
 	}
 	gcsCli, err := storage.NewClient(ctx, opts...)
 	if err != nil {
-		return errors.Wrap(err, "error creating storage client")
+		return nil, errors.Wrap(err, "error creating storage client")
 	}
 	bkt := gcsCli.Bucket(c.Bucket)
-	ewi, err := gcp.NewWindowIterator(bkt, c.Account, c.billingPeriod, time.Hour)
-	if err != nil {
-		return err
-	}
-	return report.MaxResourceCountPerGVKPerMCP(ctx, ewi, w)
+	return gcp.NewWindowIterator(bkt, c.Account, c.billingPeriod, window)
 }
 
-func (c *getCmd) collectReportAWS(ctx context.Context, w event.Writer) error {
+func (c *getCmd) getAWSIter(window time.Duration) (event.WindowIterator, error) {
 	sess, err := session.NewSession(&aws.Config{})
 	if err != nil {
-		return errors.Wrap(err, "error creating aws session")
+		return nil, errors.Wrap(err, "error creating aws session")
 	}
 	config := &aws.Config{}
 	if c.Endpoint != "" {
@@ -263,28 +266,20 @@ func (c *getCmd) collectReportAWS(ctx context.Context, w event.Writer) error {
 		}
 	}
 	s3client := s3.New(sess, config)
-	ewi, err := usageaws.NewWindowIterator(s3client, c.Bucket, c.Account, c.billingPeriod, time.Hour)
-	if err != nil {
-		return err
-	}
-	return report.MaxResourceCountPerGVKPerMCP(ctx, ewi, w)
+	return usageaws.NewWindowIterator(s3client, c.Bucket, c.Account, c.billingPeriod, window)
 }
 
-func (c *getCmd) collectReportAzure(ctx context.Context, w event.Writer) error {
+func (c *getCmd) getAzureIter(window time.Duration) (event.WindowIterator, error) {
 	cred, err := azidentity.NewDefaultAzureCredential(nil)
 	if err != nil {
-		return err
+		return nil, err
 	}
 	cli, err := azblob.NewClient(fmt.Sprintf("https://%s.blob.core.windows.net/", c.AzureStorageAccount), cred, nil)
 	if err != nil {
-		return err
+		return nil, err
 	}
 	containerCli := cli.ServiceClient().NewContainerClient(c.Bucket)
-	ewi, err := azure.NewWindowIterator(containerCli, c.Account, c.billingPeriod, time.Hour)
-	if err != nil {
-		return err
-	}
-	return report.MaxResourceCountPerGVKPerMCP(ctx, ewi, w)
+	return azure.NewWindowIterator(containerCli, c.Account, c.billingPeriod, window)
 }
 
 func (c *getCmd) getBillingPeriod() (usagetime.Range, error) {
