@@ -22,8 +22,55 @@ import (
 	"github.com/aws/aws-sdk-go/service/s3"
 	clock "k8s.io/utils/clock/testing"
 
+	"github.com/upbound/up/internal/usage/event"
+	"github.com/upbound/up/internal/usage/event/reader"
 	usagetime "github.com/upbound/up/internal/usage/time"
 )
+
+var _ event.WindowIterator = &WindowIterator{}
+
+// WindowIterator iterates through readers for windows of usage events from an
+// S3 bucket. Must be initialized with NewWindowIterator().
+type WindowIterator struct {
+	Client *s3.S3
+	Bucket string
+	Iter   *ListObjectsV2InputIterator
+}
+
+// NewWindowIterator returns an initialized *WindowIterator.
+func NewWindowIterator(cli *s3.S3, bucket, account string, tr usagetime.Range, window time.Duration) (*WindowIterator, error) {
+	iter, err := NewListObjectsV2InputIterator(bucket, account, tr, window)
+	if err != nil {
+		return nil, err
+	}
+	return &WindowIterator{
+		Bucket: bucket,
+		Iter:   iter,
+		Client: cli,
+	}, nil
+}
+
+func (i *WindowIterator) More() bool {
+	return i.Iter.More()
+}
+
+func (i *WindowIterator) Next() (event.Reader, usagetime.Range, error) {
+	inputs, window, err := i.Iter.Next()
+	if err != nil {
+		return nil, usagetime.Range{}, err
+	}
+
+	readers := make([]event.Reader, len(inputs))
+	for j, loi := range inputs {
+		readers[j] = &ListObjectsV2InputEventReader{
+			Bucket:             i.Bucket,
+			Client:             i.Client,
+			ListObjectsV2Input: loi,
+		}
+	}
+
+	return &reader.MultiReader{Readers: readers}, window, nil
+}
 
 // ListObjectsV2InputIterator iterates through a []*s3.ListObjectsV2Input for
 // each window of time in a time range. Must be initialized with

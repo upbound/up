@@ -31,14 +31,17 @@ import (
 	"github.com/Azure/azure-sdk-for-go/sdk/azidentity"
 	"github.com/Azure/azure-sdk-for-go/sdk/storage/azblob"
 	"github.com/alecthomas/kong"
+	"github.com/aws/aws-sdk-go/aws"
+	"github.com/aws/aws-sdk-go/aws/session"
+	"github.com/aws/aws-sdk-go/service/s3"
 	"github.com/crossplane/crossplane-runtime/pkg/errors"
 	gcpopt "google.golang.org/api/option"
 
+	usageaws "github.com/upbound/up/internal/usage/aws"
 	"github.com/upbound/up/internal/usage/azure"
 	"github.com/upbound/up/internal/usage/event"
 	"github.com/upbound/up/internal/usage/gcp"
 	"github.com/upbound/up/internal/usage/report"
-	reportaws "github.com/upbound/up/internal/usage/report/aws"
 	reporttar "github.com/upbound/up/internal/usage/report/file/tar"
 	usagetime "github.com/upbound/up/internal/usage/time"
 )
@@ -212,7 +215,7 @@ func (c *getCmd) collectReport() error {
 	case providerGCP:
 		err = c.collectReportGCP(ctx, rw)
 	case providerAWS:
-		err = reportaws.GenerateReport(ctx, c.Account, c.Endpoint, c.Bucket, c.billingPeriod, rw, time.Hour)
+		err = c.collectReportAWS(ctx, rw)
 	case providerAzure:
 		err = c.collectReportAzure(ctx, rw)
 	default:
@@ -242,6 +245,25 @@ func (c *getCmd) collectReportGCP(ctx context.Context, w event.Writer) error {
 	}
 	bkt := gcsCli.Bucket(c.Bucket)
 	ewi, err := gcp.NewWindowIterator(bkt, c.Account, c.billingPeriod, time.Hour)
+	if err != nil {
+		return err
+	}
+	return report.MaxResourceCountPerGVKPerMCP(ctx, ewi, w)
+}
+
+func (c *getCmd) collectReportAWS(ctx context.Context, w event.Writer) error {
+	sess, err := session.NewSession(&aws.Config{})
+	if err != nil {
+		return errors.Wrap(err, "error creating aws session")
+	}
+	config := &aws.Config{}
+	if c.Endpoint != "" {
+		config = &aws.Config{
+			Endpoint: aws.String(c.Endpoint),
+		}
+	}
+	s3client := s3.New(sess, config)
+	ewi, err := usageaws.NewWindowIterator(s3client, c.Bucket, c.Account, c.billingPeriod, time.Hour)
 	if err != nil {
 		return err
 	}
