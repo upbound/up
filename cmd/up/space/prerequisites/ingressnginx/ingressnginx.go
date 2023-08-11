@@ -38,10 +38,43 @@ var (
 	// Chart version to be installed
 	version = "4.7.1"
 	// Ensure we don't request a LoadBalancer to be deployed.
+	// xref: https://github.com/kubernetes/ingress-nginx/blob/main/hack/manifest-templates/provider/kind/values.yaml
 	values = map[string]any{
 		"controller": map[string]any{
+			"updateStrategy": map[string]any{
+				"type": "RollingUpdate",
+				"rollingUpdate": map[string]any{
+					"maxUnavailable": 1,
+				},
+			},
+			"hostPort": map[string]any{
+				"enabled": true,
+			},
+			"terminationGracePeriodSeconds": 0,
 			"service": map[string]any{
 				"type": "NodePort",
+			},
+			"watchIngressWithoutClass": true,
+			"nodeSelector": map[string]any{
+				"ingress-ready": "true",
+			},
+			"tolerations": []map[string]string{
+				{
+					"key":      "node-role.kubernetes.io/master",
+					"operator": "Equal",
+					"effect":   "NoSchedule",
+				},
+				{
+					"key":      "node-role.kubernetes.io/control-plane",
+					"operator": "Equal",
+					"effect":   "NoSchedule",
+				},
+			},
+			"publishService": map[string]any{
+				"enabled": false,
+			},
+			"extraArgs": map[string]any{
+				"publish-status-address": "localhost",
 			},
 		},
 	}
@@ -115,7 +148,6 @@ func (c *IngressNginx) Install() error { //nolint:gocyclo
 	}
 
 	for {
-		ready := false
 		d, err := c.kclient.
 			AppsV1().
 			Deployments(chartName).
@@ -127,13 +159,8 @@ func (c *IngressNginx) Install() error { //nolint:gocyclo
 		if err != nil && !kerrors.IsNotFound(err) {
 			return err
 		}
-		for _, c := range d.Status.Conditions {
-			if c.Type == "Available" && c.Status == "True" {
-				ready = true
-				break
-			}
-		}
-		if ready {
+		if d.Status.Replicas == d.Status.ReadyReplicas {
+			// deployment is ready
 			break
 		}
 	}
