@@ -28,7 +28,7 @@ import (
 	"github.com/upbound/up/internal/usage/model"
 )
 
-var EOF = event.EOF
+var ErrEOF = event.ErrEOF
 
 var _ event.Reader = &QueryEventReader{}
 
@@ -65,11 +65,11 @@ func (r *ObjectIteratorEventReader) Read(ctx context.Context) (model.MCPGVKEvent
 		if r.currReader == nil {
 			attrs, err := r.Iterator.Next()
 			if errors.Is(err, iterator.Done) {
-				return model.MCPGVKEvent{}, EOF
+				return model.MCPGVKEvent{}, ErrEOF
 			}
 			r.currReader = &ObjectHandleEventReader{Object: r.Bucket.Object(attrs.Name), Attrs: attrs}
 		}
-		if e, err := r.currReader.Read(ctx); !errors.Is(err, EOF) {
+		if e, err := r.currReader.Read(ctx); !errors.Is(err, ErrEOF) {
 			return e, err
 		}
 		if err := r.currReader.Close(); err != nil {
@@ -129,7 +129,7 @@ func (r *ObjectHandleEventReader) Read(ctx context.Context) (model.MCPGVKEvent, 
 		r.decoder = decoder
 	}
 	if !r.decoder.More() {
-		return model.MCPGVKEvent{}, EOF
+		return model.MCPGVKEvent{}, ErrEOF
 	}
 	return r.decoder.Decode()
 }

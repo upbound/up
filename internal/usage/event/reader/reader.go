@@ -22,7 +22,7 @@ import (
 	"github.com/upbound/up/internal/usage/model"
 )
 
-var EOF = event.EOF
+var ErrEOF = event.ErrEOF
 
 var _ event.Reader = &MultiReader{}
 
@@ -37,11 +37,11 @@ type MultiReader struct {
 func (r *MultiReader) Read(ctx context.Context) (model.MCPGVKEvent, error) {
 	for {
 		if len(r.Readers) < 1 {
-			return model.MCPGVKEvent{}, EOF
+			return model.MCPGVKEvent{}, ErrEOF
 		}
 		er := r.Readers[0]
 		e, err := er.Read(ctx)
-		if !errors.Is(err, EOF) {
+		if !errors.Is(err, ErrEOF) {
 			return e, err
 		}
 		if err := er.Close(); err != nil {

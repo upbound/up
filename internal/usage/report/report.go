@@ -51,7 +51,7 @@ func MaxResourceCountPerGVKPerMCP(ctx context.Context, i event.WindowIterator, w
 		ag := &aggregate.MaxResourceCountPerGVKPerMCP{}
 		for {
 			e, err := r.Read(ctx)
-			if errors.Is(err, event.EOF) {
+			if errors.Is(err, event.ErrEOF) {
 				break
 			}
 			if err != nil {

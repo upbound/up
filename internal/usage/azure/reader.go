@@ -30,7 +30,7 @@ import (
 	"github.com/upbound/up/internal/usage/model"
 )
 
-var EOF = event.EOF
+var ErrEOF = event.ErrEOF
 
 var _ event.Reader = &PagerEventReader{}
 
@@ -45,7 +45,7 @@ func (r *PagerEventReader) Read(ctx context.Context) (model.MCPGVKEvent, error) 
 	for {
 		if r.currReader == nil {
 			if !r.Pager.More() {
-				return model.MCPGVKEvent{}, EOF
+				return model.MCPGVKEvent{}, ErrEOF
 			}
 			resp, err := r.Pager.NextPage(ctx)
 			if err != nil {
@@ -54,7 +54,7 @@ func (r *PagerEventReader) Read(ctx context.Context) (model.MCPGVKEvent, error) 
 			r.currReader = &ListBlobsResponseEventReader{Client: r.Client, Response: &resp}
 		}
 		e, err := r.currReader.Read(ctx)
-		if !errors.Is(err, EOF) {
+		if !errors.Is(err, ErrEOF) {
 			return e, err
 		}
 		r.currReader = nil
@@ -82,7 +82,7 @@ func (r *ListBlobsResponseEventReader) Read(ctx context.Context) (model.MCPGVKEv
 	for {
 		if r.currReader == nil {
 			if r.itemIdx >= len(r.Response.Segment.BlobItems) {
-				return model.MCPGVKEvent{}, EOF
+				return model.MCPGVKEvent{}, ErrEOF
 			}
 
 			blob := r.Response.Segment.BlobItems[r.itemIdx]
@@ -101,7 +101,7 @@ func (r *ListBlobsResponseEventReader) Read(ctx context.Context) (model.MCPGVKEv
 			}
 			r.itemIdx += 1
 		}
-		if e, err := r.currReader.Read(ctx); !errors.Is(err, EOF) {
+		if e, err := r.currReader.Read(ctx); !errors.Is(err, ErrEOF) {
 			return e, err
 		}
 		if err := r.currReader.Close(); err != nil {
@@ -158,7 +158,7 @@ func (r *BlobEventReader) Read(ctx context.Context) (model.MCPGVKEvent, error) {
 	}
 
 	if !r.decoder.More() {
-		return model.MCPGVKEvent{}, EOF
+		return model.MCPGVKEvent{}, ErrEOF
 	}
 	return r.decoder.Decode()
 }

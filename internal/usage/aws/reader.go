@@ -28,7 +28,7 @@ import (
 	"github.com/upbound/up/internal/usage/model"
 )
 
-var EOF = event.EOF
+var ErrEOF = event.ErrEOF
 
 var _ event.Reader = &ListObjectsV2InputEventReader{}
 
@@ -120,7 +120,7 @@ func (r *GetObjectInputEventReader) Read(ctx context.Context) (model.MCPGVKEvent
 		r.decoder = decoder
 	}
 	if !r.decoder.More() {
-		return model.MCPGVKEvent{}, EOF
+		return model.MCPGVKEvent{}, ErrEOF
 	}
 	return r.decoder.Decode()
 }

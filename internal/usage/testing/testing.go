@@ -24,7 +24,7 @@ import (
 	"github.com/upbound/up/internal/usage/time"
 )
 
-var EOF = event.EOF
+var ErrEOF = event.ErrEOF
 
 // ReadResult is a return value of event.Reader.Read().
 type ReadResult struct {
@@ -40,7 +40,7 @@ type MockReader struct {
 
 func (r *MockReader) Read(context.Context) (model.MCPGVKEvent, error) {
 	if len(r.Reads) < 1 {
-		return model.MCPGVKEvent{}, EOF
+		return model.MCPGVKEvent{}, ErrEOF
 	}
 	read := r.Reads[0]
 	r.Reads = r.Reads[1:]

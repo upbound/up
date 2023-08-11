@@ -22,7 +22,7 @@ import (
 	"github.com/upbound/up/internal/usage/time"
 )
 
-var EOF = errors.New("EOF")
+var ErrEOF = errors.New("EOF")
 
 // Reader is the interface for reading usage events. Read() must return EOF when
 // there is nothing more to read. Callers must call Close() when finished

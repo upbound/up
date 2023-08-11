@@ -110,7 +110,7 @@ func TestMultiReader(t *testing.T) {
 				// Stop reading if error is EOF. If error is otherwise non-nil,
 				// add result to got and then stop reading. If error is nil, add
 				// result to got and continue reading.
-				if errors.Is(err, EOF) {
+				if errors.Is(err, ErrEOF) {
 					break
 				}
 				got = append(got, usagetesting.ReadResult{Event: e, Err: err})
