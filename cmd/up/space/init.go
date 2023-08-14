@@ -335,5 +335,5 @@ func outputNextSteps() {
 	pterm.Println()
 	pterm.Info.WithPrefix(upterm.EyesPrefix).Println("Next Steps 👇")
 	pterm.Println()
-	pterm.Println("👉 Check out Upbound Spaces docs @ https://docs.upbound.io")
+	pterm.Println("👉 Check out Upbound Spaces docs @ https://docs.upbound.io/concepts/upbound-spaces")
 }
