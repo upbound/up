@@ -517,7 +517,7 @@ on-disk Crossplane packages.
     - Behavior: Extract package contents into a Crossplane cache compatible
       format. `package` must be a valid OCI image reference and is fetched from
       a remote registry unless `--from-daemon` is specified. The [Upbound
-      Registry] (`xpkg.upbound.io`) will be used by default if reference does
+      Marketplace] (`xpkg.upbound.io`) will be used by default if reference does
       not specify.
 
 ## XPLS
@@ -538,6 +538,6 @@ server.
 
 <!-- Named Links -->
 [Upbound Software License]: https://licenses.upbound.io/upbound-software-license.html
-[Upbound Marketplace]: https://www.upbound.io/registry
+[Upbound Marketplace]: https://marketplace.upbound.io
 [up configuration documentation]: configuration.md
 [xpkg specification]: https://docs.crossplane.io/v1.11/concepts/packages/
