@@ -32,14 +32,15 @@ var (
 	}
 
 	spinnerStyle = &pterm.Style{pterm.FgDarkGray}
+	msgStyle     = &pterm.Style{pterm.FgDefault}
 
-	CheckmarkSuccessSpinner = pterm.DefaultSpinner.WithStyle(spinnerStyle)
-	EyesInfoSpinner         = pterm.DefaultSpinner.WithStyle(spinnerStyle)
+	CheckmarkSuccessSpinner = pterm.DefaultSpinner.WithStyle(spinnerStyle).WithMessageStyle(msgStyle)
+	EyesInfoSpinner         = pterm.DefaultSpinner.WithStyle(spinnerStyle).WithMessageStyle(msgStyle)
 
 	ComponentText = pterm.DefaultBasicText.WithStyle(&pterm.ThemeDefault.TreeTextStyle)
 
 	cp = &pterm.PrefixPrinter{
-		MessageStyle: &pterm.Style{pterm.FgLightWhite},
+		MessageStyle: &pterm.Style{pterm.FgDefault},
 		Prefix: pterm.Prefix{
 			Style: &pterm.Style{pterm.FgLightMagenta},
 			Text:  " √ ",
@@ -47,7 +48,7 @@ var (
 	}
 
 	ip = &pterm.PrefixPrinter{
-		MessageStyle: &pterm.Style{pterm.FgLightWhite},
+		MessageStyle: &pterm.Style{pterm.FgDefault},
 		Prefix:       EyesPrefix,
 	}
 )
