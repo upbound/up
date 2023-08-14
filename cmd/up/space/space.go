@@ -25,7 +25,11 @@ import (
 	"github.com/upbound/up/internal/kube"
 )
 
-const spacesChart = "spaces"
+const (
+	spacesChart = "spaces"
+
+	defaultRegistry = "us-west1-docker.pkg.dev/orchestration-build/upbound-environments"
+)
 
 // BeforeReset is the first hook to run.
 func (c *Cmd) BeforeReset(p *kong.Path, maturity feature.Maturity) error {
@@ -57,7 +61,18 @@ type Cmd struct {
 }
 
 type commonParams struct {
-	Repo *url.URL `hidden:"" env:"UPBOUND_REPO" default:"us-west1-docker.pkg.dev/orchestration-build/upbound-environments" help:"Set repo for Upbound."`
+	Registry *url.URL `hidden:"" env:"UPBOUND_REPO" default:"us-west1-docker.pkg.dev/orchestration-build/upbound-environments" help:"Set repo for Upbound."`
 
-	Registry *url.URL `hidden:"" env:"UPBOUND_REGISTRY_ENDPOINT" default:"https://us-west1-docker.pkg.dev" help:"Set registry for authentication."`
+	RegistryEndpoint *url.URL `hidden:"" env:"UPBOUND_REGISTRY_ENDPOINT" default:"https://us-west1-docker.pkg.dev" help:"Set registry for authentication."`
+}
+
+// overrideRegistry is a common function that takes the candidate registry,
+// compares that against the default registry and if different overrides
+// that property in the params map.
+func overrideRegistry(candidate string, params map[string]any) {
+	// NOTE(tnthornton) this is unfortunately brittle. If the helm chart values
+	// property changes, this won't necessarily account for that.
+	if candidate != defaultRegistry {
+		params["registry"] = candidate
+	}
 }

@@ -110,19 +110,32 @@ func (c *initCmd) AfterApply(insCtx *install.Context, kongCtx *kong.Context, qui
 	}
 	kongCtx.Bind(upCtx)
 
-	b, err := io.ReadAll(c.TokenFile)
-	defer c.TokenFile.Close() // nolint:errcheck
-	if err != nil {
-		return errors.Wrap(err, errReadTokenFile)
+	if c.Registry.String() != defaultRegistry {
+		id, err := c.prompter.Prompt("Username", false)
+		if err != nil {
+			return err
+		}
+		token, err := c.prompter.Prompt("Password", true)
+		if err != nil {
+			return err
+		}
+		c.id = id
+		c.token = token
+	} else {
+		b, err := io.ReadAll(c.TokenFile)
+		defer c.TokenFile.Close() // nolint:errcheck
+		if err != nil {
+			return errors.Wrap(err, errReadTokenFile)
+		}
+		c.token = string(b)
+		c.id = jsonKey
 	}
-	c.token = string(b)
+
 	prereqs, err := prerequisites.New(insCtx.Kubeconfig)
 	if err != nil {
 		return err
 	}
 	c.prereqs = prereqs
-
-	c.id = jsonKey
 	kClient, err := kubernetes.NewForConfig(insCtx.Kubeconfig)
 	if err != nil {
 		return err
@@ -137,7 +150,7 @@ func (c *initCmd) AfterApply(insCtx *install.Context, kongCtx *kong.Context, qui
 	c.dClient = dClient
 	mgr, err := helm.NewManager(insCtx.Kubeconfig,
 		spacesChart,
-		c.Repo,
+		c.Registry,
 		helm.WithNamespace(ns),
 		helm.WithBasicAuth(c.id, c.token),
 		helm.IsOCI(),
@@ -199,6 +212,7 @@ func (c *initCmd) Run(insCtx *install.Context, upCtx *upbound.Context) error {
 	if err != nil {
 		return errors.Wrap(err, errParseInstallParameters)
 	}
+	overrideRegistry(c.Registry.String(), params)
 
 	// set the defaults
 	c.Set, err = defaults.SetDefaults(c.Set, c.kClient)
@@ -278,7 +292,7 @@ func (c *initCmd) applySecret(ctx context.Context, namespace string) error {
 			namespace,
 			c.id,
 			c.token,
-			c.Registry.String(),
+			c.RegistryEndpoint.String(),
 		); err != nil {
 			return errors.Wrap(err, errCreateImagePullSecret)
 		}

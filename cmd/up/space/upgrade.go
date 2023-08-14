@@ -43,19 +43,31 @@ func (c *upgradeCmd) BeforeApply() error {
 }
 
 // AfterApply sets default values in command after assignment and validation.
-func (c *upgradeCmd) AfterApply(insCtx *install.Context, quiet config.QuietFlag) error {
+func (c *upgradeCmd) AfterApply(insCtx *install.Context, quiet config.QuietFlag) error { //nolint:gocyclo
 	// NOTE(tnthornton) we currently only have support for stylized output.
 	pterm.EnableStyling()
 	upterm.DefaultObjPrinter.Pretty = true
 
-	b, err := io.ReadAll(c.TokenFile)
-	defer c.TokenFile.Close() // nolint:errcheck
-	if err != nil {
-		return errors.Wrap(err, errReadTokenFile)
+	if c.Registry.String() != defaultRegistry {
+		id, err := c.prompter.Prompt("Username", false)
+		if err != nil {
+			return err
+		}
+		token, err := c.prompter.Prompt("Password", true)
+		if err != nil {
+			return err
+		}
+		c.id = id
+		c.token = token
+	} else {
+		b, err := io.ReadAll(c.TokenFile)
+		defer c.TokenFile.Close() // nolint:errcheck
+		if err != nil {
+			return errors.Wrap(err, errReadTokenFile)
+		}
+		c.token = string(b)
+		c.id = jsonKey
 	}
-	c.token = string(b)
-
-	c.id = jsonKey
 	kClient, err := kubernetes.NewForConfig(insCtx.Kubeconfig)
 	if err != nil {
 		return err
@@ -65,7 +77,7 @@ func (c *upgradeCmd) AfterApply(insCtx *install.Context, quiet config.QuietFlag)
 	c.pullSecret = kube.NewImagePullApplicator(secret)
 	ins, err := helm.NewManager(insCtx.Kubeconfig,
 		spacesChart,
-		c.Repo,
+		c.Registry,
 		helm.WithNamespace(ns),
 		helm.WithBasicAuth(c.id, c.token),
 		helm.IsOCI(),
@@ -125,9 +137,10 @@ func (c *upgradeCmd) Run(insCtx *install.Context) error {
 	if err != nil {
 		return errors.Wrap(err, errParseUpgradeParameters)
 	}
+	overrideRegistry(c.Registry.String(), params)
 
 	// Create or update image pull secret.
-	if err := c.pullSecret.Apply(ctx, defaultImagePullSecret, ns, c.id, c.token, c.Registry.String()); err != nil {
+	if err := c.pullSecret.Apply(ctx, defaultImagePullSecret, ns, c.id, c.token, c.RegistryEndpoint.String()); err != nil {
 		return errors.Wrap(err, errCreateImagePullSecret)
 	}
 

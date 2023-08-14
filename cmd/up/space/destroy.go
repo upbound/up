@@ -30,7 +30,7 @@ func (c *destroyCmd) AfterApply(insCtx *install.Context) error {
 
 	mgr, err := helm.NewManager(insCtx.Kubeconfig,
 		spacesChart,
-		c.Repo,
+		c.Registry,
 		helm.WithNamespace(ns),
 		helm.IsOCI())
 	if err != nil {

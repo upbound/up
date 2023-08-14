@@ -32,5 +32,5 @@ type CommonParams struct {
 	File   *os.File          `short:"f" help:"Parameters file."`
 	Bundle *os.File          `help:"Local bundle path."`
 
-	TokenFile *os.File `name:"token-file" required:"" help:"File containing authentication token."`
+	TokenFile *os.File `name:"token-file" help:"File containing authentication token."`
 }
