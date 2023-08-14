@@ -36,6 +36,7 @@ import (
 	"k8s.io/client-go/kubernetes"
 	"sigs.k8s.io/yaml"
 
+	"github.com/upbound/up/cmd/up/space/defaults"
 	"github.com/upbound/up/cmd/up/space/prerequisites"
 	"github.com/upbound/up/internal/config"
 	"github.com/upbound/up/internal/input"
@@ -120,6 +121,7 @@ func (c *initCmd) AfterApply(insCtx *install.Context, kongCtx *kong.Context, qui
 		return err
 	}
 	c.prereqs = prereqs
+
 	c.id = jsonKey
 	kClient, err := kubernetes.NewForConfig(insCtx.Kubeconfig)
 	if err != nil {
@@ -163,6 +165,7 @@ func (c *initCmd) AfterApply(insCtx *install.Context, kongCtx *kong.Context, qui
 	}
 	c.parser = helm.NewParser(base, c.Set)
 	c.quiet = quiet
+
 	return nil
 }
 
@@ -180,6 +183,7 @@ type initCmd struct {
 	quiet      config.QuietFlag
 
 	Version string `arg:"" help:"Upbound Spaces version to install."`
+	Yes     bool   `name:"yes" type:"bool" help:"Answer yes to all questions"`
 
 	commonParams
 	install.CommonParams
@@ -196,6 +200,13 @@ func (c *initCmd) Run(insCtx *install.Context, upCtx *upbound.Context) error {
 		return errors.Wrap(err, errParseInstallParameters)
 	}
 
+	// set the defaults
+	c.Set, err = defaults.SetDefaults(c.Set, c.kClient)
+	if err != nil {
+		pterm.Warning.Printfln("Error setting defaults: %v", err)
+		return err
+	}
+
 	// check if required prerequisites are installed
 	status := c.prereqs.Check()
 
@@ -207,16 +218,17 @@ func (c *initCmd) Run(insCtx *install.Context, upCtx *upbound.Context) error {
 		for _, p := range status.NotInstalled {
 			pterm.Println(fmt.Sprintf("❌ %s", p.GetName()))
 		}
-		pterm.DefaultInteractiveConfirm.DefaultText = "Would you like to install them now?"
-		pterm.Println() // Blank line
-		result, _ := pterm.DefaultInteractiveConfirm.Show()
-		pterm.Println() // Blank line
 
-		if !result {
-			pterm.Error.Println("prerequisites must be met in order to proceed with installation")
-			return nil
+		if !c.Yes {
+			pterm.DefaultInteractiveConfirm.DefaultText = "Would you like to install them now?"
+			pterm.Println() // Blank line
+			result, _ := pterm.DefaultInteractiveConfirm.Show()
+			pterm.Println() // Blank line
+			if !result {
+				pterm.Error.Println("prerequisites must be met in order to proceed with installation")
+				return nil
+			}
 		}
-
 		if err := c.installPrereqs(); err != nil {
 			return err
 		}
