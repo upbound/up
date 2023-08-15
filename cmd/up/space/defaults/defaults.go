@@ -15,9 +15,12 @@
 package defaults
 
 import (
+	"context"
+	"fmt"
 	"strings"
 
 	"github.com/pterm/pterm"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/client-go/kubernetes"
 )
 
@@ -28,6 +31,7 @@ const (
 	AzureAKS  CloudType = "aks"
 	Generic   CloudType = "generic"
 	GoogleGKE CloudType = "gke"
+	Kind      CloudType = "kind"
 )
 
 func SetDefaults(s map[string]string, kClient kubernetes.Interface) (map[string]string, error) {
@@ -35,8 +39,8 @@ func SetDefaults(s map[string]string, kClient kubernetes.Interface) (map[string]
 	if err != nil {
 		return s, err
 	}
-	if cloud == Generic {
-		pterm.Info.Println("Setting defaults for generic Kubernetes")
+	if cloud == Generic || cloud == Kind {
+		pterm.Info.Printfln("Setting defaults for vanilla Kubernetes (type %s)", string(cloud))
 		return s, nil
 	}
 
@@ -66,23 +70,24 @@ func SetDefaults(s map[string]string, kClient kubernetes.Interface) (map[string]
 }
 
 func detectKubernetes(kClient kubernetes.Interface) (CloudType, error) {
-	ver, err := kClient.Discovery().ServerVersion()
-	if err != nil {
-		return Generic, err
+	// EKS and Kind are _harder_ to detect based on version, so look at node labels.
+	ctx := context.Background()
+	if nodes, err := kClient.CoreV1().Nodes().List(ctx, metav1.ListOptions{}); err == nil {
+		for _, n := range nodes.Items {
+			providerPrefix := strings.Split(n.Spec.ProviderID, "://")[0]
+			fmt.Println(providerPrefix)
+			switch providerPrefix {
+			case "azure":
+				return AzureAKS, nil
+			case "aws":
+				return AmazonEKS, nil
+			case "gce":
+				return GoogleGKE, nil
+			case "kind":
+				return Kind, nil
+			}
+		}
 	}
 
-	// GKE has -gke in the git commit
-	// Example:
-	if strings.Contains(ver.GitVersion, "-gke.") {
-		return GoogleGKE, nil
-	}
-	// EKS has -eks in the git commit
-	if strings.Contains(ver.GitVersion, "-eks-") {
-		return AmazonEKS, nil
-	}
-	// AKS has -aks in the git commit
-	if strings.Contains(ver.GitVersion, "-aks") {
-		return AzureAKS, nil
-	}
 	return Generic, nil
 }
