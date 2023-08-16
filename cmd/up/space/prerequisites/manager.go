@@ -18,6 +18,7 @@ import (
 	"github.com/crossplane/crossplane-runtime/pkg/errors"
 	"k8s.io/client-go/rest"
 
+	"github.com/upbound/up/cmd/up/space/defaults"
 	"github.com/upbound/up/cmd/up/space/prerequisites/certmanager"
 	"github.com/upbound/up/cmd/up/space/prerequisites/ingressnginx"
 	"github.com/upbound/up/cmd/up/space/prerequisites/providers/helm"
@@ -51,7 +52,7 @@ type Status struct {
 }
 
 // New constructs a new Manager for working with installation Prerequisites.
-func New(config *rest.Config) (*Manager, error) {
+func New(config *rest.Config, defs *defaults.CloudConfig) (*Manager, error) {
 	prereqs := []Prerequisite{}
 	certmanager, err := certmanager.New(config)
 	if err != nil {
@@ -65,7 +66,12 @@ func New(config *rest.Config) (*Manager, error) {
 	}
 	prereqs = append(prereqs, uxp)
 
-	ingress, err := ingressnginx.New(config)
+	svcType := ingressnginx.NodePort
+	if defs != nil && defs.PublicIngress {
+		svcType = ingressnginx.LoadBalancer
+	}
+
+	ingress, err := ingressnginx.New(config, svcType)
 	if err != nil {
 		return nil, errors.Wrap(err, errCreatePrerequisite)
 	}

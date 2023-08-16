@@ -30,6 +30,7 @@ require (
 	github.com/spf13/cobra v1.7.0
 	github.com/upbound/up-sdk-go v0.1.1-0.20230405182644-366f20e6aa5f
 	github.com/willabides/kongplete v0.3.0
+	golang.org/x/exp v0.0.0-20230522175609-2e198f4a06a1
 	golang.org/x/sync v0.3.0
 	golang.org/x/term v0.10.0
 	google.golang.org/api v0.122.0
@@ -209,7 +210,6 @@ require (
 	go.uber.org/multierr v1.11.0 // indirect
 	go.uber.org/zap v1.24.0 // indirect
 	golang.org/x/crypto v0.10.0 // indirect
-	golang.org/x/exp v0.0.0-20230522175609-2e198f4a06a1 // indirect
 	golang.org/x/mod v0.11.0 // indirect
 	golang.org/x/net v0.11.0 // indirect
 	golang.org/x/oauth2 v0.9.0 // indirect

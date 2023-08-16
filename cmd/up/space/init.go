@@ -26,6 +26,7 @@ import (
 	"github.com/crossplane/crossplane-runtime/pkg/errors"
 	"github.com/crossplane/crossplane-runtime/pkg/resource"
 	"github.com/pterm/pterm"
+	"golang.org/x/exp/maps"
 	corev1 "k8s.io/api/core/v1"
 	kerrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -95,6 +96,7 @@ func init() {
 // BeforeApply sets default values in login before assignment and validation.
 func (c *initCmd) BeforeApply() error {
 	c.prompter = input.NewPrompter()
+	c.Set = make(map[string]string)
 	return nil
 }
 
@@ -131,16 +133,34 @@ func (c *initCmd) AfterApply(insCtx *install.Context, kongCtx *kong.Context, qui
 		c.id = jsonKey
 	}
 
-	prereqs, err := prerequisites.New(insCtx.Kubeconfig)
-	if err != nil {
-		return err
-	}
-	c.prereqs = prereqs
 	kClient, err := kubernetes.NewForConfig(insCtx.Kubeconfig)
 	if err != nil {
 		return err
 	}
 	c.kClient = kClient
+
+	// set the defaults
+	cloud := c.Set[defaults.ClusterTypeStr]
+	defs, err := defaults.GetConfig(c.kClient, cloud)
+	if err != nil {
+		return err
+	}
+	// User supplied values always override the defaults
+	maps.Copy(defs.SpacesValues, c.Set)
+	c.Set = defs.SpacesValues
+	if !c.PublicIngress {
+		defs.PublicIngress = false
+	} else {
+		pterm.Info.Println("Public ingress will be exposed")
+	}
+
+	prereqs, err := prerequisites.New(insCtx.Kubeconfig, defs)
+	if err != nil {
+		return err
+	}
+	c.prereqs = prereqs
+
+	c.id = jsonKey
 	secret := kube.NewSecretApplicator(kClient)
 	c.pullSecret = kube.NewImagePullApplicator(secret)
 	dClient, err := dynamic.NewForConfig(insCtx.Kubeconfig)
@@ -195,8 +215,9 @@ type initCmd struct {
 	token      string
 	quiet      config.QuietFlag
 
-	Version string `arg:"" help:"Upbound Spaces version to install."`
-	Yes     bool   `name:"yes" type:"bool" help:"Answer yes to all questions"`
+	Version       string `arg:"" help:"Upbound Spaces version to install."`
+	Yes           bool   `name:"yes" type:"bool" help:"Answer yes to all questions"`
+	PublicIngress bool   `name:"public-ingress" type:"bool" help:"For AKS,EKS,GKE expose ingress publically"`
 
 	commonParams
 	install.CommonParams
@@ -213,13 +234,6 @@ func (c *initCmd) Run(insCtx *install.Context, upCtx *upbound.Context) error {
 		return errors.Wrap(err, errParseInstallParameters)
 	}
 	overrideRegistry(c.Registry.String(), params)
-
-	// set the defaults
-	c.Set, err = defaults.SetDefaults(c.Set, c.kClient)
-	if err != nil {
-		pterm.Warning.Printfln("Error setting defaults: %v", err)
-		return err
-	}
 
 	// check if required prerequisites are installed
 	status := c.prereqs.Check()
