@@ -16,7 +16,7 @@ package defaults
 
 import (
 	"context"
-	"fmt"
+	"errors"
 	"strings"
 
 	"github.com/pterm/pterm"
@@ -26,68 +26,100 @@ import (
 
 type CloudType string
 
+type CloudConfig struct {
+	SpacesValues  map[string]string
+	PublicIngress bool
+}
+
 const (
 	AmazonEKS CloudType = "eks"
 	AzureAKS  CloudType = "aks"
 	Generic   CloudType = "generic"
 	GoogleGKE CloudType = "gke"
 	Kind      CloudType = "kind"
+
+	ClusterTypeStr = "clusterType"
 )
 
-func SetDefaults(s map[string]string, kClient kubernetes.Interface) (map[string]string, error) {
-	cloud, err := detectKubernetes(kClient)
-	if err != nil {
-		return s, err
+var vendorDefaults = map[CloudType]map[string]string{
+	AmazonEKS: {
+		ClusterTypeStr: string(AmazonEKS),
+	},
+	AzureAKS: {
+		ClusterTypeStr: string(AzureAKS),
+	},
+	GoogleGKE: {
+		ClusterTypeStr: string(GoogleGKE),
+	},
+	Kind: {
+		ClusterTypeStr: string(Kind),
+	},
+
+	Generic: {},
+}
+
+func (ct *CloudType) getSpaceValues() map[string]string {
+	if v, ok := vendorDefaults[*ct]; ok {
+		return v
+	}
+	return nil
+}
+
+func (ct *CloudType) Defaults() CloudConfig {
+	publicIngress := true
+	if *ct == Generic || *ct == Kind {
+		publicIngress = false
+	}
+	return CloudConfig{
+		SpacesValues:  ct.getSpaceValues(),
+		PublicIngress: publicIngress,
+	}
+}
+
+func GetConfig(kClient kubernetes.Interface, override string) (*CloudConfig, error) {
+	if kClient == nil {
+		return nil, errors.New("no kubernetes client")
+	}
+	var cloud CloudType
+	if override != "" {
+		cloud = CloudType(strings.ToLower(override))
+	} else {
+		cloud = detectKubernetes(kClient)
 	}
 	if cloud == Generic || cloud == Kind {
 		pterm.Info.Printfln("Setting defaults for vanilla Kubernetes (type %s)", string(cloud))
-		return s, nil
+	} else {
+		pterm.Info.Printfln("Applying settings for Managed Kubernetes on %s", strings.ToUpper(string(cloud)))
 	}
-
-	pterm.Info.Printfln("Applying settings for Managed Kubernetes on %s", strings.ToUpper(string(cloud)))
-	if s == nil {
-		s = make(map[string]string)
-	}
-
-	// Set defaults
-	d := map[string]string{
-		"clusterType": string(cloud),
-	}
-
-	for k, v := range d {
-		add := true
-		for cs := range s {
-			if cs == k {
-				add = false
-				break
-			}
-		}
-		if add {
-			s[k] = v
-		}
-	}
-	return s, nil
+	return &CloudConfig{
+		SpacesValues:  cloud.Defaults().SpacesValues,
+		PublicIngress: cloud.Defaults().PublicIngress,
+	}, nil
 }
 
-func detectKubernetes(kClient kubernetes.Interface) (CloudType, error) {
+// detectKubernetes looks at a nodes provider to determine what type of cluster
+// is running. Since Spaces doesn't directly use Node objects, requiring Nodes
+// to use the installer would be incorrect. This is a "best effort" attempt to
+// add some CLI sugar, so reacting to an error seems suboptimal, especially if the
+// installer doesn't have RBAC permissions to list nodes.
+func detectKubernetes(kClient kubernetes.Interface) CloudType {
 	// EKS and Kind are _harder_ to detect based on version, so look at node labels.
 	ctx := context.Background()
 	if nodes, err := kClient.CoreV1().Nodes().List(ctx, metav1.ListOptions{}); err == nil {
 		for _, n := range nodes.Items {
 			providerPrefix := strings.Split(n.Spec.ProviderID, "://")[0]
-			fmt.Println(providerPrefix)
 			switch providerPrefix {
 			case "azure":
-				return AzureAKS, nil
+				return AzureAKS
 			case "aws":
-				return AmazonEKS, nil
+				return AmazonEKS
 			case "gce":
-				return GoogleGKE, nil
+				return GoogleGKE
 			case "kind":
-				return Kind, nil
+				return Kind
 			}
 		}
 	}
 
-	return Generic, nil
+	return Generic
 }
