@@ -145,7 +145,7 @@ func (c *initCmd) AfterApply(insCtx *install.Context, kongCtx *kong.Context, qui
 	if err != nil {
 		return err
 	}
-	// User supplied values alwys override the defaults
+	// User supplied values always override the defaults
 	maps.Copy(defs.SpacesValues, c.Set)
 	c.Set = defs.SpacesValues
 	if !c.PublicIngress {
