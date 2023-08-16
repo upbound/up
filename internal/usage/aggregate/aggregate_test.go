@@ -15,7 +15,6 @@
 package aggregate
 
 import (
-	"sort"
 	"testing"
 
 	"github.com/crossplane/crossplane-runtime/pkg/errors"
@@ -23,6 +22,7 @@ import (
 	"github.com/google/go-cmp/cmp"
 
 	"github.com/upbound/up/internal/usage/model"
+	usagetesting "github.com/upbound/up/internal/usage/testing"
 )
 
 func TestMaxResourceCountPerGVKPerMCPAdd(t *testing.T) {
@@ -309,37 +309,12 @@ func TestMaxResouceCountPerGVKPerMCPUpboundEvents(t *testing.T) {
 			got := ag.UpboundEvents()
 
 			// Sort for stability.
-			sortUpboundEvents(got)
-			sortUpboundEvents(tc.want.events)
+			usagetesting.SortEvents(got)
+			usagetesting.SortEvents(tc.want.events)
 
 			if diff := cmp.Diff(tc.want.events, got); diff != "" {
 				t.Errorf("\n%s\nMaxResourceCountPerGVKPerMCP.UpboundEvents(...): -want, +got:\n%s", tc.reason, diff)
 			}
 		})
 	}
-}
-
-// sortUpboundEvents sorts Upbound events by their fields.
-func sortUpboundEvents(events []model.MCPGVKEvent) {
-	sort.SliceStable(events, func(i, j int) bool {
-		if events[i].Name != events[j].Name {
-			return events[i].Name < events[j].Name
-		}
-		if events[i].Tags.UpboundAccount != events[j].Tags.UpboundAccount {
-			return events[i].Tags.UpboundAccount < events[j].Tags.UpboundAccount
-		}
-		if events[i].Tags.MCPID != events[j].Tags.MCPID {
-			return events[i].Tags.MCPID < events[j].Tags.MCPID
-		}
-		if events[i].Tags.Group != events[j].Tags.Group {
-			return events[i].Tags.Group < events[j].Tags.Group
-		}
-		if events[i].Tags.Version != events[j].Tags.Version {
-			return events[i].Tags.Version < events[j].Tags.Version
-		}
-		if events[i].Tags.Kind != events[j].Tags.Kind {
-			return events[i].Tags.Kind < events[j].Tags.Kind
-		}
-		return events[i].Value < events[j].Value
-	})
 }

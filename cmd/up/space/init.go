@@ -102,6 +102,15 @@ func (c *initCmd) BeforeApply() error {
 
 // AfterApply sets default values in command after assignment and validation.
 func (c *initCmd) AfterApply(insCtx *install.Context, kongCtx *kong.Context, quiet config.QuietFlag) error { //nolint:gocyclo
+	kubeconfig, err := kube.GetKubeConfig(c.Kubeconfig)
+	if err != nil {
+		return err
+	}
+
+	kongCtx.Bind(&install.Context{
+		Kubeconfig: kubeconfig,
+	})
+
 	// NOTE(tnthornton) we currently only have support for stylized output.
 	pterm.EnableStyling()
 	upterm.DefaultObjPrinter.Pretty = true

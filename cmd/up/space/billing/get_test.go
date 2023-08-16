@@ -22,7 +22,7 @@ import (
 	"github.com/crossplane/crossplane-runtime/pkg/test"
 	"github.com/google/go-cmp/cmp"
 
-	"github.com/upbound/up/internal/usage"
+	usagetime "github.com/upbound/up/internal/usage/time"
 )
 
 func TestGetBillingPeriod(t *testing.T) {
@@ -31,7 +31,7 @@ func TestGetBillingPeriod(t *testing.T) {
 		billingCustom *dateRange
 	}
 	type want struct {
-		billingPeriod usage.TimeRange
+		billingPeriod usagetime.Range
 		err           error
 	}
 	cases := map[string]struct {
@@ -52,7 +52,7 @@ func TestGetBillingPeriod(t *testing.T) {
 				billingMonth: time.Date(2006, 5, 1, 0, 0, 0, 0, time.UTC),
 			},
 			want: want{
-				billingPeriod: usage.TimeRange{
+				billingPeriod: usagetime.Range{
 					Start: time.Date(2006, 5, 1, 0, 0, 0, 0, time.UTC),
 					End:   time.Date(2006, 6, 1, 0, 0, 0, 0, time.UTC),
 				},
@@ -67,7 +67,7 @@ func TestGetBillingPeriod(t *testing.T) {
 				},
 			},
 			want: want{
-				billingPeriod: usage.TimeRange{
+				billingPeriod: usagetime.Range{
 					Start: time.Date(2006, 5, 4, 0, 0, 0, 0, time.UTC),
 					End:   time.Date(2006, 5, 8, 0, 0, 0, 0, time.UTC),
 				},

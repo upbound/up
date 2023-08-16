@@ -27,14 +27,23 @@ import (
 	"strings"
 	"time"
 
+	"cloud.google.com/go/storage"
+	"github.com/Azure/azure-sdk-for-go/sdk/azidentity"
+	"github.com/Azure/azure-sdk-for-go/sdk/storage/azblob"
 	"github.com/alecthomas/kong"
+	"github.com/aws/aws-sdk-go/aws"
+	"github.com/aws/aws-sdk-go/aws/session"
+	"github.com/aws/aws-sdk-go/service/s3"
 	"github.com/crossplane/crossplane-runtime/pkg/errors"
+	gcpopt "google.golang.org/api/option"
 
-	"github.com/upbound/up/internal/usage"
+	usageaws "github.com/upbound/up/internal/usage/aws"
+	"github.com/upbound/up/internal/usage/azure"
+	"github.com/upbound/up/internal/usage/event"
+	"github.com/upbound/up/internal/usage/gcp"
 	"github.com/upbound/up/internal/usage/report"
-	reportaws "github.com/upbound/up/internal/usage/report/aws"
 	reporttar "github.com/upbound/up/internal/usage/report/file/tar"
-	reportgcs "github.com/upbound/up/internal/usage/report/gcs"
+	usagetime "github.com/upbound/up/internal/usage/time"
 )
 
 const (
@@ -45,7 +54,7 @@ const (
 	errFmtProviderNotSupported = "%q is not supported"
 )
 
-type dateRange usage.TimeRange
+type dateRange usagetime.Range
 
 func (d *dateRange) Decode(ctx *kong.DecodeContext) error {
 	var value string
@@ -77,11 +86,12 @@ func (d *dateRange) Decode(ctx *kong.DecodeContext) error {
 type provider string
 
 func (p provider) Validate() error {
-	// TODO(branden): Add support Azure.
 	switch p {
 	case providerGCP:
 		return nil
 	case providerAWS:
+		return nil
+	case providerAzure:
 		return nil
 	default:
 		return fmt.Errorf(errFmtProviderNotSupported, p)
@@ -92,17 +102,18 @@ type getCmd struct {
 	Out string `optional:"" short:"o" env:"UP_BILLING_OUT" default:"upbound_billing_report.tgz" help:"Name of the output file."`
 
 	// TODO(branden): Make storage params optional and fetch missing values from spaces cluster.
-	Provider provider `required:"" enum:"aws,gcp,azure," env:"UP_BILLING_PROVIDER" group:"Storage" help:"Storage provider. Must be one of: aws, gcp, azure."`
-	Bucket   string   `required:"" env:"UP_BILLING_BUCKET" group:"Storage" help:"Storage bucket."`
-	Endpoint string   `env:"UP_BILLING_ENDPOINT" group:"Storage" help:"Custom storage endpoint."`
-	Account  string   `required:"" env:"UP_BILLING_ACCOUNT" group:"Storage" help:"Name of the Upbound account whose billing report is being collected."`
+	Provider            provider `required:"" enum:"aws,gcp,azure," env:"UP_BILLING_PROVIDER" group:"Storage" help:"Storage provider. Must be one of: aws, gcp, azure."`
+	Bucket              string   `required:"" env:"UP_BILLING_BUCKET" group:"Storage" help:"Storage bucket."`
+	Endpoint            string   `env:"UP_BILLING_ENDPOINT" group:"Storage" help:"Custom storage endpoint."`
+	Account             string   `required:"" env:"UP_BILLING_ACCOUNT" group:"Storage" help:"Name of the Upbound account whose billing report is being collected."`
+	AzureStorageAccount string   `optional:"" env:"UP_AZURE_STORAGE_ACCOUNT" group:"Storage" help:"Name of the Azure storage account. Required for --provider=azure."`
 
 	BillingMonth    time.Time  `format:"2006-01" required:"" xor:"billingperiod" env:"UP_BILLING_MONTH" group:"Billing period" help:"Get a report for a billing period of one calendar month. Format: 2006-01."`
 	BillingCustom   *dateRange `required:"" xor:"billingperiod" env:"UP_BILLING_CUSTOM" group:"Billing period" help:"Get a report for a custom billing period. Date range is inclusive. Format: 2006-01-02/2006-01-02."`
 	ForceIncomplete bool       `env:"UP_BILLING_FORCE_INCOMPLETE" group:"Billing period" help:"Get a report for an incomplete billing period."`
 
 	outAbs        string
-	billingPeriod usage.TimeRange
+	billingPeriod usagetime.Range
 }
 
 //go:embed get_help.txt
@@ -113,6 +124,15 @@ func (c *getCmd) Help() string {
 }
 
 func (c *getCmd) Validate() error {
+	if c.Provider == providerAzure {
+		if c.AzureStorageAccount == "" {
+			return fmt.Errorf("--azure-storage-account must be set for --provider=azure")
+		}
+		if c.Endpoint != "" {
+			return fmt.Errorf("--endpoint is not supported for --provider=azure")
+		}
+	}
+
 	// Get billing period.
 	var err error
 	c.billingPeriod, err = c.getBillingPeriod()
@@ -170,15 +190,35 @@ func (c *getCmd) cleanupOnError() {
 }
 
 func (c *getCmd) collectReport() error {
+	ctx, stop := signal.NotifyContext(context.Background(), os.Interrupt)
+	defer stop()
+
+	// Make event window iterator.
+	window := time.Hour
+	var iter event.WindowIterator
+	var err error
+	switch c.Provider {
+	case providerGCP:
+		iter, err = c.getGCPIter(ctx, window)
+	case providerAWS:
+		iter, err = c.getAWSIter(window)
+	case providerAzure:
+		iter, err = c.getAzureIter(window)
+	default:
+		return fmt.Errorf(errFmtProviderNotSupported, c.Provider)
+	}
+	if err != nil {
+		return err
+	}
+
+	// Make report writer.
 	f, err := os.Create(c.outAbs)
 	if err != nil {
 		return errors.Wrap(err, "error creating report")
 	}
 	defer f.Close() // nolint:errcheck
-
 	gw := gzip.NewWriter(f)
 	tw := tar.NewWriter(gw)
-
 	rw, err := reporttar.NewWriter(tw, report.Meta{
 		UpboundAccount: c.Account,
 		TimeRange:      c.billingPeriod,
@@ -188,23 +228,10 @@ func (c *getCmd) collectReport() error {
 		return errors.Wrap(err, "error creating report")
 	}
 
-	ctx, stop := signal.NotifyContext(context.Background(), os.Interrupt)
-	defer stop()
-
-	// TODO(branden): Add support for Azure.
-	switch {
-	case c.Provider == providerGCP:
-		if err := reportgcs.GenerateReport(ctx, c.Account, c.Endpoint, c.Bucket, c.billingPeriod, time.Hour, rw); err != nil {
-			return err
-		}
-	case c.Provider == providerAWS:
-		if err := reportaws.GenerateReport(ctx, c.Account, c.Endpoint, c.Bucket, c.billingPeriod, rw); err != nil {
-			return err
-		}
-	default:
-		return fmt.Errorf(errFmtProviderNotSupported, c.Provider)
+	// Write report.
+	if err := report.MaxResourceCountPerGVKPerMCP(ctx, iter, rw); err != nil {
+		return err
 	}
-
 	if err := rw.Close(); err != nil {
 		return err
 	}
@@ -214,17 +241,58 @@ func (c *getCmd) collectReport() error {
 	return gw.Close()
 }
 
-func (c *getCmd) getBillingPeriod() (usage.TimeRange, error) {
+func (c *getCmd) getGCPIter(ctx context.Context, window time.Duration) (event.WindowIterator, error) {
+	opts := []gcpopt.ClientOption{}
+	if c.Endpoint != "" {
+		opts = append(opts, gcpopt.WithEndpoint(c.Endpoint))
+	}
+	gcsCli, err := storage.NewClient(ctx, opts...)
+	if err != nil {
+		return nil, errors.Wrap(err, "error creating storage client")
+	}
+	bkt := gcsCli.Bucket(c.Bucket)
+	return gcp.NewWindowIterator(bkt, c.Account, c.billingPeriod, window)
+}
+
+func (c *getCmd) getAWSIter(window time.Duration) (event.WindowIterator, error) {
+	sess, err := session.NewSession(&aws.Config{})
+	if err != nil {
+		return nil, errors.Wrap(err, "error creating aws session")
+	}
+	config := &aws.Config{}
+	if c.Endpoint != "" {
+		config = &aws.Config{
+			Endpoint: aws.String(c.Endpoint),
+		}
+	}
+	s3client := s3.New(sess, config)
+	return usageaws.NewWindowIterator(s3client, c.Bucket, c.Account, c.billingPeriod, window)
+}
+
+func (c *getCmd) getAzureIter(window time.Duration) (event.WindowIterator, error) {
+	cred, err := azidentity.NewDefaultAzureCredential(nil)
+	if err != nil {
+		return nil, err
+	}
+	cli, err := azblob.NewClient(fmt.Sprintf("https://%s.blob.core.windows.net/", c.AzureStorageAccount), cred, nil)
+	if err != nil {
+		return nil, err
+	}
+	containerCli := cli.ServiceClient().NewContainerClient(c.Bucket)
+	return azure.NewWindowIterator(containerCli, c.Account, c.billingPeriod, window)
+}
+
+func (c *getCmd) getBillingPeriod() (usagetime.Range, error) {
 	if !c.BillingMonth.IsZero() {
 		start := time.Date(c.BillingMonth.Year(), c.BillingMonth.Month(), 1, 0, 0, 0, 0, time.UTC)
-		return usage.TimeRange{
+		return usagetime.Range{
 			Start: start,
 			End:   start.AddDate(0, 1, 0),
 		}, nil
 	}
 
 	if c.BillingCustom != nil {
-		return usage.TimeRange{
+		return usagetime.Range{
 			Start: time.Date(
 				c.BillingCustom.Start.Year(),
 				c.BillingCustom.Start.Month(),
@@ -248,7 +316,7 @@ func (c *getCmd) getBillingPeriod() (usage.TimeRange, error) {
 		}, nil
 	}
 
-	return usage.TimeRange{}, fmt.Errorf("billing period is not set")
+	return usagetime.Range{}, fmt.Errorf("billing period is not set")
 }
 
 func formatTimestamp(t time.Time) string {
