@@ -19,7 +19,6 @@ import (
 	"io"
 	"strings"
 
-	"github.com/alecthomas/kong"
 	"github.com/crossplane/crossplane-runtime/pkg/errors"
 	"github.com/pterm/pterm"
 	"k8s.io/client-go/kubernetes"
@@ -44,16 +43,7 @@ func (c *upgradeCmd) BeforeApply() error {
 }
 
 // AfterApply sets default values in command after assignment and validation.
-func (c *upgradeCmd) AfterApply(insCtx *install.Context, kongCtx *kong.Context, quiet config.QuietFlag) error { //nolint:gocyclo
-	kubeconfig, err := kube.GetKubeConfig(c.Kubeconfig)
-	if err != nil {
-		return err
-	}
-
-	kongCtx.Bind(&install.Context{
-		Kubeconfig: kubeconfig,
-	})
-
+func (c *upgradeCmd) AfterApply(insCtx *install.Context, quiet config.QuietFlag) error { //nolint:gocyclo
 	// NOTE(tnthornton) we currently only have support for stylized output.
 	pterm.EnableStyling()
 	upterm.DefaultObjPrinter.Pretty = true
@@ -139,7 +129,7 @@ type upgradeCmd struct {
 }
 
 // Run executes the upgrade command.
-func (c *upgradeCmd) Run(insCtx *install.Context) error {
+func (c *upgradeCmd) Run() error {
 	ctx, cancel := context.WithTimeout(context.Background(), defaultTimeout)
 	defer cancel()
 
