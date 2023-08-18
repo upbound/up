@@ -120,6 +120,7 @@ type installer struct {
 	rollbackOnError bool
 	force           bool
 	wait            bool
+	noHooks         bool
 	home            HomeDirFn
 	fs              afero.Fs
 	tempDir         TempDirFn
@@ -216,6 +217,13 @@ func Wait() InstallerModifierFn {
 	}
 }
 
+// WithNoHooks will disable uninstall hooks
+func WithNoHooks() InstallerModifierFn {
+	return func(h *installer) {
+		h.noHooks = true
+	}
+}
+
 // NewManager builds a helm install manager for UXP.
 func NewManager(config *rest.Config, chartName string, repoURL *url.URL, modifiers ...InstallerModifierFn) (install.Manager, error) { // nolint:gocyclo
 	h := &installer{
@@ -287,6 +295,7 @@ func NewManager(config *rest.Config, chartName string, repoURL *url.URL, modifie
 	ic.ReleaseName = h.chartName
 	ic.Wait = h.wait
 	ic.Timeout = waitTimeout
+	ic.DisableHooks = h.noHooks
 	h.installClient = ic
 
 	// Upgrade Client
@@ -294,12 +303,14 @@ func NewManager(config *rest.Config, chartName string, repoURL *url.URL, modifie
 	uc.Namespace = h.namespace
 	uc.Wait = h.wait
 	uc.Timeout = waitTimeout
+	uc.DisableHooks = h.noHooks
 	h.upgradeClient = uc
 
 	// Uninstall Client
 	unc := action.NewUninstall(actionConfig)
 	unc.Wait = h.wait
 	unc.Timeout = waitTimeout
+	unc.DisableHooks = h.noHooks
 	h.uninstallClient = unc
 
 	// Rollback Client
