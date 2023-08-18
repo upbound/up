@@ -15,10 +15,13 @@
 package space
 
 import (
+	"context"
 	"fmt"
 	"os"
 
 	"github.com/pterm/pterm"
+	v1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/client-go/kubernetes"
 
 	"github.com/upbound/up/internal/input"
 	"github.com/upbound/up/internal/install"
@@ -26,7 +29,10 @@ import (
 	"github.com/upbound/up/internal/upterm"
 )
 
-const confirmStr = "DESTROY CONFIRMED"
+const (
+	confirmStr      = "DESTROY CONFIRMED"
+	nsUpboundSystem = "upbound-system"
+)
 
 // AfterApply sets default values in command after assignment and validation.
 func (c *destroyCmd) AfterApply(insCtx *install.Context) error {
@@ -55,6 +61,12 @@ func (c *destroyCmd) AfterApply(insCtx *install.Context) error {
 		}
 	}
 
+	kClient, err := kubernetes.NewForConfig(insCtx.Kubeconfig)
+	if err != nil {
+		return err
+	}
+	c.kClient = kClient
+
 	mgr, err := helm.NewManager(insCtx.Kubeconfig,
 		spacesChart,
 		c.Registry,
@@ -69,7 +81,8 @@ func (c *destroyCmd) AfterApply(insCtx *install.Context) error {
 
 // destroyCmd uninstalls Upbound.
 type destroyCmd struct {
-	mgr install.Manager
+	mgr     install.Manager
+	kClient kubernetes.Interface
 
 	commonParams
 
@@ -78,5 +91,8 @@ type destroyCmd struct {
 
 // Run executes the uninstall command.
 func (c *destroyCmd) Run(insCtx *install.Context) error {
-	return c.mgr.Uninstall()
+	if err := c.mgr.Uninstall(); err != nil {
+		return err
+	}
+	return c.kClient.CoreV1().Namespaces().Delete(context.Background(), nsUpboundSystem, v1.DeleteOptions{})
 }
