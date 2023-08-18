@@ -15,18 +15,45 @@
 package space
 
 import (
+	"fmt"
+	"os"
+
 	"github.com/pterm/pterm"
 
+	"github.com/upbound/up/internal/input"
 	"github.com/upbound/up/internal/install"
 	"github.com/upbound/up/internal/install/helm"
 	"github.com/upbound/up/internal/upterm"
 )
+
+const confirmStr = "DESTROY CONFIRMED"
 
 // AfterApply sets default values in command after assignment and validation.
 func (c *destroyCmd) AfterApply(insCtx *install.Context) error {
 	// NOTE(tnthornton) we currently only have support for stylized output.
 	pterm.EnableStyling()
 	upterm.DefaultObjPrinter.Pretty = true
+
+	if !c.Confirmed {
+		prompter := input.NewPrompter()
+		pterm.Println()
+		pterm.FgRed.Println("******************** DESTRUCTIVE COMMAND ********************")
+		pterm.FgRed.Println("****************** DATA-DESTRUCTION WARNING *****************")
+		pterm.Println()
+		pterm.Warning.Println("Destroying Spaces is a destructive command that will destroy data and oprhan resources.")
+		pterm.Warning.Println("Before proceeding ensure that Managed Resources in Control Planes have been deleted.")
+		pterm.Warning.Println("All Spaces components including Control Planes will be destroyed.")
+		pterm.Println()
+		in, err := prompter.Prompt(fmt.Sprintf("To proceed, type: %q", confirmStr), false)
+		if err != nil {
+			pterm.Error.Printfln("error getting user confirmation: %v", err)
+			os.Exit(1)
+		}
+		if in != confirmStr {
+			pterm.Error.Println("Destruction was not confirmed")
+			os.Exit(10)
+		}
+	}
 
 	mgr, err := helm.NewManager(insCtx.Kubeconfig,
 		spacesChart,
@@ -45,6 +72,8 @@ type destroyCmd struct {
 	mgr install.Manager
 
 	commonParams
+
+	Confirmed bool `name:"yes-really-delete-spaces-and-all-data" type:"bool" help:"Bypass safety checks and destroy Spaces"`
 }
 
 // Run executes the uninstall command.
