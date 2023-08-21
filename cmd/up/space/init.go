@@ -40,7 +40,6 @@ import (
 	"github.com/upbound/up/cmd/up/space/defaults"
 	"github.com/upbound/up/cmd/up/space/prerequisites"
 	"github.com/upbound/up/internal/config"
-	"github.com/upbound/up/internal/input"
 	"github.com/upbound/up/internal/install"
 	"github.com/upbound/up/internal/install/helm"
 	"github.com/upbound/up/internal/kube"
@@ -87,6 +86,26 @@ const (
 	errFmtCreateNamespace = "failed to create namespace %s"
 )
 
+// initCmd installs Upbound Spaces.
+type initCmd struct {
+	Kube     kubeFlags               `embed:""`
+	Registry authorizedRegistryFlags `embed:""`
+	install.CommonParams
+	Upbound upbound.Flags `embed:""`
+
+	Version       string `arg:"" help:"Upbound Spaces version to install."`
+	Yes           bool   `name:"yes" type:"bool" help:"Answer yes to all questions"`
+	PublicIngress bool   `name:"public-ingress" type:"bool" help:"For AKS,EKS,GKE expose ingress publically"`
+
+	helmMgr    install.Manager
+	prereqs    *prerequisites.Manager
+	parser     install.ParameterParser
+	kClient    kubernetes.Interface
+	dClient    dynamic.Interface
+	pullSecret *kube.ImagePullApplicator
+	quiet      config.QuietFlag
+}
+
 func init() {
 	// NOTE(tnthornton) we override the runtime.ErrorHandlers so that Helm
 	// doesn't leak Println logs.
@@ -95,45 +114,30 @@ func init() {
 
 // BeforeApply sets default values in login before assignment and validation.
 func (c *initCmd) BeforeApply() error {
-	c.prompter = input.NewPrompter()
 	c.Set = make(map[string]string)
 	return nil
 }
 
 // AfterApply sets default values in command after assignment and validation.
-func (c *initCmd) AfterApply(insCtx *install.Context, kongCtx *kong.Context, quiet config.QuietFlag) error { //nolint:gocyclo
+func (c *initCmd) AfterApply(kongCtx *kong.Context, quiet config.QuietFlag) error { //nolint:gocyclo
+	if err := c.Kube.AfterApply(); err != nil {
+		return err
+	}
+	if err := c.Registry.AfterApply(); err != nil {
+		return err
+	}
+
 	// NOTE(tnthornton) we currently only have support for stylized output.
 	pterm.EnableStyling()
 	upterm.DefaultObjPrinter.Pretty = true
 
-	upCtx, err := upbound.NewFromFlags(c.Flags)
+	upCtx, err := upbound.NewFromFlags(c.Upbound)
 	if err != nil {
 		return err
 	}
 	kongCtx.Bind(upCtx)
 
-	if c.Registry.String() != defaultRegistry {
-		id, err := c.prompter.Prompt("Username", false)
-		if err != nil {
-			return err
-		}
-		token, err := c.prompter.Prompt("Password", true)
-		if err != nil {
-			return err
-		}
-		c.id = id
-		c.token = token
-	} else {
-		b, err := io.ReadAll(c.TokenFile)
-		defer c.TokenFile.Close() // nolint:errcheck
-		if err != nil {
-			return errors.Wrap(err, errReadTokenFile)
-		}
-		c.token = string(b)
-		c.id = jsonKey
-	}
-
-	kClient, err := kubernetes.NewForConfig(insCtx.Kubeconfig)
+	kClient, err := kubernetes.NewForConfig(c.Kube.config)
 	if err != nil {
 		return err
 	}
@@ -154,25 +158,24 @@ func (c *initCmd) AfterApply(insCtx *install.Context, kongCtx *kong.Context, qui
 		pterm.Info.Println("Public ingress will be exposed")
 	}
 
-	prereqs, err := prerequisites.New(insCtx.Kubeconfig, defs)
+	prereqs, err := prerequisites.New(c.Kube.config, defs)
 	if err != nil {
 		return err
 	}
 	c.prereqs = prereqs
 
-	c.id = jsonKey
 	secret := kube.NewSecretApplicator(kClient)
 	c.pullSecret = kube.NewImagePullApplicator(secret)
-	dClient, err := dynamic.NewForConfig(insCtx.Kubeconfig)
+	dClient, err := dynamic.NewForConfig(c.Kube.config)
 	if err != nil {
 		return err
 	}
 	c.dClient = dClient
-	mgr, err := helm.NewManager(insCtx.Kubeconfig,
+	mgr, err := helm.NewManager(c.Kube.config,
 		spacesChart,
-		c.Registry,
+		c.Registry.Repository,
 		helm.WithNamespace(ns),
-		helm.WithBasicAuth(c.id, c.token),
+		helm.WithBasicAuth(c.Registry.Username, c.Registry.Password),
 		helm.IsOCI(),
 		helm.WithChart(c.Bundle),
 		helm.Wait(),
@@ -202,38 +205,15 @@ func (c *initCmd) AfterApply(insCtx *install.Context, kongCtx *kong.Context, qui
 	return nil
 }
 
-// initCmd installs Upbound Spaces.
-type initCmd struct {
-	helmMgr    install.Manager
-	prereqs    *prerequisites.Manager
-	parser     install.ParameterParser
-	kClient    kubernetes.Interface
-	dClient    dynamic.Interface
-	prompter   input.Prompter
-	pullSecret *kube.ImagePullApplicator
-	id         string
-	token      string
-	quiet      config.QuietFlag
-
-	Version       string `arg:"" help:"Upbound Spaces version to install."`
-	Yes           bool   `name:"yes" type:"bool" help:"Answer yes to all questions"`
-	PublicIngress bool   `name:"public-ingress" type:"bool" help:"For AKS,EKS,GKE expose ingress publically"`
-
-	commonParams
-	install.CommonParams
-
-	Flags upbound.Flags `embed:""`
-}
-
 // Run executes the install command.
-func (c *initCmd) Run(insCtx *install.Context, upCtx *upbound.Context) error {
+func (c *initCmd) Run() error {
 	ctx := context.Background()
 
 	params, err := c.parser.Parse()
 	if err != nil {
 		return errors.Wrap(err, errParseInstallParameters)
 	}
-	overrideRegistry(c.Registry.String(), params)
+	overrideRegistry(c.Registry.Repository.String(), params)
 
 	// check if required prerequisites are installed
 	status := c.prereqs.Check()
@@ -265,7 +245,7 @@ func (c *initCmd) Run(insCtx *install.Context, upCtx *upbound.Context) error {
 	pterm.Info.Printfln("Required prerequisites met!")
 	pterm.Info.Printfln("Proceeding with Upbound Spaces installation...")
 
-	if err := c.applySecret(ctx, ns); err != nil {
+	if err := c.applySecret(ctx, &c.Registry, ns); err != nil {
 		return err
 	}
 
@@ -280,7 +260,6 @@ func (c *initCmd) Run(insCtx *install.Context, upCtx *upbound.Context) error {
 }
 
 func (c *initCmd) installPrereqs() error {
-
 	status := c.prereqs.Check()
 	for i, p := range status.NotInstalled {
 		if err := upterm.WrapWithSuccessSpinner(
@@ -298,15 +277,15 @@ func (c *initCmd) installPrereqs() error {
 	return nil
 }
 
-func (c *initCmd) applySecret(ctx context.Context, namespace string) error {
+func (c *initCmd) applySecret(ctx context.Context, regFlags *authorizedRegistryFlags, namespace string) error {
 	creatPullSecret := func() error {
 		if err := c.pullSecret.Apply(
 			ctx,
 			defaultImagePullSecret,
 			namespace,
-			c.id,
-			c.token,
-			c.RegistryEndpoint.String(),
+			regFlags.Username,
+			regFlags.Password,
+			regFlags.Endpoint.String(),
 		); err != nil {
 			return errors.Wrap(err, errCreateImagePullSecret)
 		}

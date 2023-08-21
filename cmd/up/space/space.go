@@ -15,15 +15,10 @@
 package space
 
 import (
-	"net/url"
-
 	"github.com/alecthomas/kong"
 
 	"github.com/upbound/up/cmd/up/space/billing"
-	"github.com/upbound/up/internal/config"
 	"github.com/upbound/up/internal/feature"
-	"github.com/upbound/up/internal/install"
-	"github.com/upbound/up/internal/kube"
 )
 
 const (
@@ -39,22 +34,11 @@ func (c *Cmd) BeforeReset(p *kong.Path, maturity feature.Maturity) error {
 
 // Cmd contains commands for interacting with spaces.
 type Cmd struct {
-	kubeCmds `embed:""`
-	Billing  billing.Cmd `cmd:""`
-}
-
-type kubeCmds struct {
-	Kubeconfig string `type:"existingfile" help:"Override default kubeconfig path."`
-
 	Init    initCmd    `cmd:"" help:"Initialize an Upbound Spaces deployment."`
 	Destroy destroyCmd `cmd:"" help:"Remove the Upbound Spaces deployment."`
 	Upgrade upgradeCmd `cmd:"" help:"Upgrade the Upbound Spaces deployment."`
-}
 
-type commonParams struct {
-	Registry *url.URL `hidden:"" env:"UPBOUND_REGISTRY" default:"us-west1-docker.pkg.dev/orchestration-build/upbound-environments" help:"Set registry for where to pull OCI artifacts from. This is an OCI registry reference, i.e. a URL without the scheme or protocol prefix."`
-
-	RegistryEndpoint *url.URL `hidden:"" env:"UPBOUND_REGISTRY_ENDPOINT" default:"https://us-west1-docker.pkg.dev" help:"Set registry endpoint, including scheme, for authentication."`
+	Billing billing.Cmd `cmd:""`
 }
 
 // overrideRegistry is a common function that takes the candidate registry,
@@ -66,16 +50,4 @@ func overrideRegistry(candidate string, params map[string]any) {
 	if candidate != defaultRegistry {
 		params["registry"] = candidate
 	}
-}
-
-func (c *kubeCmds) AfterApply(kongCtx *kong.Context, quiet config.QuietFlag) error {
-	kubeconfig, err := kube.GetKubeConfig(c.Kubeconfig)
-	if err != nil {
-		return err
-	}
-	kongCtx.Bind(&install.Context{
-		Kubeconfig: kubeconfig,
-	})
-
-	return nil
 }
