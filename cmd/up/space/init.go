@@ -51,7 +51,6 @@ import (
 const (
 	hcGroup          = "internal.spaces.upbound.io"
 	hcVersion        = "v1alpha1"
-	hcKind           = "XHostCluster"
 	hcResourcePlural = "xhostclusters"
 )
 
@@ -76,12 +75,7 @@ const (
 	errReadTokenFile          = "unable to read token file"
 	errReadParametersFile     = "unable to read parameters file"
 	errParseInstallParameters = "unable to parse install parameters"
-	errGetRegistryToken       = "failed to acquire auth token"
-	errGetAccessKey           = "failed to acquire access key"
 	errCreateImagePullSecret  = "failed to create image pull secret"
-	errCreateLicenseSecret    = "failed to create license secret"
-	errTimoutExternalIP       = "timed out waiting for externalIP to resolve"
-	errUpdateConfig           = "unable to update config"
 
 	errFmtCreateNamespace = "failed to create namespace %s"
 )
