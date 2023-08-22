@@ -10,6 +10,7 @@ require (
 	github.com/Masterminds/semver v1.5.0
 	github.com/alecthomas/kong v0.8.0
 	github.com/aws/aws-sdk-go v1.44.313
+	github.com/blang/semver/v4 v4.0.0
 	github.com/crossplane/crossplane v1.13.0-rc.0.0.20230701053013-444267e84783
 	github.com/crossplane/crossplane-runtime v0.20.0-rc.0.0.20230622073604-c52ef3ac58c6
 	github.com/crossplane/crossplane/controller/apiextensions v0.0.0-00010101000000-000000000000
@@ -78,7 +79,6 @@ require (
 	github.com/asaskevich/govalidator v0.0.0-20230301143203-a9d515a09cc2 // indirect
 	github.com/beorn7/perks v1.0.1 // indirect
 	github.com/blakesmith/ar v0.0.0-20190502131153-809d4375e1fb // indirect
-	github.com/blang/semver/v4 v4.0.0 // indirect
 	github.com/bmatcuk/doublestar/v4 v4.0.2 // indirect
 	github.com/cavaliercoder/go-cpio v0.0.0-20180626203310-925f9528c45e // indirect
 	github.com/cenkalti/backoff/v4 v4.2.1 // indirect

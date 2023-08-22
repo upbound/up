@@ -185,6 +185,8 @@ func (c *upgradeCmd) upgradeUpbound(params map[string]any) error {
 		upterm.CheckmarkSuccessSpinner,
 		upgrade,
 	); err != nil {
+		fmt.Println()
+		fmt.Println()
 		return err
 	}
 
@@ -192,18 +194,20 @@ func (c *upgradeCmd) upgradeUpbound(params map[string]any) error {
 }
 
 func (c *upgradeCmd) validateVersions(from, to semver.Version) error {
-	if c.downgrade {
+	switch {
+	case c.downgrade:
 		if err := warnAndConfirm("Downgrades are not supported."); err != nil {
 			return err
 		}
-	} else if to.Major > from.Major {
+	case to.Major > from.Major:
 		if err := warnAndConfirm("Upgrades to a new major version are only supported for explicitly documented releases."); err != nil {
 			return err
 		}
-	} else if to.Minor > from.Minor+1 {
+	case to.Minor > from.Minor+1:
 		if err := warnAndConfirm("Upgrades which skip a minor version are not supported."); err != nil {
 			return err
 		}
+	default:
 	}
 
 	return nil

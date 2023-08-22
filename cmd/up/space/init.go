@@ -266,6 +266,8 @@ func (c *initCmd) installPrereqs() error {
 			upterm.CheckmarkSuccessSpinner,
 			p.Install,
 		); err != nil {
+			fmt.Println()
+			fmt.Println()
 			return err
 		}
 	}
@@ -301,6 +303,8 @@ func (c *initCmd) applySecret(ctx context.Context, regFlags *authorizedRegistryF
 		upterm.CheckmarkSuccessSpinner,
 		creatPullSecret,
 	); err != nil {
+		fmt.Println()
+		fmt.Println()
 		return err
 	}
 	return nil
@@ -323,6 +327,8 @@ func (c *initCmd) deploySpace(ctx context.Context, params map[string]any) error 
 		upterm.CheckmarkSuccessSpinner,
 		install,
 	); err != nil {
+		fmt.Println()
+		fmt.Println()
 		return err
 	}
 
