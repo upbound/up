@@ -222,9 +222,10 @@ func (c *initCmd) Run() error {
 		}
 
 		if !c.Yes {
-			pterm.DefaultInteractiveConfirm.DefaultText = "Would you like to install them now?"
 			pterm.Println() // Blank line
-			result, _ := pterm.DefaultInteractiveConfirm.Show()
+			confirm := pterm.DefaultInteractiveConfirm
+			confirm.DefaultText = "Would you like to install them now?"
+			result, _ := confirm.Show()
 			pterm.Println() // Blank line
 			if !result {
 				pterm.Error.Println("prerequisites must be met in order to proceed with installation")
