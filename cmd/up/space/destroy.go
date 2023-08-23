@@ -19,6 +19,7 @@ import (
 	"fmt"
 	"os"
 
+	"github.com/alecthomas/kong"
 	"github.com/pterm/pterm"
 	v1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/client-go/kubernetes"
@@ -34,8 +35,21 @@ const (
 	nsUpboundSystem = "upbound-system"
 )
 
+// destroyCmd uninstalls Upbound.
+type destroyCmd struct {
+	Registry registryFlags `embed:""`
+	Kube     kubeFlags     `embed:""`
+
+	Confirmed bool `name:"yes-really-delete-space-and-all-data" type:"bool" help:"Bypass safety checks and destroy Spaces"`
+	Orphan    bool `name:"orphan" type:"bool" help:"Remove Space components but retain Control Planes and data"`
+}
+
 // AfterApply sets default values in command after assignment and validation.
-func (c *destroyCmd) AfterApply(insCtx *install.Context) error {
+func (c *destroyCmd) AfterApply(kongCtx *kong.Context) error {
+	if err := c.Kube.AfterApply(); err != nil {
+		return err
+	}
+
 	// NOTE(tnthornton) we currently only have support for stylized output.
 	pterm.EnableStyling()
 	upterm.DefaultObjPrinter.Pretty = true
@@ -71,11 +85,11 @@ func (c *destroyCmd) AfterApply(insCtx *install.Context) error {
 		}
 	}
 
-	kClient, err := kubernetes.NewForConfig(insCtx.Kubeconfig)
+	kClient, err := kubernetes.NewForConfig(c.Kube.config)
 	if err != nil {
 		return err
 	}
-	c.kClient = kClient
+	kongCtx.Bind(kClient)
 
 	with := []helm.InstallerModifierFn{
 		helm.WithNamespace(ns),
@@ -85,39 +99,30 @@ func (c *destroyCmd) AfterApply(insCtx *install.Context) error {
 		with = append(with, helm.WithNoHooks())
 	}
 
-	mgr, err := helm.NewManager(insCtx.Kubeconfig,
+	mgr, err := helm.NewManager(c.Kube.config,
 		spacesChart,
-		c.Registry,
+		c.Registry.Repository,
 		with...,
 	)
 	if err != nil {
 		return err
 	}
+	kongCtx.Bind(mgr)
 
-	c.mgr = mgr
 	return nil
 }
 
-// destroyCmd uninstalls Upbound.
-type destroyCmd struct {
-	mgr     install.Manager
-	kClient kubernetes.Interface
-
-	commonParams
-
-	Confirmed bool `name:"yes-really-delete-space-and-all-data" type:"bool" help:"Bypass safety checks and destroy Spaces"`
-	Orphan    bool `name:"orphan" type:"bool" help:"Remove Space components but retain Control Planes and data"`
-}
-
 // Run executes the uninstall command.
-func (c *destroyCmd) Run(insCtx *install.Context) error {
-	if err := c.mgr.Uninstall(); err != nil {
+func (c *destroyCmd) Run(kClient kubernetes.Interface, mgr install.Manager) error {
+	if err := mgr.Uninstall(); err != nil {
 		return err
 	}
+
 	// leave `upbound-system` namespace in place since there are secrets, configmaps, etc,
 	// used by controlplanes
 	if c.Orphan {
 		return nil
 	}
-	return c.kClient.CoreV1().Namespaces().Delete(context.Background(), nsUpboundSystem, v1.DeleteOptions{})
+
+	return kClient.CoreV1().Namespaces().Delete(context.Background(), nsUpboundSystem, v1.DeleteOptions{})
 }

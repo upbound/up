@@ -31,6 +31,4 @@ type CommonParams struct {
 	Set    map[string]string `help:"Set parameters."`
 	File   *os.File          `short:"f" help:"Parameters file."`
 	Bundle *os.File          `help:"Local bundle path."`
-
-	TokenFile *os.File `name:"token-file" help:"File containing authentication token."`
 }

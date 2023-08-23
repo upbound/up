@@ -36,6 +36,26 @@ const (
 	errParseUpgradeParameters = "unable to parse upgrade parameters"
 )
 
+// upgradeCmd upgrades Upbound.
+type upgradeCmd struct {
+	Kube     kubeFlags               `embed:""`
+	Registry authorizedRegistryFlags `embed:""`
+	install.CommonParams
+
+	// NOTE(hasheddan): version is currently required for upgrade with OCI image
+	// as latest strategy is undetermined.
+	Version string `arg:"" help:"Upbound Spaces version to upgrade to."`
+
+	Rollback bool `help:"Rollback to previously installed version on failed upgrade."`
+
+	helmMgr    install.Manager
+	parser     install.ParameterParser
+	prompter   input.Prompter
+	pullSecret *kube.ImagePullApplicator
+	kClient    kubernetes.Interface
+	quiet      config.QuietFlag
+}
+
 // BeforeApply sets default values in login before assignment and validation.
 func (c *upgradeCmd) BeforeApply() error {
 	c.prompter = input.NewPrompter()
@@ -43,43 +63,30 @@ func (c *upgradeCmd) BeforeApply() error {
 }
 
 // AfterApply sets default values in command after assignment and validation.
-func (c *upgradeCmd) AfterApply(insCtx *install.Context, quiet config.QuietFlag) error { //nolint:gocyclo
+func (c *upgradeCmd) AfterApply(quiet config.QuietFlag) error { //nolint:gocyclo
+	if err := c.Kube.AfterApply(); err != nil {
+		return err
+	}
+	if err := c.Registry.AfterApply(); err != nil {
+		return err
+	}
+
 	// NOTE(tnthornton) we currently only have support for stylized output.
 	pterm.EnableStyling()
 	upterm.DefaultObjPrinter.Pretty = true
 
-	if c.Registry.String() != defaultRegistry {
-		id, err := c.prompter.Prompt("Username", false)
-		if err != nil {
-			return err
-		}
-		token, err := c.prompter.Prompt("Password", true)
-		if err != nil {
-			return err
-		}
-		c.id = id
-		c.token = token
-	} else {
-		b, err := io.ReadAll(c.TokenFile)
-		defer c.TokenFile.Close() // nolint:errcheck
-		if err != nil {
-			return errors.Wrap(err, errReadTokenFile)
-		}
-		c.token = string(b)
-		c.id = jsonKey
-	}
-	kClient, err := kubernetes.NewForConfig(insCtx.Kubeconfig)
+	kClient, err := kubernetes.NewForConfig(c.Kube.config)
 	if err != nil {
 		return err
 	}
 	c.kClient = kClient
 	secret := kube.NewSecretApplicator(kClient)
 	c.pullSecret = kube.NewImagePullApplicator(secret)
-	ins, err := helm.NewManager(insCtx.Kubeconfig,
+	ins, err := helm.NewManager(c.Kube.config,
 		spacesChart,
-		c.Registry,
+		c.Registry.Repository,
 		helm.WithNamespace(ns),
-		helm.WithBasicAuth(c.id, c.token),
+		helm.WithBasicAuth(c.Registry.Username, c.Registry.Password),
 		helm.IsOCI(),
 		helm.WithChart(c.Bundle),
 		helm.RollbackOnError(c.Rollback),
@@ -107,27 +114,6 @@ func (c *upgradeCmd) AfterApply(insCtx *install.Context, quiet config.QuietFlag)
 	return nil
 }
 
-// upgradeCmd upgrades Upbound.
-type upgradeCmd struct {
-	helmMgr    install.Manager
-	parser     install.ParameterParser
-	prompter   input.Prompter
-	pullSecret *kube.ImagePullApplicator
-	id         string
-	token      string
-	kClient    kubernetes.Interface
-	quiet      config.QuietFlag
-
-	// NOTE(hasheddan): version is currently required for upgrade with OCI image
-	// as latest strategy is undetermined.
-	Version string `arg:"" help:"Upbound Spaces version to upgrade to."`
-
-	Rollback bool `help:"Rollback to previously installed version on failed upgrade."`
-
-	commonParams
-	install.CommonParams
-}
-
 // Run executes the upgrade command.
 func (c *upgradeCmd) Run() error {
 	ctx, cancel := context.WithTimeout(context.Background(), defaultTimeout)
@@ -137,10 +123,10 @@ func (c *upgradeCmd) Run() error {
 	if err != nil {
 		return errors.Wrap(err, errParseUpgradeParameters)
 	}
-	overrideRegistry(c.Registry.String(), params)
+	overrideRegistry(c.Registry.Repository.String(), params)
 
 	// Create or update image pull secret.
-	if err := c.pullSecret.Apply(ctx, defaultImagePullSecret, ns, c.id, c.token, c.RegistryEndpoint.String()); err != nil {
+	if err := c.pullSecret.Apply(ctx, defaultImagePullSecret, ns, c.Registry.Username, c.Registry.Password, c.Registry.Endpoint.String()); err != nil {
 		return errors.Wrap(err, errCreateImagePullSecret)
 	}
 
