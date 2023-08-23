@@ -113,7 +113,7 @@ func (c *destroyCmd) AfterApply(kongCtx *kong.Context) error {
 }
 
 // Run executes the uninstall command.
-func (c *destroyCmd) Run(kClient kubernetes.Interface, mgr install.Manager) error {
+func (c *destroyCmd) Run(kClient *kubernetes.Clientset, mgr install.Manager) error {
 	if err := mgr.Uninstall(); err != nil {
 		return err
 	}
