@@ -19,6 +19,7 @@ import (
 	"fmt"
 	"os"
 
+	"github.com/alecthomas/kong"
 	"github.com/pterm/pterm"
 	v1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/client-go/kubernetes"
@@ -41,13 +42,10 @@ type destroyCmd struct {
 
 	Confirmed bool `name:"yes-really-delete-space-and-all-data" type:"bool" help:"Bypass safety checks and destroy Spaces"`
 	Orphan    bool `name:"orphan" type:"bool" help:"Remove Space components but retain Control Planes and data"`
-
-	mgr     install.Manager
-	kClient kubernetes.Interface
 }
 
 // AfterApply sets default values in command after assignment and validation.
-func (c *destroyCmd) AfterApply() error {
+func (c *destroyCmd) AfterApply(kongCtx *kong.Context) error {
 	if err := c.Kube.AfterApply(); err != nil {
 		return err
 	}
@@ -91,7 +89,7 @@ func (c *destroyCmd) AfterApply() error {
 	if err != nil {
 		return err
 	}
-	c.kClient = kClient
+	kongCtx.Bind(kClient)
 
 	with := []helm.InstallerModifierFn{
 		helm.WithNamespace(ns),
@@ -109,14 +107,14 @@ func (c *destroyCmd) AfterApply() error {
 	if err != nil {
 		return err
 	}
-	c.mgr = mgr
+	kongCtx.Bind(mgr)
 
 	return nil
 }
 
 // Run executes the uninstall command.
-func (c *destroyCmd) Run() error {
-	if err := c.mgr.Uninstall(); err != nil {
+func (c *destroyCmd) Run(kClient kubernetes.Interface, mgr install.Manager) error {
+	if err := mgr.Uninstall(); err != nil {
 		return err
 	}
 
@@ -126,5 +124,5 @@ func (c *destroyCmd) Run() error {
 		return nil
 	}
 
-	return c.kClient.CoreV1().Namespaces().Delete(context.Background(), nsUpboundSystem, v1.DeleteOptions{})
+	return kClient.CoreV1().Namespaces().Delete(context.Background(), nsUpboundSystem, v1.DeleteOptions{})
 }
