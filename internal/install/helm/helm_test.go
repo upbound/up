@@ -93,13 +93,13 @@ func TestGetCurrentVersion(t *testing.T) {
 	alternate := "some-chart"
 	cases := map[string]struct {
 		reason    string
-		installer *installer
+		installer *Installer
 		version   string
 		err       error
 	}{
 		"ErrorGetRelease": {
 			reason: "If unable to get release an error should be returned.",
-			installer: &installer{
+			installer: &Installer{
 				namespace: "test",
 				getClient: &mockGetClient{
 					runFn: func(string) (*release.Release, error) {
@@ -111,7 +111,7 @@ func TestGetCurrentVersion(t *testing.T) {
 		},
 		"ErrorGetReleaseFallbackAlternateError": {
 			reason: "If primary release not found and alternate fallback fails an error should be returned.",
-			installer: &installer{
+			installer: &Installer{
 				namespace:      "test",
 				chartName:      chartName,
 				alternateChart: alternate,
@@ -128,7 +128,7 @@ func TestGetCurrentVersion(t *testing.T) {
 		},
 		"ErrorGetReleaseFallbackAlternateSuccess": {
 			reason: "If unable to get primary release but alternate is found an error should not be returned.",
-			installer: &installer{
+			installer: &Installer{
 				namespace:      "test",
 				alternateChart: alternate,
 				getClient: &mockGetClient{
@@ -150,7 +150,7 @@ func TestGetCurrentVersion(t *testing.T) {
 		},
 		"ErrorExtractVersion": {
 			reason: "If unable to extract version from current release and error should be returned.",
-			installer: &installer{
+			installer: &Installer{
 				getClient: &mockGetClient{
 					runFn: func(string) (*release.Release, error) {
 						return &release.Release{}, nil
@@ -161,7 +161,7 @@ func TestGetCurrentVersion(t *testing.T) {
 		},
 		"Successful": {
 			reason: "If successful version and no error should be returned.",
-			installer: &installer{
+			installer: &Installer{
 				getClient: &mockGetClient{
 					runFn: func(string) (*release.Release, error) {
 						return &release.Release{
@@ -196,14 +196,14 @@ func TestInstall(t *testing.T) {
 	alternate := "some-chart"
 	cases := map[string]struct {
 		reason    string
-		installer *installer
+		installer *Installer
 		fsSetup   func() afero.Fs
 		version   string
 		err       error
 	}{
 		"ErrorCouldNotVerifyNotInstalled": {
 			reason: "If unable to verify that the chart is not already installed an error should be returned.",
-			installer: &installer{
+			installer: &Installer{
 				namespace:      "test",
 				chartName:      chartName,
 				alternateChart: alternate,
@@ -221,7 +221,7 @@ func TestInstall(t *testing.T) {
 		},
 		"ErrorPullNewVersion": {
 			reason: "If unable to pull specified version an error should be returned.",
-			installer: &installer{
+			installer: &Installer{
 				getClient: &mockGetClient{
 					runFn: func(string) (*release.Release, error) {
 						return nil, driver.ErrReleaseNotFound
@@ -239,7 +239,7 @@ func TestInstall(t *testing.T) {
 		},
 		"ErrorInstall": {
 			reason: "If unable to install specified version an error should be returned.",
-			installer: &installer{
+			installer: &Installer{
 				getClient: &mockGetClient{
 					runFn: func(string) (*release.Release, error) {
 						return nil, driver.ErrReleaseNotFound
@@ -272,7 +272,7 @@ func TestInstall(t *testing.T) {
 		},
 		"Successful": {
 			reason: "Successful installation should not return an error.",
-			installer: &installer{
+			installer: &Installer{
 				getClient: &mockGetClient{
 					runFn: func(string) (*release.Release, error) {
 						return nil, driver.ErrReleaseNotFound
@@ -320,14 +320,14 @@ func TestUpgrade(t *testing.T) {
 	alternate := "some-chart"
 	cases := map[string]struct {
 		reason    string
-		installer *installer
+		installer *Installer
 		fsSetup   func() afero.Fs
 		version   string
 		err       error
 	}{
 		"ErrorNotInstalled": {
 			reason: "If unable to verify that the chart is installed an error should be returned.",
-			installer: &installer{
+			installer: &Installer{
 				namespace:      "test",
 				chartName:      chartName,
 				alternateChart: alternate,
@@ -345,7 +345,7 @@ func TestUpgrade(t *testing.T) {
 		},
 		"ErrorAlternateVersionNotMatch": {
 			reason: "If force is not specified, error should be returned when upgrading alternate and versions do not match.",
-			installer: &installer{
+			installer: &Installer{
 				namespace:      "test",
 				chartName:      chartName,
 				alternateChart: alternate,
@@ -370,7 +370,7 @@ func TestUpgrade(t *testing.T) {
 		},
 		"AlternateVersionNotMatchForce": {
 			reason: "If force is specified, upgrade should be attempted regardless of version mismatch.",
-			installer: &installer{
+			installer: &Installer{
 				namespace:      "test",
 				force:          true,
 				alternateChart: alternate,
@@ -419,7 +419,7 @@ func TestUpgrade(t *testing.T) {
 		},
 		"ErrorPullNewVersion": {
 			reason: "If unable to pull specified version an error should be returned.",
-			installer: &installer{
+			installer: &Installer{
 				releaseName: chartName,
 				getClient: &mockGetClient{
 					runFn: func(string) (*release.Release, error) {
@@ -444,7 +444,7 @@ func TestUpgrade(t *testing.T) {
 		},
 		"ErrorUpgradeRollbackSuccessful": {
 			reason: "If upgrade fails but rollback is successful, only upgrade error should be returned.",
-			installer: &installer{
+			installer: &Installer{
 				chartName:      chartName,
 				alternateChart: alternate,
 				getClient: &mockGetClient{
@@ -489,7 +489,7 @@ func TestUpgrade(t *testing.T) {
 		},
 		"ErrorUpgradeErrorRollback": {
 			reason: "If upgrade and rollback fails a wrapped error should be returned.",
-			installer: &installer{
+			installer: &Installer{
 				chartName:      chartName,
 				alternateChart: alternate,
 				getClient: &mockGetClient{
@@ -535,7 +535,7 @@ func TestUpgrade(t *testing.T) {
 		},
 		"ErrorUpgradeSuccessfulRollback": {
 			reason: "If upgrade fails but rollback is successful a wrapped error should be returned.",
-			installer: &installer{
+			installer: &Installer{
 				chartName:      chartName,
 				alternateChart: alternate,
 				getClient: &mockGetClient{
@@ -581,7 +581,7 @@ func TestUpgrade(t *testing.T) {
 		},
 		"ErrorUpgradeNolRollback": {
 			reason: "If upgrade fails an error should be returned.",
-			installer: &installer{
+			installer: &Installer{
 				chartName:      chartName,
 				alternateChart: alternate,
 				getClient: &mockGetClient{
@@ -621,7 +621,7 @@ func TestUpgrade(t *testing.T) {
 		},
 		"Successful": {
 			reason: "If upgrade is successful no error should be returned.",
-			installer: &installer{
+			installer: &Installer{
 				releaseName: chartName,
 				getClient: &mockGetClient{
 					runFn: func(string) (*release.Release, error) {
@@ -679,7 +679,7 @@ func TestPullAndLoad(t *testing.T) {
 	errBoom := errors.New("boom")
 	cases := map[string]struct {
 		reason    string
-		installer *installer
+		installer *Installer
 		fsSetup   func() afero.Fs
 		version   string
 		err       error
@@ -687,7 +687,7 @@ func TestPullAndLoad(t *testing.T) {
 	}{
 		"ErrorPullLatestTempDir": {
 			reason: "Should return error if pulling latest and unable to create temporary directory.",
-			installer: &installer{
+			installer: &Installer{
 				tempDir: func(afero.Fs, string, string) (string, error) {
 					return "", errBoom
 				},
@@ -699,7 +699,7 @@ func TestPullAndLoad(t *testing.T) {
 		},
 		"ErrorPullLatest": {
 			reason: "Should return error if fail to pull latest.",
-			installer: &installer{
+			installer: &Installer{
 				pullClient: &mockPullClient{
 					runFn: func(string) (string, error) {
 						return "", errBoom
@@ -716,7 +716,7 @@ func TestPullAndLoad(t *testing.T) {
 		},
 		"ErrorPullLatestCorrupt": {
 			reason: "Should return error if pulling latest and temporary directory is corrupt.",
-			installer: &installer{
+			installer: &Installer{
 				pullClient: &mockPullClient{
 					runFn: func(string) (string, error) {
 						return "", nil
@@ -741,7 +741,7 @@ func TestPullAndLoad(t *testing.T) {
 		},
 		"SuccessfulPullLatest": {
 			reason: "If able to successfully pull and load latest no error should be returned.",
-			installer: &installer{
+			installer: &Installer{
 				pullClient: &mockPullClient{
 					runFn: func(string) (string, error) {
 						return "", nil
@@ -775,7 +775,7 @@ func TestPullAndLoad(t *testing.T) {
 		},
 		"SuccessfulPullVersion": {
 			reason: "If able to successfully pull and load version no error should be returned.",
-			installer: &installer{
+			installer: &Installer{
 				pullClient: &mockPullClient{
 					runFn: func(string) (string, error) {
 						return "", nil
@@ -801,7 +801,7 @@ func TestPullAndLoad(t *testing.T) {
 		},
 		"SuccessfulPullCached": {
 			reason: "If able to successfully load chart from cache no error should be returned.",
-			installer: &installer{
+			installer: &Installer{
 				cacheDir:  "/",
 				chartName: "test",
 				load: func(string) (*chart.Chart, error) {
@@ -844,12 +844,12 @@ func TestUninstall(t *testing.T) {
 	errBoom := errors.New("boom")
 	cases := map[string]struct {
 		reason    string
-		installer *installer
+		installer *Installer
 		err       error
 	}{
 		"Error": {
 			reason: "Should return error if uninstall fails.",
-			installer: &installer{
+			installer: &Installer{
 				uninstallClient: &mockUninstallClient{
 					runFn: func(string) (*release.UninstallReleaseResponse, error) {
 						return nil, errBoom
@@ -860,7 +860,7 @@ func TestUninstall(t *testing.T) {
 		},
 		"Successful": {
 			reason: "Should not return error if uninstall is successful.",
-			installer: &installer{
+			installer: &Installer{
 				uninstallClient: &mockUninstallClient{
 					runFn: func(string) (*release.UninstallReleaseResponse, error) {
 						return nil, nil
