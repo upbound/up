@@ -109,7 +109,7 @@ type LoaderFn func(name string) (*chart.Chart, error)
 // HomeDirFn indicates the location of a user's home directory.
 type HomeDirFn func() (string, error)
 
-type installer struct {
+type Installer struct {
 	repoURL         *url.URL
 	chartFile       *os.File
 	chartName       string
@@ -144,25 +144,25 @@ type installer struct {
 }
 
 // InstallerModifierFn modifies the installer.
-type InstallerModifierFn func(*installer)
+type InstallerModifierFn func(*Installer)
 
 // WithNamespace sets the namespace for the helm installer.
 func WithNamespace(ns string) InstallerModifierFn {
-	return func(h *installer) {
+	return func(h *Installer) {
 		h.namespace = ns
 	}
 }
 
 // WithAlternateChart sets an alternate chart that is compatible to upgrade from if installed.
 func WithAlternateChart(chartName string) InstallerModifierFn {
-	return func(h *installer) {
+	return func(h *Installer) {
 		h.alternateChart = chartName
 	}
 }
 
 // WithBasicAuth sets the username and password for the helm installer.
 func WithBasicAuth(username, password string) InstallerModifierFn {
-	return func(h *installer) {
+	return func(h *Installer) {
 		h.username = username
 		h.password = password
 	}
@@ -170,63 +170,63 @@ func WithBasicAuth(username, password string) InstallerModifierFn {
 
 // IsOCI indicates that the chart is an OCI image.
 func IsOCI() InstallerModifierFn {
-	return func(h *installer) {
+	return func(h *Installer) {
 		h.oci = true
 	}
 }
 
 // WithLogger sets the logger for the helm installer.
 func WithLogger(l logging.Logger) InstallerModifierFn {
-	return func(h *installer) {
+	return func(h *Installer) {
 		h.log = l
 	}
 }
 
 // WithCacheDir sets the cache directory for the helm installer.
 func WithCacheDir(c string) InstallerModifierFn {
-	return func(h *installer) {
+	return func(h *Installer) {
 		h.cacheDir = c
 	}
 }
 
 // WithChart sets the chart to be installed/upgraded
 func WithChart(chartFile *os.File) InstallerModifierFn {
-	return func(h *installer) {
+	return func(h *Installer) {
 		h.chartFile = chartFile
 	}
 }
 
 // RollbackOnError will cause installer to rollback on failed upgrade.
 func RollbackOnError(r bool) InstallerModifierFn {
-	return func(h *installer) {
+	return func(h *Installer) {
 		h.rollbackOnError = r
 	}
 }
 
 // Force will force operations when possible.
 func Force(f bool) InstallerModifierFn {
-	return func(h *installer) {
+	return func(h *Installer) {
 		h.force = f
 	}
 }
 
 // Wait will wait operations till they are completed.
 func Wait() InstallerModifierFn {
-	return func(h *installer) {
+	return func(h *Installer) {
 		h.wait = true
 	}
 }
 
 // WithNoHooks will disable uninstall hooks
 func WithNoHooks() InstallerModifierFn {
-	return func(h *installer) {
+	return func(h *Installer) {
 		h.noHooks = true
 	}
 }
 
 // NewManager builds a helm install manager for UXP.
 func NewManager(config *rest.Config, chartName string, repoURL *url.URL, modifiers ...InstallerModifierFn) (install.Manager, error) { // nolint:gocyclo
-	h := &installer{
+	h := &Installer{
 		repoURL:     repoURL,
 		chartName:   chartName,
 		releaseName: chartName,
@@ -323,7 +323,7 @@ func NewManager(config *rest.Config, chartName string, repoURL *url.URL, modifie
 }
 
 // GetCurrentVersion gets the current UXP version in the cluster.
-func (h *installer) GetCurrentVersion() (string, error) {
+func (h *Installer) GetCurrentVersion() (string, error) {
 	var release *release.Release
 	var err error
 	release, err = h.getClient.Run(h.chartName)
@@ -348,7 +348,7 @@ func (h *installer) GetCurrentVersion() (string, error) {
 }
 
 // Install installs in the cluster.
-func (h *installer) Install(version string, parameters map[string]any) error {
+func (h *Installer) Install(version string, parameters map[string]any) error {
 	// make sure no version is already installed
 	current, err := h.GetCurrentVersion()
 	if err == nil {
@@ -378,7 +378,7 @@ func (h *installer) Install(version string, parameters map[string]any) error {
 }
 
 // Upgrade upgrades an existing installation to a new version.
-func (h *installer) Upgrade(version string, parameters map[string]any) error {
+func (h *Installer) Upgrade(version string, parameters map[string]any) error {
 	// check if version exists
 	current, err := h.GetCurrentVersion()
 	if err != nil {
@@ -413,13 +413,13 @@ func (h *installer) Upgrade(version string, parameters map[string]any) error {
 }
 
 // Uninstall uninstalls an installation.
-func (h *installer) Uninstall() error {
+func (h *Installer) Uninstall() error {
 	_, err := h.uninstallClient.Run(h.chartName)
 	return err
 }
 
 // pullAndLoad pulls and loads a chart or fetches it from the cache.
-func (h *installer) pullAndLoad(version string) (*chart.Chart, error) { //nolint:gocyclo
+func (h *Installer) pullAndLoad(version string) (*chart.Chart, error) { //nolint:gocyclo
 	// check to see if version is cached
 	if version != "" {
 		// helm strips versions with leading v, which can cause issues when fetching
@@ -469,7 +469,7 @@ func (h *installer) pullAndLoad(version string) (*chart.Chart, error) { //nolint
 	return c, nil
 }
 
-func (h *installer) pullChart(version string) error {
+func (h *Installer) pullChart(version string) error {
 	// NOTE(hasheddan): Because UXP uses different Helm repos for stable and
 	// development versions, we are safe to set version to latest in repo
 	// regardless of whether stable or unstable is specified.

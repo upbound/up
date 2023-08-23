@@ -25,7 +25,6 @@ import (
 	"k8s.io/client-go/kubernetes"
 
 	"github.com/upbound/up/internal/input"
-	"github.com/upbound/up/internal/install"
 	"github.com/upbound/up/internal/install/helm"
 	"github.com/upbound/up/internal/upterm"
 )
@@ -113,7 +112,7 @@ func (c *destroyCmd) AfterApply(kongCtx *kong.Context) error {
 }
 
 // Run executes the uninstall command.
-func (c *destroyCmd) Run(kClient *kubernetes.Clientset, mgr install.Manager) error {
+func (c *destroyCmd) Run(kClient *kubernetes.Clientset, mgr *helm.Installer) error {
 	if err := mgr.Uninstall(); err != nil {
 		return err
 	}
