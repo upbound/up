@@ -64,7 +64,7 @@ func (c *destroyCmd) AfterApply(kongCtx *kong.Context) error {
 			pterm.FgRed.Println("******************** DESTRUCTIVE COMMAND ********************")
 			pterm.FgRed.Println("********************* DATA-LOSS WARNING *********************")
 			pterm.Println()
-			pterm.Warning.Println("Destroying Spaces is a destructive command that will destroy data and oprhan resources.")
+			pterm.Warning.Println("Destroying Spaces is a destructive command that will destroy data and orphan resources.")
 			pterm.Warning.Println("Before proceeding ensure that Managed Resources in Control Planes have been deleted.")
 			pterm.Warning.Println("All Spaces components including Control Planes will be destroyed.")
 			pterm.Println()
