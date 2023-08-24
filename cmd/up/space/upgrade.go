@@ -16,9 +16,11 @@ package space
 
 import (
 	"context"
+	"fmt"
 	"io"
 	"strings"
 
+	"github.com/blang/semver/v4"
 	"github.com/crossplane/crossplane-runtime/pkg/errors"
 	"github.com/pterm/pterm"
 	"k8s.io/client-go/kubernetes"
@@ -33,7 +35,10 @@ import (
 )
 
 const (
-	errParseUpgradeParameters = "unable to parse upgrade parameters"
+	errParseUpgradeParameters      = "unable to parse upgrade parameters"
+	errFailedGettingCurrentVersion = "failed to retrieve current version"
+	errInvalidVersionFmt           = "invalid version %q"
+	errAborted                     = "aborted"
 )
 
 // upgradeCmd upgrades Upbound.
@@ -54,6 +59,8 @@ type upgradeCmd struct {
 	pullSecret *kube.ImagePullApplicator
 	kClient    kubernetes.Interface
 	quiet      config.QuietFlag
+	oldVersion string
+	downgrade  bool
 }
 
 // BeforeApply sets default values in login before assignment and validation.
@@ -111,6 +118,28 @@ func (c *upgradeCmd) AfterApply(quiet config.QuietFlag) error { //nolint:gocyclo
 	}
 	c.parser = helm.NewParser(base, c.Set)
 	c.quiet = quiet
+	c.oldVersion, err = ins.GetCurrentVersion()
+	if err != nil {
+		return errors.Wrap(err, errFailedGettingCurrentVersion)
+	}
+
+	// validate versions
+	if c.Bundle == nil {
+		from, err := semver.Parse(c.oldVersion)
+		if err != nil {
+			return errors.Wrapf(err, errInvalidVersionFmt, c.oldVersion)
+		}
+		to, err := semver.Parse(strings.TrimPrefix(c.Version, "v"))
+		if err != nil {
+			return errors.Wrapf(err, errInvalidVersionFmt, c.Version)
+		}
+		c.downgrade = from.GT(to)
+
+		if err := c.validateVersions(from, to); err != nil {
+			return err
+		}
+	}
+
 	return nil
 }
 
@@ -138,20 +167,62 @@ func (c *upgradeCmd) Run() error {
 }
 
 func (c *upgradeCmd) upgradeUpbound(params map[string]any) error {
+	version := strings.TrimPrefix(c.Version, "v")
 	upgrade := func() error {
-		if err := c.helmMgr.Upgrade(strings.TrimPrefix(c.Version, "v"), params); err != nil {
+		if err := c.helmMgr.Upgrade(version, params); err != nil {
 			return err
 		}
 		return nil
 	}
 
+	verb := "Upgrading"
+	if c.downgrade {
+		verb = "Downgrading"
+	}
+
 	if err := upterm.WrapWithSuccessSpinner(
-		"Upgrading Space",
+		fmt.Sprintf("%s Space from v%s to v%s", verb, c.oldVersion, version),
 		upterm.CheckmarkSuccessSpinner,
 		upgrade,
 	); err != nil {
+		fmt.Println()
+		fmt.Println()
 		return err
 	}
 
+	return nil
+}
+
+func (c *upgradeCmd) validateVersions(from, to semver.Version) error {
+	switch {
+	case c.downgrade:
+		if err := warnAndConfirm("Downgrades are not supported."); err != nil {
+			return err
+		}
+	case to.Major > from.Major:
+		if err := warnAndConfirm("Upgrades to a new major version are only supported for explicitly documented releases."); err != nil {
+			return err
+		}
+	case to.Minor > from.Minor+1:
+		if err := warnAndConfirm("Upgrades which skip a minor version are not supported."); err != nil {
+			return err
+		}
+	default:
+	}
+
+	return nil
+}
+
+func warnAndConfirm(warning string, args ...any) error {
+	pterm.Println()
+	pterm.Warning.Printfln(warning, args...)
+	pterm.Println() // Blank line
+	confirm := pterm.DefaultInteractiveConfirm
+	confirm.DefaultText = "Are you sure you want to proceed?"
+	result, _ := confirm.Show()
+	pterm.Println() // Blank line
+	if !result {
+		return errors.New(errAborted)
+	}
 	return nil
 }

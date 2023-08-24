@@ -222,9 +222,10 @@ func (c *initCmd) Run() error {
 		}
 
 		if !c.Yes {
-			pterm.DefaultInteractiveConfirm.DefaultText = "Would you like to install them now?"
 			pterm.Println() // Blank line
-			result, _ := pterm.DefaultInteractiveConfirm.Show()
+			confirm := pterm.DefaultInteractiveConfirm
+			confirm.DefaultText = "Would you like to install them now?"
+			result, _ := confirm.Show()
 			pterm.Println() // Blank line
 			if !result {
 				pterm.Error.Println("prerequisites must be met in order to proceed with installation")
@@ -265,6 +266,8 @@ func (c *initCmd) installPrereqs() error {
 			upterm.CheckmarkSuccessSpinner,
 			p.Install,
 		); err != nil {
+			fmt.Println()
+			fmt.Println()
 			return err
 		}
 	}
@@ -300,6 +303,8 @@ func (c *initCmd) applySecret(ctx context.Context, regFlags *authorizedRegistryF
 		upterm.CheckmarkSuccessSpinner,
 		creatPullSecret,
 	); err != nil {
+		fmt.Println()
+		fmt.Println()
 		return err
 	}
 	return nil
@@ -322,6 +327,8 @@ func (c *initCmd) deploySpace(ctx context.Context, params map[string]any) error 
 		upterm.CheckmarkSuccessSpinner,
 		install,
 	); err != nil {
+		fmt.Println()
+		fmt.Println()
 		return err
 	}
 
