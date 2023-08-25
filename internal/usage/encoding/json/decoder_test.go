@@ -27,7 +27,7 @@ import (
 	"github.com/upbound/up/internal/usage/model"
 )
 
-func TestNewMCPGVKEventDecoder(t *testing.T) {
+func TestNewMXPGVKEventDecoder(t *testing.T) {
 	type args struct {
 		reader io.Reader
 	}
@@ -79,15 +79,15 @@ func TestNewMCPGVKEventDecoder(t *testing.T) {
 
 	for name, tc := range cases {
 		t.Run(name, func(t *testing.T) {
-			_, err := NewMCPGVKEventDecoder(tc.args.reader)
+			_, err := NewMXPGVKEventDecoder(tc.args.reader)
 			if diff := cmp.Diff(tc.want.err, err, test.EquateErrors()); diff != "" {
-				t.Errorf("\n%s\nNewMCPGVKEventDecoder(...): -want err, +got err:\n%s", tc.reason, diff)
+				t.Errorf("\n%s\nNewMXPGVKEventDecoder(...): -want err, +got err:\n%s", tc.reason, diff)
 			}
 		})
 	}
 }
 
-func TestMCPGVKEventDecoderMore(t *testing.T) {
+func TestMXPGVKEventDecoderMore(t *testing.T) {
 	type args struct {
 		reader io.Reader
 	}
@@ -121,26 +121,26 @@ func TestMCPGVKEventDecoderMore(t *testing.T) {
 
 	for name, tc := range cases {
 		t.Run(name, func(t *testing.T) {
-			d, err := NewMCPGVKEventDecoder(tc.args.reader)
+			d, err := NewMXPGVKEventDecoder(tc.args.reader)
 			if err != nil {
 				diff := cmp.Diff(nil, err, test.EquateErrors())
-				t.Errorf("\n%s\nNewMCPGVKEventDecoder(...): -want err, +got err:\n%s", tc.reason, diff)
+				t.Errorf("\n%s\nNewMXPGVKEventDecoder(...): -want err, +got err:\n%s", tc.reason, diff)
 			}
 
 			more := d.More()
 			if diff := cmp.Diff(tc.want.more, more); diff != "" {
-				t.Errorf("\n%s\nMCPGVKEventDecoder.More(): -want, +got:\n%s", tc.reason, diff)
+				t.Errorf("\n%s\nMXPGVKEventDecoder.More(): -want, +got:\n%s", tc.reason, diff)
 			}
 		})
 	}
 }
 
-func TestMCPGVKEventDecoderDecode(t *testing.T) {
+func TestMXPGVKEventDecoderDecode(t *testing.T) {
 	type args struct {
 		reader io.Reader
 	}
 	type want struct {
-		event model.MCPGVKEvent
+		event model.MXPGVKEvent
 		err   error
 	}
 	cases := map[string]struct {
@@ -154,7 +154,7 @@ func TestMCPGVKEventDecoderDecode(t *testing.T) {
 				reader: strings.NewReader("[]"),
 			},
 			want: want{
-				event: model.MCPGVKEvent{},
+				event: model.MXPGVKEvent{},
 				err:   errors.New("error decoding next event: invalid character ']' looking for beginning of value"),
 			},
 		},
@@ -164,22 +164,22 @@ func TestMCPGVKEventDecoderDecode(t *testing.T) {
 				reader: strings.NewReader("[{\"value\": \"a string\"}]"),
 			},
 			want: want{
-				event: model.MCPGVKEvent{},
-				err:   errors.New("error decoding next event: json: cannot unmarshal string into Go struct field MCPGVKEvent.value of type float64"),
+				event: model.MXPGVKEvent{},
+				err:   errors.New("error decoding next event: json: cannot unmarshal string into Go struct field MXPGVKEvent.value of type float64"),
 			},
 		},
 		"EmptyUsageObject": {
-			reason: "Decoding from a JSON array containing an empty usage object should return an uninitialized MCPGVKEvent.",
+			reason: "Decoding from a JSON array containing an empty usage object should return an uninitialized MXPGVKEvent.",
 			args: args{
 				reader: strings.NewReader("[{}]"),
 			},
 			want: want{
-				event: model.MCPGVKEvent{},
+				event: model.MXPGVKEvent{},
 				err:   nil,
 			},
 		},
 		"UsageObject": {
-			reason: "Decoding from a JSON array containing a usage object should return aMCPGVKEvent with its values.",
+			reason: "Decoding from a JSON array containing a usage object should return a MXPGVKEvent with its values.",
 			args: args{
 				reader: strings.NewReader(`
 [{
@@ -189,7 +189,7 @@ func TestMCPGVKEventDecoderDecode(t *testing.T) {
     "customresource_group": "example.com",
     "customresource_version": "v1",
     "customresource_kind": "Thing",
-    "mcp_id": "test-mcp-id",
+    "mxp_id": "test-mxp-id",
     "upbound_account": "test-account"
   },
   "timestamp": "2023-03-16T00:00:00.0Z",
@@ -198,11 +198,11 @@ func TestMCPGVKEventDecoderDecode(t *testing.T) {
 }]`),
 			},
 			want: want{
-				event: model.MCPGVKEvent{
+				event: model.MXPGVKEvent{
 					Name:  "event_name",
 					Value: 1.0,
-					Tags: model.MCPGVKEventTags{
-						MCPID:          "test-mcp-id",
+					Tags: model.MXPGVKEventTags{
+						MXPID:          "test-mxp-id",
 						UpboundAccount: "test-account",
 						Group:          "example.com",
 						Version:        "v1",
@@ -218,18 +218,18 @@ func TestMCPGVKEventDecoderDecode(t *testing.T) {
 
 	for name, tc := range cases {
 		t.Run(name, func(t *testing.T) {
-			d, err := NewMCPGVKEventDecoder(tc.args.reader)
+			d, err := NewMXPGVKEventDecoder(tc.args.reader)
 			if err != nil {
 				diff := cmp.Diff(nil, err, test.EquateErrors())
-				t.Errorf("\n%s\nNewMCPGVKEventDecoder(...): -want err, +got err:\n%s", tc.reason, diff)
+				t.Errorf("\n%s\nNewMXPGVKEventDecoder(...): -want err, +got err:\n%s", tc.reason, diff)
 			}
 
 			e, err := d.Decode()
 			if diff := cmp.Diff(tc.want.err, err, test.EquateErrors()); diff != "" {
-				t.Errorf("\n%s\nMCPGVKEventDecoder.Decode(): -want err, +got err:\n%s", tc.reason, diff)
+				t.Errorf("\n%s\nMXPGVKEventDecoder.Decode(): -want err, +got err:\n%s", tc.reason, diff)
 			}
 			if diff := cmp.Diff(tc.want.event, e); diff != "" {
-				t.Errorf("\n%s\nMCPGVKEventDecoder.Decode(): -want, +got:\n%s", tc.reason, diff)
+				t.Errorf("\n%s\nMXPGVKEventDecoder.Decode(): -want, +got:\n%s", tc.reason, diff)
 			}
 		})
 	}

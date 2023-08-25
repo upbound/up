@@ -34,10 +34,10 @@ type MultiReader struct {
 	Readers []event.Reader
 }
 
-func (r *MultiReader) Read(ctx context.Context) (model.MCPGVKEvent, error) {
+func (r *MultiReader) Read(ctx context.Context) (model.MXPGVKEvent, error) {
 	for {
 		if len(r.Readers) < 1 {
-			return model.MCPGVKEvent{}, ErrEOF
+			return model.MXPGVKEvent{}, ErrEOF
 		}
 		er := r.Readers[0]
 		e, err := er.Read(ctx)
@@ -45,7 +45,7 @@ func (r *MultiReader) Read(ctx context.Context) (model.MCPGVKEvent, error) {
 			return e, err
 		}
 		if err := er.Close(); err != nil {
-			return model.MCPGVKEvent{}, err
+			return model.MXPGVKEvent{}, err
 		}
 		r.Readers = r.Readers[1:]
 	}

@@ -72,7 +72,7 @@ func makeTestData() { // nolint:unused
 		panicOnErr(err, "NewWriter()")
 		defer rw.Close()
 
-		events := []model.MCPGVKEvent{
+		events := []model.MXPGVKEvent{
 			{},
 			{},
 			{},
@@ -91,7 +91,7 @@ func makeTestData() { // nolint:unused
 func TestWriter(t *testing.T) {
 	type args struct {
 		meta   report.Meta
-		events []model.MCPGVKEvent
+		events []model.MXPGVKEvent
 	}
 	type want struct {
 		file string
@@ -112,7 +112,7 @@ func TestWriter(t *testing.T) {
 					},
 					CollectedAt: time.Date(2006, 5, 4, 3, 2, 1, 0, time.UTC),
 				},
-				events: []model.MCPGVKEvent{},
+				events: []model.MXPGVKEvent{},
 			},
 			want: want{
 				file: "testdata/empty.tar",
@@ -129,7 +129,7 @@ func TestWriter(t *testing.T) {
 					},
 					CollectedAt: time.Date(2006, 5, 4, 3, 2, 1, 0, time.UTC),
 				},
-				events: []model.MCPGVKEvent{
+				events: []model.MXPGVKEvent{
 					{},
 					{},
 					{},

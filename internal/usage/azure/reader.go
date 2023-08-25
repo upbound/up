@@ -41,15 +41,15 @@ type PagerEventReader struct {
 	currReader *ListBlobsResponseEventReader
 }
 
-func (r *PagerEventReader) Read(ctx context.Context) (model.MCPGVKEvent, error) {
+func (r *PagerEventReader) Read(ctx context.Context) (model.MXPGVKEvent, error) {
 	for {
 		if r.currReader == nil {
 			if !r.Pager.More() {
-				return model.MCPGVKEvent{}, ErrEOF
+				return model.MXPGVKEvent{}, ErrEOF
 			}
 			resp, err := r.Pager.NextPage(ctx)
 			if err != nil {
-				return model.MCPGVKEvent{}, err
+				return model.MXPGVKEvent{}, err
 			}
 			r.currReader = &ListBlobsResponseEventReader{Client: r.Client, Response: &resp}
 		}
@@ -78,16 +78,16 @@ type ListBlobsResponseEventReader struct {
 	currReader *BlobEventReader
 }
 
-func (r *ListBlobsResponseEventReader) Read(ctx context.Context) (model.MCPGVKEvent, error) {
+func (r *ListBlobsResponseEventReader) Read(ctx context.Context) (model.MXPGVKEvent, error) {
 	for {
 		if r.currReader == nil {
 			if r.itemIdx >= len(r.Response.Segment.BlobItems) {
-				return model.MCPGVKEvent{}, ErrEOF
+				return model.MXPGVKEvent{}, ErrEOF
 			}
 
 			blob := r.Response.Segment.BlobItems[r.itemIdx]
 			if blob.Name == nil {
-				return model.MCPGVKEvent{}, fmt.Errorf("blob name is nil")
+				return model.MXPGVKEvent{}, fmt.Errorf("blob name is nil")
 			}
 
 			contentType := ""
@@ -105,7 +105,7 @@ func (r *ListBlobsResponseEventReader) Read(ctx context.Context) (model.MCPGVKEv
 			return e, err
 		}
 		if err := r.currReader.Close(); err != nil {
-			return model.MCPGVKEvent{}, err
+			return model.MXPGVKEvent{}, err
 		}
 		r.currReader = nil
 	}
@@ -124,15 +124,15 @@ var _ event.Reader = &BlobEventReader{}
 type BlobEventReader struct {
 	Client      *blob.Client
 	ContentType string
-	decoder     *json.MCPGVKEventDecoder
+	decoder     *json.MXPGVKEventDecoder
 	closers     []io.Closer
 }
 
-func (r *BlobEventReader) Read(ctx context.Context) (model.MCPGVKEvent, error) {
+func (r *BlobEventReader) Read(ctx context.Context) (model.MXPGVKEvent, error) {
 	if r.decoder == nil {
 		resp, err := r.Client.DownloadStream(ctx, nil)
 		if err != nil {
-			return model.MCPGVKEvent{}, err
+			return model.MXPGVKEvent{}, err
 		}
 
 		var body io.ReadCloser
@@ -143,22 +143,22 @@ func (r *BlobEventReader) Read(ctx context.Context) (model.MCPGVKEvent, error) {
 			r.closers = append(r.closers, resp.Body)
 			body, err = gzip.NewReader(resp.Body)
 			if err != nil {
-				return model.MCPGVKEvent{}, err
+				return model.MXPGVKEvent{}, err
 			}
 		default:
 			body = resp.Body
 		}
 		r.closers = append(r.closers, body)
 
-		decoder, err := json.NewMCPGVKEventDecoder(body)
+		decoder, err := json.NewMXPGVKEventDecoder(body)
 		if err != nil {
-			return model.MCPGVKEvent{}, err
+			return model.MXPGVKEvent{}, err
 		}
 		r.decoder = decoder
 	}
 
 	if !r.decoder.More() {
-		return model.MCPGVKEvent{}, ErrEOF
+		return model.MXPGVKEvent{}, ErrEOF
 	}
 	return r.decoder.Decode()
 }

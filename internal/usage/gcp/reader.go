@@ -38,7 +38,7 @@ type QueryEventReader struct {
 	reader *ObjectIteratorEventReader
 }
 
-func (r *QueryEventReader) Read(ctx context.Context) (model.MCPGVKEvent, error) {
+func (r *QueryEventReader) Read(ctx context.Context) (model.MXPGVKEvent, error) {
 	if r.reader == nil {
 		r.reader = &ObjectIteratorEventReader{Bucket: r.Bucket, Iterator: r.Bucket.Objects(ctx, r.Query)}
 	}
@@ -60,12 +60,12 @@ type ObjectIteratorEventReader struct {
 	currReader *ObjectHandleEventReader
 }
 
-func (r *ObjectIteratorEventReader) Read(ctx context.Context) (model.MCPGVKEvent, error) {
+func (r *ObjectIteratorEventReader) Read(ctx context.Context) (model.MXPGVKEvent, error) {
 	for {
 		if r.currReader == nil {
 			attrs, err := r.Iterator.Next()
 			if errors.Is(err, iterator.Done) {
-				return model.MCPGVKEvent{}, ErrEOF
+				return model.MXPGVKEvent{}, ErrEOF
 			}
 			r.currReader = &ObjectHandleEventReader{Object: r.Bucket.Object(attrs.Name), Attrs: attrs}
 		}
@@ -73,7 +73,7 @@ func (r *ObjectIteratorEventReader) Read(ctx context.Context) (model.MCPGVKEvent
 			return e, err
 		}
 		if err := r.currReader.Close(); err != nil {
-			return model.MCPGVKEvent{}, err
+			return model.MXPGVKEvent{}, err
 		}
 		r.currReader = nil
 	}
@@ -91,15 +91,15 @@ var _ event.Reader = &ObjectHandleEventReader{}
 type ObjectHandleEventReader struct {
 	Object  *storage.ObjectHandle
 	Attrs   *storage.ObjectAttrs
-	decoder *json.MCPGVKEventDecoder
+	decoder *json.MXPGVKEventDecoder
 	closers []io.Closer
 }
 
-func (r *ObjectHandleEventReader) Read(ctx context.Context) (model.MCPGVKEvent, error) {
+func (r *ObjectHandleEventReader) Read(ctx context.Context) (model.MXPGVKEvent, error) {
 	if r.decoder == nil {
 		reader, err := r.Object.NewReader(ctx)
 		if err != nil {
-			return model.MCPGVKEvent{}, err
+			return model.MXPGVKEvent{}, err
 		}
 
 		contentType := ""
@@ -115,21 +115,21 @@ func (r *ObjectHandleEventReader) Read(ctx context.Context) (model.MCPGVKEvent, 
 			r.closers = append(r.closers, reader)
 			body, err = gzip.NewReader(reader)
 			if err != nil {
-				return model.MCPGVKEvent{}, err
+				return model.MXPGVKEvent{}, err
 			}
 		default:
 			body = reader
 		}
 		r.closers = append(r.closers, body)
 
-		decoder, err := json.NewMCPGVKEventDecoder(body)
+		decoder, err := json.NewMXPGVKEventDecoder(body)
 		if err != nil {
-			return model.MCPGVKEvent{}, err
+			return model.MXPGVKEvent{}, err
 		}
 		r.decoder = decoder
 	}
 	if !r.decoder.More() {
-		return model.MCPGVKEvent{}, ErrEOF
+		return model.MXPGVKEvent{}, ErrEOF
 	}
 	return r.decoder.Decode()
 }

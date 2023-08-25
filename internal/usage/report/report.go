@@ -37,18 +37,18 @@ type Meta struct {
 	CollectedAt    time.Time       `json:"collected_at"`
 }
 
-// MaxResourceCountPerGVKPerMCP reads events from i and writes aggregated events
+// MaxResourceCountPerGVKPerMXP reads events from i and writes aggregated events
 // to w. Events are aggregated across each window of time returned by i. An
 // aggregated event records the largest observed count of instances of a GVK on
-// an MCP during a window. The order of written events is not stable.
-func MaxResourceCountPerGVKPerMCP(ctx context.Context, i event.WindowIterator, w event.Writer) error {
+// an MXP during a window. The order of written events is not stable.
+func MaxResourceCountPerGVKPerMXP(ctx context.Context, i event.WindowIterator, w event.Writer) error {
 	for i.More() {
 		r, window, err := i.Next()
 		if err != nil {
 			return errors.Wrap(err, errReadEvents)
 		}
 
-		ag := &aggregate.MaxResourceCountPerGVKPerMCP{}
+		ag := &aggregate.MaxResourceCountPerGVKPerMXP{}
 		for {
 			e, err := r.Read(ctx)
 			if errors.Is(err, event.ErrEOF) {
