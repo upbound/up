@@ -15,5 +15,5 @@
 package billing
 
 type Cmd struct {
-	Get getCmd `cmd:"" help:"Get a billing report for submission to Upbound."`
+	Export exportCmd `cmd:"" help:"Export a billing report for submission to Upbound."`
 }

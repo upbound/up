@@ -98,7 +98,7 @@ func (p provider) Validate() error {
 	}
 }
 
-type getCmd struct {
+type exportCmd struct {
 	Out string `optional:"" short:"o" env:"UP_BILLING_OUT" default:"upbound_billing_report.tgz" help:"Name of the output file."`
 
 	// TODO(branden): Make storage params optional and fetch missing values from spaces cluster.
@@ -108,22 +108,22 @@ type getCmd struct {
 	Account             string   `required:"" env:"UP_BILLING_ACCOUNT" group:"Storage" help:"Name of the Upbound account whose billing report is being collected."`
 	AzureStorageAccount string   `optional:"" env:"UP_AZURE_STORAGE_ACCOUNT" group:"Storage" help:"Name of the Azure storage account. Required for --provider=azure."`
 
-	BillingMonth    time.Time  `format:"2006-01" required:"" xor:"billingperiod" env:"UP_BILLING_MONTH" group:"Billing period" help:"Get a report for a billing period of one calendar month. Format: 2006-01."`
-	BillingCustom   *dateRange `required:"" xor:"billingperiod" env:"UP_BILLING_CUSTOM" group:"Billing period" help:"Get a report for a custom billing period. Date range is inclusive. Format: 2006-01-02/2006-01-02."`
-	ForceIncomplete bool       `env:"UP_BILLING_FORCE_INCOMPLETE" group:"Billing period" help:"Get a report for an incomplete billing period."`
+	BillingMonth    time.Time  `format:"2006-01" required:"" xor:"billingperiod" env:"UP_BILLING_MONTH" group:"Billing period" help:"Export a report for a billing period of one calendar month. Format: 2006-01."`
+	BillingCustom   *dateRange `required:"" xor:"billingperiod" env:"UP_BILLING_CUSTOM" group:"Billing period" help:"Export a report for a custom billing period. Date range is inclusive. Format: 2006-01-02/2006-01-02."`
+	ForceIncomplete bool       `env:"UP_BILLING_FORCE_INCOMPLETE" group:"Billing period" help:"Export a report for an incomplete billing period."`
 
 	outAbs        string
 	billingPeriod usagetime.Range
 }
 
-//go:embed get_help.txt
-var getCmdHelp string
+//go:embed export_help.txt
+var exportCmdHelp string
 
-func (c *getCmd) Help() string {
-	return getCmdHelp
+func (c *exportCmd) Help() string {
+	return exportCmdHelp
 }
 
-func (c *getCmd) Validate() error {
+func (c *exportCmd) Validate() error {
 	if c.Provider == providerAzure {
 		if c.AzureStorageAccount == "" {
 			return fmt.Errorf("--azure-storage-account must be set for --provider=azure")
@@ -158,9 +158,9 @@ func (c *getCmd) Validate() error {
 	return nil
 }
 
-func (c *getCmd) Run() error {
+func (c *exportCmd) Run() error {
 	fmt.Printf(
-		"Getting billing report for Upbound account %s from %s to %s.\n",
+		"Exporting billing report for Upbound account %s from %s to %s.\n",
 		c.Account,
 		formatTimestamp(c.billingPeriod.Start),
 		formatTimestamp(c.billingPeriod.End),
@@ -183,13 +183,13 @@ func (c *getCmd) Run() error {
 	return nil
 }
 
-func (c *getCmd) cleanupOnError() {
+func (c *exportCmd) cleanupOnError() {
 	if err := os.Remove(c.outAbs); err != nil {
 		fmt.Fprintf(os.Stderr, "error cleaning up: %s", err)
 	}
 }
 
-func (c *getCmd) collectReport() error {
+func (c *exportCmd) collectReport() error {
 	ctx, stop := signal.NotifyContext(context.Background(), os.Interrupt)
 	defer stop()
 
@@ -241,7 +241,7 @@ func (c *getCmd) collectReport() error {
 	return gw.Close()
 }
 
-func (c *getCmd) getGCPIter(ctx context.Context, window time.Duration) (event.WindowIterator, error) {
+func (c *exportCmd) getGCPIter(ctx context.Context, window time.Duration) (event.WindowIterator, error) {
 	opts := []gcpopt.ClientOption{}
 	if c.Endpoint != "" {
 		opts = append(opts, gcpopt.WithEndpoint(c.Endpoint))
@@ -254,7 +254,7 @@ func (c *getCmd) getGCPIter(ctx context.Context, window time.Duration) (event.Wi
 	return gcp.NewWindowIterator(bkt, c.Account, c.billingPeriod, window)
 }
 
-func (c *getCmd) getAWSIter(window time.Duration) (event.WindowIterator, error) {
+func (c *exportCmd) getAWSIter(window time.Duration) (event.WindowIterator, error) {
 	sess, err := session.NewSession(&aws.Config{})
 	if err != nil {
 		return nil, errors.Wrap(err, "error creating aws session")
@@ -269,7 +269,7 @@ func (c *getCmd) getAWSIter(window time.Duration) (event.WindowIterator, error) 
 	return usageaws.NewWindowIterator(s3client, c.Bucket, c.Account, c.billingPeriod, window)
 }
 
-func (c *getCmd) getAzureIter(window time.Duration) (event.WindowIterator, error) {
+func (c *exportCmd) getAzureIter(window time.Duration) (event.WindowIterator, error) {
 	cred, err := azidentity.NewDefaultAzureCredential(nil)
 	if err != nil {
 		return nil, err
@@ -282,7 +282,7 @@ func (c *getCmd) getAzureIter(window time.Duration) (event.WindowIterator, error
 	return azure.NewWindowIterator(containerCli, c.Account, c.billingPeriod, window)
 }
 
-func (c *getCmd) getBillingPeriod() (usagetime.Range, error) {
+func (c *exportCmd) getBillingPeriod() (usagetime.Range, error) {
 	if !c.BillingMonth.IsZero() {
 		start := time.Date(c.BillingMonth.Year(), c.BillingMonth.Month(), 1, 0, 0, 0, 0, time.UTC)
 		return usagetime.Range{
