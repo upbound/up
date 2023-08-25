@@ -18,19 +18,19 @@ import (
 	"time"
 )
 
-// MCPGVKEvent records an event associated with an MCP and k8s GVK.
-type MCPGVKEvent struct {
+// MXPGVKEvent records an event associated with an MXP and k8s GVK.
+type MXPGVKEvent struct {
 	Name         string          `json:"name"`
-	Tags         MCPGVKEventTags `json:"tags"`
+	Tags         MXPGVKEventTags `json:"tags"`
 	Timestamp    time.Time       `json:"timestamp"`
 	TimestampEnd time.Time       `json:"timestamp_end"`
 	Value        float64         `json:"value"`
 }
 
-type MCPGVKEventTags struct {
+type MXPGVKEventTags struct {
 	Group          string `json:"customresource_group"`
 	Version        string `json:"customresource_version"`
 	Kind           string `json:"customresource_kind"`
 	UpboundAccount string `json:"upbound_account"`
-	MCPID          string `json:"mcp_id"`
+	MXPID          string `json:"mxp_id"`
 }

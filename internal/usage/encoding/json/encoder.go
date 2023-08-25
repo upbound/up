@@ -21,25 +21,25 @@ import (
 	"github.com/upbound/up/internal/usage/model"
 )
 
-// MCPGVKEventEncoder encodes MCP GVK events as a JSON array of event objects
-// to a writer. Must be initialized with NewMCPGVKEventEncoder(). Callers must
+// MXPGVKEventEncoder encodes MXP GVK events as a JSON array of event objects
+// to a writer. Must be initialized with NewMXPGVKEventEncoder(). Callers must
 // call Close() when finished encoding.
-type MCPGVKEventEncoder struct {
+type MXPGVKEventEncoder struct {
 	w              io.Writer
 	wroteFirstItem bool
 }
 
-// NewMCPGVKEventEncoder returns an initialized *Encoder.
-func NewMCPGVKEventEncoder(w io.Writer) (*MCPGVKEventEncoder, error) {
+// NewMXPGVKEventEncoder returns an initialized *Encoder.
+func NewMXPGVKEventEncoder(w io.Writer) (*MXPGVKEventEncoder, error) {
 	// Write open bracket to open JSON array.
 	if _, err := w.Write([]byte("[")); err != nil {
 		return nil, err
 	}
-	return &MCPGVKEventEncoder{w: w}, nil
+	return &MXPGVKEventEncoder{w: w}, nil
 }
 
-// Encode encodes and writes an MCP GVK event.
-func (e *MCPGVKEventEncoder) Encode(event model.MCPGVKEvent) error {
+// Encode encodes and writes an MXP GVK event.
+func (e *MXPGVKEventEncoder) Encode(event model.MXPGVKEvent) error {
 	b := []byte{}
 
 	if e.wroteFirstItem {
@@ -62,7 +62,7 @@ func (e *MCPGVKEventEncoder) Encode(event model.MCPGVKEvent) error {
 }
 
 // Close closes the encoder.
-func (e *MCPGVKEventEncoder) Close() error {
+func (e *MXPGVKEventEncoder) Close() error {
 	// Write close bracket to close JSON array.
 	_, err := e.w.Write([]byte("\n]\n"))
 	return err

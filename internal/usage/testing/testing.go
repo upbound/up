@@ -28,7 +28,7 @@ var ErrEOF = event.ErrEOF
 
 // ReadResult is a return value of event.Reader.Read().
 type ReadResult struct {
-	Event model.MCPGVKEvent
+	Event model.MXPGVKEvent
 	Err   error
 }
 
@@ -38,9 +38,9 @@ type MockReader struct {
 	Reads []ReadResult
 }
 
-func (r *MockReader) Read(context.Context) (model.MCPGVKEvent, error) {
+func (r *MockReader) Read(context.Context) (model.MXPGVKEvent, error) {
 	if len(r.Reads) < 1 {
-		return model.MCPGVKEvent{}, ErrEOF
+		return model.MXPGVKEvent{}, ErrEOF
 	}
 	read := r.Reads[0]
 	r.Reads = r.Reads[1:]
@@ -80,19 +80,19 @@ func (i *MockWindowIterator) Next() (event.Reader, time.Range, error) {
 var _ event.Writer = &MockWriter{}
 
 type MockWriter struct {
-	Events []model.MCPGVKEvent
+	Events []model.MXPGVKEvent
 }
 
-func (w *MockWriter) Write(e model.MCPGVKEvent) error {
+func (w *MockWriter) Write(e model.MXPGVKEvent) error {
 	if w.Events == nil {
-		w.Events = []model.MCPGVKEvent{}
+		w.Events = []model.MXPGVKEvent{}
 	}
 	w.Events = append(w.Events, e)
 	return nil
 }
 
 // SortEvents sorts events by their fields.
-func SortEvents(events []model.MCPGVKEvent) {
+func SortEvents(events []model.MXPGVKEvent) {
 	sort.SliceStable(events, func(i, j int) bool {
 		if events[i].Name != events[j].Name {
 			return events[i].Name < events[j].Name
@@ -100,8 +100,8 @@ func SortEvents(events []model.MCPGVKEvent) {
 		if events[i].Tags.UpboundAccount != events[j].Tags.UpboundAccount {
 			return events[i].Tags.UpboundAccount < events[j].Tags.UpboundAccount
 		}
-		if events[i].Tags.MCPID != events[j].Tags.MCPID {
-			return events[i].Tags.MCPID < events[j].Tags.MCPID
+		if events[i].Tags.MXPID != events[j].Tags.MXPID {
+			return events[i].Tags.MXPID < events[j].Tags.MXPID
 		}
 		if events[i].Tags.Group != events[j].Tags.Group {
 			return events[i].Tags.Group < events[j].Tags.Group

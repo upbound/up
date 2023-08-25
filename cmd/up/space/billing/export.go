@@ -229,7 +229,7 @@ func (c *exportCmd) collectReport() error {
 	}
 
 	// Write report.
-	if err := report.MaxResourceCountPerGVKPerMCP(ctx, iter, rw); err != nil {
+	if err := report.MaxResourceCountPerGVKPerMXP(ctx, iter, rw); err != nil {
 		return err
 	}
 	if err := rw.Close(); err != nil {

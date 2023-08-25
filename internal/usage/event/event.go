@@ -29,7 +29,7 @@ var ErrEOF = errors.New("EOF")
 // reading.
 type Reader interface {
 	// Read returns the next event. Returns EOF when finished.
-	Read(context.Context) (model.MCPGVKEvent, error)
+	Read(context.Context) (model.MXPGVKEvent, error)
 	// Close closes the reader.
 	Close() error
 }
@@ -46,5 +46,5 @@ type WindowIterator interface {
 // Writer is the interface for reading usage events.
 type Writer interface {
 	// Write writes an event.
-	Write(model.MCPGVKEvent) error
+	Write(model.MXPGVKEvent) error
 }

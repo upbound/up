@@ -36,14 +36,14 @@ const (
 type Writer struct {
 	tw   *tar.Writer
 	meta report.Meta
-	ee   *usagejson.MCPGVKEventEncoder
+	ee   *usagejson.MXPGVKEventEncoder
 	buf  *bytes.Buffer
 }
 
 // NewWriter returns an initialized *Writer.
 func NewWriter(tw *tar.Writer, meta report.Meta) (*Writer, error) {
 	buf := &bytes.Buffer{}
-	ue, err := usagejson.NewMCPGVKEventEncoder(buf)
+	ue, err := usagejson.NewMXPGVKEventEncoder(buf)
 	if err != nil {
 		return nil, err
 	}
@@ -51,7 +51,7 @@ func NewWriter(tw *tar.Writer, meta report.Meta) (*Writer, error) {
 }
 
 // Write writes an Upbound usage event to a tar archive.
-func (w *Writer) Write(e model.MCPGVKEvent) error {
+func (w *Writer) Write(e model.MXPGVKEvent) error {
 	e.Tags.UpboundAccount = w.meta.UpboundAccount
 	return w.ee.Encode(e)
 }

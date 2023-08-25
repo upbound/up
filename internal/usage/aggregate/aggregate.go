@@ -24,38 +24,38 @@ import (
 
 const (
 	mrCountUpboundEventName    = "kube_managedresource_uid"
-	mrCountMaxUpboundEventName = "max_resource_count_per_gvk_per_mcp"
+	mrCountMaxUpboundEventName = "max_resource_count_per_gvk_per_mxp"
 )
 
-type mcpGVK struct {
-	MCPID   string
+type mxpGVK struct {
+	MXPID   string
 	Group   string
 	Version string
 	Kind    string
 }
 
-// MaxResourceCountPerGVKPerMCP aggregates the maximum recorded GVK counts per MCP from
+// MaxResourceCountPerGVKPerMXP aggregates the maximum recorded GVK counts per MXP from
 // Upbound usage events.
-type MaxResourceCountPerGVKPerMCP struct {
-	counts map[mcpGVK]int
+type MaxResourceCountPerGVKPerMXP struct {
+	counts map[mxpGVK]int
 }
 
 // Add adds a usage event to the aggregate.
-func (ag *MaxResourceCountPerGVKPerMCP) Add(e model.MCPGVKEvent) error {
+func (ag *MaxResourceCountPerGVKPerMXP) Add(e model.MXPGVKEvent) error {
 	if err := ag.validateEvent(e); err != nil {
 		return err
 	}
 
 	value := int(e.Value)
-	key := mcpGVK{
-		MCPID:   e.Tags.MCPID,
+	key := mxpGVK{
+		MXPID:   e.Tags.MXPID,
 		Group:   e.Tags.Group,
 		Version: e.Tags.Version,
 		Kind:    e.Tags.Kind,
 	}
 
 	if ag.counts == nil {
-		ag.counts = make(map[mcpGVK]int)
+		ag.counts = make(map[mxpGVK]int)
 	}
 	if value > ag.counts[key] {
 		ag.counts[key] = value
@@ -64,16 +64,16 @@ func (ag *MaxResourceCountPerGVKPerMCP) Add(e model.MCPGVKEvent) error {
 	return nil
 }
 
-// UpboundEvents returns an Upbound usage event for each combination of MCP and
+// UpboundEvents returns an Upbound usage event for each combination of MXP and
 // GVK.
-func (ag *MaxResourceCountPerGVKPerMCP) UpboundEvents() []model.MCPGVKEvent {
-	events := []model.MCPGVKEvent{}
+func (ag *MaxResourceCountPerGVKPerMXP) UpboundEvents() []model.MXPGVKEvent {
+	events := []model.MXPGVKEvent{}
 	for key, count := range ag.counts {
-		events = append(events, model.MCPGVKEvent{
+		events = append(events, model.MXPGVKEvent{
 			Name:  mrCountMaxUpboundEventName,
 			Value: float64(count),
-			Tags: model.MCPGVKEventTags{
-				MCPID:   key.MCPID,
+			Tags: model.MXPGVKEventTags{
+				MXPID:   key.MXPID,
 				Group:   key.Group,
 				Version: key.Version,
 				Kind:    key.Kind,
@@ -83,12 +83,12 @@ func (ag *MaxResourceCountPerGVKPerMCP) UpboundEvents() []model.MCPGVKEvent {
 	return events
 }
 
-func (ag *MaxResourceCountPerGVKPerMCP) validateEvent(e model.MCPGVKEvent) error {
+func (ag *MaxResourceCountPerGVKPerMXP) validateEvent(e model.MXPGVKEvent) error {
 	if e.Name != mrCountUpboundEventName {
 		return fmt.Errorf("expected event name %s, got %s", mrCountUpboundEventName, e.Name)
 	}
-	if e.Tags.MCPID == "" {
-		return errors.New("MCPID tag is empty")
+	if e.Tags.MXPID == "" {
+		return errors.New("MXPID tag is empty")
 	}
 	if e.Tags.Group == "" {
 		return errors.New("Group tag is empty")

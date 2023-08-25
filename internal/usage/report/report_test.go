@@ -28,7 +28,7 @@ import (
 	usagetime "github.com/upbound/up/internal/usage/time"
 )
 
-func TestMaxResourceCountPerGVKPerMCP(t *testing.T) {
+func TestMaxResourceCountPerGVKPerMXP(t *testing.T) {
 	type args struct {
 		iter   *usagetesting.MockWindowIterator
 		writer *usagetesting.MockWriter
@@ -71,14 +71,14 @@ func TestMaxResourceCountPerGVKPerMCP(t *testing.T) {
 			args: args{
 				iter: &usagetesting.MockWindowIterator{Windows: []usagetesting.Window{
 					{Reader: &usagetesting.MockReader{Reads: []usagetesting.ReadResult{
-						{Event: model.MCPGVKEvent{
+						{Event: model.MXPGVKEvent{
 							Name:  "kube_managedresource_uid",
 							Value: float64(1),
-							Tags: model.MCPGVKEventTags{
+							Tags: model.MXPGVKEventTags{
 								Group:   "example.com",
 								Version: "v1",
 								Kind:    "Thing",
-								MCPID:   "mcp1",
+								MXPID:   "mxp1",
 							},
 						}},
 						{Err: fmt.Errorf("boom")},
@@ -96,46 +96,46 @@ func TestMaxResourceCountPerGVKPerMCP(t *testing.T) {
 			args: args{
 				iter: &usagetesting.MockWindowIterator{Windows: []usagetesting.Window{
 					{Reader: &usagetesting.MockReader{Reads: []usagetesting.ReadResult{
-						{Event: model.MCPGVKEvent{
+						{Event: model.MXPGVKEvent{
 							Name:  "kube_managedresource_uid",
 							Value: float64(-1),
-							Tags: model.MCPGVKEventTags{
+							Tags: model.MXPGVKEventTags{
 								Group:   "example.com",
 								Version: "v1",
 								Kind:    "Thing",
-								MCPID:   "mcp1",
+								MXPID:   "mxp1",
 							},
 						}},
-						{Event: model.MCPGVKEvent{
+						{Event: model.MXPGVKEvent{
 							Name:  "kube_managedresource_uid",
 							Value: float64(-2),
-							Tags: model.MCPGVKEventTags{
+							Tags: model.MXPGVKEventTags{
 								Group:   "example.com",
 								Version: "v1",
 								Kind:    "Thing",
-								MCPID:   "mcp2",
+								MXPID:   "mxp2",
 							},
 						}},
 					}}},
 					{Reader: &usagetesting.MockReader{Reads: []usagetesting.ReadResult{
-						{Event: model.MCPGVKEvent{
+						{Event: model.MXPGVKEvent{
 							Name:  "kube_managedresource_uid",
 							Value: float64(0),
-							Tags: model.MCPGVKEventTags{
+							Tags: model.MXPGVKEventTags{
 								Group:   "example.com",
 								Version: "v1",
 								Kind:    "Thing",
-								MCPID:   "mcp1",
+								MXPID:   "mxp1",
 							},
 						}},
-						{Event: model.MCPGVKEvent{
+						{Event: model.MXPGVKEvent{
 							Name:  "kube_managedresource_uid",
 							Value: float64(-2),
-							Tags: model.MCPGVKEventTags{
+							Tags: model.MXPGVKEventTags{
 								Group:   "example.com",
 								Version: "v1",
 								Kind:    "Thing",
-								MCPID:   "mcp1",
+								MXPID:   "mxp1",
 							},
 						}},
 					}}},
@@ -150,38 +150,38 @@ func TestMaxResourceCountPerGVKPerMCP(t *testing.T) {
 			reason: "A report from a populated iterator has the expected aggregated events.",
 			args: args{
 				iter: &usagetesting.MockWindowIterator{Windows: []usagetesting.Window{
-					// This window's events have the same GVK and MCPID, so they
+					// This window's events have the same GVK and mxpID, so they
 					// should be aggregated into one event.
 					{
 						Reader: &usagetesting.MockReader{Reads: []usagetesting.ReadResult{
-							{Event: model.MCPGVKEvent{
+							{Event: model.MXPGVKEvent{
 								Name:  "kube_managedresource_uid",
 								Value: float64(4),
-								Tags: model.MCPGVKEventTags{
+								Tags: model.MXPGVKEventTags{
 									Group:   "example.com",
 									Version: "v1",
 									Kind:    "Thing",
-									MCPID:   "mcp1",
+									MXPID:   "mxp1",
 								},
 							}},
-							{Event: model.MCPGVKEvent{
+							{Event: model.MXPGVKEvent{
 								Name:  "kube_managedresource_uid",
 								Value: float64(7),
-								Tags: model.MCPGVKEventTags{
+								Tags: model.MXPGVKEventTags{
 									Group:   "example.com",
 									Version: "v1",
 									Kind:    "Thing",
-									MCPID:   "mcp1",
+									MXPID:   "mxp1",
 								},
 							}},
-							{Event: model.MCPGVKEvent{
+							{Event: model.MXPGVKEvent{
 								Name:  "kube_managedresource_uid",
 								Value: float64(3),
-								Tags: model.MCPGVKEventTags{
+								Tags: model.MXPGVKEventTags{
 									Group:   "example.com",
 									Version: "v1",
 									Kind:    "Thing",
-									MCPID:   "mcp1",
+									MXPID:   "mxp1",
 								},
 							}},
 						}},
@@ -191,58 +191,58 @@ func TestMaxResourceCountPerGVKPerMCP(t *testing.T) {
 						},
 					},
 					// This window's events each have a different combination of
-					// MCP and GVK, so they should be aggregated into separate
+					// mxp and GVK, so they should be aggregated into separate
 					// events.
 					{
 						Reader: &usagetesting.MockReader{Reads: []usagetesting.ReadResult{
-							{Event: model.MCPGVKEvent{
+							{Event: model.MXPGVKEvent{
 								Name:  "kube_managedresource_uid",
 								Value: float64(3),
-								Tags: model.MCPGVKEventTags{
+								Tags: model.MXPGVKEventTags{
 									Group:   "example.com",
 									Version: "v1",
 									Kind:    "Thing",
-									MCPID:   "mcp1",
+									MXPID:   "mxp1",
 								},
 							}},
-							{Event: model.MCPGVKEvent{
+							{Event: model.MXPGVKEvent{
 								Name:  "kube_managedresource_uid",
 								Value: float64(3),
-								Tags: model.MCPGVKEventTags{
+								Tags: model.MXPGVKEventTags{
 									Group:   "foo.example.com",
 									Version: "v1",
 									Kind:    "Thing",
-									MCPID:   "mcp1",
+									MXPID:   "mxp1",
 								},
 							}},
-							{Event: model.MCPGVKEvent{
+							{Event: model.MXPGVKEvent{
 								Name:  "kube_managedresource_uid",
 								Value: float64(3),
-								Tags: model.MCPGVKEventTags{
+								Tags: model.MXPGVKEventTags{
 									Group:   "example.com",
 									Version: "v1alpha1",
 									Kind:    "Thing",
-									MCPID:   "mcp1",
+									MXPID:   "mxp1",
 								},
 							}},
-							{Event: model.MCPGVKEvent{
+							{Event: model.MXPGVKEvent{
 								Name:  "kube_managedresource_uid",
 								Value: float64(3),
-								Tags: model.MCPGVKEventTags{
+								Tags: model.MXPGVKEventTags{
 									Group:   "example.com",
 									Version: "v1",
 									Kind:    "OtherThing",
-									MCPID:   "mcp1",
+									MXPID:   "mxp1",
 								},
 							}},
-							{Event: model.MCPGVKEvent{
+							{Event: model.MXPGVKEvent{
 								Name:  "kube_managedresource_uid",
 								Value: float64(3),
-								Tags: model.MCPGVKEventTags{
+								Tags: model.MXPGVKEventTags{
 									Group:   "example.com",
 									Version: "v1",
 									Kind:    "Thing",
-									MCPID:   "mcp2",
+									MXPID:   "mxp2",
 								},
 							}},
 						}},
@@ -251,30 +251,30 @@ func TestMaxResourceCountPerGVKPerMCP(t *testing.T) {
 							End:   time.Date(2006, 05, 04, 05, 0, 0, 0, time.UTC),
 						},
 					},
-					// This window's events have the same GVK and MCPID as
+					// This window's events have the same GVK and mxpID as
 					// events in the first window, but they're in a different
 					// window, so they should be aggregated into a different
 					// event.
 					{
 						Reader: &usagetesting.MockReader{Reads: []usagetesting.ReadResult{
-							{Event: model.MCPGVKEvent{
+							{Event: model.MXPGVKEvent{
 								Name:  "kube_managedresource_uid",
 								Value: float64(1),
-								Tags: model.MCPGVKEventTags{
+								Tags: model.MXPGVKEventTags{
 									Group:   "example.com",
 									Version: "v1",
 									Kind:    "Thing",
-									MCPID:   "mcp1",
+									MXPID:   "mxp1",
 								},
 							}},
-							{Event: model.MCPGVKEvent{
+							{Event: model.MXPGVKEvent{
 								Name:  "kube_managedresource_uid",
 								Value: float64(50),
-								Tags: model.MCPGVKEventTags{
+								Tags: model.MXPGVKEventTags{
 									Group:   "example.com",
 									Version: "v1",
 									Kind:    "Thing",
-									MCPID:   "mcp1",
+									MXPID:   "mxp1",
 								},
 							}},
 						}},
@@ -287,89 +287,89 @@ func TestMaxResourceCountPerGVKPerMCP(t *testing.T) {
 				writer: &usagetesting.MockWriter{},
 			},
 			want: want{
-				writer: &usagetesting.MockWriter{Events: []model.MCPGVKEvent{
+				writer: &usagetesting.MockWriter{Events: []model.MXPGVKEvent{
 					{
-						Name:         "max_resource_count_per_gvk_per_mcp",
+						Name:         "max_resource_count_per_gvk_per_mxp",
 						Value:        float64(7),
 						Timestamp:    time.Date(2006, 05, 04, 03, 0, 0, 0, time.UTC),
 						TimestampEnd: time.Date(2006, 05, 04, 04, 0, 0, 0, time.UTC),
-						Tags: model.MCPGVKEventTags{
+						Tags: model.MXPGVKEventTags{
 							Group:   "example.com",
 							Version: "v1",
 							Kind:    "Thing",
-							MCPID:   "mcp1",
+							MXPID:   "mxp1",
 						},
 					},
 					{
-						Name:         "max_resource_count_per_gvk_per_mcp",
+						Name:         "max_resource_count_per_gvk_per_mxp",
 						Value:        float64(3),
 						Timestamp:    time.Date(2006, 05, 04, 04, 0, 0, 0, time.UTC),
 						TimestampEnd: time.Date(2006, 05, 04, 05, 0, 0, 0, time.UTC),
-						Tags: model.MCPGVKEventTags{
+						Tags: model.MXPGVKEventTags{
 							Group:   "example.com",
 							Version: "v1",
 							Kind:    "Thing",
-							MCPID:   "mcp1",
+							MXPID:   "mxp1",
 						},
 					},
 					{
-						Name:         "max_resource_count_per_gvk_per_mcp",
+						Name:         "max_resource_count_per_gvk_per_mxp",
 						Value:        float64(3),
 						Timestamp:    time.Date(2006, 05, 04, 04, 0, 0, 0, time.UTC),
 						TimestampEnd: time.Date(2006, 05, 04, 05, 0, 0, 0, time.UTC),
-						Tags: model.MCPGVKEventTags{
+						Tags: model.MXPGVKEventTags{
 							Group:   "foo.example.com",
 							Version: "v1",
 							Kind:    "Thing",
-							MCPID:   "mcp1",
+							MXPID:   "mxp1",
 						},
 					},
 					{
-						Name:         "max_resource_count_per_gvk_per_mcp",
+						Name:         "max_resource_count_per_gvk_per_mxp",
 						Value:        float64(3),
 						Timestamp:    time.Date(2006, 05, 04, 04, 0, 0, 0, time.UTC),
 						TimestampEnd: time.Date(2006, 05, 04, 05, 0, 0, 0, time.UTC),
-						Tags: model.MCPGVKEventTags{
+						Tags: model.MXPGVKEventTags{
 							Group:   "example.com",
 							Version: "v1alpha1",
 							Kind:    "Thing",
-							MCPID:   "mcp1",
+							MXPID:   "mxp1",
 						},
 					},
 					{
-						Name:         "max_resource_count_per_gvk_per_mcp",
+						Name:         "max_resource_count_per_gvk_per_mxp",
 						Value:        float64(3),
 						Timestamp:    time.Date(2006, 05, 04, 04, 0, 0, 0, time.UTC),
 						TimestampEnd: time.Date(2006, 05, 04, 05, 0, 0, 0, time.UTC),
-						Tags: model.MCPGVKEventTags{
+						Tags: model.MXPGVKEventTags{
 							Group:   "example.com",
 							Version: "v1",
 							Kind:    "OtherThing",
-							MCPID:   "mcp1",
+							MXPID:   "mxp1",
 						},
 					},
 					{
-						Name:         "max_resource_count_per_gvk_per_mcp",
+						Name:         "max_resource_count_per_gvk_per_mxp",
 						Value:        float64(3),
 						Timestamp:    time.Date(2006, 05, 04, 04, 0, 0, 0, time.UTC),
 						TimestampEnd: time.Date(2006, 05, 04, 05, 0, 0, 0, time.UTC),
-						Tags: model.MCPGVKEventTags{
+						Tags: model.MXPGVKEventTags{
 							Group:   "example.com",
 							Version: "v1",
 							Kind:    "Thing",
-							MCPID:   "mcp2",
+							MXPID:   "mxp2",
 						},
 					},
 					{
-						Name:         "max_resource_count_per_gvk_per_mcp",
+						Name:         "max_resource_count_per_gvk_per_mxp",
 						Value:        float64(50),
 						Timestamp:    time.Date(2006, 05, 04, 05, 0, 0, 0, time.UTC),
 						TimestampEnd: time.Date(2006, 05, 04, 06, 0, 0, 0, time.UTC),
-						Tags: model.MCPGVKEventTags{
+						Tags: model.MXPGVKEventTags{
 							Group:   "example.com",
 							Version: "v1",
 							Kind:    "Thing",
-							MCPID:   "mcp1",
+							MXPID:   "mxp1",
 						},
 					},
 				}},
@@ -379,9 +379,9 @@ func TestMaxResourceCountPerGVKPerMCP(t *testing.T) {
 
 	for name, tc := range cases {
 		t.Run(name, func(t *testing.T) {
-			err := MaxResourceCountPerGVKPerMCP(context.Background(), tc.args.iter, tc.args.writer)
+			err := MaxResourceCountPerGVKPerMXP(context.Background(), tc.args.iter, tc.args.writer)
 			if diff := cmp.Diff(tc.want.err, err, test.EquateErrors()); diff != "" {
-				t.Errorf("\n%s\nMaxResourceCountPerGVKPerMCP: -want err, +got err:\n%s", tc.reason, diff)
+				t.Errorf("\n%s\nMaxResourceCountPerGVKPerMXP: -want err, +got err:\n%s", tc.reason, diff)
 			}
 			got := tc.args.writer
 
@@ -390,7 +390,7 @@ func TestMaxResourceCountPerGVKPerMCP(t *testing.T) {
 			usagetesting.SortEvents(tc.want.writer.Events)
 
 			if diff := cmp.Diff(tc.want.writer, got); diff != "" {
-				t.Errorf("\n%s\nMaxResourceCountPerGVKPerMCP: -want writer, +got writer:\n%s", tc.reason, diff)
+				t.Errorf("\n%s\nMaxResourceCountPerGVKPerMXP: -want writer, +got writer:\n%s", tc.reason, diff)
 			}
 		})
 	}

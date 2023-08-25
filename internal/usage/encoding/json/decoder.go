@@ -22,14 +22,14 @@ import (
 	"github.com/upbound/up/internal/usage/model"
 )
 
-// MCPGVKEventDecoder decodes MCP GVK events from a reader containing a JSON
-// array of event objects. Must be initialized with NewMCPGVKEventDecoder().
-type MCPGVKEventDecoder struct {
+// MXPGVKEventDecoder decodes MXP GVK events from a reader containing a JSON
+// array of event objects. Must be initialized with NewMXPGVKEventDecoder().
+type MXPGVKEventDecoder struct {
 	jd *json.Decoder
 }
 
-// NewMCPGVKEventDecoder returns an initialized *Decoder.
-func NewMCPGVKEventDecoder(r io.Reader) (*MCPGVKEventDecoder, error) {
+// NewMXPGVKEventDecoder returns an initialized *Decoder.
+func NewMXPGVKEventDecoder(r io.Reader) (*MXPGVKEventDecoder, error) {
 	jd := json.NewDecoder(r)
 
 	// Consume open bracket from JSON array.
@@ -41,20 +41,20 @@ func NewMCPGVKEventDecoder(r io.Reader) (*MCPGVKEventDecoder, error) {
 		return nil, fmt.Errorf("reader does not contain JSON array. expected [, got %s", t)
 	}
 
-	return &MCPGVKEventDecoder{jd: jd}, nil
+	return &MXPGVKEventDecoder{jd: jd}, nil
 }
 
 // More returns true if there is more input to be decoded.
-func (d *MCPGVKEventDecoder) More() bool {
+func (d *MXPGVKEventDecoder) More() bool {
 	return d.jd.More()
 }
 
-// Decode returns the next MCP GVK event from input.
-func (d *MCPGVKEventDecoder) Decode() (model.MCPGVKEvent, error) {
-	var e model.MCPGVKEvent
+// Decode returns the next MXP GVK event from input.
+func (d *MXPGVKEventDecoder) Decode() (model.MXPGVKEvent, error) {
+	var e model.MXPGVKEvent
 	err := d.jd.Decode(&e)
 	if err != nil {
-		return model.MCPGVKEvent{}, fmt.Errorf("error decoding next event: %s", err.Error())
+		return model.MXPGVKEvent{}, fmt.Errorf("error decoding next event: %s", err.Error())
 	}
 	return e, nil
 }

@@ -41,7 +41,7 @@ type ListObjectsV2InputEventReader struct {
 	reader             *reader.MultiReader
 }
 
-func (r *ListObjectsV2InputEventReader) Read(ctx context.Context) (model.MCPGVKEvent, error) {
+func (r *ListObjectsV2InputEventReader) Read(ctx context.Context) (model.MXPGVKEvent, error) {
 	if r.reader == nil {
 		readers := []event.Reader{}
 		if err := r.Client.ListObjectsV2PagesWithContext(
@@ -60,7 +60,7 @@ func (r *ListObjectsV2InputEventReader) Read(ctx context.Context) (model.MCPGVKE
 				return true
 			},
 		); err != nil {
-			return model.MCPGVKEvent{}, err
+			return model.MXPGVKEvent{}, err
 		}
 		r.reader = &reader.MultiReader{Readers: readers}
 	}
@@ -80,17 +80,17 @@ var _ event.Reader = &GetObjectInputEventReader{}
 type GetObjectInputEventReader struct {
 	Client         *s3.S3
 	GetObjectInput *s3.GetObjectInput
-	decoder        *json.MCPGVKEventDecoder
+	decoder        *json.MXPGVKEventDecoder
 	closers        []io.Closer
 }
 
-func (r *GetObjectInputEventReader) Read(ctx context.Context) (model.MCPGVKEvent, error) {
+func (r *GetObjectInputEventReader) Read(ctx context.Context) (model.MXPGVKEvent, error) {
 	if r.decoder == nil {
 		// TODO(branden): Use s3manager.Downloader for streaming and concurrent
 		// downloads.
 		resp, err := r.Client.GetObjectWithContext(ctx, r.GetObjectInput)
 		if err != nil {
-			return model.MCPGVKEvent{}, err
+			return model.MXPGVKEvent{}, err
 		}
 
 		contentType := ""
@@ -106,21 +106,21 @@ func (r *GetObjectInputEventReader) Read(ctx context.Context) (model.MCPGVKEvent
 			r.closers = append(r.closers, resp.Body)
 			body, err = gzip.NewReader(resp.Body)
 			if err != nil {
-				return model.MCPGVKEvent{}, err
+				return model.MXPGVKEvent{}, err
 			}
 		default:
 			body = resp.Body
 		}
 		r.closers = append(r.closers, body)
 
-		decoder, err := json.NewMCPGVKEventDecoder(body)
+		decoder, err := json.NewMXPGVKEventDecoder(body)
 		if err != nil {
-			return model.MCPGVKEvent{}, err
+			return model.MXPGVKEvent{}, err
 		}
 		r.decoder = decoder
 	}
 	if !r.decoder.More() {
-		return model.MCPGVKEvent{}, ErrEOF
+		return model.MXPGVKEvent{}, ErrEOF
 	}
 	return r.decoder.Decode()
 }

@@ -43,15 +43,15 @@ func TestMultiReader(t *testing.T) {
 			reason: "Events from a single reader are returned in order.",
 			reader: MultiReader{Readers: []event.Reader{
 				&usagetesting.MockReader{Reads: []usagetesting.ReadResult{
-					{Event: model.MCPGVKEvent{Name: "event-1"}},
-					{Event: model.MCPGVKEvent{Name: "event-2"}},
-					{Event: model.MCPGVKEvent{Name: "event-3"}},
+					{Event: model.MXPGVKEvent{Name: "event-1"}},
+					{Event: model.MXPGVKEvent{Name: "event-2"}},
+					{Event: model.MXPGVKEvent{Name: "event-3"}},
 				}},
 			}},
 			want: []usagetesting.ReadResult{
-				{Event: model.MCPGVKEvent{Name: "event-1"}},
-				{Event: model.MCPGVKEvent{Name: "event-2"}},
-				{Event: model.MCPGVKEvent{Name: "event-3"}},
+				{Event: model.MXPGVKEvent{Name: "event-1"}},
+				{Event: model.MXPGVKEvent{Name: "event-2"}},
+				{Event: model.MXPGVKEvent{Name: "event-3"}},
 			},
 		},
 		"SingleEmptyReader": {
@@ -65,17 +65,17 @@ func TestMultiReader(t *testing.T) {
 			reason: "Events from multiple readers are returned in order.",
 			reader: MultiReader{Readers: []event.Reader{
 				&usagetesting.MockReader{Reads: []usagetesting.ReadResult{
-					{Event: model.MCPGVKEvent{Name: "event-1"}},
+					{Event: model.MXPGVKEvent{Name: "event-1"}},
 				}},
 				&usagetesting.MockReader{Reads: []usagetesting.ReadResult{
-					{Event: model.MCPGVKEvent{Name: "event-2"}},
-					{Event: model.MCPGVKEvent{Name: "event-3"}},
+					{Event: model.MXPGVKEvent{Name: "event-2"}},
+					{Event: model.MXPGVKEvent{Name: "event-3"}},
 				}},
 			}},
 			want: []usagetesting.ReadResult{
-				{Event: model.MCPGVKEvent{Name: "event-1"}},
-				{Event: model.MCPGVKEvent{Name: "event-2"}},
-				{Event: model.MCPGVKEvent{Name: "event-3"}},
+				{Event: model.MXPGVKEvent{Name: "event-1"}},
+				{Event: model.MXPGVKEvent{Name: "event-2"}},
+				{Event: model.MXPGVKEvent{Name: "event-3"}},
 			},
 		},
 		"MultipleEmptyReaders": {
@@ -90,12 +90,12 @@ func TestMultiReader(t *testing.T) {
 			reason: "An error from a reader is returned.",
 			reader: MultiReader{Readers: []event.Reader{
 				&usagetesting.MockReader{Reads: []usagetesting.ReadResult{
-					{Event: model.MCPGVKEvent{Name: "event-1"}},
+					{Event: model.MXPGVKEvent{Name: "event-1"}},
 					{Err: fmt.Errorf("boom")},
 				}},
 			}},
 			want: []usagetesting.ReadResult{
-				{Event: model.MCPGVKEvent{Name: "event-1"}},
+				{Event: model.MXPGVKEvent{Name: "event-1"}},
 				{Err: fmt.Errorf("boom")},
 			},
 		},
