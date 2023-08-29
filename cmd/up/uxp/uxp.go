@@ -36,7 +36,11 @@ var (
 
 // AfterApply constructs and binds Upbound-specific context to any subcommands
 // that have Run() methods that receive it.
-func (c *Cmd) AfterApply(kongCtx *kong.Context, upCtx *upbound.Context) error {
+func (c *Cmd) AfterApply(kongCtx *kong.Context) error {
+	upCtx, err := upbound.NewFromFlags(c.Flags)
+	if err != nil {
+		return err
+	}
 	kubeconfig, err := kube.GetKubeConfig(c.Kubeconfig)
 	if err != nil {
 		return err
@@ -59,4 +63,7 @@ type Cmd struct {
 
 	Kubeconfig string `type:"existingfile" help:"Override default kubeconfig path."`
 	Namespace  string `short:"n" env:"UXP_NAMESPACE" default:"upbound-system" help:"Kubernetes namespace for UXP."`
+
+	// Common Upbound API configuration
+	Flags upbound.Flags `embed:""`
 }
