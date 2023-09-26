@@ -23,6 +23,7 @@ import (
 	"github.com/blang/semver/v4"
 	"github.com/crossplane/crossplane-runtime/pkg/errors"
 	"github.com/pterm/pterm"
+	"helm.sh/helm/v3/pkg/chart"
 	"k8s.io/client-go/kubernetes"
 	"sigs.k8s.io/yaml"
 
@@ -166,10 +167,22 @@ func (c *upgradeCmd) Run() error {
 	return nil
 }
 
+func upgradeVersionBounds(_ string, ch *chart.Chart) error {
+	return checkVersion(fmt.Sprintf("unsupported target chart version %s", ch.Metadata.Version), upgradeVersionConstraints, ch.Metadata.Version)
+}
+
+func upgradeFromVersionBounds(from string, ch *chart.Chart) error {
+	return checkVersion(fmt.Sprintf("unsupported installed chart version %s", ch.Metadata.Version), upgradeFromVersionConstraints, from)
+}
+
+func upgradeUpVersionBounds(_ string, ch *chart.Chart) error {
+	return upVersionBounds(ch)
+}
+
 func (c *upgradeCmd) upgradeUpbound(params map[string]any) error {
 	version := strings.TrimPrefix(c.Version, "v")
 	upgrade := func() error {
-		if err := c.helmMgr.Upgrade(version, params); err != nil {
+		if err := c.helmMgr.Upgrade(version, params, upgradeUpVersionBounds, upgradeFromVersionBounds, upgradeVersionBounds); err != nil {
 			return err
 		}
 		return nil

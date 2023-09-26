@@ -21,9 +21,7 @@ import (
 	"path/filepath"
 	"time"
 
-	"github.com/Masterminds/semver"
-	"github.com/crossplane/crossplane-runtime/pkg/errors"
-	"github.com/crossplane/crossplane-runtime/pkg/logging"
+	"github.com/Masterminds/semver/v3"
 	"github.com/google/go-containerregistry/pkg/authn"
 	"github.com/google/go-containerregistry/pkg/v1/remote"
 	"github.com/spf13/afero"
@@ -34,6 +32,9 @@ import (
 	"helm.sh/helm/v3/pkg/release"
 	"helm.sh/helm/v3/pkg/storage/driver"
 	"k8s.io/client-go/rest"
+
+	"github.com/crossplane/crossplane-runtime/pkg/errors"
+	"github.com/crossplane/crossplane-runtime/pkg/logging"
 
 	"github.com/upbound/up/internal/install"
 )
@@ -348,7 +349,7 @@ func (h *Installer) GetCurrentVersion() (string, error) {
 }
 
 // Install installs in the cluster.
-func (h *Installer) Install(version string, parameters map[string]any) error {
+func (h *Installer) Install(version string, parameters map[string]any, opts ...install.InstallOption) error {
 	// make sure no version is already installed
 	current, err := h.GetCurrentVersion()
 	if err == nil {
@@ -373,12 +374,18 @@ func (h *Installer) Install(version string, parameters map[string]any) error {
 		return err
 	}
 
+	for _, o := range opts {
+		if err := o(helmChart); err != nil {
+			return err
+		}
+	}
+
 	_, err = h.installClient.Run(helmChart, parameters)
 	return err
 }
 
 // Upgrade upgrades an existing installation to a new version.
-func (h *Installer) Upgrade(version string, parameters map[string]any) error {
+func (h *Installer) Upgrade(version string, parameters map[string]any, opts ...install.UpgradeOption) error { //nolint:gocyclo // looks still sane
 	// check if version exists
 	current, err := h.GetCurrentVersion()
 	if err != nil {
@@ -400,6 +407,12 @@ func (h *Installer) Upgrade(version string, parameters map[string]any) error {
 	}
 	if err != nil {
 		return err
+	}
+
+	for _, o := range opts {
+		if err := o(current, helmChart); err != nil {
+			return err
+		}
 	}
 
 	_, upErr := h.upgradeClient.Run(h.releaseName, helmChart, parameters)

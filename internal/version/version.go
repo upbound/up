@@ -22,7 +22,7 @@ import (
 	"strings"
 	"time"
 
-	"github.com/Masterminds/semver"
+	"github.com/Masterminds/semver/v3"
 	"github.com/crossplane/crossplane-runtime/pkg/logging"
 )
 
