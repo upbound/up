@@ -27,6 +27,7 @@ import (
 	"github.com/crossplane/crossplane-runtime/pkg/resource"
 	"github.com/pterm/pterm"
 	"golang.org/x/exp/maps"
+	"helm.sh/helm/v3/pkg/chart"
 	corev1 "k8s.io/api/core/v1"
 	kerrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -46,6 +47,7 @@ import (
 	"github.com/upbound/up/internal/resources"
 	"github.com/upbound/up/internal/upbound"
 	"github.com/upbound/up/internal/upterm"
+	"github.com/upbound/up/internal/version"
 )
 
 const (
@@ -310,9 +312,26 @@ func (c *initCmd) applySecret(ctx context.Context, regFlags *authorizedRegistryF
 	return nil
 }
 
+func initVersionBounds(ch *chart.Chart) error {
+	return checkVersion(fmt.Sprintf("unsupported chart version %q", ch.Metadata.Version), initVersionConstraints, ch.Metadata.Version)
+}
+
+func upVersionBounds(ch *chart.Chart) error {
+	s, found := ch.Metadata.Annotations[chartAnnotationUpConstraints]
+	if !found {
+		return nil
+	}
+	constraints, err := parseChartUpConstraints(s)
+	if err != nil {
+		return fmt.Errorf("up version constraints %q provided by the chart are invalid: %w", s, err)
+	}
+
+	return checkVersion(fmt.Sprintf("unsupported up version %q", version.GetVersion()), constraints, version.GetVersion())
+}
+
 func (c *initCmd) deploySpace(ctx context.Context, params map[string]any) error {
 	install := func() error {
-		if err := c.helmMgr.Install(strings.TrimPrefix(c.Version, "v"), params); err != nil {
+		if err := c.helmMgr.Install(strings.TrimPrefix(c.Version, "v"), params, initVersionBounds, upVersionBounds); err != nil {
 			return err
 		}
 		return nil
