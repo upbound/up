@@ -192,6 +192,30 @@ jobs:
           flags: unittests
           file: _output/tests/linux_amd64/coverage.txt
 
+  smoke-tests:
+    runs-on: ubuntu-20.04
+    # Add "id-token" with the intended permissions.
+    permissions:
+      contents: 'read'
+      id-token: 'write'
+
+    steps:
+      - id: 'auth'
+        name: 'Authenticate to Google Cloud'
+        uses: 'google-github-actions/auth@v1'
+        with:
+          token_format: 'access_token'
+          workload_identity_provider: 'projects/754619500310/locations/global/workloadIdentityPools/upbound-up-pool/providers/github-provider'
+          service_account: 'upbound-up@orchestration-build.iam.gserviceaccount.com'
+
+      - name: 'Set up Cloud SDK'
+        uses: 'google-github-actions/setup-gcloud@v1'
+        with:
+          version: '>= 363.0.0'
+    
+      - name: 'Use gcloud CLI'
+        run: 'gcloud info'
+
   publish-artifacts:
     runs-on: ubuntu-20.04
     needs: detect-noop
