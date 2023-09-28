@@ -17,11 +17,14 @@ package config
 import (
 	"bytes"
 	"encoding/json"
+	"fmt"
 	"io"
 	"os"
 	"path/filepath"
 
 	"github.com/crossplane/crossplane-runtime/pkg/errors"
+	"k8s.io/client-go/rest"
+	"k8s.io/client-go/tools/clientcmd"
 )
 
 // Location of up config file.
@@ -89,14 +92,15 @@ type ProfileType string
 
 // Types of profiles.
 const (
-	UserProfileType  ProfileType = "user"
-	TokenProfileType ProfileType = "token"
+	UserProfileType   ProfileType = "user"
+	TokenProfileType  ProfileType = "token"
+	SpacesProfileType ProfileType = "spaces"
 )
 
 // A Profile is a set of credentials
 type Profile struct {
 	// ID is either a username, email, or token.
-	ID string `json:"id"`
+	ID string `json:"id,omitempty"`
 
 	// Type is the type of the profile.
 	Type ProfileType `json:"type"`
@@ -107,11 +111,35 @@ type Profile struct {
 	// Account is the default account to use when this profile is selected.
 	Account string `json:"account,omitempty"`
 
+	// Kubeconfig is the kubeconfig file to use when this profile is selected.
+	// Used when Type is SpacesProfileType.
+	Kubeconfig string `json:"kubeconfig,omitempty"`
+
+	// KubeContext is the kubeconfig context to use when this profile is
+	// selected. Used when Type is SpacesProfileType.
+	KubeContext string `json:"kube_context,omitempty"`
+
 	// BaseConfig represent persisted settings for this profile.
 	// For example:
 	// * flags
 	// * environment variables
 	BaseConfig map[string]string `json:"base,omitempty"`
+}
+
+func (p Profile) IsSpacesProfile() bool {
+	return p.Type == SpacesProfileType
+}
+
+func (p Profile) GetKubeClientConfig() (*rest.Config, error) {
+	if !p.IsSpacesProfile() {
+		return nil, fmt.Errorf("kube client not supported for profile type %q", p.Type)
+	}
+	rules := clientcmd.NewDefaultClientConfigLoadingRules()
+	rules.ExplicitPath = p.Kubeconfig
+	return clientcmd.NewNonInteractiveDeferredLoadingClientConfig(
+		rules,
+		&clientcmd.ConfigOverrides{CurrentContext: p.KubeContext},
+	).ClientConfig()
 }
 
 // RedactedProfile embeds a Upbound Profile for the sole purpose of redacting
@@ -127,17 +155,20 @@ type RedactedProfile struct {
 func (p RedactedProfile) MarshalJSON() ([]byte, error) {
 	type profile RedactedProfile
 	pc := profile(p)
-	s := "NONE"
-	if pc.Session != "" {
-		s = "REDACTED"
+	// Spaces profiles don't have session tokens.
+	if !p.IsSpacesProfile() {
+		s := "NONE"
+		if pc.Session != "" {
+			s = "REDACTED"
+		}
+		pc.Session = s
 	}
-	pc.Session = s
 	return json.Marshal(&pc)
 }
 
 // checkProfile ensures a profile does not violate constraints.
 func checkProfile(p Profile) error {
-	if p.ID == "" || p.Type == "" {
+	if (!p.IsSpacesProfile() && p.ID == "") || p.Type == "" {
 		return errors.New(errInvalidProfile)
 	}
 	return nil

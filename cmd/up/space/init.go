@@ -74,17 +74,20 @@ const (
 
 	jsonKey = "_json_key"
 
+	defaultProfileName = "default"
+
 	errReadTokenFile          = "unable to read token file"
 	errReadParametersFile     = "unable to read parameters file"
 	errParseInstallParameters = "unable to parse install parameters"
 	errCreateImagePullSecret  = "failed to create image pull secret"
-
-	errFmtCreateNamespace = "failed to create namespace %s"
+	errFmtCreateNamespace     = "failed to create namespace %s"
+	errUpdateConfig           = "unable to update config file"
+	errUpdateProfile          = "unable to update profile"
 )
 
 // initCmd installs Upbound Spaces.
 type initCmd struct {
-	Kube     kubeFlags               `embed:""`
+	Kube     upbound.KubeFlags       `embed:""`
 	Registry authorizedRegistryFlags `embed:""`
 	install.CommonParams
 	Upbound upbound.Flags `embed:""`
@@ -133,7 +136,9 @@ func (c *initCmd) AfterApply(kongCtx *kong.Context, quiet config.QuietFlag) erro
 	}
 	kongCtx.Bind(upCtx)
 
-	kClient, err := kubernetes.NewForConfig(c.Kube.config)
+	kubeconfig := c.Kube.GetConfig()
+
+	kClient, err := kubernetes.NewForConfig(kubeconfig)
 	if err != nil {
 		return err
 	}
@@ -154,7 +159,7 @@ func (c *initCmd) AfterApply(kongCtx *kong.Context, quiet config.QuietFlag) erro
 		pterm.Info.Println("Public ingress will be exposed")
 	}
 
-	prereqs, err := prerequisites.New(c.Kube.config, defs)
+	prereqs, err := prerequisites.New(kubeconfig, defs)
 	if err != nil {
 		return err
 	}
@@ -162,12 +167,12 @@ func (c *initCmd) AfterApply(kongCtx *kong.Context, quiet config.QuietFlag) erro
 
 	secret := kube.NewSecretApplicator(kClient)
 	c.pullSecret = kube.NewImagePullApplicator(secret)
-	dClient, err := dynamic.NewForConfig(c.Kube.config)
+	dClient, err := dynamic.NewForConfig(kubeconfig)
 	if err != nil {
 		return err
 	}
 	c.dClient = dClient
-	mgr, err := helm.NewManager(c.Kube.config,
+	mgr, err := helm.NewManager(kubeconfig,
 		spacesChart,
 		c.Registry.Repository,
 		helm.WithNamespace(ns),
@@ -202,7 +207,7 @@ func (c *initCmd) AfterApply(kongCtx *kong.Context, quiet config.QuietFlag) erro
 }
 
 // Run executes the install command.
-func (c *initCmd) Run() error {
+func (c *initCmd) Run(upCtx *upbound.Context) error {
 	ctx := context.Background()
 
 	params, err := c.parser.Parse()
@@ -253,6 +258,38 @@ func (c *initCmd) Run() error {
 	pterm.Info.WithPrefix(upterm.RaisedPrefix).Println("Your Upbound Space is Ready!")
 
 	outputNextSteps()
+	return c.createOrUpdateProfile(upCtx)
+}
+
+// createOrUpdateProfile updates the active profile to access the new space,
+// or if there is no active profile, creates a new profile. The profile is set
+// as the default.
+func (c *initCmd) createOrUpdateProfile(upCtx *upbound.Context) error {
+	// If profile name was not provided and no default exists, set name to
+	// the default.
+	if upCtx.ProfileName == "" {
+		upCtx.ProfileName = defaultProfileName
+	}
+
+	// Re-initialize active profile for this space.
+	profile := config.Profile{
+		Type:        config.SpacesProfileType,
+		Kubeconfig:  c.Kube.Kubeconfig,
+		KubeContext: c.Kube.GetContext(),
+		// Carry over existing config.
+		BaseConfig: upCtx.Profile.BaseConfig,
+	}
+	upCtx.Profile = profile
+
+	if err := upCtx.Cfg.AddOrUpdateUpboundProfile(upCtx.ProfileName, upCtx.Profile); err != nil {
+		return errors.Wrap(err, errUpdateProfile)
+	}
+	if err := upCtx.Cfg.SetDefaultUpboundProfile(upCtx.ProfileName); err != nil {
+		return errors.Wrap(err, errUpdateProfile)
+	}
+	if err := upCtx.CfgSrc.UpdateConfig(upCtx.Cfg); err != nil {
+		return errors.Wrap(err, errUpdateConfig)
+	}
 	return nil
 }
 

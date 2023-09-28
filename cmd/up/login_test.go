@@ -46,6 +46,7 @@ func TestRun(t *testing.T) {
 		"ErrorNoUserOrToken": {
 			reason: "If neither user or token is provided an error should be returned.",
 			cmd:    &loginCmd{},
+			ctx:    &upbound.Context{},
 			err:    errors.Wrap(errors.New(errNoUserOrToken), errLoginFailed),
 		},
 		"ErrLoginFailed": {

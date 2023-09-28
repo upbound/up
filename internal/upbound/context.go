@@ -55,23 +55,6 @@ const (
 	errProfileNotFoundFmt = "profile not found with identifier: %s"
 )
 
-// Flags are common flags used by commands that interact with Upbound.
-type Flags struct {
-	// Optional
-	Domain  *url.URL `env:"UP_DOMAIN" default:"https://upbound.io" help:"Root Upbound domain." json:"domain,omitempty"`
-	Profile string   `env:"UP_PROFILE" help:"Profile used to execute command." predictor:"profiles" json:"profile,omitempty"`
-	Account string   `short:"a" env:"UP_ACCOUNT" help:"Account used to execute command." json:"account,omitempty"`
-
-	// Insecure
-	InsecureSkipTLSVerify bool `env:"UP_INSECURE_SKIP_TLS_VERIFY" help:"[INSECURE] Skip verifying TLS certificates." json:"insecureSkipTLSVerify,omitempty"`
-	Debug                 int  `short:"d" env:"UP_DEBUG" name:"debug" type:"counter" help:"[INSECURE] Run with debug logging. Repeat to increase verbosity. Output might contain confidential data like tokens." json:"debug,omitempty"`
-
-	// Hidden
-	APIEndpoint      *url.URL `env:"OVERRIDE_API_ENDPOINT" hidden:"" name:"override-api-endpoint" help:"Overrides the default API endpoint." json:"apiEndpoint,omitempty"`
-	ProxyEndpoint    *url.URL `env:"OVERRIDE_PROXY_ENDPOINT" hidden:"" name:"override-proxy-endpoint" help:"Overrides the default proxy endpoint." json:"proxyEndpoint,omitempty"`
-	RegistryEndpoint *url.URL `env:"OVERRIDE_REGISTRY_ENDPOINT" hidden:"" name:"override-registry-endpoint" help:"Overrides the default registry endpoint." json:"registryEndpoint,omitempty"`
-}
-
 // Context includes common data that Upbound consumers may utilize.
 type Context struct {
 	ProfileName string

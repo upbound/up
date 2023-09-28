@@ -16,6 +16,7 @@ package main
 
 import (
 	"context"
+	"fmt"
 	"net/http"
 
 	"github.com/alecthomas/kong"
@@ -59,6 +60,10 @@ type logoutCmd struct {
 
 // Run executes the logout command.
 func (c *logoutCmd) Run(p pterm.TextPrinter, upCtx *upbound.Context) error {
+	if upCtx.Profile.IsSpacesProfile() {
+		return fmt.Errorf("logout is not supported for Spaces profile %q", upCtx.ProfileName)
+	}
+
 	ctx, cancel := context.WithTimeout(context.Background(), defaultTimeout)
 	defer cancel()
 	req, err := c.client.NewRequest(ctx, http.MethodPost, logoutPath, "", nil)

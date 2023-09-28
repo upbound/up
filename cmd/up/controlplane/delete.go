@@ -16,10 +16,12 @@ package controlplane
 
 import (
 	"context"
+	"fmt"
 
 	"github.com/pterm/pterm"
 
 	cp "github.com/upbound/up-sdk-go/service/controlplanes"
+
 	"github.com/upbound/up/internal/upbound"
 )
 
@@ -30,6 +32,10 @@ type deleteCmd struct {
 
 // Run executes the delete command.
 func (c *deleteCmd) Run(p pterm.TextPrinter, cc *cp.Client, upCtx *upbound.Context) error {
+	if upCtx.Profile.IsSpacesProfile() {
+		return fmt.Errorf("delete is not supported for Spaces profile %q", upCtx.ProfileName)
+	}
+
 	if err := cc.Delete(context.Background(), upCtx.Account, c.Name); err != nil {
 		return err
 	}

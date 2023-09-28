@@ -9,18 +9,9 @@ import (
 	"os"
 
 	"github.com/crossplane/crossplane-runtime/pkg/errors"
-	"k8s.io/client-go/rest"
 
 	"github.com/upbound/up/internal/input"
-	"github.com/upbound/up/internal/kube"
 )
-
-type kubeFlags struct {
-	Kubeconfig string `type:"existingfile" help:"Override default kubeconfig path."`
-
-	// set by AfterApply
-	config *rest.Config
-}
 
 type registryFlags struct {
 	Repository *url.URL `hidden:"" name:"registry-repository" env:"UPBOUND_REGISTRY" default:"us-west1-docker.pkg.dev/orchestration-build/upbound-environments" help:"Set registry for where to pull OCI artifacts from. This is an OCI registry reference, i.e. a URL without the scheme or protocol prefix."`
@@ -33,16 +24,6 @@ type authorizedRegistryFlags struct {
 	TokenFile *os.File `name:"token-file" help:"File containing authentication token."`
 	Username  string   `hidden:"" name:"registry-username" help:"Set the registry username."`
 	Password  string   `hidden:"" name:"registry-password" help:"Set the registry password."`
-}
-
-func (f *kubeFlags) AfterApply() error {
-	restConfig, err := kube.GetKubeConfig(f.Kubeconfig)
-	if err != nil {
-		return err
-	}
-	f.config = restConfig
-
-	return nil
 }
 
 func (p *authorizedRegistryFlags) AfterApply() error {

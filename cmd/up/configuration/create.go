@@ -57,6 +57,10 @@ type createCmd struct {
 
 // Run executes the create command.
 func (c *createCmd) Run(p pterm.TextPrinter, cc *configurations.Client, gc *gitsources.Client, upCtx *upbound.Context) error {
+	if upCtx.Profile.IsSpacesProfile() {
+		return fmt.Errorf("create is not supported for Spaces profile %q", upCtx.ProfileName)
+	}
+
 	// By default, the repo name is the same as the configuration name
 	// This matches the Console's behavior
 	if c.Repo == "" {

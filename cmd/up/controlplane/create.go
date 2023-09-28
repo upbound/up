@@ -16,6 +16,7 @@ package controlplane
 
 import (
 	"context"
+	"fmt"
 
 	"github.com/pterm/pterm"
 
@@ -35,6 +36,10 @@ type createCmd struct {
 
 // Run executes the create command.
 func (c *createCmd) Run(p pterm.TextPrinter, cc *cp.Client, cfc *configurations.Client, upCtx *upbound.Context) error {
+	if upCtx.Profile.IsSpacesProfile() {
+		return fmt.Errorf("create is not supported for Spaces profile %q", upCtx.ProfileName)
+	}
+
 	// Get the UUID from the Configuration name, if it exists.
 	cfg, err := cfc.Get(context.Background(), upCtx.Account, c.ConfigurationName)
 	if err != nil {

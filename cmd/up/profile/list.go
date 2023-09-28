@@ -64,13 +64,13 @@ func (c *listCmd) Run(p pterm.TextPrinter, pt *pterm.TablePrinter, ctx *kong.Con
 	data := make([][]string, len(redacted)+1)
 	cursor := ""
 
-	data[0] = []string{"CURRENT", "NAME", "TYPE", "ACCOUNT"}
+	data[0] = []string{"CURRENT", "NAME", "TYPE", "ACCOUNT", "KUBECONFIG", "KUBECONTEXT"}
 	for i, name := range profileNames {
 		if name == dprofile {
 			cursor = "*"
 		}
 		prof := redacted[name]
-		data[i+1] = []string{cursor, name, string(prof.Type), prof.Account}
+		data[i+1] = []string{cursor, name, string(prof.Type), prof.Account, prof.Kubeconfig, prof.KubeContext}
 
 		cursor = "" // reset cursor
 	}

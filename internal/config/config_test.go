@@ -78,6 +78,58 @@ func TestAddOrUpdateUpboundProfile(t *testing.T) {
 			want:   &Config{},
 			err:    errors.New(errInvalidProfile),
 		},
+		"AddNewSpacesProfile": {
+			reason: "Adding a new spaces profile to an empty Config should not cause an error.",
+			name:   "cool-profile",
+			cfg:    &Config{},
+			add: Profile{
+				Type:        SpacesProfileType,
+				Kubeconfig:  "cool-config",
+				KubeContext: "cool-context",
+			},
+			want: &Config{
+				Upbound: Upbound{
+					Profiles: map[string]Profile{
+						"cool-profile": {
+							Type:        SpacesProfileType,
+							Kubeconfig:  "cool-config",
+							KubeContext: "cool-context",
+						},
+					},
+				},
+			},
+		},
+		"UpdateExistingSpacesProfile": {
+			reason: "Updating an existing spaces profile in the Config should not cause an error.",
+			name:   "cool-profile",
+			cfg: &Config{
+				Upbound: Upbound{
+					Profiles: map[string]Profile{
+						"cool-profile": {
+							Type:        SpacesProfileType,
+							Kubeconfig:  "cool-config",
+							KubeContext: "cool-context",
+						},
+					},
+				},
+			},
+			add: Profile{
+				Type:        SpacesProfileType,
+				Kubeconfig:  "other-config",
+				KubeContext: "other-context",
+			},
+			want: &Config{
+				Upbound: Upbound{
+					Profiles: map[string]Profile{
+						"cool-profile": {
+							Type:        SpacesProfileType,
+							Kubeconfig:  "other-config",
+							KubeContext: "other-context",
+						},
+					},
+				},
+			},
+		},
 	}
 	for name, tc := range cases {
 		t.Run(name, func(t *testing.T) {

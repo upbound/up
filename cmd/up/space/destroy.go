@@ -23,9 +23,11 @@ import (
 	"github.com/pterm/pterm"
 	v1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/client-go/kubernetes"
+	"k8s.io/client-go/rest"
 
 	"github.com/upbound/up/internal/input"
 	"github.com/upbound/up/internal/install/helm"
+	"github.com/upbound/up/internal/upbound"
 	"github.com/upbound/up/internal/upterm"
 )
 
@@ -36,8 +38,9 @@ const (
 
 // destroyCmd uninstalls Upbound.
 type destroyCmd struct {
-	Registry registryFlags `embed:""`
-	Kube     kubeFlags     `embed:""`
+	Upbound  upbound.Flags     `embed:""`
+	Registry registryFlags     `embed:""`
+	Kube     upbound.KubeFlags `embed:""`
 
 	Confirmed bool `name:"yes-really-delete-space-and-all-data" type:"bool" help:"Bypass safety checks and destroy Spaces"`
 	Orphan    bool `name:"orphan" type:"bool" help:"Remove Space components but retain Control Planes and data"`
@@ -84,7 +87,17 @@ func (c *destroyCmd) AfterApply(kongCtx *kong.Context) error {
 		}
 	}
 
-	kClient, err := kubernetes.NewForConfig(c.Kube.config)
+	upCtx, err := upbound.NewFromFlags(c.Upbound)
+	if err != nil {
+		return err
+	}
+
+	kubeconfig, err := c.getKubeconfig(upCtx)
+	if err != nil {
+		return err
+	}
+
+	kClient, err := kubernetes.NewForConfig(kubeconfig)
 	if err != nil {
 		return err
 	}
@@ -98,7 +111,7 @@ func (c *destroyCmd) AfterApply(kongCtx *kong.Context) error {
 		with = append(with, helm.WithNoHooks())
 	}
 
-	mgr, err := helm.NewManager(c.Kube.config,
+	mgr, err := helm.NewManager(kubeconfig,
 		spacesChart,
 		c.Registry.Repository,
 		with...,
@@ -109,6 +122,18 @@ func (c *destroyCmd) AfterApply(kongCtx *kong.Context) error {
 	kongCtx.Bind(mgr)
 
 	return nil
+}
+
+// getKubeconfig returns the kubeconfig from flags if provided, otherwise the
+// kubeconfig from the active profile.
+func (c *destroyCmd) getKubeconfig(upCtx *upbound.Context) (*rest.Config, error) {
+	if c.Kube.Kubeconfig != "" || c.Kube.Context != "" {
+		return c.Kube.GetConfig(), nil
+	}
+	if !upCtx.Profile.IsSpacesProfile() {
+		return nil, fmt.Errorf("destroy is not supported for non-Spaces profile %q", upCtx.ProfileName)
+	}
+	return upCtx.Profile.GetKubeClientConfig()
 }
 
 // Run executes the uninstall command.

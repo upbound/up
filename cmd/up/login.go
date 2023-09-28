@@ -156,8 +156,22 @@ func (c *loginCmd) Run(p pterm.TextPrinter, upCtx *upbound.Context) error { // n
 		return errors.Wrap(err, errLoginFailed)
 	}
 
-	// Set session early so that it can be used to fetch user info if necessary.
-	upCtx.Profile.Session = session
+	// If profile name was not provided and no default exists, set name to 'default'.
+	if upCtx.ProfileName == "" {
+		upCtx.ProfileName = defaultProfileName
+	}
+
+	// Re-initialize profile for this login.
+	profile := config.Profile{
+		Type: profType,
+		ID:   auth.ID,
+		// Set session early so that it can be used to fetch user info if
+		// necessary.
+		Session: session,
+		// Carry over existing config.
+		BaseConfig: upCtx.Profile.BaseConfig,
+	}
+	upCtx.Profile = profile
 
 	// If the default account is not set, the user's personal account is used.
 	if upCtx.Account == "" {
@@ -171,14 +185,6 @@ func (c *loginCmd) Run(p pterm.TextPrinter, upCtx *upbound.Context) error { // n
 		}
 		upCtx.Account = info.User.Username
 	}
-
-	// If profile name was not provided and no default exists, set name to 'default'.
-	if upCtx.ProfileName == "" {
-		upCtx.ProfileName = defaultProfileName
-	}
-
-	upCtx.Profile.ID = auth.ID
-	upCtx.Profile.Type = profType
 	upCtx.Profile.Account = upCtx.Account
 
 	if err := upCtx.Cfg.AddOrUpdateUpboundProfile(upCtx.ProfileName, upCtx.Profile); err != nil {
