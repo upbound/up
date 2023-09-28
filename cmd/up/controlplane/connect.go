@@ -114,7 +114,7 @@ type connectCmd struct {
 
 // Run executes the connect command.
 func (c *connectCmd) Run(p pterm.TextPrinter, upCtx *upbound.Context) error {
-	if upCtx.Profile.IsSpacesProfile() {
+	if upCtx.Profile.IsSpaces() {
 		return fmt.Errorf("connect is not supported for Spaces profile %q", upCtx.ProfileName)
 	}
 

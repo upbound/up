@@ -60,7 +60,7 @@ type logoutCmd struct {
 
 // Run executes the logout command.
 func (c *logoutCmd) Run(p pterm.TextPrinter, upCtx *upbound.Context) error {
-	if upCtx.Profile.IsSpacesProfile() {
+	if upCtx.Profile.IsSpaces() {
 		return fmt.Errorf("logout is not supported for Spaces profile %q", upCtx.ProfileName)
 	}
 

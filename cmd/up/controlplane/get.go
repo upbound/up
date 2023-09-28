@@ -43,7 +43,7 @@ type getCmd struct {
 
 // Run executes the get command.
 func (c *getCmd) Run(printer upterm.ObjectPrinter, cc *cp.Client, upCtx *upbound.Context) error {
-	if upCtx.Profile.IsSpacesProfile() {
+	if upCtx.Profile.IsSpaces() {
 		return fmt.Errorf("get is not supported for Spaces profile %q", upCtx.ProfileName)
 	}
 

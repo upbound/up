@@ -37,7 +37,7 @@ const (
 // AfterApply constructs and binds Upbound-specific context to any subcommands
 // that have Run() methods that receive it.
 func (c *createCmd) AfterApply(kongCtx *kong.Context, upCtx *upbound.Context) error {
-	if upCtx.Profile.IsSpacesProfile() {
+	if upCtx.Profile.IsSpaces() {
 		return fmt.Errorf("create is not supported for Spaces profile %q", upCtx.ProfileName)
 	}
 

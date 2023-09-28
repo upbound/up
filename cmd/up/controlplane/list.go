@@ -49,7 +49,7 @@ type listCmd struct{}
 
 // Run executes the list command.
 func (c *listCmd) Run(printer upterm.ObjectPrinter, p pterm.TextPrinter, cc *cp.Client, upCtx *upbound.Context) error {
-	if upCtx.Profile.IsSpacesProfile() {
+	if upCtx.Profile.IsSpaces() {
 		return fmt.Errorf("list is not supported for Spaces profile %q", upCtx.ProfileName)
 	}
 

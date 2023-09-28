@@ -126,12 +126,12 @@ type Profile struct {
 	BaseConfig map[string]string `json:"base,omitempty"`
 }
 
-func (p Profile) IsSpacesProfile() bool {
+func (p Profile) IsSpaces() bool {
 	return p.Type == SpacesProfileType
 }
 
 func (p Profile) GetKubeClientConfig() (*rest.Config, error) {
-	if !p.IsSpacesProfile() {
+	if !p.IsSpaces() {
 		return nil, fmt.Errorf("kube client not supported for profile type %q", p.Type)
 	}
 	rules := clientcmd.NewDefaultClientConfigLoadingRules()
@@ -156,7 +156,7 @@ func (p RedactedProfile) MarshalJSON() ([]byte, error) {
 	type profile RedactedProfile
 	pc := profile(p)
 	// Spaces profiles don't have session tokens.
-	if !p.IsSpacesProfile() {
+	if !p.IsSpaces() {
 		s := "NONE"
 		if pc.Session != "" {
 			s = "REDACTED"
@@ -168,7 +168,7 @@ func (p RedactedProfile) MarshalJSON() ([]byte, error) {
 
 // checkProfile ensures a profile does not violate constraints.
 func checkProfile(p Profile) error {
-	if (!p.IsSpacesProfile() && p.ID == "") || p.Type == "" {
+	if (!p.IsSpaces() && p.ID == "") || p.Type == "" {
 		return errors.New(errInvalidProfile)
 	}
 	return nil
