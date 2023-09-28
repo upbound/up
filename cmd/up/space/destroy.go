@@ -56,36 +56,7 @@ func (c *destroyCmd) AfterApply(kongCtx *kong.Context) error {
 	pterm.EnableStyling()
 	upterm.DefaultObjPrinter.Pretty = true
 
-	if !c.Confirmed {
-		if c.Orphan {
-			pterm.Info.Println()
-			pterm.Info.Println("Removing Space API components.")
-			pterm.Info.Println("Control Planes will continue to run and no data will be lost")
-			pterm.Info.Println()
-		} else {
-			pterm.Println()
-			pterm.FgRed.Println("******************** DESTRUCTIVE COMMAND ********************")
-			pterm.FgRed.Println("********************* DATA-LOSS WARNING *********************")
-			pterm.Println()
-			pterm.Warning.Println("Destroying Spaces is a destructive command that will destroy data and orphan resources.")
-			pterm.Warning.Println("Before proceeding ensure that Managed Resources in Control Planes have been deleted.")
-			pterm.Warning.Println("All Spaces components including Control Planes will be destroyed.")
-			pterm.Println()
-			pterm.Warning.Println("If you want to retain data, abort and run 'up space destroy --orphan'")
-			pterm.Println()
-		}
-
-		prompter := input.NewPrompter()
-		in, err := prompter.Prompt(fmt.Sprintf("To proceed, type: %q", confirmStr), false)
-		if err != nil {
-			pterm.Error.Printfln("error getting user confirmation: %v", err)
-			os.Exit(1)
-		}
-		if in != confirmStr {
-			pterm.Error.Println("Destruction was not confirmed")
-			os.Exit(10)
-		}
-	}
+	c.confirm()
 
 	upCtx, err := upbound.NewFromFlags(c.Upbound)
 	if err != nil {
@@ -122,6 +93,41 @@ func (c *destroyCmd) AfterApply(kongCtx *kong.Context) error {
 	kongCtx.Bind(mgr)
 
 	return nil
+}
+
+// confirm prompts for confirmation and exits if the user declines.
+func (c *destroyCmd) confirm() {
+	if c.Confirmed {
+		return
+	}
+	if c.Orphan {
+		pterm.Info.Println()
+		pterm.Info.Println("Removing Space API components.")
+		pterm.Info.Println("Control Planes will continue to run and no data will be lost")
+		pterm.Info.Println()
+	} else {
+		pterm.Println()
+		pterm.FgRed.Println("******************** DESTRUCTIVE COMMAND ********************")
+		pterm.FgRed.Println("********************* DATA-LOSS WARNING *********************")
+		pterm.Println()
+		pterm.Warning.Println("Destroying Spaces is a destructive command that will destroy data and orphan resources.")
+		pterm.Warning.Println("Before proceeding ensure that Managed Resources in Control Planes have been deleted.")
+		pterm.Warning.Println("All Spaces components including Control Planes will be destroyed.")
+		pterm.Println()
+		pterm.Warning.Println("If you want to retain data, abort and run 'up space destroy --orphan'")
+		pterm.Println()
+	}
+
+	prompter := input.NewPrompter()
+	in, err := prompter.Prompt(fmt.Sprintf("To proceed, type: %q", confirmStr), false)
+	if err != nil {
+		pterm.Error.Printfln("error getting user confirmation: %v", err)
+		os.Exit(1)
+	}
+	if in != confirmStr {
+		pterm.Error.Println("Destruction was not confirmed")
+		os.Exit(10)
+	}
 }
 
 // getKubeconfig returns the kubeconfig from flags if provided, otherwise the
