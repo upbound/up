@@ -15,6 +15,8 @@
 package profile
 
 import (
+	"fmt"
+
 	"github.com/alecthomas/kong"
 	"github.com/crossplane/crossplane-runtime/pkg/errors"
 	"github.com/pterm/pterm"
@@ -50,13 +52,15 @@ func (c *spaceCmd) Run(p pterm.TextPrinter, upCtx *upbound.Context) error {
 		setDefault = true
 	}
 
-	if err := upCtx.Cfg.AddOrUpdateUpboundProfile(upCtx.ProfileName, profile.Profile{
+	prof := profile.Profile{
 		Type:        profile.Space,
 		Kubeconfig:  c.Kube.Kubeconfig,
 		KubeContext: c.Kube.GetContext(),
 		// Carry over existing config.
 		BaseConfig: upCtx.Profile.BaseConfig,
-	}); err != nil {
+	}
+
+	if err := upCtx.Cfg.AddOrUpdateUpboundProfile(upCtx.ProfileName, prof); err != nil {
 		return errors.Wrap(err, errSetProfile)
 	}
 
@@ -70,10 +74,15 @@ func (c *spaceCmd) Run(p pterm.TextPrinter, upCtx *upbound.Context) error {
 		return errors.Wrap(err, errUpdateConfig)
 	}
 
-	if setDefault {
-		p.Printfln("Profile %q updated and selected as the default profile", upCtx.ProfileName)
-	} else {
-		p.Printfln("Profile %q updated", upCtx.ProfileName)
+	kubeconfigLocation := "default kubeconfig"
+	if prof.Kubeconfig != "" {
+		kubeconfigLocation = fmt.Sprintf("kubeconfig at %q", prof.Kubeconfig)
 	}
+	p.Printf("Profile %q updated to use context %q from the %s", upCtx.ProfileName, prof.KubeContext, kubeconfigLocation)
+	if setDefault {
+		p.Print(" and selected as the default profile")
+	}
+	p.Println()
+
 	return nil
 }
