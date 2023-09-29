@@ -39,8 +39,12 @@ type Flags struct {
 }
 
 type KubeFlags struct {
+	// Kubeconfig is the kubeconfig file path to read. If empty, it refers to
+	// client-go's default kubeconfig location.
 	Kubeconfig string `type:"existingfile" help:"Override default kubeconfig path."`
-	Context    string `name:"kubecontext" help:"Override default kubeconfig context."`
+	// Context is the context within Kubeconfig to read. If empty, it refers
+	// to the default context.
+	Context string `name:"kubecontext" help:"Override default kubeconfig context."`
 
 	// set by AfterApply
 	config  *rest.Config

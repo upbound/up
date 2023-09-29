@@ -111,12 +111,12 @@ type Profile struct {
 	// Account is the default account to use when this profile is selected.
 	Account string `json:"account,omitempty"`
 
-	// Kubeconfig is the kubeconfig file to use when this profile is selected.
-	// Used when Type is SpacesProfileType.
+	// Kubeconfig is the kubeconfig file path that GetKubeClientConfig() will
+	// read. If empty, it refers to client-go's default kubeconfig location.
 	Kubeconfig string `json:"kubeconfig,omitempty"`
 
-	// KubeContext is the kubeconfig context to use when this profile is
-	// selected. Used when Type is SpacesProfileType.
+	// KubeContext is the context within Kubeconfig that GetKubeClientConfig()
+	// will read. If empty, it refers to the default context.
 	KubeContext string `json:"kube_context,omitempty"`
 
 	// BaseConfig represent persisted settings for this profile.
@@ -130,6 +130,8 @@ func (p Profile) IsSpaces() bool {
 	return p.Type == SpacesProfileType
 }
 
+// GetKubeClientConfig returns a *rest.Config loaded from p.Kubeconfig and
+// p.KubeContext. It returns an error if p.IsSpaces() is false.
 func (p Profile) GetKubeClientConfig() (*rest.Config, error) {
 	if !p.IsSpaces() {
 		return nil, fmt.Errorf("kube client not supported for profile type %q", p.Type)
