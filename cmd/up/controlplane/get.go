@@ -16,6 +16,7 @@ package controlplane
 
 import (
 	"context"
+	"fmt"
 
 	"github.com/alecthomas/kong"
 	"github.com/crossplane/crossplane-runtime/pkg/errors"
@@ -42,6 +43,10 @@ type getCmd struct {
 
 // Run executes the get command.
 func (c *getCmd) Run(printer upterm.ObjectPrinter, cc *cp.Client, upCtx *upbound.Context) error {
+	if upCtx.Profile.IsSpace() {
+		return fmt.Errorf("get is not supported for space profile %q", upCtx.ProfileName)
+	}
+
 	ctp, err := cc.Get(context.Background(), upCtx.Account, c.Name)
 	if err != nil {
 		return err

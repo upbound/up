@@ -23,9 +23,11 @@ import (
 	"github.com/pterm/pterm"
 	v1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/client-go/kubernetes"
+	"k8s.io/client-go/rest"
 
 	"github.com/upbound/up/internal/input"
 	"github.com/upbound/up/internal/install/helm"
+	"github.com/upbound/up/internal/upbound"
 	"github.com/upbound/up/internal/upterm"
 )
 
@@ -36,8 +38,9 @@ const (
 
 // destroyCmd uninstalls Upbound.
 type destroyCmd struct {
-	Registry registryFlags `embed:""`
-	Kube     kubeFlags     `embed:""`
+	Upbound  upbound.Flags     `embed:""`
+	Registry registryFlags     `embed:""`
+	Kube     upbound.KubeFlags `embed:""`
 
 	Confirmed bool `name:"yes-really-delete-space-and-all-data" type:"bool" help:"Bypass safety checks and destroy Spaces"`
 	Orphan    bool `name:"orphan" type:"bool" help:"Remove Space components but retain Control Planes and data"`
@@ -49,42 +52,17 @@ func (c *destroyCmd) AfterApply(kongCtx *kong.Context) error {
 		return err
 	}
 
-	// NOTE(tnthornton) we currently only have support for stylized output.
-	pterm.EnableStyling()
-	upterm.DefaultObjPrinter.Pretty = true
-
-	if !c.Confirmed {
-		if c.Orphan {
-			pterm.Info.Println()
-			pterm.Info.Println("Removing Space API components.")
-			pterm.Info.Println("Control Planes will continue to run and no data will be lost")
-			pterm.Info.Println()
-		} else {
-			pterm.Println()
-			pterm.FgRed.Println("******************** DESTRUCTIVE COMMAND ********************")
-			pterm.FgRed.Println("********************* DATA-LOSS WARNING *********************")
-			pterm.Println()
-			pterm.Warning.Println("Destroying Spaces is a destructive command that will destroy data and orphan resources.")
-			pterm.Warning.Println("Before proceeding ensure that Managed Resources in Control Planes have been deleted.")
-			pterm.Warning.Println("All Spaces components including Control Planes will be destroyed.")
-			pterm.Println()
-			pterm.Warning.Println("If you want to retain data, abort and run 'up space destroy --orphan'")
-			pterm.Println()
-		}
-
-		prompter := input.NewPrompter()
-		in, err := prompter.Prompt(fmt.Sprintf("To proceed, type: %q", confirmStr), false)
-		if err != nil {
-			pterm.Error.Printfln("error getting user confirmation: %v", err)
-			os.Exit(1)
-		}
-		if in != confirmStr {
-			pterm.Error.Println("Destruction was not confirmed")
-			os.Exit(10)
-		}
+	upCtx, err := upbound.NewFromFlags(c.Upbound)
+	if err != nil {
+		return err
 	}
 
-	kClient, err := kubernetes.NewForConfig(c.Kube.config)
+	kubeconfig, err := c.getKubeconfig(upCtx)
+	if err != nil {
+		return err
+	}
+
+	kClient, err := kubernetes.NewForConfig(kubeconfig)
 	if err != nil {
 		return err
 	}
@@ -98,7 +76,7 @@ func (c *destroyCmd) AfterApply(kongCtx *kong.Context) error {
 		with = append(with, helm.WithNoHooks())
 	}
 
-	mgr, err := helm.NewManager(c.Kube.config,
+	mgr, err := helm.NewManager(kubeconfig,
 		spacesChart,
 		c.Registry.Repository,
 		with...,
@@ -108,7 +86,60 @@ func (c *destroyCmd) AfterApply(kongCtx *kong.Context) error {
 	}
 	kongCtx.Bind(mgr)
 
+	// NOTE(tnthornton) we currently only have support for stylized output.
+	pterm.EnableStyling()
+	upterm.DefaultObjPrinter.Pretty = true
+
+	c.confirm()
+
 	return nil
+}
+
+// confirm prompts for confirmation and exits if the user declines.
+func (c *destroyCmd) confirm() {
+	if c.Confirmed {
+		return
+	}
+	if c.Orphan {
+		pterm.Info.Println()
+		pterm.Info.Println("Removing Space API components.")
+		pterm.Info.Println("Control Planes will continue to run and no data will be lost")
+		pterm.Info.Println()
+	} else {
+		pterm.Println()
+		pterm.FgRed.Println("******************** DESTRUCTIVE COMMAND ********************")
+		pterm.FgRed.Println("********************* DATA-LOSS WARNING *********************")
+		pterm.Println()
+		pterm.Warning.Println("Destroying Spaces is a destructive command that will destroy data and orphan resources.")
+		pterm.Warning.Println("Before proceeding ensure that Managed Resources in Control Planes have been deleted.")
+		pterm.Warning.Println("All Spaces components including Control Planes will be destroyed.")
+		pterm.Println()
+		pterm.Warning.Println("If you want to retain data, abort and run 'up space destroy --orphan'")
+		pterm.Println()
+	}
+
+	prompter := input.NewPrompter()
+	in, err := prompter.Prompt(fmt.Sprintf("To proceed, type: %q", confirmStr), false)
+	if err != nil {
+		pterm.Error.Printfln("error getting user confirmation: %v", err)
+		os.Exit(1)
+	}
+	if in != confirmStr {
+		pterm.Error.Println("Destruction was not confirmed")
+		os.Exit(10)
+	}
+}
+
+// getKubeconfig returns the kubeconfig from flags if provided, otherwise the
+// kubeconfig from the active profile.
+func (c *destroyCmd) getKubeconfig(upCtx *upbound.Context) (*rest.Config, error) {
+	if c.Kube.Kubeconfig != "" || c.Kube.Context != "" {
+		return c.Kube.GetConfig(), nil
+	}
+	if !upCtx.Profile.IsSpace() {
+		return nil, fmt.Errorf("destroy is not supported for non-space profile %q", upCtx.ProfileName)
+	}
+	return upCtx.Profile.GetKubeClientConfig()
 }
 
 // Run executes the uninstall command.

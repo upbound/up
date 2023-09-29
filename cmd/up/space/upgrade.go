@@ -25,6 +25,7 @@ import (
 	"github.com/pterm/pterm"
 	"helm.sh/helm/v3/pkg/chart"
 	"k8s.io/client-go/kubernetes"
+	"k8s.io/client-go/rest"
 	"sigs.k8s.io/yaml"
 
 	"github.com/upbound/up/internal/config"
@@ -32,6 +33,7 @@ import (
 	"github.com/upbound/up/internal/install"
 	"github.com/upbound/up/internal/install/helm"
 	"github.com/upbound/up/internal/kube"
+	"github.com/upbound/up/internal/upbound"
 	"github.com/upbound/up/internal/upterm"
 )
 
@@ -44,7 +46,8 @@ const (
 
 // upgradeCmd upgrades Upbound.
 type upgradeCmd struct {
-	Kube     kubeFlags               `embed:""`
+	Upbound  upbound.Flags           `embed:""`
+	Kube     upbound.KubeFlags       `embed:""`
 	Registry authorizedRegistryFlags `embed:""`
 	install.CommonParams
 
@@ -83,14 +86,24 @@ func (c *upgradeCmd) AfterApply(quiet config.QuietFlag) error { //nolint:gocyclo
 	pterm.EnableStyling()
 	upterm.DefaultObjPrinter.Pretty = true
 
-	kClient, err := kubernetes.NewForConfig(c.Kube.config)
+	upCtx, err := upbound.NewFromFlags(c.Upbound)
+	if err != nil {
+		return err
+	}
+
+	kubeconfig, err := c.getKubeconfig(upCtx)
+	if err != nil {
+		return err
+	}
+
+	kClient, err := kubernetes.NewForConfig(kubeconfig)
 	if err != nil {
 		return err
 	}
 	c.kClient = kClient
 	secret := kube.NewSecretApplicator(kClient)
 	c.pullSecret = kube.NewImagePullApplicator(secret)
-	ins, err := helm.NewManager(c.Kube.config,
+	ins, err := helm.NewManager(kubeconfig,
 		spacesChart,
 		c.Registry.Repository,
 		helm.WithNamespace(ns),
@@ -142,6 +155,18 @@ func (c *upgradeCmd) AfterApply(quiet config.QuietFlag) error { //nolint:gocyclo
 	}
 
 	return nil
+}
+
+// getKubeconfig returns the kubeconfig from flags if provided, otherwise the
+// kubeconfig from the active profile.
+func (c *upgradeCmd) getKubeconfig(upCtx *upbound.Context) (*rest.Config, error) {
+	if c.Kube.Kubeconfig != "" || c.Kube.Context != "" {
+		return c.Kube.GetConfig(), nil
+	}
+	if !upCtx.Profile.IsSpace() {
+		return nil, fmt.Errorf("upgrade is not supported for non-space profile %q", upCtx.ProfileName)
+	}
+	return upCtx.Profile.GetKubeClientConfig()
 }
 
 // Run executes the upgrade command.

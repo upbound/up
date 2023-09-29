@@ -15,6 +15,7 @@
 package kubeconfig
 
 import (
+	"fmt"
 	"io"
 	"os"
 	"path"
@@ -44,6 +45,10 @@ type getCmd struct {
 
 // Run executes the get command.
 func (c *getCmd) Run(p pterm.TextPrinter, upCtx *upbound.Context) error {
+	if upCtx.Profile.IsSpace() {
+		return fmt.Errorf("get is not supported for space profile %q", upCtx.ProfileName)
+	}
+
 	// TODO(hasheddan): consider implementing a custom decoder
 	if c.Token == "-" {
 		b, err := io.ReadAll(c.stdin)

@@ -28,8 +28,8 @@ import (
 	"github.com/google/go-cmp/cmp"
 	"github.com/pterm/pterm"
 
-	"github.com/upbound/up/internal/config"
 	"github.com/upbound/up/internal/http/mocks"
+	"github.com/upbound/up/internal/profile"
 	"github.com/upbound/up/internal/upbound"
 )
 
@@ -46,6 +46,7 @@ func TestRun(t *testing.T) {
 		"ErrorNoUserOrToken": {
 			reason: "If neither user or token is provided an error should be returned.",
 			cmd:    &loginCmd{},
+			ctx:    &upbound.Context{},
 			err:    errors.Wrap(errors.New(errNoUserOrToken), errLoginFailed),
 		},
 		"ErrLoginFailed": {
@@ -81,7 +82,7 @@ func TestConstructAuth(t *testing.T) {
 		password string
 	}
 	type want struct {
-		pType config.ProfileType
+		pType profile.Type
 		auth  *auth
 	}
 	cases := map[string]struct {
@@ -101,7 +102,7 @@ func TestConstructAuth(t *testing.T) {
 				password: "cool-password",
 			},
 			want: want{
-				pType: config.UserProfileType,
+				pType: profile.User,
 				auth: &auth{
 					ID:       "cool-user",
 					Password: "cool-password",
@@ -115,7 +116,7 @@ func TestConstructAuth(t *testing.T) {
 				token: "eyJ0eXAiOiJKV1QiLCJhbGciOiJIUzI1NiJ9.eyJpc3MiOiJPbmxpbmUgSldUIEJ1aWxkZXIiLCJpYXQiOjE2MTg1MTc5NDMsImV4cCI6MTY1MDA1Mzk0MywiYXVkIjoiaHR0cHM6Ly9kYW5pZWxtYW5ndW0uY29tIiwic3ViIjoiZ2VvcmdlZGFuaWVsbWFuZ3VtQGdtYWlsLmNvbSIsIkpUSSI6Imhhc2hlZGRhbiJ9.zI42wXvwDHiATx9ycECz7JyATTn9P07wN-TRXvtCGcM",
 			},
 			want: want{
-				pType: config.TokenProfileType,
+				pType: profile.Token,
 				auth: &auth{
 					ID:       "hasheddan",
 					Password: "eyJ0eXAiOiJKV1QiLCJhbGciOiJIUzI1NiJ9.eyJpc3MiOiJPbmxpbmUgSldUIEJ1aWxkZXIiLCJpYXQiOjE2MTg1MTc5NDMsImV4cCI6MTY1MDA1Mzk0MywiYXVkIjoiaHR0cHM6Ly9kYW5pZWxtYW5ndW0uY29tIiwic3ViIjoiZ2VvcmdlZGFuaWVsbWFuZ3VtQGdtYWlsLmNvbSIsIkpUSSI6Imhhc2hlZGRhbiJ9.zI42wXvwDHiATx9ycECz7JyATTn9P07wN-TRXvtCGcM",
@@ -130,7 +131,7 @@ func TestConstructAuth(t *testing.T) {
 				password: "forget-about-me",
 			},
 			want: want{
-				pType: config.TokenProfileType,
+				pType: profile.Token,
 				auth: &auth{
 					ID:       "hasheddan",
 					Password: "eyJ0eXAiOiJKV1QiLCJhbGciOiJIUzI1NiJ9.eyJpc3MiOiJPbmxpbmUgSldUIEJ1aWxkZXIiLCJpYXQiOjE2MTg1MTc5NDMsImV4cCI6MTY1MDA1Mzk0MywiYXVkIjoiaHR0cHM6Ly9kYW5pZWxtYW5ndW0uY29tIiwic3ViIjoiZ2VvcmdlZGFuaWVsbWFuZ3VtQGdtYWlsLmNvbSIsIkpUSSI6Imhhc2hlZGRhbiJ9.zI42wXvwDHiATx9ycECz7JyATTn9P07wN-TRXvtCGcM",
@@ -162,7 +163,7 @@ func TestParseID(t *testing.T) {
 	}
 	type want struct {
 		id    string
-		pType config.ProfileType
+		pType profile.Type
 	}
 	cases := map[string]struct {
 		reason string
@@ -191,7 +192,7 @@ func TestParseID(t *testing.T) {
 			},
 			want: want{
 				id:    "hasheddan",
-				pType: config.TokenProfileType,
+				pType: profile.Token,
 			},
 		},
 		"Successful": {
@@ -201,7 +202,7 @@ func TestParseID(t *testing.T) {
 			},
 			want: want{
 				id:    "cool-user",
-				pType: config.UserProfileType,
+				pType: profile.User,
 			},
 		},
 	}

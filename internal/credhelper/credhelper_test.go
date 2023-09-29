@@ -23,6 +23,7 @@ import (
 	"github.com/google/go-cmp/cmp"
 
 	"github.com/upbound/up/internal/config"
+	"github.com/upbound/up/internal/profile"
 )
 
 // TODO(hasheddan): these tests are testing through to the underlying config
@@ -150,7 +151,7 @@ func TestGet(t *testing.T) {
 					GetConfigFn: func() (*config.Config, error) {
 						return &config.Config{
 							Upbound: config.Upbound{
-								Profiles: map[string]config.Profile{
+								Profiles: map[string]profile.Profile{
 									testProfile: {
 										Session: testSecret,
 									},

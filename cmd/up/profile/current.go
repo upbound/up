@@ -20,25 +20,25 @@ import (
 
 	"github.com/alecthomas/kong"
 
-	"github.com/upbound/up/internal/config"
+	"github.com/upbound/up/internal/profile"
 	"github.com/upbound/up/internal/upbound"
 )
 
 type currentCmd struct{}
 
 type output struct {
-	Name    string                 `json:"name"`
-	Profile config.RedactedProfile `json:"profile"`
+	Name    string           `json:"name"`
+	Profile profile.Redacted `json:"profile"`
 }
 
 // Run executes the current command.
 func (c *currentCmd) Run(ctx *kong.Context, upCtx *upbound.Context) error {
-	name, profile, err := upCtx.Cfg.GetDefaultUpboundProfile()
+	name, prof, err := upCtx.Cfg.GetDefaultUpboundProfile()
 	if err != nil {
 		return err
 	}
 
-	redacted := config.RedactedProfile{Profile: profile}
+	redacted := profile.Redacted{Profile: prof}
 
 	b, err := json.MarshalIndent(output{
 		Name:    name,
