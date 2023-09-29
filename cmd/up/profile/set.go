@@ -50,5 +50,9 @@ func (c *spaceCmd) Run(p pterm.TextPrinter, upCtx *upbound.Context) error {
 	}); err != nil {
 		return errors.Wrap(err, errSetProfile)
 	}
-	return errors.Wrap(upCtx.CfgSrc.UpdateConfig(upCtx.Cfg), errUpdateConfig)
+	if err := upCtx.CfgSrc.UpdateConfig(upCtx.Cfg); err != nil {
+		return errors.Wrap(err, errUpdateConfig)
+	}
+	p.Printfln("Profile %q updated", upCtx.ProfileName)
+	return nil
 }
