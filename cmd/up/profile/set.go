@@ -24,7 +24,8 @@ import (
 )
 
 const (
-	errSetProfile = "unable to set profile"
+	errSetProfile   = "unable to set profile"
+	errUpdateConfig = "unable to update config file"
 )
 
 type setCmd struct {
@@ -47,7 +48,7 @@ func (c *spaceCmd) Run(p pterm.TextPrinter, upCtx *upbound.Context) error {
 		// Carry over existing config.
 		BaseConfig: upCtx.Profile.BaseConfig,
 	}); err != nil {
-		return err
+		return errors.Wrap(err, errSetProfile)
 	}
-	return errors.Wrap(upCtx.CfgSrc.UpdateConfig(upCtx.Cfg), errSetProfile)
+	return errors.Wrap(upCtx.CfgSrc.UpdateConfig(upCtx.Cfg), errUpdateConfig)
 }
