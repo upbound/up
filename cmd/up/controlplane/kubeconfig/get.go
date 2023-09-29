@@ -45,8 +45,8 @@ type getCmd struct {
 
 // Run executes the get command.
 func (c *getCmd) Run(p pterm.TextPrinter, upCtx *upbound.Context) error {
-	if upCtx.Profile.IsSpaces() {
-		return fmt.Errorf("get is not supported for Spaces profile %q", upCtx.ProfileName)
+	if upCtx.Profile.IsSpace() {
+		return fmt.Errorf("get is not supported for space profile %q", upCtx.ProfileName)
 	}
 
 	// TODO(hasheddan): consider implementing a custom decoder

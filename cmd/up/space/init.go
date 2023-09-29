@@ -271,7 +271,7 @@ func (c *initCmd) createOrUpdateProfile(upCtx *upbound.Context) error {
 
 	// Re-initialize active profile for this space.
 	profile := config.Profile{
-		Type:        config.SpacesProfileType,
+		Type:        config.SpaceProfileType,
 		Kubeconfig:  c.Kube.Kubeconfig,
 		KubeContext: c.Kube.GetContext(),
 		// Carry over existing config.

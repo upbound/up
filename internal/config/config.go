@@ -94,9 +94,9 @@ type ProfileType string
 
 // Types of profiles.
 const (
-	UserProfileType   ProfileType = "user"
-	TokenProfileType  ProfileType = "token"
-	SpacesProfileType ProfileType = "spaces"
+	UserProfileType  ProfileType = "user"
+	TokenProfileType ProfileType = "token"
+	SpaceProfileType ProfileType = "space"
 )
 
 // A Profile is a set of credentials
@@ -128,14 +128,14 @@ type Profile struct {
 	BaseConfig map[string]string `json:"base,omitempty"`
 }
 
-func (p Profile) IsSpaces() bool {
-	return p.Type == SpacesProfileType
+func (p Profile) IsSpace() bool {
+	return p.Type == SpaceProfileType
 }
 
 // GetKubeClientConfig returns a *rest.Config loaded from p.Kubeconfig and
-// p.KubeContext. It returns an error if p.IsSpaces() is false.
+// p.KubeContext. It returns an error if p.IsSpace() is false.
 func (p Profile) GetKubeClientConfig() (*rest.Config, error) {
-	if !p.IsSpaces() {
+	if !p.IsSpace() {
 		return nil, fmt.Errorf("kube client not supported for profile type %q", p.Type)
 	}
 	rules := clientcmd.NewDefaultClientConfigLoadingRules()
@@ -159,8 +159,8 @@ type RedactedProfile struct {
 func (p RedactedProfile) MarshalJSON() ([]byte, error) {
 	type profile RedactedProfile
 	pc := profile(p)
-	// Spaces profiles don't have session tokens.
-	if !p.IsSpaces() {
+	// Space profiles don't have session tokens.
+	if !p.IsSpace() {
 		s := "NONE"
 		if pc.Session != "" {
 			s = "REDACTED"
@@ -172,7 +172,7 @@ func (p RedactedProfile) MarshalJSON() ([]byte, error) {
 
 // checkProfile ensures a profile does not violate constraints.
 func checkProfile(p Profile) error {
-	if (!p.IsSpaces() && p.ID == "") || p.Type == "" {
+	if (!p.IsSpace() && p.ID == "") || p.Type == "" {
 		return errors.New(errInvalidProfile)
 	}
 	return nil

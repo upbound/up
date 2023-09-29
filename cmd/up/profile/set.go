@@ -51,7 +51,7 @@ func (c *spaceCmd) Run(p pterm.TextPrinter, upCtx *upbound.Context) error {
 	}
 
 	if err := upCtx.Cfg.AddOrUpdateUpboundProfile(upCtx.ProfileName, config.Profile{
-		Type:        config.SpacesProfileType,
+		Type:        config.SpaceProfileType,
 		Kubeconfig:  c.Kube.Kubeconfig,
 		KubeContext: c.Kube.GetContext(),
 		// Carry over existing config.

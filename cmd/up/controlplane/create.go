@@ -36,8 +36,8 @@ type createCmd struct {
 
 // Run executes the create command.
 func (c *createCmd) Run(p pterm.TextPrinter, cc *cp.Client, cfc *configurations.Client, upCtx *upbound.Context) error {
-	if upCtx.Profile.IsSpaces() {
-		return fmt.Errorf("create is not supported for Spaces profile %q", upCtx.ProfileName)
+	if upCtx.Profile.IsSpace() {
+		return fmt.Errorf("create is not supported for space profile %q", upCtx.ProfileName)
 	}
 
 	// Get the UUID from the Configuration name, if it exists.

@@ -49,8 +49,8 @@ type listCmd struct{}
 
 // Run executes the list command.
 func (c *listCmd) Run(printer upterm.ObjectPrinter, p pterm.TextPrinter, cc *cp.Client, upCtx *upbound.Context) error {
-	if upCtx.Profile.IsSpaces() {
-		return fmt.Errorf("list is not supported for Spaces profile %q", upCtx.ProfileName)
+	if upCtx.Profile.IsSpace() {
+		return fmt.Errorf("list is not supported for space profile %q", upCtx.ProfileName)
 	}
 
 	// TODO(hasheddan): we currently just max out single page size, but we

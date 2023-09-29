@@ -78,12 +78,12 @@ func TestAddOrUpdateUpboundProfile(t *testing.T) {
 			want:   &Config{},
 			err:    errors.New(errInvalidProfile),
 		},
-		"AddNewSpacesProfile": {
-			reason: "Adding a new spaces profile to an empty Config should not cause an error.",
+		"AddNewSpaceProfile": {
+			reason: "Adding a new space profile to an empty Config should not cause an error.",
 			name:   "cool-profile",
 			cfg:    &Config{},
 			add: Profile{
-				Type:        SpacesProfileType,
+				Type:        SpaceProfileType,
 				Kubeconfig:  "cool-config",
 				KubeContext: "cool-context",
 			},
@@ -91,7 +91,7 @@ func TestAddOrUpdateUpboundProfile(t *testing.T) {
 				Upbound: Upbound{
 					Profiles: map[string]Profile{
 						"cool-profile": {
-							Type:        SpacesProfileType,
+							Type:        SpaceProfileType,
 							Kubeconfig:  "cool-config",
 							KubeContext: "cool-context",
 						},
@@ -99,14 +99,14 @@ func TestAddOrUpdateUpboundProfile(t *testing.T) {
 				},
 			},
 		},
-		"UpdateExistingSpacesProfile": {
-			reason: "Updating an existing spaces profile in the Config should not cause an error.",
+		"UpdateExistingSpaceProfile": {
+			reason: "Updating an existing space profile in the Config should not cause an error.",
 			name:   "cool-profile",
 			cfg: &Config{
 				Upbound: Upbound{
 					Profiles: map[string]Profile{
 						"cool-profile": {
-							Type:        SpacesProfileType,
+							Type:        SpaceProfileType,
 							Kubeconfig:  "cool-config",
 							KubeContext: "cool-context",
 						},
@@ -114,7 +114,7 @@ func TestAddOrUpdateUpboundProfile(t *testing.T) {
 				},
 			},
 			add: Profile{
-				Type:        SpacesProfileType,
+				Type:        SpaceProfileType,
 				Kubeconfig:  "other-config",
 				KubeContext: "other-context",
 			},
@@ -122,7 +122,7 @@ func TestAddOrUpdateUpboundProfile(t *testing.T) {
 				Upbound: Upbound{
 					Profiles: map[string]Profile{
 						"cool-profile": {
-							Type:        SpacesProfileType,
+							Type:        SpaceProfileType,
 							Kubeconfig:  "other-config",
 							KubeContext: "other-context",
 						},

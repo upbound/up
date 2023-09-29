@@ -32,8 +32,8 @@ type deleteCmd struct {
 
 // Run executes the delete command.
 func (c *deleteCmd) Run(p pterm.TextPrinter, cc *cp.Client, upCtx *upbound.Context) error {
-	if upCtx.Profile.IsSpaces() {
-		return fmt.Errorf("delete is not supported for Spaces profile %q", upCtx.ProfileName)
+	if upCtx.Profile.IsSpace() {
+		return fmt.Errorf("delete is not supported for space profile %q", upCtx.ProfileName)
 	}
 
 	if err := cc.Delete(context.Background(), upCtx.Account, c.Name); err != nil {
