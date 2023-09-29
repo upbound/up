@@ -74,8 +74,6 @@ const (
 
 	jsonKey = "_json_key"
 
-	defaultProfileName = "default"
-
 	errReadTokenFile          = "unable to read token file"
 	errReadParametersFile     = "unable to read parameters file"
 	errParseInstallParameters = "unable to parse install parameters"
@@ -268,7 +266,7 @@ func (c *initCmd) createOrUpdateProfile(upCtx *upbound.Context) error {
 	// If profile name was not provided and no default exists, set name to
 	// the default.
 	if upCtx.ProfileName == "" {
-		upCtx.ProfileName = defaultProfileName
+		upCtx.ProfileName = config.DefaultProfileName
 	}
 
 	// Re-initialize active profile for this space.

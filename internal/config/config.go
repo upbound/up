@@ -31,6 +31,8 @@ import (
 const (
 	ConfigDir  = ".up"
 	ConfigFile = "config.json"
+
+	DefaultProfileName = "default"
 )
 
 const (

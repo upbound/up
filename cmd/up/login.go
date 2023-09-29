@@ -38,9 +38,8 @@ import (
 )
 
 const (
-	defaultTimeout     = 30 * time.Second
-	defaultProfileName = "default"
-	loginPath          = "/v1/login"
+	defaultTimeout = 30 * time.Second
+	loginPath      = "/v1/login"
 
 	errLoginFailed    = "unable to login"
 	errReadBody       = "unable to read response body"
@@ -158,7 +157,7 @@ func (c *loginCmd) Run(p pterm.TextPrinter, upCtx *upbound.Context) error { // n
 
 	// If profile name was not provided and no default exists, set name to 'default'.
 	if upCtx.ProfileName == "" {
-		upCtx.ProfileName = defaultProfileName
+		upCtx.ProfileName = config.DefaultProfileName
 	}
 
 	// Re-initialize profile for this login.
