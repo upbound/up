@@ -56,7 +56,7 @@ func (c *getCmd) Run(printer upterm.ObjectPrinter, cc *cp.Client, upCtx *upbound
 		return errors.New(errNoConfigurationFound)
 	}
 
-	return printer.Print(*ctp, fieldNames, extractFields)
+	return printer.Print(*ctp, cloudFieldNames, extractCloudFields)
 }
 
 // EmptyControlPlaneConfiguration returns an empty ControlPlaneConfiguration with default values.
