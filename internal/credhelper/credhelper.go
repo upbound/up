@@ -22,6 +22,7 @@ import (
 	"github.com/docker/docker-credential-helpers/credentials"
 
 	"github.com/upbound/up/internal/config"
+	"github.com/upbound/up/internal/profile"
 )
 
 const (
@@ -118,7 +119,7 @@ func (h *Helper) Get(serverURL string) (string, string, error) {
 	if err != nil {
 		return "", "", errors.Wrap(err, errExtractConfig)
 	}
-	var p config.Profile
+	var p profile.Profile
 	if h.profile == "" {
 		_, p, err = conf.GetDefaultUpboundProfile()
 		if err != nil {

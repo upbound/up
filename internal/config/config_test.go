@@ -21,18 +21,20 @@ import (
 	"github.com/crossplane/crossplane-runtime/pkg/errors"
 	"github.com/crossplane/crossplane-runtime/pkg/test"
 	"github.com/google/go-cmp/cmp"
+
+	"github.com/upbound/up/internal/profile"
 )
 
 func TestAddOrUpdateUpboundProfile(t *testing.T) {
 	name := "cool-profile"
-	profOne := Profile{
+	profOne := profile.Profile{
 		ID:      "cool-user",
-		Type:    UserProfileType,
+		Type:    profile.User,
 		Account: "cool-org",
 	}
-	profTwo := Profile{
+	profTwo := profile.Profile{
 		ID:      "cool-user",
-		Type:    UserProfileType,
+		Type:    profile.User,
 		Account: "other-org",
 	}
 
@@ -40,7 +42,7 @@ func TestAddOrUpdateUpboundProfile(t *testing.T) {
 		reason string
 		name   string
 		cfg    *Config
-		add    Profile
+		add    profile.Profile
 		want   *Config
 		err    error
 	}{
@@ -51,7 +53,7 @@ func TestAddOrUpdateUpboundProfile(t *testing.T) {
 			add:    profOne,
 			want: &Config{
 				Upbound: Upbound{
-					Profiles: map[string]Profile{name: profOne},
+					Profiles: map[string]profile.Profile{name: profOne},
 				},
 			},
 		},
@@ -60,13 +62,13 @@ func TestAddOrUpdateUpboundProfile(t *testing.T) {
 			name:   name,
 			cfg: &Config{
 				Upbound: Upbound{
-					Profiles: map[string]Profile{name: profOne},
+					Profiles: map[string]profile.Profile{name: profOne},
 				},
 			},
 			add: profTwo,
 			want: &Config{
 				Upbound: Upbound{
-					Profiles: map[string]Profile{name: profTwo},
+					Profiles: map[string]profile.Profile{name: profTwo},
 				},
 			},
 		},
@@ -74,24 +76,24 @@ func TestAddOrUpdateUpboundProfile(t *testing.T) {
 			reason: "Adding an invalid profile should cause an error.",
 			name:   name,
 			cfg:    &Config{},
-			add:    Profile{},
+			add:    profile.Profile{},
 			want:   &Config{},
-			err:    errors.New(errInvalidProfile),
+			err:    errors.New("profile is not valid"),
 		},
 		"AddNewSpaceProfile": {
 			reason: "Adding a new space profile to an empty Config should not cause an error.",
 			name:   "cool-profile",
 			cfg:    &Config{},
-			add: Profile{
-				Type:        SpaceProfileType,
+			add: profile.Profile{
+				Type:        profile.Space,
 				Kubeconfig:  "cool-config",
 				KubeContext: "cool-context",
 			},
 			want: &Config{
 				Upbound: Upbound{
-					Profiles: map[string]Profile{
+					Profiles: map[string]profile.Profile{
 						"cool-profile": {
-							Type:        SpaceProfileType,
+							Type:        profile.Space,
 							Kubeconfig:  "cool-config",
 							KubeContext: "cool-context",
 						},
@@ -104,25 +106,25 @@ func TestAddOrUpdateUpboundProfile(t *testing.T) {
 			name:   "cool-profile",
 			cfg: &Config{
 				Upbound: Upbound{
-					Profiles: map[string]Profile{
+					Profiles: map[string]profile.Profile{
 						"cool-profile": {
-							Type:        SpaceProfileType,
+							Type:        profile.Space,
 							Kubeconfig:  "cool-config",
 							KubeContext: "cool-context",
 						},
 					},
 				},
 			},
-			add: Profile{
-				Type:        SpaceProfileType,
+			add: profile.Profile{
+				Type:        profile.Space,
 				Kubeconfig:  "other-config",
 				KubeContext: "other-context",
 			},
 			want: &Config{
 				Upbound: Upbound{
-					Profiles: map[string]Profile{
+					Profiles: map[string]profile.Profile{
 						"cool-profile": {
-							Type:        SpaceProfileType,
+							Type:        profile.Space,
 							Kubeconfig:  "other-config",
 							KubeContext: "other-context",
 						},
@@ -146,9 +148,9 @@ func TestAddOrUpdateUpboundProfile(t *testing.T) {
 
 func TestGetDefaultUpboundProfile(t *testing.T) {
 	name := "cool-profile"
-	profOne := Profile{
+	profOne := profile.Profile{
 		ID:      "cool-user",
-		Type:    UserProfileType,
+		Type:    profile.User,
 		Account: "cool-org",
 	}
 
@@ -156,13 +158,13 @@ func TestGetDefaultUpboundProfile(t *testing.T) {
 		reason string
 		name   string
 		cfg    *Config
-		want   Profile
+		want   profile.Profile
 		err    error
 	}{
 		"ErrorNoDefault": {
 			reason: "If no default defined an error should be returned.",
 			cfg:    &Config{},
-			want:   Profile{},
+			want:   profile.Profile{},
 			err:    errors.New(errNoDefaultSpecified),
 		},
 		"ErrorDefaultNotExist": {
@@ -172,7 +174,7 @@ func TestGetDefaultUpboundProfile(t *testing.T) {
 					Default: "test",
 				},
 			},
-			want: Profile{},
+			want: profile.Profile{},
 			err:  errors.New(errDefaultNotExist),
 		},
 		"Successful": {
@@ -181,7 +183,7 @@ func TestGetDefaultUpboundProfile(t *testing.T) {
 			cfg: &Config{
 				Upbound: Upbound{
 					Default:  "cool-profile",
-					Profiles: map[string]Profile{name: profOne},
+					Profiles: map[string]profile.Profile{name: profOne},
 				},
 			},
 			want: profOne,
@@ -205,9 +207,9 @@ func TestGetDefaultUpboundProfile(t *testing.T) {
 
 func TestGetUpboundProfile(t *testing.T) {
 	name := "cool-profile"
-	profOne := Profile{
+	profOne := profile.Profile{
 		ID:      "cool-user",
-		Type:    UserProfileType,
+		Type:    profile.User,
 		Account: "cool-org",
 	}
 
@@ -215,14 +217,14 @@ func TestGetUpboundProfile(t *testing.T) {
 		reason string
 		name   string
 		cfg    *Config
-		want   Profile
+		want   profile.Profile
 		err    error
 	}{
 		"ErrorProfileNotExist": {
 			reason: "If profile does not exist an error should be returned.",
 			name:   name,
 			cfg:    &Config{},
-			want:   Profile{},
+			want:   profile.Profile{},
 			err:    errors.Errorf(errProfileNotFoundFmt, "cool-profile"),
 		},
 		"Successful": {
@@ -230,7 +232,7 @@ func TestGetUpboundProfile(t *testing.T) {
 			name:   "cool-profile",
 			cfg: &Config{
 				Upbound: Upbound{
-					Profiles: map[string]Profile{name: profOne},
+					Profiles: map[string]profile.Profile{name: profOne},
 				},
 			},
 			want: profOne,
@@ -251,8 +253,8 @@ func TestGetUpboundProfile(t *testing.T) {
 
 func TestSetDefaultUpboundProfile(t *testing.T) {
 	name := "cool-user"
-	profOne := Profile{
-		Type:    UserProfileType,
+	profOne := profile.Profile{
+		Type:    profile.User,
 		Account: "cool-org",
 	}
 
@@ -273,7 +275,7 @@ func TestSetDefaultUpboundProfile(t *testing.T) {
 			name:   "cool-user",
 			cfg: &Config{
 				Upbound: Upbound{
-					Profiles: map[string]Profile{name: profOne},
+					Profiles: map[string]profile.Profile{name: profOne},
 				},
 			},
 		},
@@ -290,13 +292,13 @@ func TestSetDefaultUpboundProfile(t *testing.T) {
 
 func TestGetUpboundProfiles(t *testing.T) {
 	nameOne := "cool-user"
-	profOne := Profile{
-		Type:    UserProfileType,
+	profOne := profile.Profile{
+		Type:    profile.User,
 		Account: "cool-org",
 	}
 	nameTwo := "cool-user2"
-	profTwo := Profile{
-		Type:    UserProfileType,
+	profTwo := profile.Profile{
+		Type:    profile.User,
 		Account: "cool-org2",
 	}
 
@@ -305,7 +307,7 @@ func TestGetUpboundProfiles(t *testing.T) {
 	}
 	type want struct {
 		err      error
-		profiles map[string]Profile
+		profiles map[string]profile.Profile
 	}
 
 	cases := map[string]struct {
@@ -327,7 +329,7 @@ func TestGetUpboundProfiles(t *testing.T) {
 			args: args{
 				cfg: &Config{
 					Upbound: Upbound{
-						Profiles: map[string]Profile{
+						Profiles: map[string]profile.Profile{
 							nameOne: profOne,
 							nameTwo: profTwo,
 						},
@@ -335,7 +337,7 @@ func TestGetUpboundProfiles(t *testing.T) {
 				},
 			},
 			want: want{
-				profiles: map[string]Profile{
+				profiles: map[string]profile.Profile{
 					nameOne: profOne,
 					nameTwo: profTwo,
 				},
@@ -358,16 +360,16 @@ func TestGetUpboundProfiles(t *testing.T) {
 
 func TestGetBaseConfig(t *testing.T) {
 	nameOne := "cool-user"
-	profOne := Profile{
-		Type:    UserProfileType,
+	profOne := profile.Profile{
+		Type:    profile.User,
 		Account: "cool-org",
 		BaseConfig: map[string]string{
 			"key": "value",
 		},
 	}
 	nameTwo := "cool-user2"
-	profTwo := Profile{
-		Type:    UserProfileType,
+	profTwo := profile.Profile{
+		Type:    profile.User,
 		Account: "cool-org2",
 	}
 
@@ -401,7 +403,7 @@ func TestGetBaseConfig(t *testing.T) {
 				profile: nameOne,
 				cfg: &Config{
 					Upbound: Upbound{
-						Profiles: map[string]Profile{
+						Profiles: map[string]profile.Profile{
 							nameOne: profOne,
 							nameTwo: profTwo,
 						},
@@ -429,13 +431,13 @@ func TestGetBaseConfig(t *testing.T) {
 
 func TestAddToBaseConfig(t *testing.T) {
 	nameOne := "cool-user"
-	profOne := Profile{
-		Type:    UserProfileType,
+	profOne := profile.Profile{
+		Type:    profile.User,
 		Account: "cool-org",
 	}
 	nameTwo := "cool-user2"
-	profTwo := Profile{
-		Type:    UserProfileType,
+	profTwo := profile.Profile{
+		Type:    profile.User,
 		Account: "cool-org2",
 	}
 
@@ -473,7 +475,7 @@ func TestAddToBaseConfig(t *testing.T) {
 				value:   "v",
 				cfg: &Config{
 					Upbound: Upbound{
-						Profiles: map[string]Profile{
+						Profiles: map[string]profile.Profile{
 							nameOne: profOne,
 							nameTwo: profTwo,
 						},
@@ -536,9 +538,9 @@ func TestBaseToJSON(t *testing.T) {
 				profile: exists,
 				cfg: &Config{
 					Upbound: Upbound{
-						Profiles: map[string]Profile{
+						Profiles: map[string]profile.Profile{
 							exists: {
-								Type:    UserProfileType,
+								Type:    profile.User,
 								Account: "account",
 								BaseConfig: map[string]string{
 									"k": "v",

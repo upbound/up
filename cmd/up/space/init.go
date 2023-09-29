@@ -44,6 +44,7 @@ import (
 	"github.com/upbound/up/internal/install"
 	"github.com/upbound/up/internal/install/helm"
 	"github.com/upbound/up/internal/kube"
+	"github.com/upbound/up/internal/profile"
 	"github.com/upbound/up/internal/resources"
 	"github.com/upbound/up/internal/upbound"
 	"github.com/upbound/up/internal/upterm"
@@ -266,12 +267,12 @@ func (c *initCmd) createOrUpdateProfile(upCtx *upbound.Context) error {
 	// If profile name was not provided and no default exists, set name to
 	// the default.
 	if upCtx.ProfileName == "" {
-		upCtx.ProfileName = config.DefaultProfileName
+		upCtx.ProfileName = profile.DefaultName
 	}
 
 	// Re-initialize active profile for this space.
-	profile := config.Profile{
-		Type:        config.SpaceProfileType,
+	profile := profile.Profile{
+		Type:        profile.Space,
 		Kubeconfig:  c.Kube.Kubeconfig,
 		KubeContext: c.Kube.GetContext(),
 		// Carry over existing config.

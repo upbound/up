@@ -20,7 +20,7 @@ import (
 	"github.com/alecthomas/kong"
 	"github.com/pterm/pterm"
 
-	"github.com/upbound/up/internal/config"
+	"github.com/upbound/up/internal/profile"
 	"github.com/upbound/up/internal/upbound"
 )
 
@@ -40,9 +40,9 @@ func (c *listCmd) Run(p pterm.TextPrinter, pt *pterm.TablePrinter, ctx *kong.Con
 		return nil // nolint:nilerr
 	}
 
-	redacted := make(map[string]config.RedactedProfile)
+	redacted := make(map[string]profile.Redacted)
 	for k, v := range profiles {
-		redacted[k] = config.RedactedProfile{Profile: v}
+		redacted[k] = profile.Redacted{Profile: v}
 	}
 	if len(redacted) == 0 {
 		p.Println(errNoProfiles)

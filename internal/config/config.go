@@ -17,28 +17,24 @@ package config
 import (
 	"bytes"
 	"encoding/json"
-	"fmt"
 	"io"
 	"os"
 	"path/filepath"
 
 	"github.com/crossplane/crossplane-runtime/pkg/errors"
-	"k8s.io/client-go/rest"
-	"k8s.io/client-go/tools/clientcmd"
+
+	"github.com/upbound/up/internal/profile"
 )
 
 // Location of up config file.
 const (
 	ConfigDir  = ".up"
 	ConfigFile = "config.json"
-
-	DefaultProfileName = "default"
 )
 
 const (
 	errDefaultNotExist    = "profile specified as default does not exist"
 	errNoDefaultSpecified = "no default profile specified"
-	errInvalidProfile     = "profile is not valid"
 
 	errProfileNotFoundFmt = "profile not found with identifier: %s"
 	errNoProfilesFound    = "no profiles found"
@@ -86,105 +82,16 @@ type Upbound struct {
 
 	// Profiles contain sets of credentials for communicating with Upbound. Key
 	// is name of the profile.
-	Profiles map[string]Profile `json:"profiles,omitempty"`
-}
-
-// ProfileType is a type of Upbound profile.
-type ProfileType string
-
-// Types of profiles.
-const (
-	UserProfileType  ProfileType = "user"
-	TokenProfileType ProfileType = "token"
-	SpaceProfileType ProfileType = "space"
-)
-
-// A Profile is a set of credentials
-type Profile struct {
-	// ID is either a username, email, or token.
-	ID string `json:"id,omitempty"`
-
-	// Type is the type of the profile.
-	Type ProfileType `json:"type"`
-
-	// Session is a session token used to authenticate to Upbound.
-	Session string `json:"session,omitempty"`
-
-	// Account is the default account to use when this profile is selected.
-	Account string `json:"account,omitempty"`
-
-	// Kubeconfig is the kubeconfig file path that GetKubeClientConfig() will
-	// read. If empty, it refers to client-go's default kubeconfig location.
-	Kubeconfig string `json:"kubeconfig,omitempty"`
-
-	// KubeContext is the context within Kubeconfig that GetKubeClientConfig()
-	// will read. If empty, it refers to the default context.
-	KubeContext string `json:"kube_context,omitempty"`
-
-	// BaseConfig represent persisted settings for this profile.
-	// For example:
-	// * flags
-	// * environment variables
-	BaseConfig map[string]string `json:"base,omitempty"`
-}
-
-func (p Profile) IsSpace() bool {
-	return p.Type == SpaceProfileType
-}
-
-// GetKubeClientConfig returns a *rest.Config loaded from p.Kubeconfig and
-// p.KubeContext. It returns an error if p.IsSpace() is false.
-func (p Profile) GetKubeClientConfig() (*rest.Config, error) {
-	if !p.IsSpace() {
-		return nil, fmt.Errorf("kube client not supported for profile type %q", p.Type)
-	}
-	rules := clientcmd.NewDefaultClientConfigLoadingRules()
-	rules.ExplicitPath = p.Kubeconfig
-	return clientcmd.NewNonInteractiveDeferredLoadingClientConfig(
-		rules,
-		&clientcmd.ConfigOverrides{CurrentContext: p.KubeContext},
-	).ClientConfig()
-}
-
-// RedactedProfile embeds a Upbound Profile for the sole purpose of redacting
-// sensitive information.
-type RedactedProfile struct {
-	Profile
-}
-
-// MarshalJSON overrides the session field with `REDACTED` so as not to leak
-// sensitive information. We're using an explicit copy here instead of updating
-// the underlying Profile struct so as to not modifying the internal state of
-// the struct by accident.
-func (p RedactedProfile) MarshalJSON() ([]byte, error) {
-	type profile RedactedProfile
-	pc := profile(p)
-	// Space profiles don't have session tokens.
-	if !p.IsSpace() {
-		s := "NONE"
-		if pc.Session != "" {
-			s = "REDACTED"
-		}
-		pc.Session = s
-	}
-	return json.Marshal(&pc)
-}
-
-// checkProfile ensures a profile does not violate constraints.
-func checkProfile(p Profile) error {
-	if (!p.IsSpace() && p.ID == "") || p.Type == "" {
-		return errors.New(errInvalidProfile)
-	}
-	return nil
+	Profiles map[string]profile.Profile `json:"profiles,omitempty"`
 }
 
 // AddOrUpdateUpboundProfile adds or updates an Upbound profile to the Config.
-func (c *Config) AddOrUpdateUpboundProfile(name string, new Profile) error {
-	if err := checkProfile(new); err != nil {
+func (c *Config) AddOrUpdateUpboundProfile(name string, new profile.Profile) error {
+	if err := new.Validate(); err != nil {
 		return err
 	}
 	if c.Upbound.Profiles == nil {
-		c.Upbound.Profiles = map[string]Profile{}
+		c.Upbound.Profiles = map[string]profile.Profile{}
 	}
 	c.Upbound.Profiles[name] = new
 	return nil
@@ -192,13 +99,13 @@ func (c *Config) AddOrUpdateUpboundProfile(name string, new Profile) error {
 
 // GetDefaultUpboundProfile gets the default Upbound profile or returns an error if
 // default is not set or default profile does not exist.
-func (c *Config) GetDefaultUpboundProfile() (string, Profile, error) {
+func (c *Config) GetDefaultUpboundProfile() (string, profile.Profile, error) {
 	if c.Upbound.Default == "" {
-		return "", Profile{}, errors.New(errNoDefaultSpecified)
+		return "", profile.Profile{}, errors.New(errNoDefaultSpecified)
 	}
 	p, ok := c.Upbound.Profiles[c.Upbound.Default]
 	if !ok {
-		return "", Profile{}, errors.New(errDefaultNotExist)
+		return "", profile.Profile{}, errors.New(errDefaultNotExist)
 	}
 	return c.Upbound.Default, p, nil
 }
@@ -207,17 +114,17 @@ func (c *Config) GetDefaultUpboundProfile() (string, Profile, error) {
 // exist for the given identifier an error will be returned. Multiple profiles
 // should never exist for the same identifier, but in the case that they do, the
 // first will be returned.
-func (c *Config) GetUpboundProfile(name string) (Profile, error) {
+func (c *Config) GetUpboundProfile(name string) (profile.Profile, error) {
 	p, ok := c.Upbound.Profiles[name]
 	if !ok {
-		return Profile{}, errors.Errorf(errProfileNotFoundFmt, name)
+		return profile.Profile{}, errors.Errorf(errProfileNotFoundFmt, name)
 	}
 	return p, nil
 }
 
 // GetUpboundProfiles returns the list of existing profiles. If no profiles
 // exist, then an error will be returned.
-func (c *Config) GetUpboundProfiles() (map[string]Profile, error) {
+func (c *Config) GetUpboundProfiles() (map[string]profile.Profile, error) {
 	if c.Upbound.Profiles == nil {
 		return nil, errors.New(errNoProfilesFound)
 	}

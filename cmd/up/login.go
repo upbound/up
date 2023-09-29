@@ -31,9 +31,9 @@ import (
 	"github.com/pterm/pterm"
 
 	"github.com/upbound/up-sdk-go/service/userinfo"
-	"github.com/upbound/up/internal/config"
 	uphttp "github.com/upbound/up/internal/http"
 	"github.com/upbound/up/internal/input"
+	"github.com/upbound/up/internal/profile"
 	"github.com/upbound/up/internal/upbound"
 )
 
@@ -157,11 +157,11 @@ func (c *loginCmd) Run(p pterm.TextPrinter, upCtx *upbound.Context) error { // n
 
 	// If profile name was not provided and no default exists, set name to 'default'.
 	if upCtx.ProfileName == "" {
-		upCtx.ProfileName = config.DefaultProfileName
+		upCtx.ProfileName = profile.DefaultName
 	}
 
 	// Re-initialize profile for this login.
-	profile := config.Profile{
+	profile := profile.Profile{
 		Type: profType,
 		ID:   auth.ID,
 		// Set session early so that it can be used to fetch user info if
@@ -208,7 +208,7 @@ type auth struct {
 
 // constructAuth constructs the body of an Upbound Cloud authentication request
 // given the provided credentials.
-func constructAuth(username, token, password string) (*auth, config.ProfileType, error) {
+func constructAuth(username, token, password string) (*auth, profile.Type, error) {
 	if username == "" && token == "" {
 		return nil, "", errors.New(errNoUserOrToken)
 	}
@@ -216,7 +216,7 @@ func constructAuth(username, token, password string) (*auth, config.ProfileType,
 	if err != nil {
 		return nil, "", err
 	}
-	if profType == config.TokenProfileType {
+	if profType == profile.Token {
 		password = token
 	}
 	return &auth{
@@ -227,7 +227,7 @@ func constructAuth(username, token, password string) (*auth, config.ProfileType,
 }
 
 // parseID gets a user ID by either parsing a token or returning the username.
-func parseID(user, token string) (string, config.ProfileType, error) {
+func parseID(user, token string) (string, profile.Type, error) {
 	if token != "" {
 		p := jwt.Parser{}
 		claims := &jwt.StandardClaims{}
@@ -238,9 +238,9 @@ func parseID(user, token string) (string, config.ProfileType, error) {
 		if claims.Id == "" {
 			return "", "", errors.New(errNoIDInToken)
 		}
-		return claims.Id, config.TokenProfileType, nil
+		return claims.Id, profile.Token, nil
 	}
-	return user, config.UserProfileType, nil
+	return user, profile.User, nil
 }
 
 // extractSession extracts the specified cookie from an HTTP response. The

@@ -28,6 +28,7 @@ import (
 	"github.com/spf13/afero"
 
 	"github.com/upbound/up/internal/config"
+	"github.com/upbound/up/internal/profile"
 )
 
 var (
@@ -134,7 +135,7 @@ func TestNewFromFlags(t *testing.T) {
 					APIEndpoint:      withURL("https://api.upbound.io"),
 					Cfg:              &config.Config{},
 					Domain:           withURL("https://upbound.io"),
-					Profile:          config.Profile{},
+					Profile:          profile.Profile{},
 					ProxyEndpoint:    withURL("https://proxy.upbound.io/v1/controlPlanes"),
 					RegistryEndpoint: withURL("https://xpkg.upbound.io"),
 				},
@@ -169,7 +170,7 @@ func TestNewFromFlags(t *testing.T) {
 					APIEndpoint:      withURL("https://api.upbound.io"),
 					Cfg:              &config.Config{},
 					Domain:           withURL("https://upbound.io"),
-					Profile:          config.Profile{},
+					Profile:          profile.Profile{},
 					ProxyEndpoint:    withURL("https://proxy.upbound.io/v1/controlPlanes"),
 					RegistryEndpoint: withURL("https://xpkg.upbound.io"),
 				},
@@ -191,9 +192,9 @@ func TestNewFromFlags(t *testing.T) {
 					APIEndpoint:           withURL("https://api.upbound.io"),
 					Domain:                withURL("https://upbound.io"),
 					InsecureSkipTLSVerify: false,
-					Profile: config.Profile{
+					Profile: profile.Profile{
 						ID:      "someone@upbound.io",
-						Type:    config.UserProfileType,
+						Type:    profile.User,
 						Session: "a token",
 						Account: "",
 					},
@@ -219,9 +220,9 @@ func TestNewFromFlags(t *testing.T) {
 					APIEndpoint:           withURL("https://api.local.upbound.io"),
 					Domain:                withURL("https://local.upbound.io"),
 					InsecureSkipTLSVerify: true,
-					Profile: config.Profile{
+					Profile: profile.Profile{
 						ID:      "someone@upbound.io",
-						Type:    config.UserProfileType,
+						Type:    profile.User,
 						Session: "a token",
 						Account: "",
 						BaseConfig: map[string]string{
@@ -257,9 +258,9 @@ func TestNewFromFlags(t *testing.T) {
 					APIEndpoint:           withURL("http://not.a.url"),
 					Domain:                withURL("http://a.domain.org"),
 					InsecureSkipTLSVerify: true,
-					Profile: config.Profile{
+					Profile: profile.Profile{
 						ID:      "someone@upbound.io",
-						Type:    config.UserProfileType,
+						Type:    profile.User,
 						Session: "a token",
 						Account: "",
 						BaseConfig: map[string]string{
@@ -288,7 +289,7 @@ func TestNewFromFlags(t *testing.T) {
 					APIEndpoint:      withURL("https://api.upbound.io"),
 					Cfg:              &config.Config{},
 					Domain:           withURL("https://upbound.io"),
-					Profile:          config.Profile{},
+					Profile:          profile.Profile{},
 					ProxyEndpoint:    withURL("https://proxy.upbound.io/v1/controlPlanes"),
 					RegistryEndpoint: withURL("https://xpkg.upbound.io"),
 					DebugLevel:       3,

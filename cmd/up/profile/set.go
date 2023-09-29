@@ -19,7 +19,7 @@ import (
 	"github.com/crossplane/crossplane-runtime/pkg/errors"
 	"github.com/pterm/pterm"
 
-	"github.com/upbound/up/internal/config"
+	"github.com/upbound/up/internal/profile"
 	"github.com/upbound/up/internal/upbound"
 )
 
@@ -46,12 +46,12 @@ func (c *spaceCmd) Run(p pterm.TextPrinter, upCtx *upbound.Context) error {
 	// If profile name was not provided and no default exists, set name to
 	// the default, and set this profile as the default profile.
 	if upCtx.ProfileName == "" {
-		upCtx.ProfileName = config.DefaultProfileName
+		upCtx.ProfileName = profile.DefaultName
 		setDefault = true
 	}
 
-	if err := upCtx.Cfg.AddOrUpdateUpboundProfile(upCtx.ProfileName, config.Profile{
-		Type:        config.SpaceProfileType,
+	if err := upCtx.Cfg.AddOrUpdateUpboundProfile(upCtx.ProfileName, profile.Profile{
+		Type:        profile.Space,
 		Kubeconfig:  c.Kube.Kubeconfig,
 		KubeContext: c.Kube.GetContext(),
 		// Carry over existing config.

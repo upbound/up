@@ -30,6 +30,7 @@ import (
 	"github.com/upbound/up-sdk-go"
 
 	"github.com/upbound/up/internal/config"
+	"github.com/upbound/up/internal/profile"
 )
 
 const (
@@ -58,7 +59,7 @@ const (
 // Context includes common data that Upbound consumers may utilize.
 type Context struct {
 	ProfileName string
-	Profile     config.Profile
+	Profile     profile.Profile
 	Token       string
 	Account     string
 	Domain      *url.URL
@@ -123,7 +124,7 @@ func NewFromFlags(f Flags, opts ...Option) (*Context, error) { //nolint:gocyclo
 
 	// If profile identifier is not provided, use the default, or empty if the
 	// default cannot be obtained.
-	c.Profile = config.Profile{}
+	c.Profile = profile.Profile{}
 	if f.Profile == "" {
 		if name, p, err := c.Cfg.GetDefaultUpboundProfile(); err == nil {
 			c.Profile = p

@@ -21,7 +21,7 @@ import (
 	"github.com/alecthomas/kong"
 	"github.com/pterm/pterm"
 
-	"github.com/upbound/up/internal/config"
+	"github.com/upbound/up/internal/profile"
 	"github.com/upbound/up/internal/upbound"
 )
 
@@ -39,9 +39,9 @@ func (c *viewCmd) Run(p pterm.TextPrinter, ctx *kong.Context, upCtx *upbound.Con
 		return nil // nolint:nilerr
 	}
 
-	redacted := make(map[string]config.RedactedProfile)
+	redacted := make(map[string]profile.Redacted)
 	for k, v := range profiles {
-		redacted[k] = config.RedactedProfile{Profile: v}
+		redacted[k] = profile.Redacted{Profile: v}
 	}
 
 	b, err := json.MarshalIndent(redacted, "", "    ")
