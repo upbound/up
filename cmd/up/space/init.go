@@ -80,7 +80,7 @@ const (
 	errReadParametersFile     = "unable to read parameters file"
 	errParseInstallParameters = "unable to parse install parameters"
 	errCreateImagePullSecret  = "failed to create image pull secret"
-	errFmtCreateNamespace     = "failed to create namespace %s"
+	errFmtCreateNamespace     = "failed to create namespace %q"
 	errUpdateConfig           = "unable to update config file"
 	errUpdateProfile          = "unable to update profile"
 )
