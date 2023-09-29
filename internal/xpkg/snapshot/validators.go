@@ -101,7 +101,7 @@ func validatorsFromV1Beta1CRD(c *extv1beta1.CustomResourceDefinition, acc map[sc
 	}
 
 	if internal.Spec.Validation != nil {
-		sv, _, err := validation.NewSchemaValidator(internal.Spec.Validation)
+		sv, _, err := validation.NewSchemaValidator(internal.Spec.Validation.OpenAPIV3Schema)
 		if err != nil {
 			return err
 		}
@@ -111,7 +111,7 @@ func validatorsFromV1Beta1CRD(c *extv1beta1.CustomResourceDefinition, acc map[sc
 		return nil
 	}
 	for _, v := range internal.Spec.Versions {
-		sv, _, err := validation.NewSchemaValidator(v.Schema)
+		sv, _, err := validation.NewSchemaValidator(v.Schema.OpenAPIV3Schema)
 		if err != nil {
 			return err
 		}

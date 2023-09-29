@@ -331,7 +331,7 @@ func TestCompositionValidation(t *testing.T) {
 					Errors: []error{
 						&validator.Validation{
 							TypeCode: validator.ErrorTypeCode,
-							Message:  "cannot mix named and anonymous resource templates - ensure all resource templates are named",
+							Message:  "spec.resources[1].name: Required value: cannot mix named and anonymous resources, all resources must have a name or none must have a name",
 							Name:     "spec.resources",
 						},
 					},
@@ -367,7 +367,7 @@ func TestCompositionValidation(t *testing.T) {
 					Errors: []error{
 						&validator.Validation{
 							TypeCode: validator.ErrorTypeCode,
-							Message:  "resource template names must be unique within their Composition",
+							Message:  `spec.resources[1].name: Duplicate value: "r1"`,
 							Name:     "spec.resources",
 						},
 					},

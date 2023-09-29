@@ -30,7 +30,8 @@ import (
 	"github.com/crossplane/crossplane-runtime/pkg/resource/unstructured/composite"
 
 	v1 "github.com/crossplane/crossplane/apis/apiextensions/v1"
-	env "github.com/crossplane/crossplane/internal/controller/apiextensions/composite/environment"
+	composition "github.com/crossplane/crossplane/controller/apiextensions/compositions"
+	env "github.com/crossplane/crossplane/internal/controller/apiextensions/composite"
 )
 
 const (
@@ -201,27 +202,29 @@ func WithLogger(log logging.Logger) ReconcilerOption {
 	}
 }
 
-// WithCompositionValidator specifies how the Reconciler should validate
-// Compositions.
-func WithCompositionValidator(v CompositionValidator) ReconcilerOption {
-	return func(r *Reconciler) {
-		r.composition.CompositionValidator = v
-	}
-}
-
-// WithCompositionTemplateAssociator specifies how the Reconciler should
-// associate composition templates with composed resources.
-func WithCompositionTemplateAssociator(a CompositionTemplateAssociator) ReconcilerOption {
-	return func(r *Reconciler) {
-		r.composition.CompositionTemplateAssociator = a
-	}
-}
-
 // WithComposer specifies how the Reconciler should compose resources.
 func WithComposer(c Composer) ReconcilerOption {
 	return func(r *Reconciler) {
 		r.resource = c
 	}
+}
+
+type revision struct {
+	CompositionRevisionValidator
+}
+
+// A CompositionRevisionValidator validates the supplied CompositionRevision.
+type CompositionRevisionValidator interface {
+	Validate(*v1.CompositionRevision) error
+}
+
+// A CompositionRevisionValidatorFn is a function that validates a
+// CompositionRevision.
+type CompositionRevisionValidatorFn func(*v1.CompositionRevision) error
+
+// Validate the supplied CompositionRevision.
+func (fn CompositionRevisionValidatorFn) Validate(c *v1.CompositionRevision) error {
+	return fn(c)
 }
 
 // WithConfigurator specifies how the Reconciler should configure
@@ -230,11 +233,6 @@ func WithConfigurator(c Configurator) ReconcilerOption {
 	return func(r *Reconciler) {
 		r.composite.Configurator = c
 	}
-}
-
-type composition struct {
-	CompositionValidator
-	CompositionTemplateAssociator
 }
 
 type compositeResource struct {
@@ -250,16 +248,22 @@ func NewReconciler(of resource.CompositeKind, opts ...ReconcilerOption) *Reconci
 	r := &Reconciler{
 		newComposite: nc,
 
-		composition: composition{
-			CompositionValidator: ValidationChain{
-				CompositionValidatorFn(RejectMixedTemplates),
-				CompositionValidatorFn(RejectDuplicateNames),
-			},
-			CompositionTemplateAssociator: NewGarbageCollectingAssociator(),
-		},
-
 		composite: compositeResource{
 			Configurator: NewConfiguratorChain(NewAPINamingConfigurator(), NewAPIConfigurator()),
+		},
+
+		revision: revision{
+			CompositionRevisionValidator: CompositionRevisionValidatorFn(func(rev *v1.CompositionRevision) error {
+				// TODO(negz): Presumably this validation will eventually be
+				// removed in favor of the new Composition validation
+				// webhook.
+				// This is the last remaining use of conv.FromRevisionSpec -
+				// we can stop generating that once this is removed.
+				conv := &v1.GeneratedRevisionSpecConverter{}
+				comp := &v1.Composition{Spec: conv.FromRevisionSpec(rev.Spec)}
+				_, errs := comp.Validate()
+				return errs.ToAggregate()
+			}),
 		},
 
 		resource: NewPTComposer(),
@@ -277,8 +281,8 @@ func NewReconciler(of resource.CompositeKind, opts ...ReconcilerOption) *Reconci
 type Reconciler struct {
 	newComposite func() resource.Composite
 
-	composition composition
-	composite   compositeResource
+	revision  revision
+	composite compositeResource
 
 	resource Composer
 
@@ -306,7 +310,7 @@ func (r *Reconciler) Reconcile(ctx context.Context, comp *v1.Composition) ([]Com
 
 	// TODO(negz): Composition validation should be handled by a validation
 	// webhook, not by this controller.
-	if err := r.composition.Validate(comp); err != nil {
+	if err := r.revision.Validate(composition.NewCompositionRevision(comp, 1)); err != nil {
 		r.log.Debug(errValidate, "error", err)
 		return nil, err
 	}

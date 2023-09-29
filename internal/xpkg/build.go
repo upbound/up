@@ -24,6 +24,7 @@ import (
 	"github.com/crossplane/crossplane-runtime/pkg/errors"
 	pkgmetav1 "github.com/crossplane/crossplane/apis/pkg/meta/v1"
 	v1alpha1 "github.com/crossplane/crossplane/apis/pkg/meta/v1alpha1"
+	"github.com/crossplane/crossplane/apis/pkg/v1beta1"
 	v1 "github.com/google/go-containerregistry/pkg/v1"
 	"github.com/google/go-containerregistry/pkg/v1/empty"
 	"github.com/google/go-containerregistry/pkg/v1/mutate"
@@ -192,7 +193,7 @@ func (b *Builder) Build(ctx context.Context, opts ...BuildOpt) (v1.Image, runtim
 	switch meta.GetObjectKind().GroupVersionKind().Kind {
 	case pkgmetav1.ConfigurationKind:
 		linter = NewConfigurationLinter()
-	case v1alpha1.FunctionKind:
+	case v1beta1.FunctionKind:
 		linter = NewFunctionLinter()
 	case pkgmetav1.ProviderKind:
 		if b.ab != nil { // if we have an auth.yaml file

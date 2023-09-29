@@ -33,7 +33,7 @@ import (
 	"github.com/crossplane/crossplane-runtime/pkg/resource/unstructured/composed"
 
 	v1 "github.com/crossplane/crossplane/apis/apiextensions/v1"
-	env "github.com/crossplane/crossplane/internal/controller/apiextensions/composite/environment"
+	env "github.com/crossplane/crossplane/internal/controller/apiextensions/composite"
 	"github.com/crossplane/crossplane/internal/xcrd"
 )
 
@@ -188,7 +188,7 @@ func (c *PTComposer) Compose(ctx context.Context, xr resource.Composite, req Com
 		}
 
 		cds[i] = ComposedResourceState{
-			ComposedResource:  ComposedResource{ResourceName: name},
+			ComposedResource:  ComposedResource{ResourceName: ResourceName(name)},
 			TemplateRenderErr: rerr,
 			Template:          &ta.Template,
 			Resource:          r,
