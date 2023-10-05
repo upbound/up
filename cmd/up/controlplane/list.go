@@ -18,6 +18,7 @@ import (
 	"context"
 
 	"github.com/alecthomas/kong"
+	xpcommonv1 "github.com/crossplane/crossplane-runtime/apis/common/v1"
 	"github.com/pterm/pterm"
 	v1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
@@ -27,6 +28,7 @@ import (
 	"github.com/upbound/up-sdk-go/service/common"
 	cp "github.com/upbound/up-sdk-go/service/controlplanes"
 
+	"github.com/upbound/up/internal/resources"
 	"github.com/upbound/up/internal/upbound"
 	"github.com/upbound/up/internal/upterm"
 )
@@ -40,7 +42,7 @@ const (
 )
 
 var cloudFieldNames = []string{"NAME", "ID", "STATUS", "DEPLOYED CONFIGURATION", "CONFIGURATION STATUS"}
-var spacesFieldNames = []string{"NAME", "ID", "STATUS"}
+var spacesFieldNames = []string{"NAME", "ID", "STATUS", "MESSAGE"}
 
 // AfterApply sets default values in command after assignment and validation.
 func (c *listCmd) AfterApply(kongCtx *kong.Context, upCtx *upbound.Context) error {
@@ -122,23 +124,15 @@ func extractCloudFields(obj any) []string {
 }
 
 func extractSpacesFields(obj any) []string {
-	ctp := obj.(unstructured.Unstructured)
-	id, found, err := unstructured.NestedString(ctp.Object, "status", "controlPlaneID")
-	if !found || err != nil {
-		id = "unknown"
+	id, readyStatus := "unknown", "unknown"
+
+	uc, ok := obj.(unstructured.Unstructured)
+	if !ok {
+		return []string{"", id, readyStatus}
 	}
 
-	readyStatus := "unknown"
-	conditions, found, err := unstructured.NestedSlice(ctp.Object, "status", "conditions")
-	if found && err == nil {
-		for _, condition := range conditions {
-			statusType := condition.(map[string]interface{})["type"]
-			if statusType == "Ready" {
-				readyStatus = condition.(map[string]interface{})["status"].(string)
-			}
-		}
+	ctp := resources.ControlPlane{Unstructured: uc}
+	cnd := ctp.GetCondition(xpcommonv1.TypeReady)
 
-	}
-
-	return []string{ctp.GetName(), id, readyStatus}
+	return []string{ctp.GetName(), ctp.GetControlPlaneID(), string(cnd.Reason), cnd.Message}
 }
