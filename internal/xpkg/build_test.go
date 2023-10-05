@@ -20,6 +20,7 @@ import (
 	"io"
 	"os"
 	"sort"
+	"strings"
 	"testing"
 
 	"github.com/crossplane/crossplane-runtime/pkg/errors"
@@ -38,19 +39,35 @@ import (
 )
 
 var (
-	testCRD  []byte
-	testMeta []byte
-	testEx1  []byte
-	testEx2  []byte
-	testEx3  []byte
-	testEx4  []byte
+	testCRD               []byte
+	testAuth              []byte
+	testPC                []byte
+	testMetav1alpha1WAuth []byte
+	testMetav1alpha1      []byte
+	testMetav1WAuth       []byte
+	testMetav1            []byte
+	testEx1               []byte
+	testEx2               []byte
+	testEx3               []byte
+	testEx4               []byte
 
 	_ parser.Backend = &MockBackend{}
+
+	defaultFilters = []parser.FilterFn{
+		parser.SkipDirs(),
+		parser.SkipNotYAML(),
+		parser.SkipEmpty(),
+	}
 )
 
 func init() {
 	testCRD, _ = afero.ReadFile(afero.NewOsFs(), "testdata/providerconfigs.helm.crossplane.io.yaml")
-	testMeta, _ = afero.ReadFile(afero.NewOsFs(), "testdata/provider_meta.yaml")
+	testPC, _ = afero.ReadFile(afero.NewOsFs(), "testdata/upbound.io_providerconfigs.yaml")
+	testMetav1alpha1WAuth, _ = afero.ReadFile(afero.NewOsFs(), "testdata/provider_meta_v1alpha1_w_auth.yaml")
+	testMetav1alpha1, _ = afero.ReadFile(afero.NewOsFs(), "testdata/provider_meta_v1alpha1.yaml")
+	testMetav1WAuth, _ = afero.ReadFile(afero.NewOsFs(), "testdata/provider_meta_v1_w_auth.yaml")
+	testMetav1, _ = afero.ReadFile(afero.NewOsFs(), "testdata/provider_meta_v1.yaml")
+	testAuth, _ = afero.ReadFile(afero.NewOsFs(), "testdata/auth.yaml")
 	testEx1, _ = afero.ReadFile(afero.NewOsFs(), "testdata/examples/ec2/instance.yaml")
 	testEx2, _ = afero.ReadFile(afero.NewOsFs(), "testdata/examples/ec2/internetgateway.yaml")
 	testEx3, _ = afero.ReadFile(afero.NewOsFs(), "testdata/examples/ecr/repository.yaml")
@@ -135,12 +152,6 @@ func TestBuild(t *testing.T) {
 func TestBuildExamples(t *testing.T) {
 	pkgp, _ := yaml.New()
 
-	defaultFilters := []parser.FilterFn{
-		parser.SkipDirs(),
-		parser.SkipNotYAML(),
-		parser.SkipEmpty(),
-	}
-
 	type withFsFn func() afero.Fs
 
 	type args struct {
@@ -168,7 +179,7 @@ func TestBuildExamples(t *testing.T) {
 					fs := afero.NewMemMapFs()
 					_ = fs.Mkdir("/ws", os.ModePerm)
 					_ = fs.Mkdir("/ws/crds", os.ModePerm)
-					_ = afero.WriteFile(fs, "/ws/crossplane.yaml", testMeta, os.ModePerm)
+					_ = afero.WriteFile(fs, "/ws/crossplane.yaml", testMetav1alpha1, os.ModePerm)
 					_ = afero.WriteFile(fs, "/ws/crds/crd.yaml", testCRD, os.ModePerm)
 					return fs
 				},
@@ -187,7 +198,7 @@ func TestBuildExamples(t *testing.T) {
 				fs: func() afero.Fs {
 					fs := afero.NewMemMapFs()
 					_ = fs.Mkdir("/ws", os.ModePerm)
-					_ = afero.WriteFile(fs, "/ws/crossplane.yaml", testMeta, os.ModePerm)
+					_ = afero.WriteFile(fs, "/ws/crossplane.yaml", testMetav1alpha1, os.ModePerm)
 					_ = afero.WriteFile(fs, "/ws/crds/crd.yaml", testCRD, os.ModePerm)
 					_ = afero.WriteFile(fs, "/ws/examples/ec2/instance.yaml", testEx1, os.ModePerm)
 					_ = afero.WriteFile(fs, "/ws/examples/ec2/internetgateway.yaml", testEx2, os.ModePerm)
@@ -213,7 +224,7 @@ func TestBuildExamples(t *testing.T) {
 					fs := afero.NewMemMapFs()
 					_ = fs.Mkdir("/ws", os.ModePerm)
 					_ = fs.Mkdir("/other_directory", os.ModePerm)
-					_ = afero.WriteFile(fs, "/ws/crossplane.yaml", testMeta, os.ModePerm)
+					_ = afero.WriteFile(fs, "/ws/crossplane.yaml", testMetav1alpha1, os.ModePerm)
 					_ = afero.WriteFile(fs, "/ws/crds/crd.yaml", testCRD, os.ModePerm)
 					_ = afero.WriteFile(fs, "/other_directory/examples/ec2/instance.yaml", testEx1, os.ModePerm)
 					_ = afero.WriteFile(fs, "/other_directory/examples/ec2/internetgateway.yaml", testEx2, os.ModePerm)
@@ -282,10 +293,150 @@ func TestBuildExamples(t *testing.T) {
 	}
 }
 
+func TestBuildAuth(t *testing.T) {
+	pkgp, _ := yaml.New()
+
+	type withFsFn func() afero.Fs
+
+	type args struct {
+		rootDir string
+		// The auth parser backend is constructed then passed in during
+		// initialization. We mimic that behavior here instead of strictly
+		// relying on the filesystem contents.
+		authBE parser.Backend
+		fs     withFsFn
+	}
+	type want struct {
+		pkgExists  bool
+		authExists bool
+		err        error
+	}
+
+	cases := map[string]struct {
+		reason string
+		args   args
+		want   want
+	}{
+		"SuccessNoAuthV1alpha1Provider": {
+			args: args{
+				rootDir: "/ws",
+				fs: func() afero.Fs {
+					fs := afero.NewMemMapFs()
+					_ = fs.Mkdir("/ws", os.ModePerm)
+					_ = fs.Mkdir("/ws/crds", os.ModePerm)
+					_ = afero.WriteFile(fs, "/ws/crossplane.yaml", testMetav1alpha1, os.ModePerm)
+					_ = afero.WriteFile(fs, "/ws/crds/crd.yaml", testCRD, os.ModePerm)
+					return fs
+				},
+			},
+			want: want{
+				pkgExists: true,
+			},
+		},
+		"SuccessNoAuthV1Provider": {
+			args: args{
+				rootDir: "/ws",
+				fs: func() afero.Fs {
+					fs := afero.NewMemMapFs()
+					_ = fs.Mkdir("/ws", os.ModePerm)
+					_ = fs.Mkdir("/ws/crds", os.ModePerm)
+					_ = afero.WriteFile(fs, "/ws/crossplane.yaml", testMetav1, os.ModePerm)
+					_ = afero.WriteFile(fs, "/ws/crds/crd.yaml", testCRD, os.ModePerm)
+					return fs
+				},
+			},
+			want: want{
+				pkgExists: true,
+			},
+		},
+		"SuccessAuthV1Alpha1Provider": {
+			args: args{
+				rootDir: "/ws",
+				authBE:  parser.NewEchoBackend(string(testAuth)),
+				fs: func() afero.Fs {
+					fs := afero.NewMemMapFs()
+					_ = fs.Mkdir("/ws", os.ModePerm)
+					_ = fs.Mkdir("/ws/crds", os.ModePerm)
+					_ = afero.WriteFile(fs, "/ws/crossplane.yaml", testMetav1alpha1WAuth, os.ModePerm)
+					_ = afero.WriteFile(fs, "/ws/crds/providerconfig.yaml", testPC, os.ModePerm)
+					_ = afero.WriteFile(fs, "/ws/crds/crd.yaml", testCRD, os.ModePerm)
+					return fs
+				},
+			},
+			want: want{
+				pkgExists:  true,
+				authExists: true,
+			},
+		},
+		"SuccessAuthV1Provider": {
+			args: args{
+				rootDir: "/ws",
+				authBE:  parser.NewEchoBackend(string(testAuth)),
+				fs: func() afero.Fs {
+					fs := afero.NewMemMapFs()
+					_ = fs.Mkdir("/ws", os.ModePerm)
+					_ = fs.Mkdir("/ws/crds", os.ModePerm)
+					_ = afero.WriteFile(fs, "/ws/crossplane.yaml", testMetav1WAuth, os.ModePerm)
+					_ = afero.WriteFile(fs, "/ws/crds/providerconfig.yaml", testPC, os.ModePerm)
+					_ = afero.WriteFile(fs, "/ws/crds/crd.yaml", testCRD, os.ModePerm)
+					return fs
+				},
+			},
+			want: want{
+				pkgExists:  true,
+				authExists: true,
+			},
+		},
+	}
+
+	for name, tc := range cases {
+		t.Run(name, func(t *testing.T) {
+			pkgBe := parser.NewFsBackend(
+				tc.args.fs(),
+				parser.FsDir(tc.args.rootDir),
+				parser.FsFilters([]parser.FilterFn{
+					parser.SkipDirs(),
+					parser.SkipNotYAML(),
+					parser.SkipEmpty(),
+					SkipContains("examples/"), // don't try to parse the examples in the package
+				}...),
+			)
+
+			pkgEx := parser.NewFsBackend(
+				tc.args.fs(),
+				parser.FsFilters(defaultFilters...),
+			)
+
+			builder := New(pkgBe, tc.args.authBE, pkgEx, pkgp, examples.New())
+
+			img, _, err := builder.Build(context.TODO())
+
+			if diff := cmp.Diff(tc.want.err, err, test.EquateErrors()); diff != "" {
+				t.Errorf("\n%s\nBuildAuth(...): -want err, +got err:\n%s", tc.reason, diff)
+			}
+			// validate the xpkg img has the correct annotations, etc
+			contents, err := readImg(img)
+			// sort the contents slice for test comparison
+			sort.Strings(contents.labels)
+
+			if diff := cmp.Diff(tc.want.pkgExists, len(contents.pkgBytes) != 0); diff != "" {
+				t.Errorf("\n%s\nBuildAuth(...): -want, +got:\n%s", tc.reason, diff)
+			}
+			if diff := cmp.Diff(tc.want.authExists, contents.includesAuth); diff != "" {
+				t.Errorf("\n%s\nBuildAuth(...): -want, +got:\n%s", tc.reason, diff)
+			}
+			if diff := cmp.Diff(nil, err, test.EquateErrors()); diff != "" {
+				t.Errorf("\n%s\nBuildAuth(...): -want err, +got err:\n%s", tc.reason, diff)
+			}
+		})
+	}
+}
+
 type xpkgContents struct {
-	labels   []string
-	pkgBytes []byte
-	exBytes  []byte
+	labels       []string
+	pkgBytes     []byte
+	exBytes      []byte
+	includesAuth bool
 }
 
 func readImg(i v1.Image) (xpkgContents, error) {
@@ -305,6 +456,15 @@ func readImg(i v1.Image) (xpkgContents, error) {
 		return contents, err
 	}
 	contents.pkgBytes = pkgBytes
+	ps := string(pkgBytes)
+
+	// This is pretty unfortunate. Unless we build out steps to re-parse the
+	// package from the image (i.e. the system under test) we're left
+	// performing string parsing. For now we choose part of the auth spec,
+	// specifically the version and date used in auth yamls.
+	if strings.Contains(ps, authObjectAnno) {
+		contents.includesAuth = strings.Contains(ps, "version: \"2023-06-23\"")
+	}
 
 	exYaml, err := fs.Open(XpkgExamplesFile)
 	if err != nil && !os.IsNotExist(err) {

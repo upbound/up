@@ -1,0 +1,33 @@
+version: '2023-06-23'
+discriminant: spec.credentials.source
+sources:
+  - name: Upbound
+    docs: |
+      # Upbound OpenID Connect (OIDC)
+      
+      Using Upbound OIDC to authenticate to AWS eliminates the need to store credentials in this control plane.
+      
+      You will need to:
+      
+      1. Create an **AWS Application** that will be used to authenticate `provider-AWS`.
+      2. Establish trust between your **AWS Application** and **Upbound** using a **Federated Credential**.
+      3. Grant the necessary permissions to your **Application Service Principal** by assigning it a **Role**.
+      4. Provide **Client ID**, **Tenant ID**, and **Subscription ID** of your **AWS Application**.
+
+      ## Create an Application
+
+      1. Sign in to [AWS portal](https://portal.AWS.com/).
+      2. Go to **AWS Active Directory**.
+      3. Select **App registrations** in the left navigation.
+      4. Click **+ New registration**.
+      5. In the **Name** field enter `upbound-oidc-provider`.
+      6. In the **Supported account types**> section select **Accounts in this organizational directory only**.
+      7. In the **Redirect URI** section select **Web** and leave the **URL** field blank.
+      8. Press **Register**.
+
+      ## Create a Federated Credential
+
+      When **Upbound** authenticates to **AWS** it provides an OIDC subject (`sub`) in the following format:
+      ```
+      mcp:<account>/<mcp-name>:provider:<provider-name>
+      ```
