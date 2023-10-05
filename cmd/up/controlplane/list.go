@@ -22,7 +22,6 @@ import (
 	"github.com/pterm/pterm"
 	v1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
-	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/client-go/dynamic"
 
 	"github.com/upbound/up-sdk-go/service/common"
@@ -42,7 +41,7 @@ const (
 )
 
 var cloudFieldNames = []string{"NAME", "ID", "STATUS", "DEPLOYED CONFIGURATION", "CONFIGURATION STATUS"}
-var spacesFieldNames = []string{"NAME", "ID", "STATUS", "MESSAGE"}
+var spacesFieldNames = []string{"NAME", "ID", "STATUS", "MESSAGE", "CONNECTION NAME", "CONNECTION NAMESPACE"}
 
 // AfterApply sets default values in command after assignment and validation.
 func (c *listCmd) AfterApply(kongCtx *kong.Context, upCtx *upbound.Context) error {
@@ -96,12 +95,7 @@ func (c *listCmd) runSpaces(printer upterm.ObjectPrinter, p pterm.TextPrinter, k
 // Hey Taylor -- I was thinking of moving this function to a new package.
 // That was the one thing I wanted to do before putting this up for a PR.
 func getControlPlanes(ctx context.Context, kube *dynamic.DynamicClient) (*unstructured.UnstructuredList, error) {
-	gvr := schema.GroupVersionResource{
-		Group:    "spaces.upbound.io",
-		Version:  "v1alpha1",
-		Resource: "controlplanes",
-	}
-	cpList, err := kube.Resource(gvr).List(ctx, v1.ListOptions{})
+	cpList, err := kube.Resource(resources.ControlPlaneGVR).List(ctx, v1.ListOptions{})
 	if err != nil {
 		return nil, err
 	}
@@ -132,7 +126,12 @@ func extractSpacesFields(obj any) []string {
 	}
 
 	ctp := resources.ControlPlane{Unstructured: uc}
-	cnd := ctp.GetCondition(xpcommonv1.TypeReady)
 
-	return []string{ctp.GetName(), ctp.GetControlPlaneID(), string(cnd.Reason), cnd.Message}
+	cnd := ctp.GetCondition(xpcommonv1.TypeReady)
+	ref := ctp.GetConnectionSecretToReference()
+	if ref == nil {
+		ref = &xpcommonv1.SecretReference{}
+	}
+
+	return []string{ctp.GetName(), ctp.GetControlPlaneID(), string(cnd.Reason), cnd.Message, ref.Name, ref.Namespace}
 }

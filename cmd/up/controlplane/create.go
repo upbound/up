@@ -16,13 +16,16 @@ package controlplane
 
 import (
 	"context"
-	"fmt"
 
+	v1 "github.com/crossplane/crossplane-runtime/apis/common/v1"
 	"github.com/pterm/pterm"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/client-go/dynamic"
 
 	"github.com/upbound/up-sdk-go/service/configurations"
 	cp "github.com/upbound/up-sdk-go/service/controlplanes"
 
+	"github.com/upbound/up/internal/resources"
 	"github.com/upbound/up/internal/upbound"
 )
 
@@ -30,14 +33,17 @@ import (
 type createCmd struct {
 	Name string `arg:"" required:"" help:"Name of control plane."`
 
-	ConfigurationName string `required:"" help:"The name of the Configuration."`
+	ConfigurationName string `help:"The name of the Configuration. This property is required for cloud control planes."`
 	Description       string `short:"d" help:"Description for control plane."`
+
+	SecretName      string `default:"kubeconfig-ctp" help:"The name of the control plane's secret. Only applicable for Space control planes."`
+	SecretNamespace string `default:"default" help:"The name of namespace for the control plane's secret. Only applicable for Space control planes."`
 }
 
 // Run executes the create command.
-func (c *createCmd) Run(p pterm.TextPrinter, cc *cp.Client, cfc *configurations.Client, upCtx *upbound.Context) error {
+func (c *createCmd) Run(p pterm.TextPrinter, cc *cp.Client, cfc *configurations.Client, kube *dynamic.DynamicClient, upCtx *upbound.Context) error {
 	if upCtx.Profile.IsSpace() {
-		return fmt.Errorf("create is not supported for space profile %q", upCtx.ProfileName)
+		return c.runSpaces(kube)
 	}
 
 	// Get the UUID from the Configuration name, if it exists.
@@ -56,4 +62,23 @@ func (c *createCmd) Run(p pterm.TextPrinter, cc *cp.Client, cfc *configurations.
 
 	p.Printfln("%s created", c.Name)
 	return nil
+}
+
+func (c *createCmd) runSpaces(kube *dynamic.DynamicClient) error {
+	ctp := &resources.ControlPlane{}
+	ctp.SetName(c.Name)
+	ctp.SetGroupVersionKind(resources.ControlPlaneGVK)
+	ctp.SetWriteConnectionSecretToReference(&v1.SecretReference{
+		Name:      c.SecretName,
+		Namespace: c.SecretNamespace,
+	})
+
+	_, err := kube.
+		Resource(resources.ControlPlaneGVK.GroupVersion().WithResource("controlplanes")).
+		Create(
+			context.Background(),
+			ctp.GetUnstructured(),
+			metav1.CreateOptions{},
+		)
+	return err
 }
