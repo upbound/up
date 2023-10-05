@@ -23,13 +23,13 @@ import (
 
 	"github.com/crossplane/crossplane-runtime/pkg/errors"
 	pkgmetav1 "github.com/crossplane/crossplane/apis/pkg/meta/v1"
-	v1alpha1 "github.com/crossplane/crossplane/apis/pkg/meta/v1alpha1"
 	"github.com/crossplane/crossplane/apis/pkg/v1beta1"
 	v1 "github.com/google/go-containerregistry/pkg/v1"
 	"github.com/google/go-containerregistry/pkg/v1/empty"
 	"github.com/google/go-containerregistry/pkg/v1/mutate"
 	"gopkg.in/yaml.v2"
 	crd "k8s.io/apiextensions-apiserver/pkg/apis/apiextensions/v1"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/runtime/serializer/json"
 
@@ -197,48 +197,38 @@ func (b *Builder) Build(ctx context.Context, opts ...BuildOpt) (v1.Image, runtim
 		linter = NewFunctionLinter()
 	case pkgmetav1.ProviderKind:
 		if b.ab != nil { // if we have an auth.yaml file
-			authGroup := ""
-			if p, ok := meta.(*v1alpha1.Provider); ok {
-				if group, ok := p.ObjectMeta.Annotations[authMetaAnno]; ok {
-					authGroup = group
-				}
-			}
-			if p, ok := meta.(*pkgmetav1.Provider); ok {
-				if group, ok := p.ObjectMeta.Annotations[authMetaAnno]; ok {
-					authGroup = group
-				}
-			}
-
-			if authGroup != "" {
-				// if we found an annotation auth.upbound.io/group then look for the object
-				// specified there like aws.upbound.io and annotate that with auth.upbound.io/config
-				// and embed the contents of the auth.yaml file
-				ar, err := b.ab.Init(ctx)
-				if err != nil {
-					return nil, nil, errors.Wrap(err, errParseAuth)
-				}
-				// validate the auth.yaml file
-				var auth AuthExtension
-				if err := yaml.NewDecoder(ar).Decode(&auth); err != nil {
-					return nil, nil, errors.Wrap(err, errParseAuth)
-				}
-				annotated := false
-				for x, o := range pkg.GetObjects() {
-					if c, ok := o.(*crd.CustomResourceDefinition); ok {
-						if c.Spec.Group == authGroup && c.Spec.Names.Kind == ProviderConfigKind {
-							ab := new(bytes.Buffer)
-							if err := yaml.NewEncoder(ab).Encode(auth); err != nil {
-								return nil, nil, errors.Wrap(err, errParseAuth)
+			if p, ok := meta.(metav1.Object); ok {
+				if group, ok := p.GetAnnotations()[authMetaAnno]; ok {
+					// if we found an annotation auth.upbound.io/group then look for the object
+					// specified there like aws.upbound.io and annotate that with auth.upbound.io/config
+					// and embed the contents of the auth.yaml file
+					ar, err := b.ab.Init(ctx)
+					if err != nil {
+						return nil, nil, errors.Wrap(err, errParseAuth)
+					}
+					// validate the auth.yaml file
+					var auth AuthExtension
+					if err := yaml.NewDecoder(ar).Decode(&auth); err != nil {
+						return nil, nil, errors.Wrap(err, errParseAuth)
+					}
+					annotated := false
+					for x, o := range pkg.GetObjects() {
+						if c, ok := o.(*crd.CustomResourceDefinition); ok {
+							if c.Spec.Group == group && c.Spec.Names.Kind == ProviderConfigKind {
+								ab := new(bytes.Buffer)
+								if err := yaml.NewEncoder(ab).Encode(auth); err != nil {
+									return nil, nil, errors.Wrap(err, errParseAuth)
+								}
+								c.Annotations[authObjectAnno] = ab.String()
+								pkg.GetObjects()[x] = c
+								annotated = true
+								break
 							}
-							c.Annotations[authObjectAnno] = ab.String()
-							pkg.GetObjects()[x] = c
-							annotated = true
-							break
 						}
 					}
-				}
-				if !annotated {
-					return nil, nil, errors.New(errAuthNotAnnotated)
+					if !annotated {
+						return nil, nil, errors.New(errAuthNotAnnotated)
+					}
 				}
 			}
 		}
