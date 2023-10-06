@@ -17,50 +17,60 @@ package controlplane
 import (
 	"context"
 
+	"github.com/alecthomas/kong"
 	"github.com/pterm/pterm"
-	kerrors "k8s.io/apimachinery/pkg/api/errors"
-	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/client-go/dynamic"
 
+	"github.com/upbound/up-sdk-go/service/configurations"
 	cp "github.com/upbound/up-sdk-go/service/controlplanes"
 
-	"github.com/upbound/up/internal/resources"
+	"github.com/upbound/up/internal/controlplane/cloud"
+	"github.com/upbound/up/internal/controlplane/space"
 	"github.com/upbound/up/internal/upbound"
 )
+
+type ctpDeleter interface {
+	Delete(ctx context.Context, name string) error
+}
 
 // deleteCmd deletes a control plane on Upbound.
 type deleteCmd struct {
 	Name string `arg:"" help:"Name of control plane." predictor:"ctps"`
+
+	client ctpDeleter
 }
 
-// Run executes the delete command.
-func (c *deleteCmd) Run(p pterm.TextPrinter, cc *cp.Client, kube *dynamic.DynamicClient, upCtx *upbound.Context) error {
+// AfterApply sets default values in command after assignment and validation.
+func (c *deleteCmd) AfterApply(kongCtx *kong.Context, upCtx *upbound.Context) error {
+
 	if upCtx.Profile.IsSpace() {
-		if err := c.runSpaces(p, kube); err != nil {
+		kubeconfig, err := upCtx.Profile.GetKubeClientConfig()
+		if err != nil {
 			return err
 		}
+		client, err := dynamic.NewForConfig(kubeconfig)
+		if err != nil {
+			return err
+		}
+		c.client = space.New(client)
 	} else {
-		if err := cc.Delete(context.Background(), upCtx.Account, c.Name); err != nil {
+		cfg, err := upCtx.BuildSDKConfig()
+		if err != nil {
 			return err
 		}
+		ctpclient := cp.NewClient(cfg)
+		cfgclient := configurations.NewClient(cfg)
+
+		c.client = cloud.New(ctpclient, cfgclient, upCtx.Account)
 	}
-	p.Printfln("%s deleted", c.Name)
 	return nil
 }
 
-func (c *deleteCmd) runSpaces(p pterm.TextPrinter, kube *dynamic.DynamicClient) error {
-	err := kube.
-		Resource(resources.ControlPlaneGVK.GroupVersion().WithResource("controlplanes")).
-		Delete(
-			context.Background(),
-			c.Name,
-			metav1.DeleteOptions{},
-		)
-
-	if kerrors.IsNotFound(err) {
-		p.Println("No control planes found")
-		return nil
+// Run executes the delete command.
+func (c *deleteCmd) Run(p pterm.TextPrinter, upCtx *upbound.Context) error {
+	if err := c.client.Delete(context.Background(), c.Name); err != nil {
+		return err
 	}
-
-	return err
+	p.Printfln("%s deleted", c.Name)
+	return nil
 }

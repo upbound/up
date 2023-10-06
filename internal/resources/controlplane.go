@@ -16,11 +16,6 @@ var (
 		Version: "v1beta1",
 		Kind:    "ControlPlane",
 	}
-	ControlPlaneGVR = schema.GroupVersionResource{
-		Group:    "spaces.upbound.io",
-		Version:  "v1beta1",
-		Resource: "controlplanes",
-	}
 )
 
 // ControlPlane represents the ControlPlane CustomResource and extends an
@@ -29,9 +24,17 @@ type ControlPlane struct {
 	unstructured.Unstructured
 }
 
+type ControlPlaneList struct {
+	unstructured.UnstructuredList
+}
+
 // GetUnstructured returns the underlying *unstructured.Unstructured.
 func (c *ControlPlane) GetUnstructured() *unstructured.Unstructured {
 	return &c.Unstructured
+}
+
+func (cl *ControlPlaneList) GetUnstructured() *unstructured.UnstructuredList {
+	return &cl.UnstructuredList
 }
 
 // GetCondition returns the condition for the given xpv1.ConditionType if it

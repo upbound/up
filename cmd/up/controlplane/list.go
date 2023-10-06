@@ -20,86 +20,76 @@ import (
 	"github.com/alecthomas/kong"
 	xpcommonv1 "github.com/crossplane/crossplane-runtime/apis/common/v1"
 	"github.com/pterm/pterm"
-	v1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 	"k8s.io/client-go/dynamic"
 
-	"github.com/upbound/up-sdk-go/service/common"
+	"github.com/upbound/up-sdk-go/service/configurations"
 	cp "github.com/upbound/up-sdk-go/service/controlplanes"
 
+	"github.com/upbound/up/internal/controlplane/cloud"
+	"github.com/upbound/up/internal/controlplane/space"
 	"github.com/upbound/up/internal/resources"
 	"github.com/upbound/up/internal/upbound"
 	"github.com/upbound/up/internal/upterm"
 )
 
 const (
-	maxItems = 100
-)
-
-const (
 	notAvailable = "n/a"
 )
 
-var cloudFieldNames = []string{"NAME", "ID", "STATUS", "DEPLOYED CONFIGURATION", "CONFIGURATION STATUS"}
+var cloudFieldNames = []string{"NAME", "ID", "STATUS", "CONFIGURATION", "CONFIGURATION STATUS", "CONNECTION NAME", "CONNECTION NAMESPACE"}
 var spacesFieldNames = []string{"NAME", "ID", "STATUS", "MESSAGE", "CONNECTION NAME", "CONNECTION NAMESPACE"}
+
+type ctpLister interface {
+	List(ctx context.Context) (*resources.ControlPlaneList, error)
+}
+
+// listCmd list control planes in an account on Upbound.
+type listCmd struct {
+	client ctpLister
+}
 
 // AfterApply sets default values in command after assignment and validation.
 func (c *listCmd) AfterApply(kongCtx *kong.Context, upCtx *upbound.Context) error {
+
+	if upCtx.Profile.IsSpace() {
+		kubeconfig, err := upCtx.Profile.GetKubeClientConfig()
+		if err != nil {
+			return err
+		}
+		client, err := dynamic.NewForConfig(kubeconfig)
+		if err != nil {
+			return err
+		}
+		c.client = space.New(client)
+	} else {
+		cfg, err := upCtx.BuildSDKConfig()
+		if err != nil {
+			return err
+		}
+		ctpclient := cp.NewClient(cfg)
+		cfgclient := configurations.NewClient(cfg)
+
+		c.client = cloud.New(ctpclient, cfgclient, upCtx.Account)
+	}
+
 	kongCtx.Bind(pterm.DefaultTable.WithWriter(kongCtx.Stdout).WithSeparator("   "))
 	return nil
 }
 
-// listCmd list control planes in an account on Upbound.
-type listCmd struct{}
-
 // Run executes the list command.
-func (c *listCmd) Run(printer upterm.ObjectPrinter, p pterm.TextPrinter, cc *cp.Client, kube *dynamic.DynamicClient, upCtx *upbound.Context) error {
-	if upCtx.Profile.IsSpace() {
-		return c.runSpaces(printer, p, kube)
-	}
-	return c.runCloud(printer, p, cc, upCtx)
-}
-
-func (c *listCmd) runCloud(printer upterm.ObjectPrinter, p pterm.TextPrinter, cc *cp.Client, upCtx *upbound.Context) error {
-	// TODO(hasheddan): we currently just max out single page size, but we
-	// may opt to support limiting page size and iterating through pages via
-	// flags in the future.
-	cpList, err := cc.List(context.Background(), upCtx.Account, common.WithSize(maxItems))
+func (c *listCmd) Run(printer upterm.ObjectPrinter, p pterm.TextPrinter, upCtx *upbound.Context) error {
+	l, err := c.client.List(context.Background())
 	if err != nil {
 		return err
 	}
 
-	if len(cpList.ControlPlanes) == 0 {
-		p.Printfln("No control planes found in %s", upCtx.Account)
-		return nil
-	}
-	return printer.Print(cpList.ControlPlanes, cloudFieldNames, extractCloudFields)
-}
-
-func (c *listCmd) runSpaces(printer upterm.ObjectPrinter, p pterm.TextPrinter, kube *dynamic.DynamicClient) error {
-	// NOTE: It would be convenient if we could import the ControlPlane types
-	// and SchemeBuilder from upbound/mxe and use them to build a client that
-	// returns structured data, but it's a private repo. Instead we use a dynamic
-	// client and unstructured objects.
-	cpList, err := getControlPlanes(context.Background(), kube)
-	if err != nil {
-		return err
-	}
-	if len(cpList.Items) == 0 {
+	if len(l.Items) == 0 {
 		p.Println("No control planes found")
 		return nil
 	}
-	return printer.Print(cpList.Items, spacesFieldNames, extractSpacesFields)
-}
-
-// Hey Taylor -- I was thinking of moving this function to a new package.
-// That was the one thing I wanted to do before putting this up for a PR.
-func getControlPlanes(ctx context.Context, kube *dynamic.DynamicClient) (*unstructured.UnstructuredList, error) {
-	cpList, err := kube.Resource(resources.ControlPlaneGVR).List(ctx, v1.ListOptions{})
-	if err != nil {
-		return nil, err
-	}
-	return cpList, nil
+	printer.Print(l.Items, spacesFieldNames, extractSpacesFields)
+	return nil
 }
 
 func extractCloudFields(obj any) []string {

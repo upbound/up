@@ -17,17 +17,23 @@ package controlplane
 import (
 	"context"
 
-	v1 "github.com/crossplane/crossplane-runtime/apis/common/v1"
+	"github.com/alecthomas/kong"
 	"github.com/pterm/pterm"
-	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/client-go/dynamic"
 
 	"github.com/upbound/up-sdk-go/service/configurations"
 	cp "github.com/upbound/up-sdk-go/service/controlplanes"
 
+	"github.com/upbound/up/internal/controlplane"
+	"github.com/upbound/up/internal/controlplane/cloud"
+	"github.com/upbound/up/internal/controlplane/space"
 	"github.com/upbound/up/internal/resources"
 	"github.com/upbound/up/internal/upbound"
 )
+
+type ctpCreator interface {
+	Create(ctx context.Context, name string, opts controlplane.Options) (*resources.ControlPlane, error)
+}
 
 // createCmd creates a control plane on Upbound.
 type createCmd struct {
@@ -38,47 +44,52 @@ type createCmd struct {
 
 	SecretName      string `default:"kubeconfig-ctp" help:"The name of the control plane's secret. Only applicable for Space control planes."`
 	SecretNamespace string `default:"default" help:"The name of namespace for the control plane's secret. Only applicable for Space control planes."`
+
+	client ctpCreator
+}
+
+// AfterApply sets default values in command after assignment and validation.
+func (c *createCmd) AfterApply(kongCtx *kong.Context, upCtx *upbound.Context) error {
+
+	if upCtx.Profile.IsSpace() {
+		kubeconfig, err := upCtx.Profile.GetKubeClientConfig()
+		if err != nil {
+			return err
+		}
+		client, err := dynamic.NewForConfig(kubeconfig)
+		if err != nil {
+			return err
+		}
+		c.client = space.New(client)
+	} else {
+		cfg, err := upCtx.BuildSDKConfig()
+		if err != nil {
+			return err
+		}
+		ctpclient := cp.NewClient(cfg)
+		cfgclient := configurations.NewClient(cfg)
+
+		c.client = cloud.New(ctpclient, cfgclient, upCtx.Account)
+	}
+
+	kongCtx.Bind(pterm.DefaultTable.WithWriter(kongCtx.Stdout).WithSeparator("   "))
+	return nil
 }
 
 // Run executes the create command.
-func (c *createCmd) Run(p pterm.TextPrinter, cc *cp.Client, cfc *configurations.Client, kube *dynamic.DynamicClient, upCtx *upbound.Context) error {
-	if upCtx.Profile.IsSpace() {
-		return c.runSpaces(kube)
-	}
-
-	// Get the UUID from the Configuration name, if it exists.
-	cfg, err := cfc.Get(context.Background(), upCtx.Account, c.ConfigurationName)
+func (c *createCmd) Run(p pterm.TextPrinter, upCtx *upbound.Context) error {
+	_, err := c.client.Create(
+		context.Background(),
+		c.Name,
+		controlplane.Options{
+			SecretName:      c.SecretName,
+			SecretNamespace: c.SecretNamespace,
+		},
+	)
 	if err != nil {
-		return err
-	}
-
-	if _, err := cc.Create(context.Background(), upCtx.Account, &cp.ControlPlaneCreateParameters{
-		Name:            c.Name,
-		Description:     c.Description,
-		ConfigurationID: cfg.ID,
-	}); err != nil {
 		return err
 	}
 
 	p.Printfln("%s created", c.Name)
 	return nil
-}
-
-func (c *createCmd) runSpaces(kube *dynamic.DynamicClient) error {
-	ctp := &resources.ControlPlane{}
-	ctp.SetName(c.Name)
-	ctp.SetGroupVersionKind(resources.ControlPlaneGVK)
-	ctp.SetWriteConnectionSecretToReference(&v1.SecretReference{
-		Name:      c.SecretName,
-		Namespace: c.SecretNamespace,
-	})
-
-	_, err := kube.
-		Resource(resources.ControlPlaneGVK.GroupVersion().WithResource("controlplanes")).
-		Create(
-			context.Background(),
-			ctp.GetUnstructured(),
-			metav1.CreateOptions{},
-		)
-	return err
 }

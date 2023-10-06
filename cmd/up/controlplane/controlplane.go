@@ -19,9 +19,7 @@ import (
 
 	"github.com/alecthomas/kong"
 	"github.com/posener/complete"
-	"k8s.io/client-go/dynamic"
 
-	"github.com/upbound/up-sdk-go/service/configurations"
 	cp "github.com/upbound/up-sdk-go/service/controlplanes"
 	"github.com/upbound/up/cmd/up/controlplane/kubeconfig"
 	"github.com/upbound/up/cmd/up/controlplane/pkg"
@@ -43,32 +41,6 @@ func (c *Cmd) AfterApply(kongCtx *kong.Context) error {
 		return err
 	}
 	kongCtx.Bind(upCtx)
-
-	var cpCli *cp.Client
-	var cfgCli *configurations.Client
-	// TODO(branden): Replace kubeCli with a custom client type for interacting
-	// with controlplanes in a space. Something like:
-	// import spacesControlPlanes "github.com/upbound/up-sdk-go/service/spaces/controlplanes"
-	// ctpCli := spacesControlplanes.NewClient(kubeconfig)
-	var kubeCli *dynamic.DynamicClient
-	if upCtx.Profile.IsSpace() {
-		kubeconfig, err := upCtx.Profile.GetKubeClientConfig()
-		if err != nil {
-			return err
-		}
-		kubeCli, err = dynamic.NewForConfig(kubeconfig)
-		if err != nil {
-			return err
-		}
-	} else {
-		cfg, err := upCtx.BuildSDKConfig()
-		if err != nil {
-			return err
-		}
-		cpCli = cp.NewClient(cfg)
-		cfgCli = configurations.NewClient(cfg)
-	}
-	kongCtx.Bind(cpCli, cfgCli, kubeCli)
 
 	return nil
 }
