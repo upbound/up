@@ -18,30 +18,21 @@ import (
 	"context"
 
 	"github.com/alecthomas/kong"
-	xpcommonv1 "github.com/crossplane/crossplane-runtime/apis/common/v1"
 	"github.com/pterm/pterm"
-	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 	"k8s.io/client-go/dynamic"
 
 	"github.com/upbound/up-sdk-go/service/configurations"
 	cp "github.com/upbound/up-sdk-go/service/controlplanes"
 
+	"github.com/upbound/up/internal/controlplane"
 	"github.com/upbound/up/internal/controlplane/cloud"
 	"github.com/upbound/up/internal/controlplane/space"
-	"github.com/upbound/up/internal/resources"
 	"github.com/upbound/up/internal/upbound"
 	"github.com/upbound/up/internal/upterm"
 )
 
-const (
-	notAvailable = "n/a"
-)
-
-var cloudFieldNames = []string{"NAME", "ID", "STATUS", "CONFIGURATION", "CONFIGURATION STATUS", "CONNECTION NAME", "CONNECTION NAMESPACE"}
-var spacesFieldNames = []string{"NAME", "ID", "STATUS", "MESSAGE", "CONNECTION NAME", "CONNECTION NAMESPACE"}
-
 type ctpLister interface {
-	List(ctx context.Context) (*resources.ControlPlaneList, error)
+	List(ctx context.Context) ([]*controlplane.Response, error)
 }
 
 // listCmd list control planes in an account on Upbound.
@@ -84,44 +75,10 @@ func (c *listCmd) Run(printer upterm.ObjectPrinter, p pterm.TextPrinter, upCtx *
 		return err
 	}
 
-	if len(l.Items) == 0 {
+	if len(l) == 0 {
 		p.Println("No control planes found")
 		return nil
 	}
-	printer.Print(l.Items, spacesFieldNames, extractSpacesFields)
-	return nil
-}
 
-func extractCloudFields(obj any) []string {
-	c := obj.(cp.ControlPlaneResponse)
-	var cfgName string
-	var cfgStatus string
-	// All Upbound managed control planes in an account should be associated to a configuration.
-	// However, we should still list all control planes and indicate where this isn't the case.
-	if c.ControlPlane.Configuration.Name != nil && c.ControlPlane.Configuration != EmptyControlPlaneConfiguration() {
-		cfgName = *c.ControlPlane.Configuration.Name
-		cfgStatus = string(c.ControlPlane.Configuration.Status)
-	} else {
-		cfgName, cfgStatus = notAvailable, notAvailable
-	}
-	return []string{c.ControlPlane.Name, c.ControlPlane.ID.String(), string(c.Status), cfgName, cfgStatus}
-}
-
-func extractSpacesFields(obj any) []string {
-	id, readyStatus := "unknown", "unknown"
-
-	uc, ok := obj.(unstructured.Unstructured)
-	if !ok {
-		return []string{"", id, readyStatus}
-	}
-
-	ctp := resources.ControlPlane{Unstructured: uc}
-
-	cnd := ctp.GetCondition(xpcommonv1.TypeReady)
-	ref := ctp.GetConnectionSecretToReference()
-	if ref == nil {
-		ref = &xpcommonv1.SecretReference{}
-	}
-
-	return []string{ctp.GetName(), ctp.GetControlPlaneID(), string(cnd.Reason), cnd.Message, ref.Name, ref.Namespace}
+	return tabularPrint(l, printer, upCtx)
 }

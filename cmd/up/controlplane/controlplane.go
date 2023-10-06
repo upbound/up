@@ -24,8 +24,15 @@ import (
 	"github.com/upbound/up/cmd/up/controlplane/kubeconfig"
 	"github.com/upbound/up/cmd/up/controlplane/pkg"
 	"github.com/upbound/up/cmd/up/controlplane/pullsecret"
+	"github.com/upbound/up/internal/controlplane"
 	"github.com/upbound/up/internal/feature"
 	"github.com/upbound/up/internal/upbound"
+	"github.com/upbound/up/internal/upterm"
+)
+
+var (
+	cloudfieldNames = []string{"NAME", "ID", "STATUS", "CONFIGURATION", "CONFIGURATION STATUS"}
+	spacefieldNames = []string{"NAME", "ID", "STATUS", "MESSAGE", "CONNECTION NAME", "CONNECTION NAMESPACE"}
 )
 
 // BeforeReset is the first hook to run.
@@ -96,4 +103,48 @@ type Cmd struct {
 
 	// Common Upbound API configuration
 	Flags upbound.Flags `embed:""`
+}
+
+func extractCloudFields(obj any) []string {
+	id, readyStatus := "unknown", "unknown"
+
+	resp, ok := obj.(*controlplane.Response)
+	if !ok {
+		return []string{"", id, readyStatus}
+	}
+
+	return []string{
+		resp.Name,
+		resp.ID,
+		resp.Status,
+		resp.Cfg,
+		resp.CfgStatus,
+	}
+}
+
+func extractSpaceFields(obj any) []string {
+	id, readyStatus := "unknown", "unknown"
+
+	resp, ok := obj.(*controlplane.Response)
+	if !ok {
+		return []string{"", id, readyStatus}
+	}
+
+	return []string{
+		resp.Name,
+		resp.ID,
+		resp.Status,
+		resp.Message,
+		resp.ConnName,
+		resp.ConnNamespace,
+	}
+}
+
+func tabularPrint(obj any, printer upterm.ObjectPrinter, upCtx *upbound.Context) error {
+	if upCtx.Profile.IsSpace() {
+		printer.Print(obj, spacefieldNames, extractSpaceFields)
+	} else {
+		printer.Print(obj, cloudfieldNames, extractCloudFields)
+	}
+	return nil
 }

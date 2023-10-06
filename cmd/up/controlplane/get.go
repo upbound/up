@@ -24,9 +24,9 @@ import (
 	"github.com/upbound/up-sdk-go/service/configurations"
 	cp "github.com/upbound/up-sdk-go/service/controlplanes"
 
+	"github.com/upbound/up/internal/controlplane"
 	"github.com/upbound/up/internal/controlplane/cloud"
 	"github.com/upbound/up/internal/controlplane/space"
-	"github.com/upbound/up/internal/resources"
 	"github.com/upbound/up/internal/upbound"
 	"github.com/upbound/up/internal/upterm"
 )
@@ -34,7 +34,7 @@ import (
 const errNoConfigurationFound = "no configuration associated to this control plane"
 
 type ctpGetter interface {
-	Get(ctx context.Context, name string) (*resources.ControlPlane, error)
+	Get(ctx context.Context, name string) (*controlplane.Response, error)
 }
 
 // AfterApply sets default values in command after assignment and validation.
@@ -79,8 +79,7 @@ func (c *getCmd) Run(printer upterm.ObjectPrinter, upCtx *upbound.Context) error
 		return err
 	}
 
-	printer.Print(*ctp.GetUnstructured(), spacesFieldNames, extractSpacesFields)
-	return nil
+	return tabularPrint(ctp, printer, upCtx)
 }
 
 // EmptyControlPlaneConfiguration returns an empty ControlPlaneConfiguration with default values.

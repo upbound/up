@@ -3,18 +3,17 @@ package cloud
 import (
 	"context"
 
-	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
-
 	"github.com/upbound/up-sdk-go/service/common"
 	"github.com/upbound/up-sdk-go/service/configurations"
 	"github.com/upbound/up-sdk-go/service/controlplanes"
 
 	"github.com/upbound/up/internal/controlplane"
-	"github.com/upbound/up/internal/resources"
 )
 
 const (
 	maxItems = 100
+
+	notAvailable = "n/a"
 )
 
 // Client is the client used for interacting with the ControlPlanes API in
@@ -36,38 +35,30 @@ func New(ctp *controlplanes.Client, cfg *configurations.Client, account string) 
 }
 
 // Get the ControlPlane corresponding to the given ControlPlane name.
-func (c *Client) Get(ctx context.Context, name string) (*resources.ControlPlane, error) {
+func (c *Client) Get(ctx context.Context, name string) (*controlplane.Response, error) {
 	resp, err := c.ctp.Get(context.Background(), c.account, name)
 	if err != nil {
 		return nil, err
 	}
 
-	ctp := &resources.ControlPlane{}
-	ctp.SetName(resp.ControlPlane.Name)
-	return ctp, nil
+	return convert(resp), nil
 }
 
 // List all ControlPlanes within the Space.
-func (c *Client) List(ctx context.Context) (*resources.ControlPlaneList, error) {
+func (c *Client) List(ctx context.Context) ([]*controlplane.Response, error) {
 	l, err := c.ctp.List(context.Background(), c.account, common.WithSize(maxItems))
 	if err != nil {
 		return nil, err
 	}
-	list := []unstructured.Unstructured{}
-	for _, uc := range l.ControlPlanes {
-		ctp := &resources.ControlPlane{}
-		ctp.SetName(uc.ControlPlane.Name)
-		list = append(list, *ctp.GetUnstructured())
+	resps := []*controlplane.Response{}
+	for _, r := range l.ControlPlanes {
+		resps = append(resps, convert(&r))
 	}
-	return &resources.ControlPlaneList{
-		UnstructuredList: unstructured.UnstructuredList{
-			Items: list,
-		},
-	}, nil
+	return resps, nil
 }
 
 // Create a new ControlPlane with the given name and the supplied Options.
-func (c *Client) Create(ctx context.Context, name string, opts controlplane.Options) (*resources.ControlPlane, error) {
+func (c *Client) Create(ctx context.Context, name string, opts controlplane.Options) (*controlplane.Response, error) {
 	// Get the UUID from the Configuration name, if it exists.
 	cfg, err := c.cfg.Get(context.Background(), c.account, opts.ConfigurationName)
 	if err != nil {
@@ -83,12 +74,39 @@ func (c *Client) Create(ctx context.Context, name string, opts controlplane.Opti
 		return nil, err
 	}
 
-	ctp := &resources.ControlPlane{}
-	ctp.SetName(resp.ControlPlane.Name)
-	return ctp, nil
+	return convert(resp), nil
 }
 
 // Delete the ControlPlane corresponding to the given ControlPlane name.
 func (c *Client) Delete(ctx context.Context, name string) error {
 	return c.ctp.Delete(context.Background(), c.account, name)
+}
+
+func convert(ctp *controlplanes.ControlPlaneResponse) *controlplane.Response {
+
+	var cfgName string
+	var cfgStatus string
+	// All Upbound managed control planes in an account should be associated to a configuration.
+	// However, we should still list all control planes and indicate where this isn't the case.
+	if ctp.ControlPlane.Configuration.Name != nil && ctp.ControlPlane.Configuration != EmptyControlPlaneConfiguration() {
+		cfgName = *ctp.ControlPlane.Configuration.Name
+		cfgStatus = string(ctp.ControlPlane.Configuration.Status)
+	} else {
+		cfgName, cfgStatus = notAvailable, notAvailable
+	}
+
+	return &controlplane.Response{
+		ID:        ctp.ControlPlane.ID.String(),
+		Name:      ctp.ControlPlane.Name,
+		Status:    string(ctp.Status),
+		Cfg:       cfgName,
+		CfgStatus: cfgStatus,
+	}
+}
+
+// EmptyControlPlaneConfiguration returns an empty ControlPlaneConfiguration with default values.
+func EmptyControlPlaneConfiguration() controlplanes.ControlPlaneConfiguration {
+	configuration := controlplanes.ControlPlaneConfiguration{}
+	configuration.Status = controlplanes.ConfigurationInstallationQueued
+	return configuration
 }

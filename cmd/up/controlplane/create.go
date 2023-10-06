@@ -27,12 +27,11 @@ import (
 	"github.com/upbound/up/internal/controlplane"
 	"github.com/upbound/up/internal/controlplane/cloud"
 	"github.com/upbound/up/internal/controlplane/space"
-	"github.com/upbound/up/internal/resources"
 	"github.com/upbound/up/internal/upbound"
 )
 
 type ctpCreator interface {
-	Create(ctx context.Context, name string, opts controlplane.Options) (*resources.ControlPlane, error)
+	Create(ctx context.Context, name string, opts controlplane.Options) (*controlplane.Response, error)
 }
 
 // createCmd creates a control plane on Upbound.
