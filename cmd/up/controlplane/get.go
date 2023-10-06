@@ -16,14 +16,17 @@ package controlplane
 
 import (
 	"context"
-	"fmt"
 
 	"github.com/alecthomas/kong"
 	"github.com/crossplane/crossplane-runtime/pkg/errors"
 	"github.com/pterm/pterm"
+	kerrors "k8s.io/apimachinery/pkg/api/errors"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/client-go/dynamic"
 
 	cp "github.com/upbound/up-sdk-go/service/controlplanes"
 
+	"github.com/upbound/up/internal/resources"
 	"github.com/upbound/up/internal/upbound"
 	"github.com/upbound/up/internal/upterm"
 )
@@ -42,9 +45,9 @@ type getCmd struct {
 }
 
 // Run executes the get command.
-func (c *getCmd) Run(printer upterm.ObjectPrinter, cc *cp.Client, upCtx *upbound.Context) error {
+func (c *getCmd) Run(printer upterm.ObjectPrinter, p pterm.TextPrinter, cc *cp.Client, kube *dynamic.DynamicClient, upCtx *upbound.Context) error {
 	if upCtx.Profile.IsSpace() {
-		return fmt.Errorf("get is not supported for space profile %q", upCtx.ProfileName)
+		return c.runSpaces(printer, p, kube)
 	}
 
 	ctp, err := cc.Get(context.Background(), upCtx.Account, c.Name)
@@ -57,6 +60,23 @@ func (c *getCmd) Run(printer upterm.ObjectPrinter, cc *cp.Client, upCtx *upbound
 	}
 
 	return printer.Print(*ctp, cloudFieldNames, extractCloudFields)
+}
+
+func (c *getCmd) runSpaces(printer upterm.ObjectPrinter, p pterm.TextPrinter, kube *dynamic.DynamicClient) error {
+	u, err := kube.
+		Resource(resources.ControlPlaneGVK.GroupVersion().WithResource("controlplanes")).
+		Get(
+			context.Background(),
+			c.Name,
+			metav1.GetOptions{},
+		)
+
+	if kerrors.IsNotFound(err) {
+		p.Println("No control planes found")
+		return nil
+	}
+
+	return printer.Print(*u, spacesFieldNames, extractSpacesFields)
 }
 
 // EmptyControlPlaneConfiguration returns an empty ControlPlaneConfiguration with default values.

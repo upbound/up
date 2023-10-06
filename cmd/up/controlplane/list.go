@@ -55,7 +55,7 @@ type listCmd struct{}
 // Run executes the list command.
 func (c *listCmd) Run(printer upterm.ObjectPrinter, p pterm.TextPrinter, cc *cp.Client, kube *dynamic.DynamicClient, upCtx *upbound.Context) error {
 	if upCtx.Profile.IsSpace() {
-		return c.runSpaces(printer, p, kube, upCtx)
+		return c.runSpaces(printer, p, kube)
 	}
 	return c.runCloud(printer, p, cc, upCtx)
 }
@@ -76,7 +76,7 @@ func (c *listCmd) runCloud(printer upterm.ObjectPrinter, p pterm.TextPrinter, cc
 	return printer.Print(cpList.ControlPlanes, cloudFieldNames, extractCloudFields)
 }
 
-func (c *listCmd) runSpaces(printer upterm.ObjectPrinter, p pterm.TextPrinter, kube *dynamic.DynamicClient, upCtx *upbound.Context) error {
+func (c *listCmd) runSpaces(printer upterm.ObjectPrinter, p pterm.TextPrinter, kube *dynamic.DynamicClient) error {
 	// NOTE: It would be convenient if we could import the ControlPlane types
 	// and SchemeBuilder from upbound/mxe and use them to build a client that
 	// returns structured data, but it's a private repo. Instead we use a dynamic
