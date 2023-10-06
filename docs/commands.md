@@ -482,6 +482,8 @@ on-disk Crossplane packages.
           examples directory.
         - `--ignore = STRING,...`: Paths, specified relative to --package-root,
           to exclude from the package.
+        - `--tar-path = STRING`: Path to a locally built tar file, an alternative 
+          to the Controller parameter. 
     - Behavior: Builds a Crossplane package (`.xpkg`) that is compatible with
       upstream Crossplane packages and is a valid OCI image. Build will fail if
       package is malformed or contains resources that are not compatible with
