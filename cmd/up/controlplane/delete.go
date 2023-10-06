@@ -16,12 +16,15 @@ package controlplane
 
 import (
 	"context"
-	"fmt"
 
 	"github.com/pterm/pterm"
+	kerrors "k8s.io/apimachinery/pkg/api/errors"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/client-go/dynamic"
 
 	cp "github.com/upbound/up-sdk-go/service/controlplanes"
 
+	"github.com/upbound/up/internal/resources"
 	"github.com/upbound/up/internal/upbound"
 )
 
@@ -31,14 +34,33 @@ type deleteCmd struct {
 }
 
 // Run executes the delete command.
-func (c *deleteCmd) Run(p pterm.TextPrinter, cc *cp.Client, upCtx *upbound.Context) error {
+func (c *deleteCmd) Run(p pterm.TextPrinter, cc *cp.Client, kube *dynamic.DynamicClient, upCtx *upbound.Context) error {
 	if upCtx.Profile.IsSpace() {
-		return fmt.Errorf("delete is not supported for space profile %q", upCtx.ProfileName)
-	}
-
-	if err := cc.Delete(context.Background(), upCtx.Account, c.Name); err != nil {
-		return err
+		if err := c.runSpaces(p, kube); err != nil {
+			return err
+		}
+	} else {
+		if err := cc.Delete(context.Background(), upCtx.Account, c.Name); err != nil {
+			return err
+		}
 	}
 	p.Printfln("%s deleted", c.Name)
 	return nil
+}
+
+func (c *deleteCmd) runSpaces(p pterm.TextPrinter, kube *dynamic.DynamicClient) error {
+	err := kube.
+		Resource(resources.ControlPlaneGVK.GroupVersion().WithResource("controlplanes")).
+		Delete(
+			context.Background(),
+			c.Name,
+			metav1.DeleteOptions{},
+		)
+
+	if kerrors.IsNotFound(err) {
+		p.Println("No control planes found")
+		return nil
+	}
+
+	return err
 }
