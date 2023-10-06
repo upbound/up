@@ -44,13 +44,13 @@ var (
 	// initVersionConstraints is the list of version constraints that are checked
 	// on up init.
 	initVersionConstraints = []constraint{
-		{semver: ">= 1.0", message: "target version must be 1.0 or later. Use up < 0.20.0 to install earlier versions."},
+		{semver: ">= 1.0-0", message: "target version must be 1.0 or later. Use up < 0.20.0 to install earlier versions."},
 	}
 
 	// upgradeVersionConstraints is the list of version constraints that are
 	// checked on up upgrade.
 	upgradeVersionConstraints = []constraint{
-		{semver: ">= 1.0", message: "target version must be 1.0 or later. Use up < 0.20.0 to install earlier versions."},
+		{semver: ">= 1.0-0", message: "target version must be 1.0 or later. Use up < 0.20.0 to install earlier versions."},
 	}
 
 	// upgradeFromVersionConstraints is the list of version constraints that are

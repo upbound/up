@@ -15,10 +15,13 @@
 package space
 
 import (
+	"fmt"
 	"reflect"
 	"testing"
 
 	"github.com/Masterminds/semver/v3"
+	"github.com/crossplane/crossplane-runtime/pkg/test"
+	"github.com/google/go-cmp/cmp"
 )
 
 func TestInitVersionConstraints(t *testing.T) {
@@ -115,6 +118,81 @@ func Test_parseChartUpConstraints(t *testing.T) {
 			}
 			if !reflect.DeepEqual(got, tt.want.constraints) {
 				t.Errorf("parseChartUpConstraints() got = %v, want.constraints %v", got, tt.want)
+			}
+		})
+	}
+}
+
+func TestCheckVersion(t *testing.T) {
+	errBoom := "boom"
+
+	type args struct {
+		constraints []constraint
+		version     string
+	}
+	type want struct {
+		err error
+	}
+
+	cases := map[string]struct {
+		reason string
+		args   args
+		want   want
+	}{
+		"ErrorVersionGreaterThanBoundary": {
+			reason: "If the supplied version fails the check an error is returned.",
+			args: args{
+				version:     "1.0",
+				constraints: []constraint{{semver: "<1.0", message: "versions must be less than 1.0"}},
+			},
+			want: want{
+				err: fmt.Errorf("%s: versions must be less than 1.0", errBoom),
+			},
+		},
+		"ErrorVersionLessThanBoundary": {
+			reason: "If the supplied version fails the check an error is returned.",
+			args: args{
+				version:     "0.10",
+				constraints: []constraint{{semver: ">=1.0", message: "versions must be greater than 1.0"}},
+			},
+			want: want{
+				err: fmt.Errorf("%s: versions must be greater than 1.0", errBoom),
+			},
+		},
+		"SuccessInitStandardVersion": {
+			reason: "A standard version that falls within our initVersionConstraints should not return an error.",
+			args: args{
+				version:     "1.0",
+				constraints: initVersionConstraints,
+			},
+		},
+		"SuccessInitPreReleaseVersion": {
+			reason: "A pre-release version that falls within our initVersionConstraints should not return an error.",
+			args: args{
+				version:     "1.0.0-rc.1",
+				constraints: initVersionConstraints,
+			},
+		},
+		"SuccessUpgradeStandardVersion": {
+			reason: "A standard version that falls within our upgradeVersionConstraints should not return an error.",
+			args: args{
+				version:     "1.0",
+				constraints: upgradeVersionConstraints,
+			},
+		},
+		"SuccessUpgradePreReleaseVersion": {
+			reason: "A pre-release version that falls within our upgradeVersionConstraints should not return an error.",
+			args: args{
+				version:     "1.0.0-rc.1",
+				constraints: upgradeVersionConstraints,
+			},
+		},
+	}
+	for name, tc := range cases {
+		t.Run(name, func(t *testing.T) {
+			err := checkVersion(errBoom, tc.args.constraints, tc.args.version)
+			if diff := cmp.Diff(tc.want.err, err, test.EquateErrors()); diff != "" {
+				t.Errorf("\n%s\ncheckVersion(...): -want err, +got err:\n%s", tc.reason, diff)
 			}
 		})
 	}
