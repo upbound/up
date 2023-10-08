@@ -16,68 +16,69 @@ package controlplane
 
 import (
 	"context"
-	"fmt"
 
 	"github.com/alecthomas/kong"
 	"github.com/pterm/pterm"
+	"k8s.io/client-go/dynamic"
 
-	"github.com/upbound/up-sdk-go/service/common"
+	"github.com/upbound/up-sdk-go/service/configurations"
 	cp "github.com/upbound/up-sdk-go/service/controlplanes"
 
+	"github.com/upbound/up/internal/controlplane"
+	"github.com/upbound/up/internal/controlplane/cloud"
+	"github.com/upbound/up/internal/controlplane/space"
 	"github.com/upbound/up/internal/upbound"
 	"github.com/upbound/up/internal/upterm"
 )
 
-const (
-	maxItems = 100
-)
+type ctpLister interface {
+	List(ctx context.Context) ([]*controlplane.Response, error)
+}
 
-const (
-	notAvailable = "n/a"
-)
-
-var fieldNames = []string{"NAME", "ID", "STATUS", "DEPLOYED CONFIGURATION", "CONFIGURATION STATUS"}
+// listCmd list control planes in an account on Upbound.
+type listCmd struct {
+	client ctpLister
+}
 
 // AfterApply sets default values in command after assignment and validation.
 func (c *listCmd) AfterApply(kongCtx *kong.Context, upCtx *upbound.Context) error {
+
+	if upCtx.Profile.IsSpace() {
+		kubeconfig, err := upCtx.Profile.GetKubeClientConfig()
+		if err != nil {
+			return err
+		}
+		client, err := dynamic.NewForConfig(kubeconfig)
+		if err != nil {
+			return err
+		}
+		c.client = space.New(client)
+	} else {
+		cfg, err := upCtx.BuildSDKConfig()
+		if err != nil {
+			return err
+		}
+		ctpclient := cp.NewClient(cfg)
+		cfgclient := configurations.NewClient(cfg)
+
+		c.client = cloud.New(ctpclient, cfgclient, upCtx.Account)
+	}
+
 	kongCtx.Bind(pterm.DefaultTable.WithWriter(kongCtx.Stdout).WithSeparator("   "))
 	return nil
 }
 
-// listCmd list control planes in an account on Upbound.
-type listCmd struct{}
-
 // Run executes the list command.
-func (c *listCmd) Run(printer upterm.ObjectPrinter, p pterm.TextPrinter, cc *cp.Client, upCtx *upbound.Context) error {
-	if upCtx.Profile.IsSpace() {
-		return fmt.Errorf("list is not supported for space profile %q", upCtx.ProfileName)
-	}
-
-	// TODO(hasheddan): we currently just max out single page size, but we
-	// may opt to support limiting page size and iterating through pages via
-	// flags in the future.
-	cpList, err := cc.List(context.Background(), upCtx.Account, common.WithSize(maxItems))
+func (c *listCmd) Run(printer upterm.ObjectPrinter, p pterm.TextPrinter, upCtx *upbound.Context) error {
+	l, err := c.client.List(context.Background())
 	if err != nil {
 		return err
 	}
-	if len(cpList.ControlPlanes) == 0 {
-		p.Printfln("No control planes found in %s", upCtx.Account)
+
+	if len(l) == 0 {
+		p.Println("No control planes found")
 		return nil
 	}
-	return printer.Print(cpList.ControlPlanes, fieldNames, extractFields)
-}
 
-func extractFields(obj any) []string {
-	c := obj.(cp.ControlPlaneResponse)
-	var cfgName string
-	var cfgStatus string
-	// All Upbound managed control planes in an account should be associated to a configuration.
-	// However, we should still list all control planes and indicate where this isn't the case.
-	if c.ControlPlane.Configuration.Name != nil && c.ControlPlane.Configuration != EmptyControlPlaneConfiguration() {
-		cfgName = *c.ControlPlane.Configuration.Name
-		cfgStatus = string(c.ControlPlane.Configuration.Status)
-	} else {
-		cfgName, cfgStatus = notAvailable, notAvailable
-	}
-	return []string{c.ControlPlane.Name, c.ControlPlane.ID.String(), string(c.Status), cfgName, cfgStatus}
+	return tabularPrint(l, printer, upCtx)
 }

@@ -16,22 +16,49 @@ package controlplane
 
 import (
 	"context"
-	"fmt"
 
 	"github.com/alecthomas/kong"
-	"github.com/crossplane/crossplane-runtime/pkg/errors"
 	"github.com/pterm/pterm"
+	"k8s.io/client-go/dynamic"
 
+	"github.com/upbound/up-sdk-go/service/configurations"
 	cp "github.com/upbound/up-sdk-go/service/controlplanes"
 
+	"github.com/upbound/up/internal/controlplane"
+	"github.com/upbound/up/internal/controlplane/cloud"
+	"github.com/upbound/up/internal/controlplane/space"
 	"github.com/upbound/up/internal/upbound"
 	"github.com/upbound/up/internal/upterm"
 )
 
-const errNoConfigurationFound = "no configuration associated to this control plane"
+type ctpGetter interface {
+	Get(ctx context.Context, name string) (*controlplane.Response, error)
+}
 
 // AfterApply sets default values in command after assignment and validation.
 func (c *getCmd) AfterApply(kongCtx *kong.Context, upCtx *upbound.Context) error {
+
+	if upCtx.Profile.IsSpace() {
+		kubeconfig, err := upCtx.Profile.GetKubeClientConfig()
+		if err != nil {
+			return err
+		}
+		client, err := dynamic.NewForConfig(kubeconfig)
+		if err != nil {
+			return err
+		}
+		c.client = space.New(client)
+	} else {
+		cfg, err := upCtx.BuildSDKConfig()
+		if err != nil {
+			return err
+		}
+		ctpclient := cp.NewClient(cfg)
+		cfgclient := configurations.NewClient(cfg)
+
+		c.client = cloud.New(ctpclient, cfgclient, upCtx.Account)
+	}
+
 	kongCtx.Bind(pterm.DefaultTable.WithWriter(kongCtx.Stdout).WithSeparator("   "))
 	return nil
 }
@@ -39,24 +66,23 @@ func (c *getCmd) AfterApply(kongCtx *kong.Context, upCtx *upbound.Context) error
 // getCmd gets a single control plane in an account on Upbound.
 type getCmd struct {
 	Name string `arg:"" required:"" help:"Name of control plane." predictor:"ctps"`
+
+	client ctpGetter
 }
 
 // Run executes the get command.
-func (c *getCmd) Run(printer upterm.ObjectPrinter, cc *cp.Client, upCtx *upbound.Context) error {
-	if upCtx.Profile.IsSpace() {
-		return fmt.Errorf("get is not supported for space profile %q", upCtx.ProfileName)
+func (c *getCmd) Run(printer upterm.ObjectPrinter, p pterm.TextPrinter, upCtx *upbound.Context) error {
+	ctp, err := c.client.Get(context.Background(), c.Name)
+	if controlplane.IsNotFound(err) {
+		p.Printfln("Control plane %s not found", c.Name)
+		return nil
 	}
 
-	ctp, err := cc.Get(context.Background(), upCtx.Account, c.Name)
 	if err != nil {
 		return err
 	}
-	// All Upbound managed control planes in an account should be associated to a configuration.
-	if ctp.ControlPlane.Configuration == EmptyControlPlaneConfiguration() {
-		return errors.New(errNoConfigurationFound)
-	}
 
-	return printer.Print(*ctp, fieldNames, extractFields)
+	return tabularPrint(ctp, printer, upCtx)
 }
 
 // EmptyControlPlaneConfiguration returns an empty ControlPlaneConfiguration with default values.
