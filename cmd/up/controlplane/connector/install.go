@@ -12,7 +12,7 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-package controlplane
+package connector
 
 import (
 	"context"
@@ -48,7 +48,7 @@ const (
 )
 
 // AfterApply sets default values in command after assignment and validation.
-func (c *connectCmd) AfterApply(kongCtx *kong.Context, upCtx *upbound.Context) error {
+func (c *installCmd) AfterApply(kongCtx *kong.Context, upCtx *upbound.Context) error {
 	if c.ClusterName == "" {
 		c.ClusterName = c.Namespace
 	}
@@ -94,9 +94,9 @@ func (c *connectCmd) AfterApply(kongCtx *kong.Context, upCtx *upbound.Context) e
 	return nil
 }
 
-// connectCmd connects the current cluster to a control plane in an account on
+// installCmd connects the current cluster to a control plane in an account on
 // Upbound.
-type connectCmd struct {
+type installCmd struct {
 	mgr     install.Manager
 	parser  install.ParameterParser
 	kClient kubernetes.Interface
@@ -113,7 +113,7 @@ type connectCmd struct {
 }
 
 // Run executes the connect command.
-func (c *connectCmd) Run(p pterm.TextPrinter, upCtx *upbound.Context) error {
+func (c *installCmd) Run(p pterm.TextPrinter, upCtx *upbound.Context) error {
 	if upCtx.Profile.IsSpace() {
 		return fmt.Errorf("connect is not supported for space profile %q", upCtx.ProfileName)
 	}
@@ -147,7 +147,7 @@ func (c *connectCmd) Run(p pterm.TextPrinter, upCtx *upbound.Context) error {
 	return nil
 }
 
-func (c *connectCmd) getToken(p pterm.TextPrinter, upCtx *upbound.Context) (string, error) {
+func (c *installCmd) getToken(p pterm.TextPrinter, upCtx *upbound.Context) (string, error) {
 	if c.Token != "" {
 		return c.Token, nil
 	}
