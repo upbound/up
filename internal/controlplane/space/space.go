@@ -2,8 +2,10 @@ package space
 
 import (
 	"context"
+	"fmt"
 
 	xpcommonv1 "github.com/crossplane/crossplane-runtime/apis/common/v1"
+	kerrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/client-go/dynamic"
 
@@ -12,7 +14,8 @@ import (
 )
 
 var (
-	resource = resources.ControlPlaneGVK.GroupVersion().WithResource("controlplanes")
+	resource      = resources.ControlPlaneGVK.GroupVersion().WithResource("controlplanes")
+	kubeconfigFmt = "kubeconfig-%s"
 )
 
 // Client is the client used for interacting with the ControlPlanes API in an
@@ -37,6 +40,9 @@ func (c *Client) Get(ctx context.Context, name string) (*controlplane.Response, 
 			name,
 			metav1.GetOptions{},
 		)
+	if kerrors.IsNotFound(err) {
+		return nil, controlplane.NewNotFound(err)
+	}
 
 	if err != nil {
 		return nil, err
@@ -67,12 +73,13 @@ func (c *Client) List(ctx context.Context) ([]*controlplane.Response, error) {
 
 // Create a new ControlPlane with the given name and the supplied Options.
 func (c *Client) Create(ctx context.Context, name string, opts controlplane.Options) (*controlplane.Response, error) {
+	o := calculateSecret(name, opts)
+
 	ctp := &resources.ControlPlane{}
 	ctp.SetName(name)
-	ctp.SetGroupVersionKind(resources.ControlPlaneGVK)
 	ctp.SetWriteConnectionSecretToReference(&xpcommonv1.SecretReference{
-		Name:      opts.SecretName,
-		Namespace: opts.SecretNamespace,
+		Name:      o.SecretName,
+		Namespace: o.SecretNamespace,
 	})
 
 	u, err := c.c.
@@ -82,7 +89,6 @@ func (c *Client) Create(ctx context.Context, name string, opts controlplane.Opti
 			ctp.GetUnstructured(),
 			metav1.CreateOptions{},
 		)
-
 	if err != nil {
 		return nil, err
 	}
@@ -92,13 +98,18 @@ func (c *Client) Create(ctx context.Context, name string, opts controlplane.Opti
 
 // Delete the ControlPlane corresponding to the given ControlPlane name.
 func (c *Client) Delete(ctx context.Context, name string) error {
-	return c.c.
+	err := c.c.
 		Resource(resource).
 		Delete(
 			context.Background(),
 			name,
 			metav1.DeleteOptions{},
 		)
+	if kerrors.IsNotFound(err) {
+		return controlplane.NewNotFound(err)
+	}
+
+	return err
 }
 
 func convert(ctp *resources.ControlPlane) *controlplane.Response {
@@ -116,4 +127,11 @@ func convert(ctp *resources.ControlPlane) *controlplane.Response {
 		ConnName:      ref.Name,
 		ConnNamespace: ref.Namespace,
 	}
+}
+
+func calculateSecret(name string, opts controlplane.Options) controlplane.Options {
+	if opts.SecretName == "" {
+		opts.SecretName = fmt.Sprintf(kubeconfigFmt, name)
+	}
+	return opts
 }

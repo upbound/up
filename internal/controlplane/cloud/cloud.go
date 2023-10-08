@@ -3,6 +3,7 @@ package cloud
 import (
 	"context"
 
+	sdkerrs "github.com/upbound/up-sdk-go/errors"
 	"github.com/upbound/up-sdk-go/service/common"
 	"github.com/upbound/up-sdk-go/service/configurations"
 	"github.com/upbound/up-sdk-go/service/controlplanes"
@@ -37,6 +38,11 @@ func New(ctp *controlplanes.Client, cfg *configurations.Client, account string) 
 // Get the ControlPlane corresponding to the given ControlPlane name.
 func (c *Client) Get(ctx context.Context, name string) (*controlplane.Response, error) {
 	resp, err := c.ctp.Get(context.Background(), c.account, name)
+
+	if sdkerrs.IsNotFound(err) {
+		return nil, controlplane.NewNotFound(err)
+	}
+
 	if err != nil {
 		return nil, err
 	}
@@ -79,7 +85,11 @@ func (c *Client) Create(ctx context.Context, name string, opts controlplane.Opti
 
 // Delete the ControlPlane corresponding to the given ControlPlane name.
 func (c *Client) Delete(ctx context.Context, name string) error {
-	return c.ctp.Delete(context.Background(), c.account, name)
+	err := c.ctp.Delete(context.Background(), c.account, name)
+	if sdkerrs.IsNotFound(err) {
+		return controlplane.NewNotFound(err)
+	}
+	return err
 }
 
 func convert(ctp *controlplanes.ControlPlaneResponse) *controlplane.Response {

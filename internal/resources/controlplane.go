@@ -24,17 +24,10 @@ type ControlPlane struct {
 	unstructured.Unstructured
 }
 
-type ControlPlaneList struct {
-	unstructured.UnstructuredList
-}
-
 // GetUnstructured returns the underlying *unstructured.Unstructured.
 func (c *ControlPlane) GetUnstructured() *unstructured.Unstructured {
+	c.SetGroupVersionKind(ControlPlaneGVK)
 	return &c.Unstructured
-}
-
-func (cl *ControlPlaneList) GetUnstructured() *unstructured.UnstructuredList {
-	return &cl.UnstructuredList
 }
 
 // GetCondition returns the condition for the given xpv1.ConditionType if it
@@ -48,6 +41,15 @@ func (c *ControlPlane) GetCondition(ct xpv1.ConditionType) xpv1.Condition {
 	return conditioned.GetCondition(ct)
 }
 
+// SetConditions of this composite resource claim.
+func (c *ControlPlane) SetConditions(conditions ...xpv1.Condition) {
+	conditioned := xpv1.ConditionedStatus{}
+	// The path is directly `status` because conditions are inline.
+	_ = fieldpath.Pave(c.Object).GetValueInto("status", &conditioned)
+	conditioned.SetConditions(conditions...)
+	_ = fieldpath.Pave(c.Object).SetValue("status.conditions", conditioned.Conditions)
+}
+
 // GetControlPlaneID returns the MXP ID associated with the ControlPlane.
 func (c *ControlPlane) GetControlPlaneID() string {
 	id, err := fieldpath.Pave(c.Object).GetString("status.controlPlaneID")
@@ -57,13 +59,19 @@ func (c *ControlPlane) GetControlPlaneID() string {
 	return id
 }
 
-// SetWriteConnectionSecretToReference of this composite resource claim.
-func (c *ControlPlane) SetWriteConnectionSecretToReference(ref *xpv1.SecretReference) {
-	_ = fieldpath.Pave(c.Object).SetValue("spec.writeConnectionSecretToRef", ref)
+// SetControlPlaneID for the MXP ID associated with the control plane.
+func (c *ControlPlane) SetControlPlaneID(id string) {
+	_ = fieldpath.Pave(c.Object).SetString("status.controlPlaneID", id)
 }
 
+// GetConnectionSecretToReference of this control plane.
 func (c *ControlPlane) GetConnectionSecretToReference() *xpv1.SecretReference {
 	out := &xpv1.SecretReference{}
 	_ = fieldpath.Pave(c.Object).GetValueInto("spec.writeConnectionSecretToRef", out)
 	return out
+}
+
+// SetWriteConnectionSecretToReference of this control plane.
+func (c *ControlPlane) SetWriteConnectionSecretToReference(ref *xpv1.SecretReference) {
+	_ = fieldpath.Pave(c.Object).SetValue("spec.writeConnectionSecretToRef", ref)
 }

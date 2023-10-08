@@ -24,6 +24,7 @@ import (
 	"github.com/upbound/up-sdk-go/service/configurations"
 	cp "github.com/upbound/up-sdk-go/service/controlplanes"
 
+	"github.com/upbound/up/internal/controlplane"
 	"github.com/upbound/up/internal/controlplane/cloud"
 	"github.com/upbound/up/internal/controlplane/space"
 	"github.com/upbound/up/internal/upbound"
@@ -69,6 +70,10 @@ func (c *deleteCmd) AfterApply(kongCtx *kong.Context, upCtx *upbound.Context) er
 // Run executes the delete command.
 func (c *deleteCmd) Run(p pterm.TextPrinter, upCtx *upbound.Context) error {
 	if err := c.client.Delete(context.Background(), c.Name); err != nil {
+		if controlplane.IsNotFound(err) {
+			p.Printfln("Control plane %s not found", c.Name)
+			return nil
+		}
 		return err
 	}
 	p.Printfln("%s deleted", c.Name)
