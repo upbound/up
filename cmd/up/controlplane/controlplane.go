@@ -21,6 +21,7 @@ import (
 	"github.com/posener/complete"
 
 	cp "github.com/upbound/up-sdk-go/service/controlplanes"
+	"github.com/upbound/up/cmd/up/controlplane/connector"
 	"github.com/upbound/up/cmd/up/controlplane/kubeconfig"
 	"github.com/upbound/up/cmd/up/controlplane/pkg"
 	"github.com/upbound/up/cmd/up/controlplane/pullsecret"
@@ -92,7 +93,7 @@ type Cmd struct {
 	List   listCmd   `cmd:"" help:"List control planes for the account."`
 	Get    getCmd    `cmd:"" help:"Get a single control plane."`
 
-	Connect connectCmd `cmd:"" help:"Connect an App Cluster to a managed control plane."`
+	Connector connector.Cmd `cmd:"" help:"Connect an App Cluster to a managed control plane."`
 
 	Configuration pkg.Cmd `cmd:"" set:"package_type=Configuration" help:"Manage Configurations."`
 	Provider      pkg.Cmd `cmd:"" set:"package_type=Provider" help:"Manage Providers."`
