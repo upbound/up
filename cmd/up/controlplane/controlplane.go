@@ -142,9 +142,8 @@ func extractSpaceFields(obj any) []string {
 
 func tabularPrint(obj any, printer upterm.ObjectPrinter, upCtx *upbound.Context) error {
 	if upCtx.Profile.IsSpace() {
-		printer.Print(obj, spacefieldNames, extractSpaceFields)
+		return printer.Print(obj, spacefieldNames, extractSpaceFields)
 	} else {
-		printer.Print(obj, cloudfieldNames, extractCloudFields)
+		return printer.Print(obj, cloudfieldNames, extractCloudFields)
 	}
-	return nil
 }

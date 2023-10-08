@@ -31,8 +31,6 @@ import (
 	"github.com/upbound/up/internal/upterm"
 )
 
-const errNoConfigurationFound = "no configuration associated to this control plane"
-
 type ctpGetter interface {
 	Get(ctx context.Context, name string) (*controlplane.Response, error)
 }

@@ -1,3 +1,17 @@
+// Copyright 2023 Upbound Inc
+//
+// Licensed under the Apache License, Version 2.0 (the "License");
+// you may not use this file except in compliance with the License.
+// You may obtain a copy of the License at
+//
+//      http://www.apache.org/licenses/LICENSE-2.0
+//
+// Unless required by applicable law or agreed to in writing, software
+// distributed under the License is distributed on an "AS IS" BASIS,
+// WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+// See the License for the specific language governing permissions and
+// limitations under the License.
+
 package cloud
 
 import (
@@ -17,17 +31,28 @@ const (
 	notAvailable = "n/a"
 )
 
+type ctpClient interface {
+	Create(ctx context.Context, account string, params *controlplanes.ControlPlaneCreateParameters) (*controlplanes.ControlPlaneResponse, error)
+	Delete(ctx context.Context, account, name string) error
+	Get(ctx context.Context, account, name string) (*controlplanes.ControlPlaneResponse, error)
+	List(ctx context.Context, account string, opts ...common.ListOption) (*controlplanes.ControlPlaneListResponse, error)
+}
+
+type cfgGetter interface {
+	Get(ctx context.Context, account, name string) (*configurations.ConfigurationResponse, error)
+}
+
 // Client is the client used for interacting with the ControlPlanes API in
 // Upbound Cloud.
 type Client struct {
-	ctp *controlplanes.Client
-	cfg *configurations.Client
+	ctp ctpClient
+	cfg cfgGetter
 
 	account string
 }
 
 // New instantiates a new Client.
-func New(ctp *controlplanes.Client, cfg *configurations.Client, account string) *Client {
+func New(ctp ctpClient, cfg cfgGetter, account string) *Client {
 	return &Client{
 		ctp:     ctp,
 		cfg:     cfg,
@@ -37,7 +62,7 @@ func New(ctp *controlplanes.Client, cfg *configurations.Client, account string) 
 
 // Get the ControlPlane corresponding to the given ControlPlane name.
 func (c *Client) Get(ctx context.Context, name string) (*controlplane.Response, error) {
-	resp, err := c.ctp.Get(context.Background(), c.account, name)
+	resp, err := c.ctp.Get(ctx, c.account, name)
 
 	if sdkerrs.IsNotFound(err) {
 		return nil, controlplane.NewNotFound(err)
@@ -52,13 +77,14 @@ func (c *Client) Get(ctx context.Context, name string) (*controlplane.Response, 
 
 // List all ControlPlanes within the Space.
 func (c *Client) List(ctx context.Context) ([]*controlplane.Response, error) {
-	l, err := c.ctp.List(context.Background(), c.account, common.WithSize(maxItems))
+	l, err := c.ctp.List(ctx, c.account, common.WithSize(maxItems))
 	if err != nil {
 		return nil, err
 	}
 	resps := []*controlplane.Response{}
 	for _, r := range l.ControlPlanes {
-		resps = append(resps, convert(&r))
+		cp := r
+		resps = append(resps, convert(&cp))
 	}
 	return resps, nil
 }
@@ -66,12 +92,12 @@ func (c *Client) List(ctx context.Context) ([]*controlplane.Response, error) {
 // Create a new ControlPlane with the given name and the supplied Options.
 func (c *Client) Create(ctx context.Context, name string, opts controlplane.Options) (*controlplane.Response, error) {
 	// Get the UUID from the Configuration name, if it exists.
-	cfg, err := c.cfg.Get(context.Background(), c.account, opts.ConfigurationName)
+	cfg, err := c.cfg.Get(ctx, c.account, opts.ConfigurationName)
 	if err != nil {
 		return nil, err
 	}
 
-	resp, err := c.ctp.Create(context.Background(), c.account, &controlplanes.ControlPlaneCreateParameters{
+	resp, err := c.ctp.Create(ctx, c.account, &controlplanes.ControlPlaneCreateParameters{
 		Name:            name,
 		Description:     opts.Description,
 		ConfigurationID: cfg.ID,
@@ -85,7 +111,7 @@ func (c *Client) Create(ctx context.Context, name string, opts controlplane.Opti
 
 // Delete the ControlPlane corresponding to the given ControlPlane name.
 func (c *Client) Delete(ctx context.Context, name string) error {
-	err := c.ctp.Delete(context.Background(), c.account, name)
+	err := c.ctp.Delete(ctx, c.account, name)
 	if sdkerrs.IsNotFound(err) {
 		return controlplane.NewNotFound(err)
 	}
