@@ -75,7 +75,7 @@ func (c *Client) Get(ctx context.Context, name string) (*controlplane.Response, 
 	return convert(resp), nil
 }
 
-// List all ControlPlanes within the Space.
+// List all ControlPlanes within the Upbound Cloud account.
 func (c *Client) List(ctx context.Context) ([]*controlplane.Response, error) {
 	l, err := c.ctp.List(ctx, c.account, common.WithSize(maxItems))
 	if err != nil {
