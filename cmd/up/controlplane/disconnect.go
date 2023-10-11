@@ -28,7 +28,7 @@ import (
 	"github.com/upbound/up/internal/upterm"
 )
 
-var (
+const (
 	errFmtCurrentContext = "context %q is currently in use"
 	errFmtContextParts   = "given context does not have the correct number of parts, expected: 4, got: %d"
 )

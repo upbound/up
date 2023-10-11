@@ -40,7 +40,7 @@ import (
 	"github.com/upbound/up/internal/upterm"
 )
 
-var (
+const (
 	upboundPrefix = "upbound_"
 
 	errFmtConfigBroken = "config is broken, missing %s: %q"
