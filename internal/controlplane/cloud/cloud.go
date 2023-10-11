@@ -153,6 +153,7 @@ func (c *Client) GetKubeConfig(ctx context.Context, name string) (*api.Config, e
 		c.proxy,
 		path.Join(c.account, name),
 		c.token,
+		false,
 	), nil
 }
 

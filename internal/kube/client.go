@@ -49,9 +49,12 @@ func GetKubeConfig(path string) (*rest.Config, error) {
 }
 
 // BuildControlPlaneKubeconfig builds a kubeconfig entry for a control plane.
-func BuildControlPlaneKubeconfig(proxy *url.URL, id string, token string) *api.Config { //nolint:interfacer
+func BuildControlPlaneKubeconfig(proxy *url.URL, id string, token string, includePrefix bool) *api.Config { //nolint:interfacer
 	conf := api.NewConfig()
-	key := fmt.Sprintf(UpboundKubeconfigKeyFmt, strings.ReplaceAll(id, "/", "-"))
+	key := strings.ReplaceAll(id, "/", "-")
+	if includePrefix {
+		key = fmt.Sprintf(UpboundKubeconfigKeyFmt, key)
+	}
 	proxy.Path = path.Join(proxy.Path, id, UpboundK8sResource)
 	conf.Clusters[key] = &api.Cluster{
 		Server: proxy.String(),

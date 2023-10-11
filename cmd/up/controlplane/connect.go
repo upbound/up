@@ -18,6 +18,8 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"io"
+	"os"
 	"strings"
 
 	"github.com/alecthomas/kong"
@@ -50,6 +52,7 @@ type ctpConnector interface {
 
 // AfterApply sets default values in command after assignment and validation.
 func (c *connectCmd) AfterApply(kongCtx *kong.Context, upCtx *upbound.Context) error {
+	c.stdin = os.Stdin
 
 	if upCtx.Profile.IsSpace() {
 		kubeconfig, err := upCtx.Profile.GetKubeClientConfig()
@@ -64,6 +67,14 @@ func (c *connectCmd) AfterApply(kongCtx *kong.Context, upCtx *upbound.Context) e
 	} else {
 		if c.Token == "" {
 			return fmt.Errorf("--token must be specified")
+		}
+
+		if c.Token == "-" {
+			b, err := io.ReadAll(c.stdin)
+			if err != nil {
+				return err
+			}
+			c.Token = strings.TrimSpace(string(b))
 		}
 
 		cfg, err := upCtx.BuildSDKConfig()
@@ -93,6 +104,7 @@ type connectCmd struct {
 	Name  string `arg:"" required:"" help:"Name of control plane." predictor:"ctps"`
 	Token string `help:"API token used to authenticate. Required for Upbound Cloud; ignored otherwise."`
 
+	stdin  io.Reader
 	client ctpConnector
 }
 
@@ -143,7 +155,7 @@ func (c *connectCmd) Run(printer upterm.ObjectPrinter, p pterm.TextPrinter, upCt
 // context keys based on the account, control plane name, and original context
 // that are provided.
 func updateKubeConfig(cfg api.Config, account, ctpName, origContext string) (api.Config, error) {
-	// Grap the context from control plane kubeconfig.
+	// Grab the context from control plane kubeconfig.
 	sourceKey := defaultContextName(account, ctpName)
 	ctpKey := controlplaneContextName(account, ctpName, origContext)
 

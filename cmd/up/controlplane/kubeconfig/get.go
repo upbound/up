@@ -57,7 +57,7 @@ func (c *getCmd) Run(p pterm.TextPrinter, upCtx *upbound.Context) error {
 		}
 		c.Token = strings.TrimSpace(string(b))
 	}
-	mcpConf := kube.BuildControlPlaneKubeconfig(upCtx.ProxyEndpoint, path.Join(upCtx.Account, c.Name), c.Token)
+	mcpConf := kube.BuildControlPlaneKubeconfig(upCtx.ProxyEndpoint, path.Join(upCtx.Account, c.Name), c.Token, true)
 	if err := kube.ApplyControlPlaneKubeconfig(*mcpConf, c.File, upCtx.WrapTransport); err != nil {
 		return err
 	}
