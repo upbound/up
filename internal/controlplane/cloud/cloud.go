@@ -16,6 +16,10 @@ package cloud
 
 import (
 	"context"
+	"net/url"
+	"path"
+
+	"k8s.io/client-go/tools/clientcmd/api"
 
 	sdkerrs "github.com/upbound/up-sdk-go/errors"
 	"github.com/upbound/up-sdk-go/service/common"
@@ -23,6 +27,7 @@ import (
 	"github.com/upbound/up-sdk-go/service/controlplanes"
 
 	"github.com/upbound/up/internal/controlplane"
+	"github.com/upbound/up/internal/kube"
 )
 
 const (
@@ -42,22 +47,46 @@ type cfgGetter interface {
 	Get(ctx context.Context, account, name string) (*configurations.ConfigurationResponse, error)
 }
 
+type Option func(*Client)
+
+func WithToken(t string) Option {
+	return func(c *Client) {
+		c.token = t
+	}
+}
+
+func WithProxyEndpoint(p *url.URL) Option {
+	return func(c *Client) {
+		c.proxy = p
+	}
+}
+
 // Client is the client used for interacting with the ControlPlanes API in
 // Upbound Cloud.
 type Client struct {
 	ctp ctpClient
 	cfg cfgGetter
 
+	// Upbound Account
 	account string
+	// Cloud PAT for Control Plane Kubeconfig.
+	token string
+	// Proxy Endppint corresponding to Upbound Cloud's Proxy.
+	proxy *url.URL
 }
 
 // New instantiates a new Client.
-func New(ctp ctpClient, cfg cfgGetter, account string) *Client {
-	return &Client{
+func New(ctp ctpClient, cfg cfgGetter, account string, opts ...Option) *Client {
+	c := &Client{
 		ctp:     ctp,
 		cfg:     cfg,
 		account: account,
 	}
+
+	for _, o := range opts {
+		o(c)
+	}
+	return c
 }
 
 // Get the ControlPlane corresponding to the given ControlPlane name.
@@ -116,6 +145,15 @@ func (c *Client) Delete(ctx context.Context, name string) error {
 		return controlplane.NewNotFound(err)
 	}
 	return err
+}
+
+// GetKubeConfig for the given Control Plane.
+func (c *Client) GetKubeConfig(ctx context.Context, name string) (*api.Config, error) {
+	return kube.BuildControlPlaneKubeconfig(
+		c.proxy,
+		path.Join(c.account, name),
+		c.token,
+	), nil
 }
 
 func convert(ctp *controlplanes.ControlPlaneResponse) *controlplane.Response {

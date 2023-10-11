@@ -53,6 +53,7 @@ func (c *spaceCmd) Run(p pterm.TextPrinter, upCtx *upbound.Context) error {
 	}
 
 	prof := profile.Profile{
+		Account:     upCtx.Account,
 		Type:        profile.Space,
 		Kubeconfig:  c.Kube.Kubeconfig,
 		KubeContext: c.Kube.GetContext(),

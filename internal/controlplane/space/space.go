@@ -19,9 +19,14 @@ import (
 	"fmt"
 
 	xpcommonv1 "github.com/crossplane/crossplane-runtime/apis/common/v1"
+	corev1 "k8s.io/api/core/v1"
 	kerrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/runtime"
+	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/client-go/dynamic"
+	"k8s.io/client-go/tools/clientcmd"
+	"k8s.io/client-go/tools/clientcmd/api"
 
 	"github.com/upbound/up/internal/controlplane"
 	"github.com/upbound/up/internal/resources"
@@ -124,6 +129,41 @@ func (c *Client) Delete(ctx context.Context, name string) error {
 	}
 
 	return err
+}
+
+// GetKubeConfig for the given Control Plane.
+func (c *Client) GetKubeConfig(ctx context.Context, name string) (*api.Config, error) {
+
+	// get the control plane
+	r, err := c.Get(ctx, name)
+	if err != nil {
+		return nil, err
+	}
+
+	// get the corresponding kubeconfig secret
+	u, err := c.c.
+		Resource(schema.GroupVersionResource{
+			Group:    "",
+			Version:  "v1",
+			Resource: "secrets",
+		}).
+		Namespace(r.ConnNamespace).
+		Get(
+			ctx,
+			r.ConnName,
+			metav1.GetOptions{},
+		)
+	if kerrors.IsNotFound(err) {
+		return nil, controlplane.NewNotFound(err)
+	}
+
+	// marshal into secret
+	var s corev1.Secret
+	if err := runtime.DefaultUnstructuredConverter.FromUnstructured(u.UnstructuredContent(), &s); err != nil {
+		return nil, err
+	}
+
+	return clientcmd.Load(s.Data["kubeconfig"])
 }
 
 func convert(ctp *resources.ControlPlane) *controlplane.Response {

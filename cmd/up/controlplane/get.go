@@ -77,7 +77,6 @@ func (c *getCmd) Run(printer upterm.ObjectPrinter, p pterm.TextPrinter, upCtx *u
 		p.Printfln("Control plane %s not found", c.Name)
 		return nil
 	}
-
 	if err != nil {
 		return err
 	}

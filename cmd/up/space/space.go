@@ -51,3 +51,10 @@ func overrideRegistry(candidate string, params map[string]any) {
 		params["registry"] = candidate
 	}
 }
+
+func ensureAccount(params map[string]any) {
+	_, ok := params["account"]
+	if !ok {
+		params["account"] = defaultAcct
+	}
+}

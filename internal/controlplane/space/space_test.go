@@ -284,6 +284,69 @@ func TestList(t *testing.T) {
 	}
 }
 
+func TestGetKubeConfig(t *testing.T) {
+	ctp1 := &resources.ControlPlane{}
+	ctp1.SetName("ctp1")
+	ctp1.SetWriteConnectionSecretToReference(&xpcommonv1.SecretReference{
+		Name:      "kubeconfig-ctp1",
+		Namespace: "default",
+	})
+
+	type args struct {
+		client dynamic.Interface
+		name   string
+	}
+	type want struct {
+		err error
+	}
+
+	cases := map[string]struct {
+		reason string
+		args   args
+		want   want
+	}{
+		"ErrorControlPlaneNotFound": {
+			reason: "If the requested control plane does not exist, a not found error is returned.",
+			args: args{
+				client: func() dynamic.Interface {
+					c := fake.NewSimpleDynamicClient(scheme)
+					c.PrependReactor(
+						"delete",
+						ctpresource,
+						func(action cgotesting.Action) (handled bool, ret runtime.Object, err error) {
+							return true, nil, kerrors.NewNotFound(controlPlaneGRV, "ctp-dne")
+						})
+
+					return c
+				}(),
+				name: "ctp-dne",
+			},
+			want: want{
+				err: controlplane.NewNotFound(errors.New(`controlplanes.spaces.upbound.io "ctp-dne" not found`)),
+			},
+		},
+		"Success": {
+			reason: "If the control plane exists, no error is returned.",
+			args: args{
+				client: fake.NewSimpleDynamicClient(scheme, ctp1.GetUnstructured()),
+				name:   "ctp1",
+			},
+			want: want{},
+		},
+	}
+	for name, tc := range cases {
+		t.Run(name, func(t *testing.T) {
+
+			c := New(tc.args.client)
+			err := c.Delete(context.Background(), tc.args.name)
+
+			if diff := cmp.Diff(tc.want.err, err, test.EquateErrors()); diff != "" {
+				t.Errorf("\n%s\nDelete(...): -want error, +got error:\n%s", tc.reason, diff)
+			}
+		})
+	}
+}
+
 func TestCalculateSecret(t *testing.T) {
 	type args struct {
 		name string
