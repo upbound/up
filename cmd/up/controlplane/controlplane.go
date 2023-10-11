@@ -88,10 +88,12 @@ func PredictControlPlanes() complete.Predictor {
 
 // Cmd contains commands for interacting with control planes.
 type Cmd struct {
-	Create createCmd `cmd:"" help:"Create a managed control plane."`
-	Delete deleteCmd `cmd:"" help:"Delete a control plane."`
-	List   listCmd   `cmd:"" help:"List control planes for the account."`
-	Get    getCmd    `cmd:"" help:"Get a single control plane."`
+	Connect    connectCmd    `cmd:"" help:"Connect kubectl to control plane."`
+	Disconnect disconnectCmd `cmd:"" help:"Disconnect kubectl from control plane."`
+	Create     createCmd     `cmd:"" help:"Create a managed control plane."`
+	Delete     deleteCmd     `cmd:"" help:"Delete a control plane."`
+	List       listCmd       `cmd:"" help:"List control planes for the account."`
+	Get        getCmd        `cmd:"" help:"Get a single control plane."`
 
 	Connector connector.Cmd `cmd:"" help:"Connect an App Cluster to a managed control plane."`
 
@@ -144,7 +146,6 @@ func extractSpaceFields(obj any) []string {
 func tabularPrint(obj any, printer upterm.ObjectPrinter, upCtx *upbound.Context) error {
 	if upCtx.Profile.IsSpace() {
 		return printer.Print(obj, spacefieldNames, extractSpaceFields)
-	} else {
-		return printer.Print(obj, cloudfieldNames, extractCloudFields)
 	}
+	return printer.Print(obj, cloudfieldNames, extractCloudFields)
 }

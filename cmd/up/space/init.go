@@ -65,6 +65,8 @@ var (
 		Version:  hcVersion,
 		Resource: hcResourcePlural,
 	}
+
+	defaultAcct = "notdemo"
 )
 
 const (
@@ -214,6 +216,7 @@ func (c *initCmd) Run(upCtx *upbound.Context) error {
 		return errors.Wrap(err, errParseInstallParameters)
 	}
 	overrideRegistry(c.Registry.Repository.String(), params)
+	ensureAccount(params)
 
 	// check if required prerequisites are installed
 	status := c.prereqs.Check()
@@ -257,13 +260,14 @@ func (c *initCmd) Run(upCtx *upbound.Context) error {
 	pterm.Info.WithPrefix(upterm.RaisedPrefix).Println("Your Upbound Space is Ready!")
 
 	outputNextSteps()
-	return c.createOrUpdateProfile(upCtx)
+
+	return c.createOrUpdateProfile(getAcct(params), upCtx)
 }
 
 // createOrUpdateProfile updates the active profile to access the new space,
 // or if there is no active profile, creates a new profile. The profile is set
 // as the default.
-func (c *initCmd) createOrUpdateProfile(upCtx *upbound.Context) error {
+func (c *initCmd) createOrUpdateProfile(acct string, upCtx *upbound.Context) error {
 	// If profile name was not provided and no default exists, set name to
 	// the default.
 	if upCtx.ProfileName == "" {
@@ -272,6 +276,7 @@ func (c *initCmd) createOrUpdateProfile(upCtx *upbound.Context) error {
 
 	// Re-initialize active profile for this space.
 	profile := profile.Profile{
+		Account:     acct,
 		Type:        profile.Space,
 		Kubeconfig:  c.Kube.Kubeconfig,
 		KubeContext: c.Kube.GetContext(),
@@ -363,6 +368,15 @@ func upVersionBounds(ch *chart.Chart) error {
 	}
 
 	return checkVersion(fmt.Sprintf("unsupported up version %q", version.GetVersion()), constraints, version.GetVersion())
+}
+
+func getAcct(params map[string]any) string {
+	v, ok := params["account"]
+	if !ok {
+		return "account_unset"
+	}
+
+	return v.(string)
 }
 
 func (c *initCmd) deploySpace(ctx context.Context, params map[string]any) error {
