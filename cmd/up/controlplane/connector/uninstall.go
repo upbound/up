@@ -61,7 +61,7 @@ type uninstallCmd struct {
 }
 
 // Run executes the uninstall command.
-func (c *uninstallCmd) Run(p pterm.TextPrinter, insCtx *install.Context) error {
+func (c *uninstallCmd) Run(p pterm.TextPrinter) error {
 	if err := c.mgr.Uninstall(); err != nil {
 		return err
 	}

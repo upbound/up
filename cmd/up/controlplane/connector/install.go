@@ -131,7 +131,7 @@ func (c *installCmd) Run(p pterm.TextPrinter, upCtx *upbound.Context) error {
 	// Some of these settings are only applicable if pointing to an Upbound
 	// Cloud control plane. We leave them consistent since they won't impact
 	// our ability to point the connector at Space control plane.
-	params["mcp"] = map[string]string{
+	params["mcp"] = map[string]any{
 		"account":   upCtx.Account,
 		"name":      c.Name,
 		"namespace": c.Namespace,
@@ -144,9 +144,9 @@ func (c *installCmd) Run(p pterm.TextPrinter, upCtx *upbound.Context) error {
 	if c.ControlPlaneSecret != "" {
 		v := params["mcp"]
 		param := v.(map[string]any)
-		param["secret"] = map[string]string{
+		param["secret"] = map[string]any{
 			"name":      c.ControlPlaneSecret,
-			"provision": "false",
+			"provision": false,
 		}
 
 		params["mcp"] = param
