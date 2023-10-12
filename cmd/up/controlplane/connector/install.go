@@ -108,24 +108,29 @@ type installCmd struct {
 	ClusterName           string `help:"Name of the cluster connecting to the control plane. If not provided, the namespace argument value will be used."`
 	Kubeconfig            string `type:"existingfile" help:"Override the default kubeconfig path."`
 	InstallationNamespace string `short:"n" env:"MCP_CONNECTOR_NAMESPACE" default:"kube-system" help:"Kubernetes namespace for MCP Connector. Default is kube-system."`
+	ControlPlaneSecret    string `help:"Name of the secret that contains the kubeconfig for a control plane."`
 
 	install.CommonParams
 }
 
 // Run executes the connect command.
 func (c *installCmd) Run(p pterm.TextPrinter, upCtx *upbound.Context) error {
-	if upCtx.Profile.IsSpace() {
-		return fmt.Errorf("connect is not supported for space profile %q", upCtx.ProfileName)
-	}
+	token := "not defined"
+	var err error
 
-	token, err := c.getToken(p, upCtx)
-	if err != nil {
-		return errors.Wrap(err, "failed to get token")
+	if !upCtx.Profile.IsSpace() {
+		token, err = c.getToken(p, upCtx)
+		if err != nil {
+			return errors.Wrap(err, "failed to get token")
+		}
 	}
 	params, err := c.parser.Parse()
 	if err != nil {
 		return errors.Wrap(err, errParseInstallParameters)
 	}
+	// Some of these settings are only applicable if pointing to an Upbound
+	// Cloud control plane. We leave them consistent since they won't impact
+	// our ability to point the connector at Space control plane.
 	params["mcp"] = map[string]string{
 		"account":   upCtx.Account,
 		"name":      c.Name,
@@ -133,6 +138,20 @@ func (c *installCmd) Run(p pterm.TextPrinter, upCtx *upbound.Context) error {
 		"host":      fmt.Sprintf("%s://%s", upCtx.ProxyEndpoint.Scheme, upCtx.ProxyEndpoint.Host),
 		"token":     token,
 	}
+
+	// If the control-plane-secret has been specified, disable provisioning
+	// the mcp-kubeconfig secret in favor of the supplied secret name.
+	if c.ControlPlaneSecret != "" {
+		v := params["mcp"]
+		param := v.(map[string]any)
+		param["secret"] = map[string]string{
+			"name":      c.ControlPlaneSecret,
+			"provision": "false",
+		}
+
+		params["mcp"] = param
+	}
+
 	p.Printfln("Installing %s to kube-system. This may take a few minutes.", connectorName)
 	if err = c.mgr.Install("", params); err != nil {
 		return err
