@@ -108,6 +108,13 @@ type Cmd struct {
 	Flags upbound.Flags `embed:""`
 }
 
+func (c *Cmd) Help() string {
+	return `
+Interact with control planes of the current profile. Both Upbound profiles and
+local Spaces are supported. Use the "profile" management command to switch
+between different Upbound profiles or to connect to a local Space.`
+}
+
 func extractCloudFields(obj any) []string {
 	id, readyStatus := "unknown", "unknown"
 
