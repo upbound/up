@@ -103,9 +103,10 @@ type cli struct {
 	Login              loginCmd                     `cmd:"" help:"Login to Upbound."`
 	Logout             logoutCmd                    `cmd:"" help:"Logout of Upbound."`
 	Configuration      configuration.Cmd            `cmd:"" name:"configuration" aliases:"cfg" help:"Interact with configurations."`
-	ControlPlane       controlplane.Cmd             `cmd:"" name:"controlplane" aliases:"ctp" help:"Interact with control planes."`
-	Organization       organization.Cmd             `cmd:"" name:"organization" aliases:"org" help:"Interact with organizations."`
-	Profile            profile.Cmd                  `cmd:"" help:"Interact with Upbound profiles."`
+	ControlPlane       controlplane.Cmd             `cmd:"" name:"controlplane" aliases:"ctp" help:"Interact with control planes of the current profile, both in Upbound and local Spaces."`
+	Space              space.Cmd                    `cmd:"" help:"Interact with local Spaces."`
+	Organization       organization.Cmd             `cmd:"" name:"organization" aliases:"org" help:"Interact with Upbound organizations."`
+	Profile            profile.Cmd                  `cmd:"" help:"Interact with Upbound profiles or local Spaces."`
 	Repository         repository.Cmd               `cmd:"" name:"repository" aliases:"repo" help:"Interact with repositories."`
 	Robot              robot.Cmd                    `cmd:"" name:"robot" help:"Interact with robots."`
 	UXP                uxp.Cmd                      `cmd:"" help:"Interact with UXP."`
@@ -113,7 +114,6 @@ type cli struct {
 	XPLS               xpls.Cmd                     `cmd:"" help:"Start xpls language server."`
 	Alpha              alpha                        `cmd:"" help:"Alpha features. Commands may be removed in future releases."`
 	InstallCompletions kongplete.InstallCompletions `cmd:"" help:"Install shell completions"`
-	Space              space.Cmd                    `cmd:"" help:"Interact with spaces."`
 }
 
 type helpCmd struct{}
@@ -133,7 +133,7 @@ func (a *alpha) BeforeReset(ctx *kong.Context) error { //nolint:unparam
 type alpha struct {
 	// For now, we maintain compatibility for systems that may still use the alpha variant.
 	// This nudges users towards the stable variant when they attempt to emit help.
-	ControlPlane controlplane.Cmd `cmd:"" hidden:"" name:"controlplane" aliases:"ctp" help:"Interact with control planes."`
+	ControlPlane controlplane.Cmd `cmd:"" hidden:"" name:"controlplane" aliases:"ctp" help:"Interact with control planes of the current profile, both in the cloud and in a local space."`
 	Upbound      upbound.Cmd      `cmd:"" maturity:"alpha" help:"Interact with Upbound."`
 	XPKG         xpkg.Cmd         `cmd:"" maturity:"alpha" help:"Interact with UXP packages."`
 }
