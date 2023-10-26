@@ -26,10 +26,10 @@ import (
 type Cmd struct {
 	Current currentCmd `cmd:"" help:"Get current Upbound Profile."`
 	List    listCmd    `cmd:"" help:"List Upbound Profiles."`
-	Use     useCmd     `cmd:"" help:"Set the default Upbound Profile to the given Profile."`
+	Use     useCmd     `cmd:"" help:"Select an Upbound Profile as the default."`
 	View    viewCmd    `cmd:"" help:"View the Upbound Profile settings across profiles."`
 	Config  config.Cmd `cmd:"" help:"Interact with the current Upbound Profile's config."`
-	Set     setCmd     `cmd:"" help:"Create or update an Upbound Profile."`
+	Set     setCmd     `cmd:"" help:"Set an Upbound Profile for use with a Space."`
 
 	Flags upbound.Flags `embed:""`
 }

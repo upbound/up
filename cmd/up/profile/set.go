@@ -32,7 +32,7 @@ const (
 )
 
 type setCmd struct {
-	Space spaceCmd `cmd:"" help:"Create or update a profile for use with a Space."`
+	Space spaceCmd `cmd:"" help:"Set an Upbound Profile for use with a Space."`
 }
 
 type spaceCmd struct {
