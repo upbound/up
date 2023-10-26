@@ -1,0 +1,5 @@
+A Space profile communicates with a Space using a Kubernetes context from a kubeconfig
+file. The kubeconfig and context may be selected using the --kubeconfig and
+--kubecontext flags. If --kubeconfig is not provided, then the profile will use
+the default kubeconfig at ~/.kube/config. If --kubecontext is not provided, then
+the profile will use the kubeconfig's current default context.

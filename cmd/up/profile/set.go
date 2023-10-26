@@ -15,12 +15,12 @@
 package profile
 
 import (
+	_ "embed"
 	"fmt"
 
 	"github.com/alecthomas/kong"
-	"github.com/pterm/pterm"
-
 	"github.com/crossplane/crossplane-runtime/pkg/errors"
+	"github.com/pterm/pterm"
 
 	"github.com/upbound/up/internal/profile"
 	"github.com/upbound/up/internal/upbound"
@@ -37,6 +37,13 @@ type setCmd struct {
 
 type spaceCmd struct {
 	Kube upbound.KubeFlags `embed:""`
+}
+
+//go:embed space_help.txt
+var spaceCmdHelp string
+
+func (c *spaceCmd) Help() string {
+	return spaceCmdHelp
 }
 
 func (c *spaceCmd) AfterApply(kongCtx *kong.Context) error {
