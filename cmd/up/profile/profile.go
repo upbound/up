@@ -29,7 +29,7 @@ type Cmd struct {
 	Use     useCmd     `cmd:"" help:"Set the default Upbound Profile to the given Profile."`
 	View    viewCmd    `cmd:"" help:"View the Upbound Profile settings across profiles."`
 	Config  config.Cmd `cmd:"" help:"Interact with the current Upbound Profile's config."`
-	Set     setCmd     `cmd:"" help:"Create an Upbound Profile."`
+	Set     setCmd     `cmd:"" help:"Create or update an Upbound Profile."`
 
 	Flags upbound.Flags `embed:""`
 }
