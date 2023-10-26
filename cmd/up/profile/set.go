@@ -44,10 +44,13 @@ func (c *spaceCmd) AfterApply(kongCtx *kong.Context) error {
 }
 
 func (c *spaceCmd) Run(p pterm.TextPrinter, upCtx *upbound.Context) error {
+	setDefault := false
+
 	// If profile name was not provided and no default exists, set name to
-	// the default.
+	// the default, and set this profile as the default profile.
 	if upCtx.ProfileName == "" {
 		upCtx.ProfileName = profile.DefaultName
+		setDefault = true
 	}
 
 	prof := profile.Profile{
@@ -62,9 +65,13 @@ func (c *spaceCmd) Run(p pterm.TextPrinter, upCtx *upbound.Context) error {
 	if err := upCtx.Cfg.AddOrUpdateUpboundProfile(upCtx.ProfileName, prof); err != nil {
 		return errors.Wrap(err, errSetProfile)
 	}
-	if err := upCtx.Cfg.SetDefaultUpboundProfile(upCtx.ProfileName); err != nil {
-		return errors.Wrap(err, errSetProfile)
+
+	if setDefault {
+		if err := upCtx.Cfg.SetDefaultUpboundProfile(upCtx.ProfileName); err != nil {
+			return errors.Wrap(err, errSetProfile)
+		}
 	}
+
 	if err := upCtx.CfgSrc.UpdateConfig(upCtx.Cfg); err != nil {
 		return errors.Wrap(err, errUpdateConfig)
 	}
@@ -73,12 +80,10 @@ func (c *spaceCmd) Run(p pterm.TextPrinter, upCtx *upbound.Context) error {
 	if prof.Kubeconfig != "" {
 		kubeconfigLocation = fmt.Sprintf("kubeconfig at %q", prof.Kubeconfig)
 	}
-	p.Printf(
-		"Profile %q updated to use context %q from the %s and selected as the default profile",
-		upCtx.ProfileName,
-		prof.KubeContext,
-		kubeconfigLocation,
-	)
+	p.Printf("Profile %q updated to use context %q from the %s", upCtx.ProfileName, prof.KubeContext, kubeconfigLocation)
+	if setDefault {
+		p.Print(" and selected as the default profile")
+	}
 	p.Println()
 
 	return nil

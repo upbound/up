@@ -144,7 +144,7 @@ func TestSpaceRun(t *testing.T) {
 			},
 		},
 		"CreateProfile": {
-			reason: "Passing the name of a nonexistent profile creates that profile and sets it as the default.",
+			reason: "Passing the name of a nonexistent profile creates that profile.",
 			cmd: &spaceCmd{
 				Kube: upbound.KubeFlags{
 					Kubeconfig: kubeconfig,
@@ -169,7 +169,7 @@ func TestSpaceRun(t *testing.T) {
 			},
 			want: want{
 				cfg: &config.Config{Upbound: config.Upbound{
-					Default: "other-profile",
+					Default: "default",
 					Profiles: map[string]profile.Profile{
 						"default": {
 							Account:     "test-account",
@@ -188,7 +188,7 @@ func TestSpaceRun(t *testing.T) {
 			},
 		},
 		"UpdateProfile": {
-			reason: "Passing the name of an existent profile updates that profile and sets it as the default.",
+			reason: "Passing the name of an existent profile updates that profile.",
 			cmd: &spaceCmd{
 				Kube: upbound.KubeFlags{
 					Kubeconfig: kubeconfig,
@@ -219,7 +219,7 @@ func TestSpaceRun(t *testing.T) {
 			},
 			want: want{
 				cfg: &config.Config{Upbound: config.Upbound{
-					Default: "other-profile",
+					Default: "default",
 					Profiles: map[string]profile.Profile{
 						"default": {
 							Account:     "test-account",
