@@ -47,7 +47,7 @@ func (m *mockConfigSource) UpdateConfig(cfg *config.Config) error {
 	return nil
 }
 
-func TestSpaceRun(t *testing.T) {
+func TestSpaceCmd_Run(t *testing.T) {
 	wd, err := os.Getwd()
 	if err != nil {
 		t.Fatalf("error getting working directory: %s", err)
@@ -63,17 +63,11 @@ func TestSpaceRun(t *testing.T) {
 	}
 	cases := map[string]struct {
 		reason string
-		cmd    *spaceCmd
 		args   args
 		want   want
 	}{
 		"EmptyConfigDefaultProfile": {
 			reason: "Setting the default profile with empty config creates a new default profile.",
-			cmd: &spaceCmd{
-				Kube: upbound.KubeFlags{
-					Kubeconfig: kubeconfig,
-				},
-			},
 			args: args{
 				ctx: &upbound.Context{
 					Account: "test-account",
@@ -96,11 +90,6 @@ func TestSpaceRun(t *testing.T) {
 		},
 		"PopulatedConfigDefaultProfile": {
 			reason: "Setting the default profile with populated config updates the default profile.",
-			cmd: &spaceCmd{
-				Kube: upbound.KubeFlags{
-					Kubeconfig: kubeconfig,
-				},
-			},
 			args: args{
 				ctx: &upbound.Context{
 					Account: "test-account",
@@ -145,11 +134,6 @@ func TestSpaceRun(t *testing.T) {
 		},
 		"CreateProfile": {
 			reason: "Passing the name of a nonexistent profile creates that profile.",
-			cmd: &spaceCmd{
-				Kube: upbound.KubeFlags{
-					Kubeconfig: kubeconfig,
-				},
-			},
 			args: args{
 				ctx: &upbound.Context{
 					ProfileName: "other-profile",
@@ -189,11 +173,6 @@ func TestSpaceRun(t *testing.T) {
 		},
 		"UpdateProfile": {
 			reason: "Passing the name of an existent profile updates that profile.",
-			cmd: &spaceCmd{
-				Kube: upbound.KubeFlags{
-					Kubeconfig: kubeconfig,
-				},
-			},
 			args: args{
 				ctx: &upbound.Context{
 					ProfileName: "other-profile",
@@ -241,19 +220,17 @@ func TestSpaceRun(t *testing.T) {
 
 	for name, tc := range cases {
 		t.Run(name, func(t *testing.T) {
-			cfgSrc := &mockConfigSource{cfg: tc.args.ctx.Cfg}
-			tc.args.ctx.CfgSrc = cfgSrc
-
-			p := pterm.DefaultBasicText.WithWriter(io.Discard)
-
-			if diff := cmp.Diff(nil, tc.cmd.AfterApply(nil), test.EquateErrors()); diff != "" {
+			cmd := &spaceCmd{Kube: upbound.KubeFlags{Kubeconfig: kubeconfig}}
+			if diff := cmp.Diff(nil, cmd.AfterApply(nil), test.EquateErrors()); diff != "" {
 				t.Errorf("\n%s\nspaceCmd.AfterApply(...): -want error, +got error:\n%s", tc.reason, diff)
 			}
 
-			if diff := cmp.Diff(tc.want.err, tc.cmd.Run(p, tc.args.ctx), test.EquateErrors()); diff != "" {
+			cfgSrc := &mockConfigSource{cfg: tc.args.ctx.Cfg}
+			tc.args.ctx.CfgSrc = cfgSrc
+			p := pterm.DefaultBasicText.WithWriter(io.Discard)
+			if diff := cmp.Diff(tc.want.err, cmd.Run(p, tc.args.ctx), test.EquateErrors()); diff != "" {
 				t.Errorf("\n%s\nspaceCmd.Run(...): -want error, +got error:\n%s", tc.reason, diff)
 			}
-
 			if diff := cmp.Diff(tc.want.cfg, cfgSrc.cfg); diff != "" {
 				t.Errorf("\n%s\nspaceCmd.Run(...): -want, +got:\n%s", tc.reason, diff)
 			}
