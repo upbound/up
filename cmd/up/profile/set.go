@@ -80,7 +80,7 @@ func (c *spaceCmd) Run(p pterm.TextPrinter, upCtx *upbound.Context) error {
 	if prof.Kubeconfig != "" {
 		kubeconfigLocation = fmt.Sprintf("kubeconfig at %q", prof.Kubeconfig)
 	}
-	p.Printf("Profile %q updated to use context %q from the %s", upCtx.ProfileName, prof.KubeContext, kubeconfigLocation)
+	p.Printf("Profile %q updated to use Kubernetes context %q from the %s", upCtx.ProfileName, prof.KubeContext, kubeconfigLocation)
 	if setDefault {
 		p.Print(" and selected as the default profile")
 	}
