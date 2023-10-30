@@ -123,7 +123,7 @@ func TestXPExtractRun(t *testing.T) {
 				fetch:  tc.fetch,
 				name:   tc.name,
 				Output: tc.out,
-			}).Run(pterm.DefaultBasicText.WithWriter(io.Discard))
+			}).Run(context.TODO(), pterm.DefaultBasicText.WithWriter(io.Discard))
 			if diff := cmp.Diff(tc.want, err, test.EquateErrors()); diff != "" {
 				t.Errorf("\n%s\nRun(...): -want error, +got error:\n%s", tc.reason, diff)
 			}

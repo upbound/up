@@ -170,8 +170,8 @@ func (c *upgradeCmd) getKubeconfig(upCtx *upbound.Context) (*rest.Config, error)
 }
 
 // Run executes the upgrade command.
-func (c *upgradeCmd) Run() error {
-	ctx, cancel := context.WithTimeout(context.Background(), defaultTimeout)
+func (c *upgradeCmd) Run(ctx context.Context) error {
+	ctx, cancel := context.WithTimeout(ctx, defaultTimeout)
 	defer cancel()
 
 	params, err := c.parser.Parse()

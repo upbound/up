@@ -32,13 +32,13 @@ type inviteCmd struct {
 }
 
 // Run executes the invite command.
-func (c *inviteCmd) Run(printer upterm.ObjectPrinter, p pterm.TextPrinter, oc *organizations.Client, upCtx *upbound.Context) error {
-	orgID, err := oc.GetOrgID(context.Background(), c.OrgName)
+func (c *inviteCmd) Run(ctx context.Context, printer upterm.ObjectPrinter, p pterm.TextPrinter, oc *organizations.Client, upCtx *upbound.Context) error {
+	orgID, err := oc.GetOrgID(ctx, c.OrgName)
 	if err != nil {
 		return err
 	}
 
-	if err = oc.CreateInvite(context.Background(), orgID, &organizations.OrganizationInviteCreateParameters{
+	if err = oc.CreateInvite(ctx, orgID, &organizations.OrganizationInviteCreateParameters{
 		Email:      c.Email,
 		Permission: c.Permission,
 	}); err != nil {

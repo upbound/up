@@ -76,9 +76,9 @@ func (c *createCmd) AfterApply(kongCtx *kong.Context, upCtx *upbound.Context) er
 }
 
 // Run executes the create command.
-func (c *createCmd) Run(p pterm.TextPrinter, upCtx *upbound.Context) error {
+func (c *createCmd) Run(ctx context.Context, p pterm.TextPrinter, upCtx *upbound.Context) error {
 	_, err := c.client.Create(
-		context.Background(),
+		ctx,
 		c.Name,
 		controlplane.Options{
 			SecretName:      c.SecretName,

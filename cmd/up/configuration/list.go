@@ -30,8 +30,8 @@ var fieldNames = []string{"NAME", "TEMPLATE ID", "PROVIDER", "REPO", "BRANCH", "
 type listCmd struct{}
 
 // Run executes the list command.
-func (c *listCmd) Run(printer upterm.ObjectPrinter, p pterm.TextPrinter, cc *configurations.Client, upCtx *upbound.Context) error {
-	cfgList, err := cc.List(context.Background(), upCtx.Account)
+func (c *listCmd) Run(ctx context.Context, printer upterm.ObjectPrinter, p pterm.TextPrinter, cc *configurations.Client, upCtx *upbound.Context) error {
+	cfgList, err := cc.List(ctx, upCtx.Account)
 	if err != nil {
 		return err
 	}

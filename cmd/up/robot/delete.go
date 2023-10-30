@@ -70,15 +70,15 @@ type deleteCmd struct {
 }
 
 // Run executes the delete command.
-func (c *deleteCmd) Run(p pterm.TextPrinter, ac *accounts.Client, oc *organizations.Client, rc *robots.Client, upCtx *upbound.Context) error { //nolint:gocyclo
-	a, err := ac.Get(context.Background(), upCtx.Account)
+func (c *deleteCmd) Run(ctx context.Context, p pterm.TextPrinter, ac *accounts.Client, oc *organizations.Client, rc *robots.Client, upCtx *upbound.Context) error { //nolint:gocyclo
+	a, err := ac.Get(ctx, upCtx.Account)
 	if err != nil {
 		return err
 	}
 	if a.Account.Type != accounts.AccountOrganization {
 		return errors.New(errUserAccount)
 	}
-	rs, err := oc.ListRobots(context.Background(), a.Organization.ID)
+	rs, err := oc.ListRobots(ctx, a.Organization.ID)
 	if err != nil {
 		return err
 	}
@@ -105,7 +105,7 @@ func (c *deleteCmd) Run(p pterm.TextPrinter, ac *accounts.Client, oc *organizati
 		return errors.Errorf(errFindRobotFmt, c.Name, upCtx.Account)
 	}
 
-	if err := rc.Delete(context.Background(), *id); err != nil {
+	if err := rc.Delete(ctx, *id); err != nil {
 		return err
 	}
 	p.Printfln("%s/%s deleted", upCtx.Account, c.Name)

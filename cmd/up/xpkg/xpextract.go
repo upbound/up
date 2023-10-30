@@ -133,13 +133,13 @@ type xpExtractCmd struct {
 }
 
 // Run runs the xp extract cmd.
-func (c *xpExtractCmd) Run(p pterm.TextPrinter) error { //nolint:gocyclo
+func (c *xpExtractCmd) Run(ctx context.Context, p pterm.TextPrinter) error { //nolint:gocyclo
 	// NOTE(hasheddan): most of the logic in this method is from the machinery
 	// used in Crossplane's package cache and should be updated to use shared
 	// libraries if moved to crossplane-runtime.
 
 	// Fetch package.
-	img, err := c.fetch(context.Background(), c.name)
+	img, err := c.fetch(ctx, c.name)
 	if err != nil {
 		return errors.Wrap(err, errFetchPackage)
 	}

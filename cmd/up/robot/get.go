@@ -40,8 +40,8 @@ type getCmd struct {
 }
 
 // Run executes the get robot command.
-func (c *getCmd) Run(printer upterm.ObjectPrinter, ac *accounts.Client, oc *organizations.Client, upCtx *upbound.Context) error {
-	a, err := ac.Get(context.Background(), upCtx.Account)
+func (c *getCmd) Run(ctx context.Context, printer upterm.ObjectPrinter, ac *accounts.Client, oc *organizations.Client, upCtx *upbound.Context) error {
+	a, err := ac.Get(ctx, upCtx.Account)
 	if err != nil {
 		return err
 	}
@@ -54,7 +54,7 @@ func (c *getCmd) Run(printer upterm.ObjectPrinter, ac *accounts.Client, oc *orga
 	// The API doesn't guarantee uniqueness, but we just print the first
 	// one we find. If a user wants to list all of them, they can use
 	// the list command.
-	rs, err := oc.ListRobots(context.Background(), a.Organization.ID)
+	rs, err := oc.ListRobots(ctx, a.Organization.ID)
 	if err != nil {
 		return err
 	}

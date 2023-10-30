@@ -69,16 +69,16 @@ func (c *removeCmd) AfterApply(p pterm.TextPrinter) error {
 }
 
 // Run executes the remove command.
-func (c *removeCmd) Run(printer upterm.ObjectPrinter, p pterm.TextPrinter, oc *organizations.Client, upCtx *upbound.Context) error {
-	orgID, err := oc.GetOrgID(context.Background(), c.OrgName)
+func (c *removeCmd) Run(ctx context.Context, printer upterm.ObjectPrinter, p pterm.TextPrinter, oc *organizations.Client, upCtx *upbound.Context) error {
+	orgID, err := oc.GetOrgID(ctx, c.OrgName)
 	if err != nil {
 		return err
 	}
 
 	// First try to remove an invite.
-	inviteID, err := findInviteID(oc, orgID, c.User)
+	inviteID, err := findInviteID(ctx, oc, orgID, c.User)
 	if err == nil {
-		if err = oc.DeleteInvite(context.Background(), orgID, inviteID); err != nil {
+		if err = oc.DeleteInvite(ctx, orgID, inviteID); err != nil {
 			return err
 		}
 
@@ -87,9 +87,9 @@ func (c *removeCmd) Run(printer upterm.ObjectPrinter, p pterm.TextPrinter, oc *o
 	}
 
 	// If no invite was found, try to remove a member.
-	userID, err := findUserID(oc, orgID, c.User)
+	userID, err := findUserID(ctx, oc, orgID, c.User)
 	if err == nil {
-		if err = oc.RemoveMember(context.Background(), orgID, userID); err != nil {
+		if err = oc.RemoveMember(ctx, orgID, userID); err != nil {
 			return err
 		}
 		p.Printfln("Member %s removed from %s", c.User, c.OrgName)
@@ -100,8 +100,8 @@ func (c *removeCmd) Run(printer upterm.ObjectPrinter, p pterm.TextPrinter, oc *o
 }
 
 // findInviteID returns the invite ID for the given email address, if it exists.
-func findInviteID(oc *organizations.Client, orgID uint, email string) (uint, error) {
-	invites, err := oc.ListInvites(context.Background(), orgID)
+func findInviteID(ctx context.Context, oc *organizations.Client, orgID uint, email string) (uint, error) {
+	invites, err := oc.ListInvites(ctx, orgID)
 	if err != nil {
 		return 0, err
 	}
@@ -114,8 +114,8 @@ func findInviteID(oc *organizations.Client, orgID uint, email string) (uint, err
 }
 
 // findUserID returns the user ID for the given username or email address, if it exists.
-func findUserID(oc *organizations.Client, orgID uint, username string) (uint, error) {
-	users, err := oc.ListMembers(context.Background(), orgID)
+func findUserID(ctx context.Context, oc *organizations.Client, orgID uint, username string) (uint, error) {
+	users, err := oc.ListMembers(ctx, orgID)
 	if err != nil {
 		return 0, err
 	}

@@ -87,9 +87,9 @@ type installCmd struct {
 }
 
 // Run executes the install command.
-func (c *installCmd) Run(p pterm.TextPrinter, insCtx *install.Context) error {
+func (c *installCmd) Run(ctx context.Context, p pterm.TextPrinter, insCtx *install.Context) error {
 	// Create namespace if it does not exist.
-	_, err := c.kClient.CoreV1().Namespaces().Create(context.Background(), &corev1.Namespace{
+	_, err := c.kClient.CoreV1().Namespaces().Create(ctx, &corev1.Namespace{
 		ObjectMeta: metav1.ObjectMeta{
 			Name: insCtx.Namespace,
 		},

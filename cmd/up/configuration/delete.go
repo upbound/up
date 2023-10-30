@@ -80,8 +80,8 @@ type deleteCmd struct {
 }
 
 // Run executes the delete command.
-func (c *deleteCmd) Run(p pterm.TextPrinter, cc *configurations.Client, upCtx *upbound.Context) error {
-	if err := cc.Delete(context.Background(), upCtx.Account, c.Name); err != nil {
+func (c *deleteCmd) Run(ctx context.Context, p pterm.TextPrinter, cc *configurations.Client, upCtx *upbound.Context) error {
+	if err := cc.Delete(ctx, upCtx.Account, c.Name); err != nil {
 		return err
 	}
 	p.Printfln("%s deleted", c.Name)

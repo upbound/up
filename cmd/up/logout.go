@@ -59,12 +59,12 @@ type logoutCmd struct {
 }
 
 // Run executes the logout command.
-func (c *logoutCmd) Run(p pterm.TextPrinter, upCtx *upbound.Context) error {
+func (c *logoutCmd) Run(ctx context.Context, p pterm.TextPrinter, upCtx *upbound.Context) error {
 	if upCtx.Profile.IsSpace() {
 		return fmt.Errorf("logout is not supported for space profile %q", upCtx.ProfileName)
 	}
 
-	ctx, cancel := context.WithTimeout(context.Background(), defaultTimeout)
+	ctx, cancel := context.WithTimeout(ctx, defaultTimeout)
 	defer cancel()
 	req, err := c.client.NewRequest(ctx, http.MethodPost, logoutPath, "", nil)
 	if err != nil {

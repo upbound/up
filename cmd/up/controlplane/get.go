@@ -71,8 +71,8 @@ type getCmd struct {
 }
 
 // Run executes the get command.
-func (c *getCmd) Run(printer upterm.ObjectPrinter, p pterm.TextPrinter, upCtx *upbound.Context) error {
-	ctp, err := c.client.Get(context.Background(), c.Name)
+func (c *getCmd) Run(ctx context.Context, printer upterm.ObjectPrinter, p pterm.TextPrinter, upCtx *upbound.Context) error {
+	ctp, err := c.client.Get(ctx, c.Name)
 	if controlplane.IsNotFound(err) {
 		p.Printfln("Control plane %s not found", c.Name)
 		return nil

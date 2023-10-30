@@ -109,7 +109,7 @@ type connectCmd struct {
 }
 
 // Run executes the get command.
-func (c *connectCmd) Run(printer upterm.ObjectPrinter, p pterm.TextPrinter, upCtx *upbound.Context) error {
+func (c *connectCmd) Run(ctx context.Context, printer upterm.ObjectPrinter, p pterm.TextPrinter, upCtx *upbound.Context) error {
 	if upCtx.Account == "" {
 		return errors.New("error: account is missing from profile")
 	}
@@ -129,7 +129,7 @@ func (c *connectCmd) Run(printer upterm.ObjectPrinter, p pterm.TextPrinter, upCt
 		return nil
 	}
 
-	cfg, err := c.client.GetKubeConfig(context.Background(), c.Name)
+	cfg, err := c.client.GetKubeConfig(ctx, c.Name)
 	if controlplane.IsNotFound(err) {
 		p.Printfln("Control plane %s not found", c.Name)
 		return nil

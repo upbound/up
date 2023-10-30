@@ -36,7 +36,7 @@ type serveCmd struct {
 }
 
 // Run runs the language server.
-func (c *serveCmd) Run() error {
+func (c *serveCmd) Run(ctx context.Context) error {
 
 	// cache directory resolution should occur at this level.
 
@@ -50,6 +50,6 @@ func (c *serveCmd) Run() error {
 	}
 
 	// TODO(hasheddan): handle graceful shutdown.
-	<-jsonrpc2.NewConn(context.Background(), jsonrpc2.NewBufferedStream(xpls.StdRWC{}, jsonrpc2.VSCodeObjectCodec{}), h).DisconnectNotify()
+	<-jsonrpc2.NewConn(ctx, jsonrpc2.NewBufferedStream(xpls.StdRWC{}, jsonrpc2.VSCodeObjectCodec{}), h).DisconnectNotify()
 	return nil
 }

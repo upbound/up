@@ -28,8 +28,8 @@ type createCmd struct {
 }
 
 // Run executes the create command.
-func (c *createCmd) Run(p pterm.TextPrinter, oc *organizations.Client) error {
-	if err := oc.Create(context.Background(), &organizations.OrganizationCreateParameters{
+func (c *createCmd) Run(ctx context.Context, p pterm.TextPrinter, oc *organizations.Client) error {
+	if err := oc.Create(ctx, &organizations.OrganizationCreateParameters{
 		Name: c.Name,
 		// NOTE(hasheddan): we default display name to the same as name.
 		DisplayName: c.Name,

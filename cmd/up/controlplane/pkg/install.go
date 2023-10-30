@@ -105,7 +105,7 @@ type installCmd struct {
 }
 
 // Run executes the install command.
-func (c *installCmd) Run(p pterm.TextPrinter, upCtx *upbound.Context) error {
+func (c *installCmd) Run(ctx context.Context, p pterm.TextPrinter, upCtx *upbound.Context) error {
 	ref, err := name.ParseReference(c.Package, name.WithDefaultRegistry(upCtx.RegistryEndpoint.Hostname()))
 	if err != nil {
 		return err
@@ -119,7 +119,7 @@ func (c *installCmd) Run(p pterm.TextPrinter, upCtx *upbound.Context) error {
 			Name: s,
 		}
 	}
-	if _, err := c.r.Create(context.Background(), &unstructured.Unstructured{Object: map[string]interface{}{
+	if _, err := c.r.Create(ctx, &unstructured.Unstructured{Object: map[string]interface{}{
 		"apiVersion": "pkg.crossplane.io/v1",
 		"kind":       c.kind,
 		"metadata": map[string]interface{}{
@@ -141,7 +141,7 @@ func (c *installCmd) Run(p pterm.TextPrinter, upCtx *upbound.Context) error {
 
 	s, _ := upterm.CheckmarkSuccessSpinner.Start(fmt.Sprintf("%s installed. Waiting to become healthy...", c.Name))
 
-	ctx, cancel := context.WithCancel(context.Background())
+	ctx, cancel := context.WithCancel(ctx)
 	defer cancel()
 	t := int64(c.Wait.Seconds())
 	errC, err := kube.DynamicWatch(ctx, c.r, &t, func(u *unstructured.Unstructured) (bool, error) {

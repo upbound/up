@@ -208,9 +208,7 @@ func (c *initCmd) AfterApply(kongCtx *kong.Context, quiet config.QuietFlag) erro
 }
 
 // Run executes the install command.
-func (c *initCmd) Run(upCtx *upbound.Context) error {
-	ctx := context.Background()
-
+func (c *initCmd) Run(ctx context.Context, upCtx *upbound.Context) error {
 	params, err := c.parser.Parse()
 	if err != nil {
 		return errors.Wrap(err, errParseInstallParameters)
@@ -253,7 +251,7 @@ func (c *initCmd) Run(upCtx *upbound.Context) error {
 		return err
 	}
 
-	if err := c.deploySpace(context.Background(), params); err != nil {
+	if err := c.deploySpace(ctx, params); err != nil {
 		return err
 	}
 
