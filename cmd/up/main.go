@@ -18,6 +18,7 @@ import (
 	"fmt"
 	"io"
 	"os"
+	"os/signal"
 
 	"github.com/alecthomas/kong"
 	"github.com/pterm/pterm"
@@ -175,5 +176,14 @@ func main() {
 
 	ctx, err := parser.Parse(os.Args[1:])
 	parser.FatalIfErrorf(err)
+
+	sigCh := make(chan os.Signal, 1)
+	signal.Notify(sigCh, os.Interrupt)
+	defer signal.Stop(sigCh)
+	go func() {
+		<-sigCh
+		ctx.Exit(1)
+	}()
+
 	ctx.FatalIfErrorf(ctx.Run())
 }
