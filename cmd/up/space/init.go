@@ -18,6 +18,8 @@ import (
 	"context"
 	"fmt"
 	"io"
+	"os"
+	"os/signal"
 	"strings"
 	"time"
 
@@ -210,6 +212,14 @@ func (c *initCmd) AfterApply(kongCtx *kong.Context, quiet config.QuietFlag) erro
 // Run executes the install command.
 func (c *initCmd) Run(upCtx *upbound.Context) error {
 	ctx := context.Background()
+
+	sigCh := make(chan os.Signal, 1)
+	signal.Notify(sigCh, os.Interrupt)
+	defer signal.Stop(sigCh)
+	go func() {
+		<-sigCh
+		os.Exit(1)
+	}()
 
 	params, err := c.parser.Parse()
 	if err != nil {
