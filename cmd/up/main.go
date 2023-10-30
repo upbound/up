@@ -15,6 +15,7 @@
 package main
 
 import (
+	"context"
 	"fmt"
 	"io"
 	"os"
@@ -174,16 +175,19 @@ func main() {
 		return
 	}
 
-	ctx, err := parser.Parse(os.Args[1:])
+	kongCtx, err := parser.Parse(os.Args[1:])
 	parser.FatalIfErrorf(err)
 
+	ctx, cancel := context.WithCancel(context.Background())
 	sigCh := make(chan os.Signal, 1)
 	signal.Notify(sigCh, os.Interrupt)
 	defer signal.Stop(sigCh)
 	go func() {
+		defer cancel()
 		<-sigCh
-		ctx.Exit(1)
+		kongCtx.Exit(1)
 	}()
 
-	ctx.FatalIfErrorf(ctx.Run())
+	kongCtx.BindTo(ctx, (*context.Context)(nil))
+	kongCtx.FatalIfErrorf(kongCtx.Run())
 }
