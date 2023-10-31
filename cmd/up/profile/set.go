@@ -15,12 +15,12 @@
 package profile
 
 import (
+	_ "embed"
 	"fmt"
 
 	"github.com/alecthomas/kong"
-	"github.com/pterm/pterm"
-
 	"github.com/crossplane/crossplane-runtime/pkg/errors"
+	"github.com/pterm/pterm"
 
 	"github.com/upbound/up/internal/profile"
 	"github.com/upbound/up/internal/upbound"
@@ -32,11 +32,18 @@ const (
 )
 
 type setCmd struct {
-	Space spaceCmd `cmd:"" help:"Create or update a profile for use with a Space."`
+	Space spaceCmd `cmd:"" help:"Set an Upbound Profile for use with a Space."`
 }
 
 type spaceCmd struct {
 	Kube upbound.KubeFlags `embed:""`
+}
+
+//go:embed space_help.txt
+var spaceCmdHelp string
+
+func (c *spaceCmd) Help() string {
+	return spaceCmdHelp
 }
 
 func (c *spaceCmd) AfterApply(kongCtx *kong.Context) error {
@@ -80,7 +87,7 @@ func (c *spaceCmd) Run(p pterm.TextPrinter, upCtx *upbound.Context) error {
 	if prof.Kubeconfig != "" {
 		kubeconfigLocation = fmt.Sprintf("kubeconfig at %q", prof.Kubeconfig)
 	}
-	p.Printf("Profile %q updated to use context %q from the %s", upCtx.ProfileName, prof.KubeContext, kubeconfigLocation)
+	p.Printf("Profile %q updated to use Kubernetes context %q from the %s", upCtx.ProfileName, prof.KubeContext, kubeconfigLocation)
 	if setDefault {
 		p.Print(" and selected as the default profile")
 	}
