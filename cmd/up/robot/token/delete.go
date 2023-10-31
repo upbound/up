@@ -67,15 +67,15 @@ type deleteCmd struct {
 }
 
 // Run executes the delete command.
-func (c *deleteCmd) Run(p pterm.TextPrinter, ac *accounts.Client, oc *organizations.Client, rc *robots.Client, tc *tokens.Client, upCtx *upbound.Context) error { //nolint:gocyclo
-	a, err := ac.Get(context.Background(), upCtx.Account)
+func (c *deleteCmd) Run(ctx context.Context, p pterm.TextPrinter, ac *accounts.Client, oc *organizations.Client, rc *robots.Client, tc *tokens.Client, upCtx *upbound.Context) error { //nolint:gocyclo
+	a, err := ac.Get(ctx, upCtx.Account)
 	if err != nil {
 		return err
 	}
 	if a.Account.Type != accounts.AccountOrganization {
 		return errors.New(errUserAccount)
 	}
-	rs, err := oc.ListRobots(context.Background(), a.Organization.ID)
+	rs, err := oc.ListRobots(ctx, a.Organization.ID)
 	if err != nil {
 		return err
 	}
@@ -101,7 +101,7 @@ func (c *deleteCmd) Run(p pterm.TextPrinter, ac *accounts.Client, oc *organizati
 		return errors.Errorf(errFindRobotFmt, c.RobotName, upCtx.Account)
 	}
 
-	ts, err := rc.ListTokens(context.Background(), *rid)
+	ts, err := rc.ListTokens(ctx, *rid)
 	if err != nil {
 		return err
 	}
@@ -128,7 +128,7 @@ func (c *deleteCmd) Run(p pterm.TextPrinter, ac *accounts.Client, oc *organizati
 		return errors.Errorf(errFindTokenFmt, c.TokenName, c.RobotName, upCtx.Account)
 	}
 
-	if err := tc.Delete(context.Background(), *tid); err != nil {
+	if err := tc.Delete(ctx, *tid); err != nil {
 		return err
 	}
 	p.Printfln("%s/%s/%s deleted", upCtx.Account, c.RobotName, c.TokenName)

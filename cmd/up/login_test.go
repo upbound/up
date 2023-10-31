@@ -16,6 +16,7 @@ package main
 
 import (
 	"bytes"
+	"context"
 	"io"
 	"net/http"
 	"net/url"
@@ -68,7 +69,7 @@ func TestRun(t *testing.T) {
 	}
 	for name, tc := range cases {
 		t.Run(name, func(t *testing.T) {
-			if diff := cmp.Diff(tc.err, tc.cmd.Run(pterm.DefaultBasicText.WithWriter(io.Discard), tc.ctx), test.EquateErrors()); diff != "" {
+			if diff := cmp.Diff(tc.err, tc.cmd.Run(context.TODO(), pterm.DefaultBasicText.WithWriter(io.Discard), tc.ctx), test.EquateErrors()); diff != "" {
 				t.Errorf("\n%s\nRun(...): -want error, +got error:\n%s", tc.reason, diff)
 			}
 		})

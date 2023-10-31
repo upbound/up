@@ -42,15 +42,15 @@ type createCmd struct {
 }
 
 // Run executes the create command.
-func (c *createCmd) Run(p pterm.TextPrinter, ac *accounts.Client, oc *organizations.Client, rc *robots.Client, tc *tokens.Client, upCtx *upbound.Context) error { //nolint:gocyclo
-	a, err := ac.Get(context.Background(), upCtx.Account)
+func (c *createCmd) Run(ctx context.Context, p pterm.TextPrinter, ac *accounts.Client, oc *organizations.Client, rc *robots.Client, tc *tokens.Client, upCtx *upbound.Context) error { //nolint:gocyclo
+	a, err := ac.Get(ctx, upCtx.Account)
 	if err != nil {
 		return err
 	}
 	if a.Account.Type != accounts.AccountOrganization {
 		return errors.New(errUserAccount)
 	}
-	rs, err := oc.ListRobots(context.Background(), a.Organization.ID)
+	rs, err := oc.ListRobots(ctx, a.Organization.ID)
 	if err != nil {
 		return err
 	}
@@ -75,7 +75,7 @@ func (c *createCmd) Run(p pterm.TextPrinter, ac *accounts.Client, oc *organizati
 	if !found {
 		return errors.Errorf(errFindRobotFmt, c.RobotName, upCtx.Account)
 	}
-	res, err := tc.Create(context.Background(), &tokens.TokenCreateParameters{
+	res, err := tc.Create(ctx, &tokens.TokenCreateParameters{
 		Attributes: tokens.TokenAttributes{
 			Name: c.TokenName,
 		},

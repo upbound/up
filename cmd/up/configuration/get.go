@@ -30,8 +30,8 @@ type getCmd struct {
 }
 
 // Run executes the get command.
-func (c *getCmd) Run(printer upterm.ObjectPrinter, p pterm.TextPrinter, cc *configurations.Client, upCtx *upbound.Context) error {
-	cfg, err := cc.Get(context.Background(), upCtx.Account, c.Name)
+func (c *getCmd) Run(ctx context.Context, printer upterm.ObjectPrinter, p pterm.TextPrinter, cc *configurations.Client, upCtx *upbound.Context) error {
+	cfg, err := cc.Get(ctx, upCtx.Account, c.Name)
 	if err != nil {
 		return err
 	}

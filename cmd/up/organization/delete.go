@@ -60,12 +60,12 @@ type deleteCmd struct {
 }
 
 // Run executes the delete command.
-func (c *deleteCmd) Run(p pterm.TextPrinter, oc *organizations.Client) error {
-	id, err := oc.GetOrgID(context.Background(), c.Name)
+func (c *deleteCmd) Run(ctx context.Context, p pterm.TextPrinter, oc *organizations.Client) error {
+	id, err := oc.GetOrgID(ctx, c.Name)
 	if err != nil {
 		return err
 	}
-	if err := oc.Delete(context.Background(), id); err != nil {
+	if err := oc.Delete(ctx, id); err != nil {
 		return err
 	}
 	p.Printfln("%s deleted", c.Name)

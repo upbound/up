@@ -143,7 +143,7 @@ func (c *destroyCmd) getKubeconfig(upCtx *upbound.Context) (*rest.Config, error)
 }
 
 // Run executes the uninstall command.
-func (c *destroyCmd) Run(kClient *kubernetes.Clientset, mgr *helm.Installer) error {
+func (c *destroyCmd) Run(ctx context.Context, kClient *kubernetes.Clientset, mgr *helm.Installer) error {
 	if err := mgr.Uninstall(); err != nil {
 		return err
 	}
@@ -154,5 +154,5 @@ func (c *destroyCmd) Run(kClient *kubernetes.Clientset, mgr *helm.Installer) err
 		return nil
 	}
 
-	return kClient.CoreV1().Namespaces().Delete(context.Background(), nsUpboundSystem, v1.DeleteOptions{})
+	return kClient.CoreV1().Namespaces().Delete(ctx, nsUpboundSystem, v1.DeleteOptions{})
 }

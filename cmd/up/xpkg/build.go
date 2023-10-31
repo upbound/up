@@ -135,20 +135,20 @@ Even more details can be found in the xpkg reference document.`
 }
 
 // Run executes the build command.
-func (c *buildCmd) Run(p pterm.TextPrinter) error { //nolint:gocyclo
+func (c *buildCmd) Run(ctx context.Context, p pterm.TextPrinter) error { //nolint:gocyclo
 	var buildOpts []xpkg.BuildOpt
 	if c.Controller != "" {
 		ref, err := name.ParseReference(c.Controller)
 		if err != nil {
 			return err
 		}
-		base, err := c.fetch(context.Background(), ref)
+		base, err := c.fetch(ctx, ref)
 		if err != nil {
 			return err
 		}
 		buildOpts = append(buildOpts, xpkg.WithController(base))
 	}
-	img, meta, err := c.builder.Build(context.Background(), buildOpts...)
+	img, meta, err := c.builder.Build(ctx, buildOpts...)
 	if err != nil {
 		return errors.Wrap(err, errBuildPackage)
 	}

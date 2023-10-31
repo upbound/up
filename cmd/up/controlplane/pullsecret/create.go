@@ -85,9 +85,9 @@ type createCmd struct {
 }
 
 // Run executes the pull secret command.
-func (c *createCmd) Run(p pterm.TextPrinter, upCtx *upbound.Context) error { //nolint:gocyclo
+func (c *createCmd) Run(ctx context.Context, p pterm.TextPrinter, upCtx *upbound.Context) error { //nolint:gocyclo
 	if err := kube.NewImagePullApplicator(kube.NewSecretApplicator(c.kClient)).
-		Apply(context.Background(),
+		Apply(ctx,
 			c.Name,
 			c.Namespace,
 			c.user,

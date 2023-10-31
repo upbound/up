@@ -47,8 +47,8 @@ type listCmd struct{}
 var fieldNames = []string{"NAME", "TYPE", "PUBLIC", "UPDATED"}
 
 // Run executes the list command.
-func (c *listCmd) Run(printer upterm.ObjectPrinter, p pterm.TextPrinter, rc *repositories.Client, upCtx *upbound.Context) error {
-	rList, err := rc.List(context.Background(), upCtx.Account, common.WithSize(maxItems))
+func (c *listCmd) Run(ctx context.Context, printer upterm.ObjectPrinter, p pterm.TextPrinter, rc *repositories.Client, upCtx *upbound.Context) error {
+	rList, err := rc.List(ctx, upCtx.Account, common.WithSize(maxItems))
 	if err != nil {
 		return err
 	}

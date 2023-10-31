@@ -68,8 +68,8 @@ func (c *deleteCmd) AfterApply(kongCtx *kong.Context, upCtx *upbound.Context) er
 }
 
 // Run executes the delete command.
-func (c *deleteCmd) Run(p pterm.TextPrinter, upCtx *upbound.Context) error {
-	if err := c.client.Delete(context.Background(), c.Name); err != nil {
+func (c *deleteCmd) Run(ctx context.Context, p pterm.TextPrinter, upCtx *upbound.Context) error {
+	if err := c.client.Delete(ctx, c.Name); err != nil {
 		if controlplane.IsNotFound(err) {
 			p.Printfln("Control plane %s not found", c.Name)
 			return nil

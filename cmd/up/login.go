@@ -113,7 +113,7 @@ type loginCmd struct {
 }
 
 // Run executes the login command.
-func (c *loginCmd) Run(p pterm.TextPrinter, upCtx *upbound.Context) error { // nolint:gocyclo
+func (c *loginCmd) Run(ctx context.Context, p pterm.TextPrinter, upCtx *upbound.Context) error { // nolint:gocyclo
 	if c.Token == "-" {
 		b, err := io.ReadAll(c.stdin)
 		if err != nil {
@@ -128,7 +128,7 @@ func (c *loginCmd) Run(p pterm.TextPrinter, upCtx *upbound.Context) error { // n
 		}
 		c.Password = strings.TrimSpace(string(b))
 	}
-	ctx, cancel := context.WithTimeout(context.Background(), defaultTimeout)
+	ctx, cancel := context.WithTimeout(ctx, defaultTimeout)
 	defer cancel()
 	auth, profType, err := constructAuth(c.Username, c.Token, c.Password)
 	if err != nil {

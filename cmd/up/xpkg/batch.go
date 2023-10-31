@@ -125,7 +125,7 @@ type batchCmd struct {
 }
 
 // Run executes the batch command.
-func (c *batchCmd) Run(p pterm.TextPrinter, upCtx *upbound.Context) error { //nolint:gocyclo
+func (c *batchCmd) Run(ctx context.Context, p pterm.TextPrinter, upCtx *upbound.Context) error { //nolint:gocyclo
 	baseImgMap := make(map[string]v1.Image, len(c.Platform))
 	for _, p := range c.Platform {
 		tokens := strings.Split(p, "_")
@@ -136,7 +136,7 @@ func (c *batchCmd) Run(p pterm.TextPrinter, upCtx *upbound.Context) error { //no
 		if err != nil {
 			return err
 		}
-		img, err := c.fetch(context.Background(), ref)
+		img, err := c.fetch(ctx, ref)
 		if err != nil {
 			return err
 		}

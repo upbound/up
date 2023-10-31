@@ -38,8 +38,8 @@ type getCmd struct {
 }
 
 // Run executes the get command.
-func (c *getCmd) Run(printer upterm.ObjectPrinter, rc *repos.Client, upCtx *upbound.Context) error {
-	repo, err := rc.Get(context.Background(), upCtx.Account, c.Name)
+func (c *getCmd) Run(ctx context.Context, printer upterm.ObjectPrinter, rc *repos.Client, upCtx *upbound.Context) error {
+	repo, err := rc.Get(ctx, upCtx.Account, c.Name)
 	if err != nil {
 		return err
 	}

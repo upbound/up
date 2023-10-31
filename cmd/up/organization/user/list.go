@@ -51,16 +51,16 @@ type listCmd struct {
 }
 
 // Run executes the list command.
-func (c *listCmd) Run(printer upterm.ObjectPrinter, p pterm.TextPrinter, oc *organizations.Client, upCtx *upbound.Context) error {
-	orgID, err := oc.GetOrgID(context.Background(), c.OrgName)
+func (c *listCmd) Run(ctx context.Context, printer upterm.ObjectPrinter, p pterm.TextPrinter, oc *organizations.Client, upCtx *upbound.Context) error {
+	orgID, err := oc.GetOrgID(ctx, c.OrgName)
 	if err != nil {
 		return err
 	}
-	members, err := oc.ListMembers(context.Background(), orgID)
+	members, err := oc.ListMembers(ctx, orgID)
 	if err != nil {
 		return err
 	}
-	invites, err := oc.ListInvites(context.Background(), orgID)
+	invites, err := oc.ListInvites(ctx, orgID)
 	if err != nil {
 		return err
 	}
