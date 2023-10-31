@@ -15,13 +15,22 @@
 package profile
 
 import (
+	"context"
 	"io"
 	"os"
 	"testing"
 
-	"github.com/crossplane/crossplane-runtime/pkg/test"
 	"github.com/google/go-cmp/cmp"
 	"github.com/pterm/pterm"
+	appsv1 "k8s.io/api/apps/v1"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/runtime"
+	"k8s.io/client-go/kubernetes"
+	"k8s.io/client-go/kubernetes/fake"
+	clientgotesting "k8s.io/client-go/testing"
+
+	"github.com/crossplane/crossplane-runtime/pkg/errors"
+	"github.com/crossplane/crossplane-runtime/pkg/test"
 
 	"github.com/upbound/up/internal/config"
 	"github.com/upbound/up/internal/profile"
@@ -54,8 +63,16 @@ func TestSpaceCmd_Run(t *testing.T) {
 	}
 	kubeconfig := wd + "/testdata/kubeconfig"
 
+	mxeController := &appsv1.Deployment{
+		ObjectMeta: metav1.ObjectMeta{
+			Name:      "mxe-controller",
+			Namespace: "upbound-system",
+		},
+	}
+
 	type args struct {
-		ctx *upbound.Context
+		ctx       *upbound.Context
+		getClient func() (kubernetes.Interface, error)
 	}
 	type want struct {
 		cfg *config.Config
@@ -73,6 +90,9 @@ func TestSpaceCmd_Run(t *testing.T) {
 					Account: "test-account",
 					Cfg:     &config.Config{},
 				},
+				getClient: func() (kubernetes.Interface, error) {
+					return fake.NewSimpleClientset(mxeController), nil
+				},
 			},
 			want: want{
 				cfg: &config.Config{Upbound: config.Upbound{
@@ -86,6 +106,42 @@ func TestSpaceCmd_Run(t *testing.T) {
 						},
 					},
 				}},
+			},
+		},
+		"NoSpacesError": {
+			reason: "There is no upbound/mxe-controller in the cluster.",
+			args: args{
+				ctx: &upbound.Context{
+					Account: "test-account",
+					Cfg:     &config.Config{},
+				},
+				getClient: func() (kubernetes.Interface, error) {
+					return fake.NewSimpleClientset(), nil
+				},
+			},
+			want: want{
+				err: errors.New(errNoSpace),
+				cfg: &config.Config{},
+			},
+		},
+		"KubeClientError": {
+			reason: "The kube clients returns a non-NotFound error.",
+			args: args{
+				ctx: &upbound.Context{
+					Account: "test-account",
+					Cfg:     &config.Config{},
+				},
+				getClient: func() (kubernetes.Interface, error) {
+					c := fake.NewSimpleClientset()
+					c.PrependReactor("get", "deployments", func(action clientgotesting.Action) (handled bool, ret runtime.Object, err error) {
+						return true, nil, errors.New("contact error")
+					})
+					return c, nil
+				},
+			},
+			want: want{
+				err: errors.Wrap(errors.New("contact error"), errKubeContact),
+				cfg: &config.Config{},
 			},
 		},
 		"PopulatedConfigDefaultProfile": {
@@ -110,6 +166,9 @@ func TestSpaceCmd_Run(t *testing.T) {
 							},
 						},
 					}},
+				},
+				getClient: func() (kubernetes.Interface, error) {
+					return fake.NewSimpleClientset(mxeController), nil
 				},
 			},
 			want: want{
@@ -149,6 +208,9 @@ func TestSpaceCmd_Run(t *testing.T) {
 							},
 						},
 					}},
+				},
+				getClient: func() (kubernetes.Interface, error) {
+					return fake.NewSimpleClientset(mxeController), nil
 				},
 			},
 			want: want{
@@ -195,6 +257,9 @@ func TestSpaceCmd_Run(t *testing.T) {
 						},
 					}},
 				},
+				getClient: func() (kubernetes.Interface, error) {
+					return fake.NewSimpleClientset(mxeController), nil
+				},
 			},
 			want: want{
 				cfg: &config.Config{Upbound: config.Upbound{
@@ -220,7 +285,7 @@ func TestSpaceCmd_Run(t *testing.T) {
 
 	for name, tc := range cases {
 		t.Run(name, func(t *testing.T) {
-			cmd := &spaceCmd{Kube: upbound.KubeFlags{Kubeconfig: kubeconfig}}
+			cmd := &spaceCmd{Kube: upbound.KubeFlags{Kubeconfig: kubeconfig}, getClient: tc.args.getClient}
 			if diff := cmp.Diff(nil, cmd.AfterApply(nil), test.EquateErrors()); diff != "" {
 				t.Errorf("\n%s\nspaceCmd.AfterApply(...): -want error, +got error:\n%s", tc.reason, diff)
 			}
@@ -228,7 +293,7 @@ func TestSpaceCmd_Run(t *testing.T) {
 			cfgSrc := &mockConfigSource{cfg: tc.args.ctx.Cfg}
 			tc.args.ctx.CfgSrc = cfgSrc
 			p := pterm.DefaultBasicText.WithWriter(io.Discard)
-			if diff := cmp.Diff(tc.want.err, cmd.Run(p, tc.args.ctx), test.EquateErrors()); diff != "" {
+			if diff := cmp.Diff(tc.want.err, cmd.Run(context.TODO(), p, tc.args.ctx), test.EquateErrors()); diff != "" {
 				t.Errorf("\n%s\nspaceCmd.Run(...): -want error, +got error:\n%s", tc.reason, diff)
 			}
 			if diff := cmp.Diff(tc.want.cfg, cfgSrc.cfg); diff != "" {
