@@ -5,8 +5,6 @@ import (
 	"github.com/upbound/up/internal/kube"
 	"github.com/upbound/up/internal/migration"
 	"github.com/upbound/up/internal/upbound"
-	"k8s.io/client-go/dynamic"
-	"k8s.io/client-go/kubernetes"
 )
 
 // AfterApply constructs and binds Upbound-specific context to any subcommands
@@ -23,19 +21,10 @@ func (c *Cmd) AfterApply(kongCtx *kong.Context) error {
 	if upCtx.WrapTransport != nil {
 		cfg.Wrap(upCtx.WrapTransport)
 	}
-	client, err := kubernetes.NewForConfig(cfg)
-	if err != nil {
-		return err
-	}
-	d, err := dynamic.NewForConfig(cfg)
-	if err != nil {
-		return err
-	}
 
 	kongCtx.Bind(&migration.Context{
-		KubeCore:    client.CoreV1(),
-		KubeDynamic: d,
-		Namespace:   c.Namespace,
+		Kubeconfig: cfg,
+		Namespace:  c.Namespace,
 	})
 	return nil
 }

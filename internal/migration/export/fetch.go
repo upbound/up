@@ -17,24 +17,24 @@ type ResourceFetcher interface {
 	FetchResources(ctx context.Context) ([]unstructured.Unstructured, error)
 }
 
-type PagedResourceFetcher struct {
+type UnstructuredFetcher struct {
 	kube     dynamic.Interface
 	gvr      schema.GroupVersionResource
 	pageSize int64
 }
 
-func NewPagedResourceFetcher(kube dynamic.Interface, gvr schema.GroupVersionResource) *PagedResourceFetcher {
-	return &PagedResourceFetcher{
+func NewUnstructuredFetcher(kube dynamic.Interface, gvr schema.GroupVersionResource) *UnstructuredFetcher {
+	return &UnstructuredFetcher{
 		kube:     kube,
 		gvr:      gvr,
 		pageSize: defaultPageSize,
 	}
 }
 
-func (e *PagedResourceFetcher) FetchResources(ctx context.Context) ([]unstructured.Unstructured, error) {
+func (e *UnstructuredFetcher) FetchResources(ctx context.Context) ([]unstructured.Unstructured, error) {
 	var resources []unstructured.Unstructured
 
-	var continueToken string
+	continueToken := ""
 	for {
 		l, err := e.kube.Resource(e.gvr).List(ctx, v1.ListOptions{
 			Limit:    e.pageSize,
