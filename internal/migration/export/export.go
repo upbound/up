@@ -15,33 +15,30 @@ import (
 	"k8s.io/client-go/dynamic"
 )
 
+type Options struct {
+	IncludedNamespaces []string // default: none
+	ExcludedNamespaces []string // default: except kube-system, kube-public, kube-node-lease, local-path-storage
+
+	IncludedResources []string // default: namespaces, configmaps, secrets ( + all Crossplane resources)
+	ExcludedResources []string // default: none
+}
+
 type ControlPlaneStateExporter struct {
 	crdClient      apiextensionsclientset.Interface
 	dynamicClient  dynamic.Interface
 	resourceMapper meta.RESTMapper
-	extraCRDs      map[string]struct{}
+
+	options Options
 }
 
-type ControlPlaneStateExporterOptions func(*ControlPlaneStateExporter)
-
-func WithExtraCRDs(crds map[string]struct{}) ControlPlaneStateExporterOptions {
-	return func(e *ControlPlaneStateExporter) {
-		e.extraCRDs = crds
-	}
-}
-
-func NewControlPlaneStateExporter(crdClient apiextensionsclientset.Interface, dynamicClient dynamic.Interface, mapper meta.RESTMapper, opts ...ControlPlaneStateExporterOptions) *ControlPlaneStateExporter {
-	e := &ControlPlaneStateExporter{
+func NewControlPlaneStateExporter(crdClient apiextensionsclientset.Interface, dynamicClient dynamic.Interface, mapper meta.RESTMapper, opts Options) *ControlPlaneStateExporter {
+	return &ControlPlaneStateExporter{
 		crdClient:      crdClient,
 		dynamicClient:  dynamicClient,
 		resourceMapper: mapper,
-	}
 
-	for _, opt := range opts {
-		opt(e)
+		options: opts,
 	}
-
-	return e
 }
 
 func (e *ControlPlaneStateExporter) Export(ctx context.Context) error {
@@ -51,12 +48,28 @@ func (e *ControlPlaneStateExporter) Export(ctx context.Context) error {
 		return errors.Wrap(err, "cannot create temporary directory")
 	}
 
-	// List all CRDs
+	// Export native resources.
+	for _, r := range e.options.IncludedResources {
+		// TODO(turkenh): Proper parsing / resolving resources to GVRs.
+		gvr := schema.GroupVersionResource{
+			Group:    "",
+			Version:  "v1",
+			Resource: r,
+		}
+		exporter := NewUnstructuredExporter(
+			NewUnstructuredFetcher(e.dynamicClient, e.options),
+			NewFileSystemPersister(fs, "/tmp/up", nil))
+
+		if err = exporter.ExportResources(ctx, gvr); err != nil {
+			return errors.Wrapf(err, "cannot export resources for %q", r)
+		}
+	}
+
+	// Export custom resources.
 	crdList, err := fetchAllCRDs(ctx, e.crdClient)
 	if err != nil {
 		return errors.Wrap(err, "cannot fetch CRDs")
 	}
-
 	for _, crd := range crdList {
 		if !e.shouldExport(crd) {
 			// Ignore CRDs that we don't want to export.
@@ -69,10 +82,10 @@ func (e *ControlPlaneStateExporter) Export(ctx context.Context) error {
 		}
 
 		exporter := NewUnstructuredExporter(
-			NewUnstructuredFetcher(e.dynamicClient, gvr),
-			NewFileSystemPersister(fs, "/tmp/up", crd.GetName(), crd.Spec.Names.Categories))
+			NewUnstructuredFetcher(e.dynamicClient, e.options),
+			NewFileSystemPersister(fs, "/tmp/up", crd.Spec.Names.Categories))
 
-		if err = exporter.ExportResources(ctx); err != nil {
+		if err = exporter.ExportResources(ctx, gvr); err != nil {
 			return errors.Wrapf(err, "cannot export resources for %q", crd.GetName())
 		}
 	}
@@ -101,8 +114,11 @@ func (e *ControlPlaneStateExporter) shouldExport(in apiextensionsv1.CustomResour
 		return true
 	}
 
-	if _, ok := e.extraCRDs[in.GetName()]; ok {
-		return true
+	for _, r := range e.options.IncludedResources {
+		if in.GetName() == r {
+			// If there are any extra CRs that we want to export.
+			return true
+		}
 	}
 
 	return false
