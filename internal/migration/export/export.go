@@ -2,7 +2,7 @@ package export
 
 import (
 	"context"
-	"fmt"
+	"github.com/mholt/archiver/v4"
 	"strings"
 
 	"github.com/crossplane/crossplane-runtime/pkg/errors"
@@ -16,6 +16,8 @@ import (
 )
 
 type Options struct {
+	OutputArchive string // default: xp-state.tar.gz
+
 	IncludedNamespaces []string // default: none
 	ExcludedNamespaces []string // default: except kube-system, kube-public, kube-node-lease, local-path-storage
 
@@ -43,10 +45,13 @@ func NewControlPlaneStateExporter(crdClient apiextensionsclientset.Interface, dy
 
 func (e *ControlPlaneStateExporter) Export(ctx context.Context) error {
 	fs := afero.Afero{Fs: afero.NewOsFs()}
-	tmpDir, err := fs.TempDir("", "export")
+	tmpDir, err := fs.TempDir("", "up")
 	if err != nil {
 		return errors.Wrap(err, "cannot create temporary directory")
 	}
+	defer func() {
+		_ = fs.RemoveAll(tmpDir)
+	}()
 
 	// Export native resources.
 	for _, r := range e.options.IncludedResources {
@@ -58,7 +63,7 @@ func (e *ControlPlaneStateExporter) Export(ctx context.Context) error {
 		}
 		exporter := NewUnstructuredExporter(
 			NewUnstructuredFetcher(e.dynamicClient, e.options),
-			NewFileSystemPersister(fs, "/tmp/up", nil))
+			NewFileSystemPersister(fs, tmpDir, nil))
 
 		if err = exporter.ExportResources(ctx, gvr); err != nil {
 			return errors.Wrapf(err, "cannot export resources for %q", r)
@@ -83,15 +88,15 @@ func (e *ControlPlaneStateExporter) Export(ctx context.Context) error {
 
 		exporter := NewUnstructuredExporter(
 			NewUnstructuredFetcher(e.dynamicClient, e.options),
-			NewFileSystemPersister(fs, "/tmp/up", crd.Spec.Names.Categories))
+			NewFileSystemPersister(fs, tmpDir, crd.Spec.Names.Categories))
 
 		if err = exporter.ExportResources(ctx, gvr); err != nil {
 			return errors.Wrapf(err, "cannot export resources for %q", crd.GetName())
 		}
 	}
 
-	fmt.Println("Exported resources to", tmpDir)
-	return nil
+	// Archive the exported state.
+	return e.archive(fs, tmpDir)
 }
 
 func (e *ControlPlaneStateExporter) shouldExport(in apiextensionsv1.CustomResourceDefinition) bool {
@@ -140,6 +145,34 @@ func (e *ControlPlaneStateExporter) customResourceGVR(in apiextensionsv1.CustomR
 	}
 
 	return rm.Resource, nil
+}
+
+func (e *ControlPlaneStateExporter) archive(fs afero.Afero, dir string) error {
+	files, err := archiver.FilesFromDisk(nil, map[string]string{
+		dir + "/": "",
+	})
+	if err != nil {
+		return err
+	}
+
+	out, err := fs.Create(e.options.OutputArchive)
+	if err != nil {
+		return err
+	}
+	defer func() {
+		_ = out.Close()
+	}()
+
+	if err = fs.Chmod(e.options.OutputArchive, 0600); err != nil {
+		return err
+	}
+
+	format := archiver.CompressedArchive{
+		Compression: archiver.Gz{},
+		Archival:    archiver.Tar{},
+	}
+
+	return format.Archive(context.Background(), out, files)
 }
 
 func fetchAllCRDs(ctx context.Context, kube apiextensionsclientset.Interface) ([]apiextensionsv1.CustomResourceDefinition, error) {
