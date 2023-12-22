@@ -17,15 +17,6 @@ type ResourceFetcher interface {
 	FetchResources(ctx context.Context, gvr schema.GroupVersionResource) ([]unstructured.Unstructured, error)
 }
 
-var (
-	defaultExcludedNamespaces = map[string]struct{}{
-		"kube-system":        {},
-		"kube-public":        {},
-		"kube-node-lease":    {},
-		"local-path-storage": {},
-	}
-)
-
 type UnstructuredFetcher struct {
 	kube     dynamic.Interface
 	pageSize int64

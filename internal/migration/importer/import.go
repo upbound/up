@@ -45,7 +45,9 @@ func (i *ControlPlaneStateImporter) Import(ctx context.Context) error {
 		_ = ur.Close()
 	}()
 
-	_ = afero.Afero{Fs: tarfs.New(tar.NewReader(ur))}
+	fs := afero.Afero{Fs: tarfs.New(tar.NewReader(ur))}
 
-	return nil
+	importer := NewUnstructuredImporter(NewFileSystemGetter(fs))
+
+	return importer.ImportResources(ctx)
 }
