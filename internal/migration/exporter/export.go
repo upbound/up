@@ -1,4 +1,4 @@
-package export
+package exporter
 
 import (
 	"context"
@@ -96,7 +96,7 @@ func (e *ControlPlaneStateExporter) Export(ctx context.Context) error {
 	}
 
 	// Archive the exported state.
-	return e.archive(fs, tmpDir)
+	return e.archive(ctx, fs, tmpDir)
 }
 
 func (e *ControlPlaneStateExporter) shouldExport(in apiextensionsv1.CustomResourceDefinition) bool {
@@ -147,7 +147,7 @@ func (e *ControlPlaneStateExporter) customResourceGVR(in apiextensionsv1.CustomR
 	return rm.Resource, nil
 }
 
-func (e *ControlPlaneStateExporter) archive(fs afero.Afero, dir string) error {
+func (e *ControlPlaneStateExporter) archive(ctx context.Context, fs afero.Afero, dir string) error {
 	files, err := archiver.FilesFromDisk(nil, map[string]string{
 		dir + "/": "",
 	})
@@ -172,7 +172,7 @@ func (e *ControlPlaneStateExporter) archive(fs afero.Afero, dir string) error {
 		Archival:    archiver.Tar{},
 	}
 
-	return format.Archive(context.Background(), out, files)
+	return format.Archive(ctx, out, files)
 }
 
 func fetchAllCRDs(ctx context.Context, kube apiextensionsclientset.Interface) ([]apiextensionsv1.CustomResourceDefinition, error) {
