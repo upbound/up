@@ -7,7 +7,7 @@ import (
 )
 
 type ResourceExporter interface {
-	ExportResources(ctx context.Context) error
+	ExportResources(ctx context.Context, gvr schema.GroupVersionResource) error
 }
 
 type UnstructuredExporter struct {

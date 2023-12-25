@@ -4,9 +4,14 @@ import (
 	"archive/tar"
 	"compress/gzip"
 	"context"
+	"fmt"
 	"github.com/crossplane/crossplane-runtime/pkg/errors"
+	"github.com/crossplane/crossplane-runtime/pkg/fieldpath"
 	"github.com/spf13/afero"
 	"github.com/spf13/afero/tarfs"
+	"k8s.io/apimachinery/pkg/api/meta"
+	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
+	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/client-go/dynamic"
 	"os"
 )
@@ -16,15 +21,17 @@ type Options struct {
 }
 
 type ControlPlaneStateImporter struct {
-	dynamicClient dynamic.Interface
+	dynamicClient  dynamic.Interface
+	resourceMapper meta.RESTMapper
 
 	options Options
 }
 
-func NewControlPlaneStateImporter(dynamicClient dynamic.Interface, opts Options) *ControlPlaneStateImporter {
+func NewControlPlaneStateImporter(dynamicClient dynamic.Interface, mapper meta.RESTMapper, opts Options) *ControlPlaneStateImporter {
 	return &ControlPlaneStateImporter{
-		dynamicClient: dynamicClient,
-		options:       opts,
+		dynamicClient:  dynamicClient,
+		resourceMapper: mapper,
+		options:        opts,
 	}
 }
 
@@ -47,7 +54,27 @@ func (i *ControlPlaneStateImporter) Import(ctx context.Context) error {
 
 	fs := afero.Afero{Fs: tarfs.New(tar.NewReader(ur))}
 
-	importer := NewUnstructuredImporter(NewFileSystemGetter(fs))
+	importer := NewUnstructuredImporter(NewFileSystemGetter(fs), NewTransformingResourceApplier(i.dynamicClient, i.resourceMapper, func(u *unstructured.Unstructured) {
+		paved := fieldpath.Pave(u.Object)
 
-	return importer.ImportResources(ctx)
+		for _, f := range []string{"generateName", "selfLink", "uid", "resourceVersion", "generation", "creationTimestamp", "ownerReferences", "managedFields"} {
+			err = paved.DeleteField(fmt.Sprintf("metadata.%s", f))
+			if err != nil {
+				// TODO(turkenh): proper error handling
+				panic(err)
+			}
+		}
+	}))
+
+	for _, gr := range []string{"namespaces", "configmaps", "secrets", "storeconfigs.secrets.crossplane.io", "deploymentruntimeconfigs.pkg.crossplane.io", "providers.pkg.crossplane.io", "compositionrevisions.apiextensions.crossplane.io", "compositions.apiextensions.crossplane.io", "compositeresourcedefinitions.apiextensions.crossplane.io"} {
+		if err = importer.ImportResources(ctx, schema.ParseGroupResource(gr)); err != nil {
+			return errors.Wrapf(err, "cannot import %q resources", gr)
+		}
+	}
+
+	// TODO(turkenh): Wait until all packages and XRDs are installed and healthy.
+
+	// TODO(turkenh): Import the rest of the resources.
+
+	return nil
 }
