@@ -132,5 +132,10 @@ func (e *UnstructuredFetcher) shouldSkip(r unstructured.Unstructured) bool {
 		}
 	}
 
+	if r.GetKind() == "Lock" && r.GetAPIVersion() == "pkg.crossplane.io/v1beta1" {
+		// We don't want to export package manager locks.
+		return true
+	}
+
 	return false
 }

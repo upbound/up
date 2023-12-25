@@ -11,7 +11,7 @@ import (
 	"strings"
 )
 
-const categoryPattern = `^_categories\/[a-z0-9]([-a-z0-9]*[a-z0-9])?$`
+const categoryPattern = `^[a-z]([-a-z0-9]*[a-z0-9])?$`
 const yamlPathPattern = `^(cluster|namespaces\/[a-z0-9]([-a-z0-9]*[a-z0-9])?)\/[a-z0-9]([-a-z0-9]*[a-z0-9])?(\.[a-z0-9]([-a-z0-9]*[a-z0-9])?)*\.yaml$`
 
 var (
@@ -41,7 +41,7 @@ func NewFileSystemReader(fs afero.Afero) *FileSystemReader {
 
 func (g *FileSystemReader) ReadResources(groupResource string) (categories []string, resources []unstructured.Unstructured, err error) {
 	err = g.fs.Walk(groupResource, func(path string, info fs.FileInfo, err error) error {
-		if info.IsDir() {
+		if info == nil || info.IsDir() {
 			return nil
 		}
 

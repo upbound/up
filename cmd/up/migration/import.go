@@ -35,5 +35,6 @@ func (c *importCmd) Run(ctx context.Context, migCtx *migration.Context) error {
 		return err
 	}
 
+	fmt.Println("Import Complete!")
 	return nil
 }

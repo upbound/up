@@ -16,6 +16,29 @@ import (
 	"os"
 )
 
+var (
+	coreResources = map[string]struct{}{
+		// Core Kubernetes resources
+		"namespaces": {},
+		"configmaps": {},
+		"secrets":    {},
+
+		// Crossplane resources
+		// Runtime
+		"controllerconfigs.pkg.crossplane.io":        {},
+		"deploymentruntimeconfigs.pkg.crossplane.io": {},
+		"storeconfigs.secrets.crossplane.io":         {},
+		// Compositions
+		"compositionrevisions.apiextensions.crossplane.io":         {},
+		"compositions.apiextensions.crossplane.io":                 {},
+		"compositeresourcedefinitions.apiextensions.crossplane.io": {},
+		// Packages
+		"providers.pkg.crossplane.io":      {},
+		"functions.pkg.crossplane.io":      {},
+		"configurations.pkg.crossplane.io": {},
+	}
+)
+
 type Options struct {
 	InputArchive string // default: xp-state.tar.gz
 }
@@ -54,7 +77,7 @@ func (i *ControlPlaneStateImporter) Import(ctx context.Context) error {
 
 	fs := afero.Afero{Fs: tarfs.New(tar.NewReader(ur))}
 
-	importer := NewTransformingResourceImporter(NewFileSystemReader(fs), NewUnstructuredResourceApplier(i.dynamicClient, i.resourceMapper), []ResourceTransformer{
+	r := NewTransformingResourceImporter(NewFileSystemReader(fs), NewUnstructuredResourceApplier(i.dynamicClient, i.resourceMapper), []ResourceTransformer{
 		func(u *unstructured.Unstructured) error {
 			paved := fieldpath.Pave(u.Object)
 
@@ -68,8 +91,8 @@ func (i *ControlPlaneStateImporter) Import(ctx context.Context) error {
 		},
 	})
 
-	for _, gr := range []string{"namespaces", "configmaps", "secrets", "storeconfigs.secrets.crossplane.io", "deploymentruntimeconfigs.pkg.crossplane.io", "providers.pkg.crossplane.io", "compositionrevisions.apiextensions.crossplane.io", "compositions.apiextensions.crossplane.io", "compositeresourcedefinitions.apiextensions.crossplane.io"} {
-		if err = importer.ImportResources(ctx, schema.ParseGroupResource(gr)); err != nil {
+	for gr := range coreResources {
+		if err = r.ImportResources(ctx, schema.ParseGroupResource(gr)); err != nil {
 			return errors.Wrapf(err, "cannot import %q resources", gr)
 		}
 	}
@@ -77,6 +100,24 @@ func (i *ControlPlaneStateImporter) Import(ctx context.Context) error {
 	// TODO(turkenh): Wait until all packages and XRDs are installed and healthy.
 
 	// TODO(turkenh): Import the rest of the resources.
+	grs, err := fs.ReadDir("/")
+	if err != nil {
+		return errors.Wrap(err, "cannot list group resources")
+	}
+	for _, gr := range grs {
+		if !gr.IsDir() {
+			return errors.Errorf("unexpected file %q in root directory of exported state", gr.Name())
+		}
+
+		if _, ok := coreResources[gr.Name()]; ok {
+			// We already imported core resources above.
+			continue
+		}
+
+		if err = r.ImportResources(ctx, schema.ParseGroupResource(gr.Name())); err != nil {
+			return errors.Wrapf(err, "cannot import %q resources", gr.Name())
+		}
+	}
 
 	return nil
 }

@@ -44,5 +44,6 @@ func (c *exportCmd) Run(ctx context.Context, migCtx *migration.Context) error {
 		return err
 	}
 
+	fmt.Println("Export complete!")
 	return nil
 }
