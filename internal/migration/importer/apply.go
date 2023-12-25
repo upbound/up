@@ -13,50 +13,20 @@ type ResourceApplier interface {
 	ApplyResources(ctx context.Context, resources []unstructured.Unstructured) error
 }
 
-type ResourceTransformer func(*unstructured.Unstructured)
-
-type TransformingResourceApplier struct {
+type UnstructuredResourceApplier struct {
 	dynamicClient  dynamic.Interface
 	resourceMapper meta.RESTMapper
-
-	transformers []ResourceTransformer
 }
 
-func NewTransformingResourceApplier(dynamicClient dynamic.Interface, resourceMapper meta.RESTMapper, transformers ...ResourceTransformer) *TransformingResourceApplier {
-	return &TransformingResourceApplier{
+func NewUnstructuredResourceApplier(dynamicClient dynamic.Interface, resourceMapper meta.RESTMapper) *UnstructuredResourceApplier {
+	return &UnstructuredResourceApplier{
 		dynamicClient:  dynamicClient,
 		resourceMapper: resourceMapper,
-		transformers:   transformers,
 	}
 }
 
-func (a *TransformingResourceApplier) ApplyResources(ctx context.Context, resources []unstructured.Unstructured) error {
+func (a *UnstructuredResourceApplier) ApplyResources(ctx context.Context, resources []unstructured.Unstructured) error {
 	for _, r := range resources {
-		if r.GetName() == "kube-root-ca.crt" {
-			// TODO: This is a hack to avoid applying the kube-root-ca.crt ConfigMap.
-			continue
-		}
-		if r.GetLabels() != nil && r.GetLabels()["app.kubernetes.io/managed-by"] == "Helm" {
-			// TODO: This is a hack to avoid applying Helm resources.
-			continue
-		}
-		if r.GetOwnerReferences() != nil {
-			ownedByPackageManager := false
-			for _, or := range r.GetOwnerReferences() {
-				if or.APIVersion == "pkg.crossplane.io/v1" {
-					ownedByPackageManager = true
-					break
-				}
-			}
-			if ownedByPackageManager {
-				// TODO: This is a hack to avoid applying resources owned by the package manager.
-				continue
-			}
-		}
-		for _, t := range a.transformers {
-			t(&r)
-		}
-
 		rm, err := a.resourceMapper.RESTMapping(r.GroupVersionKind().GroupKind(), r.GroupVersionKind().Version)
 		if err != nil {
 			return errors.Wrap(err, "cannot get REST mapping for resource")

@@ -54,17 +54,19 @@ func (i *ControlPlaneStateImporter) Import(ctx context.Context) error {
 
 	fs := afero.Afero{Fs: tarfs.New(tar.NewReader(ur))}
 
-	importer := NewUnstructuredImporter(NewFileSystemGetter(fs), NewTransformingResourceApplier(i.dynamicClient, i.resourceMapper, func(u *unstructured.Unstructured) {
-		paved := fieldpath.Pave(u.Object)
+	importer := NewTransformingResourceImporter(NewFileSystemReader(fs), NewUnstructuredResourceApplier(i.dynamicClient, i.resourceMapper), []ResourceTransformer{
+		func(u *unstructured.Unstructured) error {
+			paved := fieldpath.Pave(u.Object)
 
-		for _, f := range []string{"generateName", "selfLink", "uid", "resourceVersion", "generation", "creationTimestamp", "ownerReferences", "managedFields"} {
-			err = paved.DeleteField(fmt.Sprintf("metadata.%s", f))
-			if err != nil {
-				// TODO(turkenh): proper error handling
-				panic(err)
+			for _, f := range []string{"generateName", "selfLink", "uid", "resourceVersion", "generation", "creationTimestamp", "ownerReferences", "managedFields"} {
+				err = paved.DeleteField(fmt.Sprintf("metadata.%s", f))
+				if err != nil {
+					return errors.Wrapf(err, "cannot delete %q field", f)
+				}
 			}
-		}
-	}))
+			return nil
+		},
+	})
 
 	for _, gr := range []string{"namespaces", "configmaps", "secrets", "storeconfigs.secrets.crossplane.io", "deploymentruntimeconfigs.pkg.crossplane.io", "providers.pkg.crossplane.io", "compositionrevisions.apiextensions.crossplane.io", "compositions.apiextensions.crossplane.io", "compositeresourcedefinitions.apiextensions.crossplane.io"} {
 		if err = importer.ImportResources(ctx, schema.ParseGroupResource(gr)); err != nil {

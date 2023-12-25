@@ -5,6 +5,7 @@ import (
 	"github.com/crossplane/crossplane-runtime/pkg/errors"
 	"github.com/spf13/afero"
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
+	"os"
 	"path/filepath"
 	"sigs.k8s.io/yaml"
 )
@@ -34,30 +35,23 @@ func (p *FileSystemPersister) pathFor(dirs ...string) string {
 }
 
 func (p *FileSystemPersister) PersistResources(_ context.Context, groupResource string, resources []unstructured.Unstructured) error {
-	linker, linkCategories := p.fs.Fs.(afero.Linker)
-	if linkCategories {
-		// Create directories for all categories if they don't exist.
-		// We will only need the directories if we are going to create symlinks.
-		for _, c := range p.categories {
-			if err := p.fs.MkdirAll(p.pathFor("_categories", c), 0700); err != nil {
-				return errors.Wrapf(err, "cannot create directory %q for category %q", filepath.Join(p.root, c), c)
-			}
+	if len(resources) == 0 {
+		return nil
+	}
+
+	if err := p.fs.MkdirAll(p.pathFor(groupResource), 0700); err != nil {
+		return errors.Wrapf(err, "cannot create directory resource group", groupResource)
+	}
+
+	for _, c := range p.categories {
+		f, err := p.fs.OpenFile(p.pathFor(groupResource, c), os.O_RDONLY|os.O_CREATE, 0600)
+		if err != nil {
+			return errors.Wrapf(err, "cannot touch category file %q", c)
 		}
+		_ = f.Close()
 	}
 
 	for _, r := range resources {
-		if err := p.fs.MkdirAll(p.pathFor(groupResource), 0700); err != nil {
-			return errors.Wrapf(err, "cannot create directory %q for resource %q", groupResource, r.GetName())
-		}
-
-		if linkCategories {
-			for _, c := range p.categories {
-				if err := linker.SymlinkIfPossible(filepath.Join("../..", groupResource), p.pathFor("_categories", c, groupResource)); err != nil {
-					return errors.Wrapf(err, "cannot create symlink for resources %q in category %q", groupResource, c)
-				}
-			}
-		}
-
 		fileDirPath := p.pathFor(groupResource, "cluster")
 		if r.GetNamespace() != "" {
 			fileDirPath = p.pathFor(groupResource, "namespaces", r.GetNamespace())
