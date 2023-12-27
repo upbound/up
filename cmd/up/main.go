@@ -17,10 +17,11 @@ package main
 import (
 	"context"
 	"fmt"
-	"github.com/upbound/up/cmd/up/migration"
 	"io"
 	"os"
 	"os/signal"
+
+	"github.com/upbound/up/cmd/up/migration"
 
 	"github.com/alecthomas/kong"
 	"github.com/pterm/pterm"
