@@ -16,6 +16,7 @@ package importer
 
 import (
 	"context"
+	"github.com/crossplane/crossplane-runtime/pkg/resource"
 
 	"github.com/crossplane/crossplane-runtime/pkg/errors"
 	"k8s.io/apimachinery/pkg/api/meta"
@@ -47,12 +48,26 @@ func (a *UnstructuredResourceApplier) ApplyResources(ctx context.Context, resour
 			return errors.Wrap(err, "cannot get REST mapping for resource")
 		}
 
+		rs := r.DeepCopy()
 		_, err = a.dynamicClient.Resource(rm.Resource).Namespace(r.GetNamespace()).Apply(ctx, r.GetName(), &r, v1.ApplyOptions{
 			FieldManager: "up-controlplane-migrator",
 			Force:        true,
 		})
 
-		return errors.Wrapf(err, "cannot apply resource %q", r.GetName())
+		if err != nil {
+			return errors.Wrapf(err, "cannot apply resource %q", r.GetName())
+		}
+
+		_, err = a.dynamicClient.Resource(rm.Resource).Namespace(r.GetNamespace()).ApplyStatus(ctx, rs.GetName(), rs, v1.ApplyOptions{
+			FieldManager: "up-controlplane-migrator",
+			Force:        true,
+		})
+		// TODO(turkenh): Not all resources have status subresource, and we will get a NotFound error for those.
+		// 	This is why we ignore NotFound errors here. Alternatively, we can check if the resource has a status
+		// 	subresource before applying the status.
+		if resource.IgnoreNotFound(err) != nil {
+			return errors.Wrapf(err, "cannot apply resource %q", r.GetName())
+		}
 	}
 
 	return nil

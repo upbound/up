@@ -37,25 +37,25 @@ import (
 )
 
 var (
-	coreResources = map[string]struct{}{
+	baseResources = []string{
 		// Core Kubernetes resources
-		"namespaces": {},
-		"configmaps": {},
-		"secrets":    {},
+		"namespaces",
+		"configmaps",
+		"secrets",
 
 		// Crossplane resources
 		// Runtime
-		"controllerconfigs.pkg.crossplane.io":        {},
-		"deploymentruntimeconfigs.pkg.crossplane.io": {},
-		"storeconfigs.secrets.crossplane.io":         {},
+		"controllerconfigs.pkg.crossplane.io",
+		"deploymentruntimeconfigs.pkg.crossplane.io",
+		"storeconfigs.secrets.crossplane.io",
 		// Compositions
-		"compositionrevisions.apiextensions.crossplane.io":         {},
-		"compositions.apiextensions.crossplane.io":                 {},
-		"compositeresourcedefinitions.apiextensions.crossplane.io": {},
+		"compositionrevisions.apiextensions.crossplane.io",
+		"compositions.apiextensions.crossplane.io",
+		"compositeresourcedefinitions.apiextensions.crossplane.io",
 		// Packages
-		"providers.pkg.crossplane.io":      {},
-		"functions.pkg.crossplane.io":      {},
-		"configurations.pkg.crossplane.io": {},
+		"providers.pkg.crossplane.io",
+		"functions.pkg.crossplane.io",
+		"configurations.pkg.crossplane.io",
 	}
 )
 
@@ -111,8 +111,8 @@ func (i *ControlPlaneStateImporter) Import(ctx context.Context) error {
 		},
 	})
 
-	fmt.Println("Importing core resources")
-	for gr := range coreResources {
+	fmt.Println("Importing base resources")
+	for _, gr := range baseResources {
 		if err = r.ImportResources(ctx, schema.ParseGroupResource(gr)); err != nil {
 			return errors.Wrapf(err, "cannot import %q resources", gr)
 		}
@@ -148,8 +148,8 @@ func (i *ControlPlaneStateImporter) Import(ctx context.Context) error {
 			return errors.Errorf("unexpected file %q in root directory of exported state", gr.Name())
 		}
 
-		if _, ok := coreResources[gr.Name()]; ok {
-			// We already imported core resources above.
+		if isBaseResource(gr.Name()) {
+			// We already imported base resources above.
 			continue
 		}
 
@@ -159,6 +159,15 @@ func (i *ControlPlaneStateImporter) Import(ctx context.Context) error {
 	}
 
 	return nil
+}
+
+func isBaseResource(gr string) bool {
+	for _, k := range baseResources {
+		if k == gr {
+			return true
+		}
+	}
+	return false
 }
 
 func (i *ControlPlaneStateImporter) waitForConditions(ctx context.Context, gk schema.GroupKind, conditions []xpv1.ConditionType) error {

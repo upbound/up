@@ -87,5 +87,5 @@ func (g *FileSystemReader) ReadResources(groupResource string) (categories []str
 		return nil, nil, errors.Wrapf(err, "cannot walk directory for resource group %q", groupResource)
 	}
 
-	return nil, resources, nil
+	return categories, resources, nil
 }

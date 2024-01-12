@@ -16,9 +16,9 @@ package importer
 
 import (
 	"context"
+	"github.com/crossplane/crossplane-runtime/pkg/meta"
 
 	"github.com/crossplane/crossplane-runtime/pkg/errors"
-	"github.com/crossplane/crossplane-runtime/pkg/meta"
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 	"k8s.io/apimachinery/pkg/runtime/schema"
 )
@@ -50,17 +50,16 @@ func (i *TransformingResourceImporter) ImportResources(ctx context.Context, gr s
 		return errors.Wrapf(err, "cannot get %q resources", gr.String())
 	}
 
-	isManaged := false
+	shouldPause := false
 	for _, c := range categories {
-		if c == "managed" {
-			isManaged = true
-			break
+		if c == "managed" || c == "claim" || c == "composite" {
+			shouldPause = true
 		}
 	}
 
-	t := i.transformers
-	if isManaged {
-		t = append(t, func(r *unstructured.Unstructured) error {
+	allTransformers := i.transformers
+	if shouldPause {
+		allTransformers = append(allTransformers, func(r *unstructured.Unstructured) error {
 			meta.AddAnnotations(r, map[string]string{
 				"crossplane.io/paused": "true",
 			})
@@ -69,7 +68,7 @@ func (i *TransformingResourceImporter) ImportResources(ctx context.Context, gr s
 	}
 
 	for _, r := range resources {
-		for _, t := range i.transformers {
+		for _, t := range allTransformers {
 			if err = t(&r); err != nil {
 				return errors.Wrapf(err, "cannot transform resource %q for import", r.GetName())
 			}

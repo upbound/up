@@ -16,6 +16,7 @@ package exporter
 
 import (
 	"context"
+	"strings"
 
 	"github.com/crossplane/crossplane-runtime/pkg/errors"
 	"github.com/crossplane/crossplane-runtime/pkg/fieldpath"
@@ -133,7 +134,7 @@ func (e *UnstructuredFetcher) shouldSkip(r unstructured.Unstructured) bool {
 	if r.GetOwnerReferences() != nil {
 		ownedByPackageManager := false
 		for _, or := range r.GetOwnerReferences() {
-			if or.APIVersion == "pkg.crossplane.io/v1" {
+			if strings.HasPrefix(or.APIVersion, "pkg.crossplane.io") {
 				ownedByPackageManager = true
 				break
 			}

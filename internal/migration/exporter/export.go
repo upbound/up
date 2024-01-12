@@ -201,15 +201,17 @@ func (e *ControlPlaneStateExporter) shouldExport(in apiextensionsv1.CustomResour
 }
 
 func (e *ControlPlaneStateExporter) customResourceGVR(in apiextensionsv1.CustomResourceDefinition) (schema.GroupVersionResource, error) {
-	versions := make([]string, 0, len(in.Spec.Versions))
+	version := ""
 	for _, vr := range in.Spec.Versions {
-		versions = append(versions, vr.Name)
+		if vr.Storage {
+			version = vr.Name
+		}
 	}
 
 	rm, err := e.resourceMapper.RESTMapping(schema.GroupKind{
 		Group: in.Spec.Group,
 		Kind:  in.Spec.Names.Kind,
-	}, versions...)
+	}, version)
 
 	if err != nil {
 		return schema.GroupVersionResource{}, errors.Wrapf(err, "cannot get REST mapping for %q", in.GetName())
