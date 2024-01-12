@@ -22,7 +22,7 @@ import (
 )
 
 type ResourceExporter interface {
-	ExportResources(ctx context.Context, gvr schema.GroupVersionResource) error
+	ExportResources(ctx context.Context, gvr schema.GroupVersionResource) (count int, err error)
 }
 
 type UnstructuredExporter struct {
@@ -37,15 +37,15 @@ func NewUnstructuredExporter(f ResourceFetcher, p ResourcePersister) *Unstructur
 	}
 }
 
-func (e *UnstructuredExporter) ExportResources(ctx context.Context, gvr schema.GroupVersionResource) error {
+func (e *UnstructuredExporter) ExportResources(ctx context.Context, gvr schema.GroupVersionResource) (int, error) {
 	resources, err := e.fetcher.FetchResources(ctx, gvr)
 	if err != nil {
-		return errors.Wrap(err, "cannot fetch resources")
+		return 0, errors.Wrap(err, "cannot fetch resources")
 	}
 
 	if err = e.persister.PersistResources(ctx, gvr.GroupResource().String(), resources); err != nil {
-		return errors.Wrap(err, "cannot persist resources")
+		return 0, errors.Wrap(err, "cannot persist resources")
 	}
 
-	return nil
+	return len(resources), nil
 }

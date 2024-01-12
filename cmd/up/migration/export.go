@@ -16,7 +16,6 @@ package migration
 
 import (
 	"context"
-	"fmt"
 
 	apiextensionsclientset "k8s.io/apiextensions-apiserver/pkg/client/clientset/clientset"
 	"k8s.io/client-go/discovery"
@@ -32,8 +31,6 @@ type exportCmd struct {
 }
 
 func (c *exportCmd) Run(ctx context.Context, migCtx *migration.Context) error {
-	fmt.Println("Exporting ...")
-
 	cfg := migCtx.Kubeconfig
 
 	crdClient, err := apiextensionsclientset.NewForConfig(cfg)
@@ -59,7 +56,5 @@ func (c *exportCmd) Run(ctx context.Context, migCtx *migration.Context) error {
 	if err = e.Export(ctx); err != nil {
 		return err
 	}
-
-	fmt.Println("Export complete!")
 	return nil
 }

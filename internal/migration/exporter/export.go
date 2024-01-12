@@ -16,11 +16,12 @@ package exporter
 
 import (
 	"context"
+	"fmt"
 	"strings"
 
-	"github.com/mholt/archiver/v4"
-
 	"github.com/crossplane/crossplane-runtime/pkg/errors"
+	"github.com/mholt/archiver/v4"
+	"github.com/pterm/pterm"
 	"github.com/spf13/afero"
 	apiextensionsv1 "k8s.io/apiextensions-apiserver/pkg/apis/apiextensions/v1"
 	apiextensionsclientset "k8s.io/apiextensions-apiserver/pkg/client/clientset/clientset"
@@ -28,6 +29,8 @@ import (
 	v1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/client-go/dynamic"
+
+	"github.com/upbound/up/internal/upterm"
 )
 
 type Options struct {
@@ -59,6 +62,11 @@ func NewControlPlaneStateExporter(crdClient apiextensionsclientset.Interface, dy
 }
 
 func (e *ControlPlaneStateExporter) Export(ctx context.Context) error {
+	pterm.EnableStyling()
+	upterm.DefaultObjPrinter.Pretty = true
+
+	pterm.Info.Println("Exporting control plane state...")
+
 	fs := afero.Afero{Fs: afero.NewOsFs()}
 	tmpDir, err := fs.TempDir("", "up")
 	if err != nil {
@@ -68,7 +76,61 @@ func (e *ControlPlaneStateExporter) Export(ctx context.Context) error {
 		_ = fs.RemoveAll(tmpDir)
 	}()
 
+	// Scan the control plane for types to export.
+	scanMsg := "Scanning control plane for types to export... "
+	s, _ := upterm.EyesInfoSpinner.Start(scanMsg)
+	crdList, err := fetchAllCRDs(ctx, e.crdClient)
+	if err != nil {
+		s.Fail(scanMsg + "Failed!")
+		return errors.Wrap(err, "cannot fetch CRDs")
+	}
+	exportList := make([]apiextensionsv1.CustomResourceDefinition, 0, len(crdList))
+	for _, crd := range crdList {
+		if !e.shouldExport(crd) {
+			// Ignore CRDs that we don't want to export.
+			continue
+		}
+		exportList = append(exportList, crd)
+	}
+	s.Info(scanMsg + fmt.Sprintf("%d types found!", len(exportList)))
+	//////////////////////
+
+	// Export Crossplane resources.
+	crCounts := make(map[string]int, len(crdList))
+	exportCRsMsg := "Exporting Crossplane resources... "
+	s, _ = upterm.CheckmarkSuccessSpinner.Start(exportCRsMsg + fmt.Sprintf("0 / %d", len(crdList)))
+	for i, crd := range crdList {
+		gvr, err := e.customResourceGVR(crd)
+		if err != nil {
+			s.Fail(exportCRsMsg + "Failed!")
+			return errors.Wrapf(err, "cannot get GVR for %q", crd.GetName())
+		}
+
+		s.UpdateText(fmt.Sprintf("(%d / %d) Exporting %s...", i, len(crdList), gvr.GroupResource()))
+
+		exporter := NewUnstructuredExporter(
+			NewUnstructuredFetcher(e.dynamicClient, e.options),
+			NewFileSystemPersister(fs, tmpDir, crd.Spec.Names.Categories))
+
+		count, err := exporter.ExportResources(ctx, gvr)
+		if err != nil {
+			s.Fail(exportCRsMsg + "Failed!")
+			return errors.Wrapf(err, "cannot export resources for %q", crd.GetName())
+		}
+		crCounts[gvr.GroupResource().String()] = count
+	}
+
+	total := 0
+	for _, count := range crCounts {
+		total += count
+	}
+	s.Success(exportCRsMsg + fmt.Sprintf("%d resources exported!", total))
+	//////////////////////
+
 	// Export native resources.
+	exportNativeMsg := "Exporting native resources... "
+	s, _ = upterm.CheckmarkSuccessSpinner.Start(exportNativeMsg + fmt.Sprintf("0 / %d", len(e.options.IncludedResources)))
+	nativeCounts := make(map[string]int, len(e.options.IncludedResources))
 	for _, r := range e.options.IncludedResources {
 		// TODO(turkenh): Proper parsing / resolving resources to GVRs.
 		gvr := schema.GroupVersionResource{
@@ -80,38 +142,32 @@ func (e *ControlPlaneStateExporter) Export(ctx context.Context) error {
 			NewUnstructuredFetcher(e.dynamicClient, e.options),
 			NewFileSystemPersister(fs, tmpDir, nil))
 
-		if err = exporter.ExportResources(ctx, gvr); err != nil {
+		count, err := exporter.ExportResources(ctx, gvr)
+		if _, err = exporter.ExportResources(ctx, gvr); err != nil {
+			s.Fail(exportNativeMsg + "Failed!")
 			return errors.Wrapf(err, "cannot export resources for %q", r)
 		}
+		nativeCounts[gvr.Resource] = count
 	}
-
-	// Export custom resources.
-	crdList, err := fetchAllCRDs(ctx, e.crdClient)
-	if err != nil {
-		return errors.Wrap(err, "cannot fetch CRDs")
+	total = 0
+	for _, count := range nativeCounts {
+		total += count
 	}
-	for _, crd := range crdList {
-		if !e.shouldExport(crd) {
-			// Ignore CRDs that we don't want to export.
-			continue
-		}
-
-		gvr, err := e.customResourceGVR(crd)
-		if err != nil {
-			return errors.Wrapf(err, "cannot get GVR for %q", crd.GetName())
-		}
-
-		exporter := NewUnstructuredExporter(
-			NewUnstructuredFetcher(e.dynamicClient, e.options),
-			NewFileSystemPersister(fs, tmpDir, crd.Spec.Names.Categories))
-
-		if err = exporter.ExportResources(ctx, gvr); err != nil {
-			return errors.Wrapf(err, "cannot export resources for %q", crd.GetName())
-		}
-	}
+	s.Success(exportNativeMsg + fmt.Sprintf("%d resources exported!", total))
+	//////////////////////
 
 	// Archive the exported state.
-	return e.archive(ctx, fs, tmpDir)
+	archiveMsg := "Archiving exported state... "
+	s, _ = upterm.ArchiveSuccessSpinner.Start(archiveMsg)
+	if err = e.archive(ctx, fs, tmpDir); err != nil {
+		s.Fail(archiveMsg + "Failed!")
+		return errors.Wrap(err, "cannot archive exported state")
+	}
+	s.Success(archiveMsg + fmt.Sprintf("archived to %q!", e.options.OutputArchive))
+	//////////////////////
+
+	pterm.Success.Println("Successfully exported control plane state!")
+	return nil
 }
 
 func (e *ControlPlaneStateExporter) shouldExport(in apiextensionsv1.CustomResourceDefinition) bool {

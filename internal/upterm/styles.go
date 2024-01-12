@@ -36,6 +36,7 @@ var (
 
 	CheckmarkSuccessSpinner = pterm.DefaultSpinner.WithStyle(spinnerStyle).WithMessageStyle(msgStyle)
 	EyesInfoSpinner         = pterm.DefaultSpinner.WithStyle(spinnerStyle).WithMessageStyle(msgStyle)
+	ArchiveSuccessSpinner   = pterm.DefaultSpinner.WithStyle(spinnerStyle).WithMessageStyle(msgStyle)
 
 	ComponentText = pterm.DefaultBasicText.WithStyle(&pterm.ThemeDefault.TreeTextStyle)
 
@@ -51,11 +52,20 @@ var (
 		MessageStyle: &pterm.Style{pterm.FgDefault},
 		Prefix:       EyesPrefix,
 	}
+
+	ap = &pterm.PrefixPrinter{
+		MessageStyle: &pterm.Style{pterm.FgDefault},
+		Prefix: pterm.Prefix{
+			Style: &pterm.Style{pterm.FgLightMagenta},
+			Text:  " 📦",
+		},
+	}
 )
 
 func init() {
 	CheckmarkSuccessSpinner.SuccessPrinter = cp
 	EyesInfoSpinner.InfoPrinter = ip
+	ArchiveSuccessSpinner.SuccessPrinter = ap
 }
 
 func WrapWithSuccessSpinner(msg string, spinner *pterm.SpinnerPrinter, f func() error) error {
