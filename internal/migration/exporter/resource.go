@@ -16,6 +16,10 @@ package exporter
 
 import (
 	"context"
+	"fmt"
+
+	"github.com/crossplane/crossplane-runtime/pkg/fieldpath"
+	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 
 	"github.com/crossplane/crossplane-runtime/pkg/errors"
 	"k8s.io/apimachinery/pkg/runtime/schema"
@@ -43,9 +47,28 @@ func (e *UnstructuredExporter) ExportResources(ctx context.Context, gvr schema.G
 		return 0, errors.Wrap(err, "cannot fetch resources")
 	}
 
+	for i := range resources {
+		if err := cleanupClusterSpecificData(&resources[i]); err != nil {
+			return 0, errors.Wrap(err, "cannot cleanup cluster specific data")
+		}
+	}
+
 	if err = e.persister.PersistResources(ctx, gvr.GroupResource().String(), resources); err != nil {
 		return 0, errors.Wrap(err, "cannot persist resources")
 	}
 
 	return len(resources), nil
+}
+
+func cleanupClusterSpecificData(u *unstructured.Unstructured) error {
+	paved := fieldpath.Pave(u.Object)
+
+	for _, f := range []string{"generateName", "selfLink", "uid", "resourceVersion", "generation", "creationTimestamp", "ownerReferences", "managedFields"} {
+		err := paved.DeleteField(fmt.Sprintf("metadata.%s", f))
+		if err != nil {
+			return errors.Wrapf(err, "cannot delete %q field", f)
+		}
+	}
+
+	return nil
 }

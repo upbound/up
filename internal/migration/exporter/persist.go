@@ -55,7 +55,7 @@ func (p *FileSystemPersister) PersistResources(_ context.Context, groupResource 
 	}
 
 	if err := p.fs.MkdirAll(p.pathFor(groupResource), 0700); err != nil {
-		return errors.Wrapf(err, "cannot create directory resource group", groupResource)
+		return errors.Wrapf(err, "cannot create directory resource group %q", groupResource)
 	}
 
 	for _, c := range p.categories {
@@ -66,22 +66,22 @@ func (p *FileSystemPersister) PersistResources(_ context.Context, groupResource 
 		_ = f.Close()
 	}
 
-	for _, r := range resources {
+	for i := range resources {
 		fileDirPath := p.pathFor(groupResource, "cluster")
-		if r.GetNamespace() != "" {
-			fileDirPath = p.pathFor(groupResource, "namespaces", r.GetNamespace())
+		if resources[i].GetNamespace() != "" {
+			fileDirPath = p.pathFor(groupResource, "namespaces", resources[i].GetNamespace())
 		}
 
 		if err := p.fs.MkdirAll(fileDirPath, 0700); err != nil {
-			return errors.Wrapf(err, "cannot create directory %q for resource %q", groupResource, r.GetName())
+			return errors.Wrapf(err, "cannot create directory %q for resource %q", groupResource, resources[i].GetName())
 		}
 
-		b, err := yaml.Marshal(&r)
+		b, err := yaml.Marshal(&resources[i])
 		if err != nil {
 			return errors.Wrap(err, "cannot marshal resource to yaml")
 		}
 
-		f := filepath.Join(fileDirPath, r.GetName()+".yaml")
+		f := filepath.Join(fileDirPath, resources[i].GetName()+".yaml")
 		err = p.fs.WriteFile(f, b, 0600)
 		if err != nil {
 			return errors.Wrapf(err, "cannot write resource to %q", f)

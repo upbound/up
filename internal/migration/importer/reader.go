@@ -54,8 +54,8 @@ func NewFileSystemReader(fs afero.Afero) *FileSystemReader {
 	}
 }
 
-func (g *FileSystemReader) ReadResources(groupResource string) (categories []string, resources []unstructured.Unstructured, err error) {
-	err = g.fs.Walk(groupResource, func(path string, info fs.FileInfo, err error) error {
+func (g *FileSystemReader) ReadResources(groupResource string) (categories []string, resources []unstructured.Unstructured, rErr error) {
+	rErr = g.fs.Walk(groupResource, func(path string, info fs.FileInfo, _ error) error {
 		if info == nil || info.IsDir() {
 			return nil
 		}
@@ -83,8 +83,8 @@ func (g *FileSystemReader) ReadResources(groupResource string) (categories []str
 		resources = append(resources, r)
 		return nil
 	})
-	if err != nil {
-		return nil, nil, errors.Wrapf(err, "cannot walk directory for resource group %q", groupResource)
+	if rErr != nil {
+		return nil, nil, errors.Wrapf(rErr, "cannot walk directory for resource group %q", groupResource)
 	}
 
 	return categories, resources, nil

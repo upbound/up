@@ -16,7 +16,6 @@ package migration
 
 import (
 	"context"
-	"fmt"
 
 	"k8s.io/client-go/discovery"
 	"k8s.io/client-go/discovery/cached/memory"
@@ -31,8 +30,6 @@ type importCmd struct {
 }
 
 func (c *importCmd) Run(ctx context.Context, migCtx *migration.Context) error {
-	fmt.Println("Importing ...")
-
 	cfg := migCtx.Kubeconfig
 	dynamicClient, err := dynamic.NewForConfig(cfg)
 	if err != nil {
@@ -51,6 +48,5 @@ func (c *importCmd) Run(ctx context.Context, migCtx *migration.Context) error {
 		return err
 	}
 
-	fmt.Println("Import Complete!")
 	return nil
 }

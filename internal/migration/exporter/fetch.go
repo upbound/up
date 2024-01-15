@@ -101,7 +101,7 @@ func (e *UnstructuredFetcher) namespaceInScope(namespace string) bool {
 	return true
 }
 
-func (e *UnstructuredFetcher) shouldSkip(r unstructured.Unstructured) bool {
+func (e *UnstructuredFetcher) shouldSkip(r unstructured.Unstructured) bool { // nolint:gocyclo // Relatively simple logic.
 	// Filter out namespaces that are not in the scope.
 	// - If the resource is a Namespace and its name is not in the scope, skip it.
 	// - If the resource is namespaced and its namespace is in the scope, skip it.

@@ -16,6 +16,7 @@ package importer
 
 import (
 	"context"
+
 	"github.com/crossplane/crossplane-runtime/pkg/resource"
 
 	"github.com/crossplane/crossplane-runtime/pkg/errors"
@@ -42,23 +43,22 @@ func NewUnstructuredResourceApplier(dynamicClient dynamic.Interface, resourceMap
 }
 
 func (a *UnstructuredResourceApplier) ApplyResources(ctx context.Context, resources []unstructured.Unstructured) error {
-	for _, r := range resources {
-		rm, err := a.resourceMapper.RESTMapping(r.GroupVersionKind().GroupKind(), r.GroupVersionKind().Version)
+	for i := range resources {
+		rm, err := a.resourceMapper.RESTMapping(resources[i].GroupVersionKind().GroupKind(), resources[i].GroupVersionKind().Version)
 		if err != nil {
 			return errors.Wrap(err, "cannot get REST mapping for resource")
 		}
 
-		rs := r.DeepCopy()
-		_, err = a.dynamicClient.Resource(rm.Resource).Namespace(r.GetNamespace()).Apply(ctx, r.GetName(), &r, v1.ApplyOptions{
+		rs := resources[i].DeepCopy()
+		_, err = a.dynamicClient.Resource(rm.Resource).Namespace(resources[i].GetNamespace()).Apply(ctx, resources[i].GetName(), &resources[i], v1.ApplyOptions{
 			FieldManager: "up-controlplane-migrator",
 			Force:        true,
 		})
-
 		if err != nil {
-			return errors.Wrapf(err, "cannot apply resource %q", r.GetName())
+			return errors.Wrapf(err, "cannot apply resource %q", resources[i].GetName())
 		}
 
-		_, err = a.dynamicClient.Resource(rm.Resource).Namespace(r.GetNamespace()).ApplyStatus(ctx, rs.GetName(), rs, v1.ApplyOptions{
+		_, err = a.dynamicClient.Resource(rm.Resource).Namespace(resources[i].GetNamespace()).ApplyStatus(ctx, rs.GetName(), rs, v1.ApplyOptions{
 			FieldManager: "up-controlplane-migrator",
 			Force:        true,
 		})
@@ -66,7 +66,7 @@ func (a *UnstructuredResourceApplier) ApplyResources(ctx context.Context, resour
 		// 	This is why we ignore NotFound errors here. Alternatively, we can check if the resource has a status
 		// 	subresource before applying the status.
 		if resource.IgnoreNotFound(err) != nil {
-			return errors.Wrapf(err, "cannot apply resource %q", r.GetName())
+			return errors.Wrapf(err, "cannot apply resource %q", resources[i].GetName())
 		}
 	}
 

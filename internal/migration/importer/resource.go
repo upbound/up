@@ -16,68 +16,48 @@ package importer
 
 import (
 	"context"
+
 	"github.com/crossplane/crossplane-runtime/pkg/meta"
 
 	"github.com/crossplane/crossplane-runtime/pkg/errors"
-	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
-	"k8s.io/apimachinery/pkg/runtime/schema"
 )
 
 type ResourceImporter interface {
-	ImportResources(ctx context.Context, gvr schema.GroupVersionResource) error
+	ImportResources(ctx context.Context, gr string) (int, error)
 }
 
-type ResourceTransformer func(*unstructured.Unstructured) error
-
-type TransformingResourceImporter struct {
+type PausingResourceImporter struct {
 	reader  ResourceReader
 	applier ResourceApplier
-
-	transformers []ResourceTransformer
 }
 
-func NewTransformingResourceImporter(r ResourceReader, a ResourceApplier, t []ResourceTransformer) *TransformingResourceImporter {
-	return &TransformingResourceImporter{
-		reader:       r,
-		applier:      a,
-		transformers: t,
+func NewPausingResourceImporter(r ResourceReader, a ResourceApplier) *PausingResourceImporter {
+	return &PausingResourceImporter{
+		reader:  r,
+		applier: a,
 	}
 }
 
-func (i *TransformingResourceImporter) ImportResources(ctx context.Context, gr schema.GroupResource) error {
-	categories, resources, err := i.reader.ReadResources(gr.String())
+func (im *PausingResourceImporter) ImportResources(ctx context.Context, gr string) (int, error) {
+	categories, resources, err := im.reader.ReadResources(gr)
 	if err != nil {
-		return errors.Wrapf(err, "cannot get %q resources", gr.String())
+		return 0, errors.Wrapf(err, "cannot get %q resources", gr)
 	}
 
-	shouldPause := false
 	for _, c := range categories {
 		if c == "managed" || c == "claim" || c == "composite" {
-			shouldPause = true
-		}
-	}
-
-	allTransformers := i.transformers
-	if shouldPause {
-		allTransformers = append(allTransformers, func(r *unstructured.Unstructured) error {
-			meta.AddAnnotations(r, map[string]string{
-				"crossplane.io/paused": "true",
-			})
-			return nil
-		})
-	}
-
-	for _, r := range resources {
-		for _, t := range allTransformers {
-			if err = t(&r); err != nil {
-				return errors.Wrapf(err, "cannot transform resource %q for import", r.GetName())
+			for i := range resources {
+				meta.AddAnnotations(&resources[i], map[string]string{
+					"crossplane.io/paused": "true",
+				})
 			}
+			break
 		}
 	}
 
-	if err := i.applier.ApplyResources(ctx, resources); err != nil {
-		return errors.Wrapf(err, "cannot apply %q resources", gr.String())
+	if err := im.applier.ApplyResources(ctx, resources); err != nil {
+		return 0, errors.Wrapf(err, "cannot apply %q resources", gr)
 	}
 
-	return nil
+	return len(resources), nil
 }

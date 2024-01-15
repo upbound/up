@@ -61,11 +61,11 @@ func NewControlPlaneStateExporter(crdClient apiextensionsclientset.Interface, dy
 	}
 }
 
-func (e *ControlPlaneStateExporter) Export(ctx context.Context) error {
+func (e *ControlPlaneStateExporter) Export(ctx context.Context) error { // nolint:gocyclo // This is the high level export command, so it's expected to be a bit complex.
 	pterm.EnableStyling()
 	upterm.DefaultObjPrinter.Pretty = true
 
-	pterm.Info.Println("Exporting control plane state...")
+	fmt.Println("Exporting control plane state...")
 
 	fs := afero.Afero{Fs: afero.NewOsFs()}
 	tmpDir, err := fs.TempDir("", "up")
@@ -78,7 +78,7 @@ func (e *ControlPlaneStateExporter) Export(ctx context.Context) error {
 
 	// Scan the control plane for types to export.
 	scanMsg := "Scanning control plane for types to export... "
-	s, _ := upterm.EyesInfoSpinner.Start(scanMsg)
+	s, _ := upterm.CheckmarkSuccessSpinner.Start(scanMsg)
 	crdList, err := fetchAllCRDs(ctx, e.crdClient)
 	if err != nil {
 		s.Fail(scanMsg + "Failed!")
@@ -92,7 +92,7 @@ func (e *ControlPlaneStateExporter) Export(ctx context.Context) error {
 		}
 		exportList = append(exportList, crd)
 	}
-	s.Info(scanMsg + fmt.Sprintf("%d types found!", len(exportList)))
+	s.Success(scanMsg + fmt.Sprintf("%d types found! 👀", len(exportList)))
 	//////////////////////
 
 	// Export Crossplane resources.
@@ -124,7 +124,7 @@ func (e *ControlPlaneStateExporter) Export(ctx context.Context) error {
 	for _, count := range crCounts {
 		total += count
 	}
-	s.Success(exportCRsMsg + fmt.Sprintf("%d resources exported!", total))
+	s.Success(exportCRsMsg + fmt.Sprintf("%d resources exported! 📤", total))
 	//////////////////////
 
 	// Export native resources.
@@ -143,7 +143,7 @@ func (e *ControlPlaneStateExporter) Export(ctx context.Context) error {
 			NewFileSystemPersister(fs, tmpDir, nil))
 
 		count, err := exporter.ExportResources(ctx, gvr)
-		if _, err = exporter.ExportResources(ctx, gvr); err != nil {
+		if err != nil {
 			s.Fail(exportNativeMsg + "Failed!")
 			return errors.Wrapf(err, "cannot export resources for %q", r)
 		}
@@ -153,20 +153,20 @@ func (e *ControlPlaneStateExporter) Export(ctx context.Context) error {
 	for _, count := range nativeCounts {
 		total += count
 	}
-	s.Success(exportNativeMsg + fmt.Sprintf("%d resources exported!", total))
+	s.Success(exportNativeMsg + fmt.Sprintf("%d resources exported! 📤", total))
 	//////////////////////
 
 	// Archive the exported state.
 	archiveMsg := "Archiving exported state... "
-	s, _ = upterm.ArchiveSuccessSpinner.Start(archiveMsg)
+	s, _ = upterm.CheckmarkSuccessSpinner.Start(archiveMsg)
 	if err = e.archive(ctx, fs, tmpDir); err != nil {
 		s.Fail(archiveMsg + "Failed!")
 		return errors.Wrap(err, "cannot archive exported state")
 	}
-	s.Success(archiveMsg + fmt.Sprintf("archived to %q!", e.options.OutputArchive))
+	s.Success(archiveMsg + fmt.Sprintf("archived to %q! 📦", e.options.OutputArchive))
 	//////////////////////
 
-	pterm.Success.Println("Successfully exported control plane state!")
+	fmt.Println("\nSuccessfully exported control plane state!")
 	return nil
 }
 
@@ -260,9 +260,7 @@ func fetchAllCRDs(ctx context.Context, kube apiextensionsclientset.Interface) ([
 		if err != nil {
 			return nil, errors.Wrap(err, "cannot list CRDs")
 		}
-		for _, r := range l.Items {
-			crds = append(crds, r)
-		}
+		crds = append(crds, l.Items...)
 		continueToken = l.GetContinue()
 		if continueToken == "" {
 			break

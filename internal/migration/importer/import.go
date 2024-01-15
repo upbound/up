@@ -20,7 +20,12 @@ import (
 	"context"
 	"fmt"
 	"os"
+	"strings"
 	"time"
+
+	"github.com/pterm/pterm"
+
+	"github.com/upbound/up/internal/upterm"
 
 	xpv1 "github.com/crossplane/crossplane-runtime/apis/common/v1"
 	"github.com/crossplane/crossplane-runtime/pkg/errors"
@@ -30,7 +35,6 @@ import (
 	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/meta"
 	v1 "k8s.io/apimachinery/pkg/apis/meta/v1"
-	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/apimachinery/pkg/util/wait"
 	"k8s.io/client-go/dynamic"
@@ -78,10 +82,19 @@ func NewControlPlaneStateImporter(dynamicClient dynamic.Interface, mapper meta.R
 	}
 }
 
-func (i *ControlPlaneStateImporter) Import(ctx context.Context) error {
-	g, err := os.Open(i.options.InputArchive)
+func (im *ControlPlaneStateImporter) Import(ctx context.Context) error { // nolint:gocyclo // This is the high level import command, so it's expected to be a bit complex.
+	pterm.EnableStyling()
+	upterm.DefaultObjPrinter.Pretty = true
+
+	fmt.Println("Importing control plane state...")
+
+	// Reading state from the archive
+	unarchiveMsg := "Reading state from the archive... "
+	s, _ := upterm.CheckmarkSuccessSpinner.Start(unarchiveMsg)
+	g, err := os.Open(im.options.InputArchive)
 	if err != nil {
-		errors.Wrap(err, "cannot open input archive")
+		s.Fail(unarchiveMsg + "Failed!")
+		return errors.Wrap(err, "cannot open input archive")
 	}
 	defer func() {
 		_ = g.Close()
@@ -89,61 +102,74 @@ func (i *ControlPlaneStateImporter) Import(ctx context.Context) error {
 
 	ur, err := gzip.NewReader(g)
 	if err != nil {
+		s.Fail(unarchiveMsg + "Failed!")
 		return errors.Wrap(err, "cannot decompress archive")
 	}
 	defer func() {
 		_ = ur.Close()
 	}()
-
 	fs := afero.Afero{Fs: tarfs.New(tar.NewReader(ur))}
+	s.Success(unarchiveMsg + "Done! 👀")
+	//////////////////////////////////////////
 
-	r := NewTransformingResourceImporter(NewFileSystemReader(fs), NewUnstructuredResourceApplier(i.dynamicClient, i.resourceMapper), []ResourceTransformer{
-		func(u *unstructured.Unstructured) error {
-			paved := fieldpath.Pave(u.Object)
+	r := NewPausingResourceImporter(NewFileSystemReader(fs), NewUnstructuredResourceApplier(im.dynamicClient, im.resourceMapper))
 
-			for _, f := range []string{"generateName", "selfLink", "uid", "resourceVersion", "generation", "creationTimestamp", "ownerReferences", "managedFields"} {
-				err = paved.DeleteField(fmt.Sprintf("metadata.%s", f))
-				if err != nil {
-					return errors.Wrapf(err, "cannot delete %q field", f)
-				}
-			}
-			return nil
-		},
-	})
-
-	fmt.Println("Importing base resources")
-	for _, gr := range baseResources {
-		if err = r.ImportResources(ctx, schema.ParseGroupResource(gr)); err != nil {
+	// Import base resources
+	importBaseMsg := "Importing base resources... "
+	s, _ = upterm.CheckmarkSuccessSpinner.Start(importBaseMsg + fmt.Sprintf("0 / %d", len(baseResources)))
+	baseCounts := make(map[string]int, len(baseResources))
+	for i, gr := range baseResources {
+		count, err := r.ImportResources(ctx, gr)
+		if err != nil {
+			s.Fail(importBaseMsg + "Failed!")
 			return errors.Wrapf(err, "cannot import %q resources", gr)
 		}
+		s.UpdateText(fmt.Sprintf("(%d / %d) Importing %s...", i, len(baseResources), gr))
+		baseCounts[gr] = count
 	}
+	total := 0
+	for _, count := range baseCounts {
+		total += count
+	}
+	s.Success(importBaseMsg + fmt.Sprintf("%d resources imported! 📥", total))
+	//////////////////////////////////////////
 
-	fmt.Println("Waiting for all XRDs to be established")
-	if err = i.waitForConditions(ctx, schema.GroupKind{Group: "apiextensions.crossplane.io", Kind: "CompositeResourceDefinition"}, []xpv1.ConditionType{"Established"}); err != nil {
+	// Wait for all base resources to be ready
+	waitXRDsMsg := "Waiting for XRDs... "
+	s, _ = upterm.CheckmarkSuccessSpinner.Start(waitXRDsMsg)
+	if err = im.waitForConditions(ctx, s, schema.GroupKind{Group: "apiextensions.crossplane.io", Kind: "CompositeResourceDefinition"}, []xpv1.ConditionType{"Established"}); err != nil {
+		s.Fail(waitXRDsMsg + "Failed!")
 		return errors.Wrap(err, "there are unhealthy CompositeResourceDefinitions")
 	}
+	s.Success(waitXRDsMsg + "Established! ⏳")
 
-	fmt.Println("Waiting for all packages to be installed and healthy")
+	waitPkgsMsg := "Waiting for Packages... "
+	s, _ = upterm.CheckmarkSuccessSpinner.Start(waitPkgsMsg)
 	for _, k := range []schema.GroupKind{
 		{Group: "pkg.crossplane.io", Kind: "Provider"},
 		{Group: "pkg.crossplane.io", Kind: "Function"},
 		{Group: "pkg.crossplane.io", Kind: "Configuration"},
 	} {
-		if err = i.waitForConditions(ctx, k, []xpv1.ConditionType{"Installed", "Healthy"}); err != nil {
+		if err = im.waitForConditions(ctx, s, k, []xpv1.ConditionType{"Installed", "Healthy"}); err != nil {
+			s.Fail(waitPkgsMsg + "Failed!")
 			return errors.Wrapf(err, "there are unhealthy %qs", k.Kind)
 		}
 	}
+	s.Success(waitPkgsMsg + "Installed and Healthy! ⏳")
 
 	// Reset the resource mapper to make sure all CRDs introduced by packages
 	// or XRDs are available.
-	i.resourceMapper.Reset()
+	im.resourceMapper.Reset()
 
-	fmt.Println("Importing all other resources")
+	importRemainingMsg := "Importing remaining resources... "
+	s, _ = upterm.CheckmarkSuccessSpinner.Start(importRemainingMsg)
 	grs, err := fs.ReadDir("/")
 	if err != nil {
+		s.Fail(importRemainingMsg + "Failed!")
 		return errors.Wrap(err, "cannot list group resources")
 	}
-	for _, gr := range grs {
+	remainingCounts := make(map[string]int, len(grs))
+	for i, gr := range grs {
 		if !gr.IsDir() {
 			return errors.Errorf("unexpected file %q in root directory of exported state", gr.Name())
 		}
@@ -153,11 +179,20 @@ func (i *ControlPlaneStateImporter) Import(ctx context.Context) error {
 			continue
 		}
 
-		if err = r.ImportResources(ctx, schema.ParseGroupResource(gr.Name())); err != nil {
+		count, err := r.ImportResources(ctx, gr.Name())
+		if err != nil {
 			return errors.Wrapf(err, "cannot import %q resources", gr.Name())
 		}
+		remainingCounts[gr.Name()] = count
+		s.UpdateText(fmt.Sprintf("(%d / %d) Importing %s...", i, len(grs), gr.Name()))
 	}
+	total = 0
+	for _, count := range remainingCounts {
+		total += count
+	}
+	s.Success(importRemainingMsg + fmt.Sprintf("%d resources imported! 📥", total))
 
+	fmt.Println("\nSuccessfully imported control plane state!")
 	return nil
 }
 
@@ -170,8 +205,8 @@ func isBaseResource(gr string) bool {
 	return false
 }
 
-func (i *ControlPlaneStateImporter) waitForConditions(ctx context.Context, gk schema.GroupKind, conditions []xpv1.ConditionType) error {
-	rm, err := i.resourceMapper.RESTMapping(gk)
+func (im *ControlPlaneStateImporter) waitForConditions(ctx context.Context, sp *pterm.SpinnerPrinter, gk schema.GroupKind, conditions []xpv1.ConditionType) error {
+	rm, err := im.resourceMapper.RESTMapping(gk)
 	if err != nil {
 		return errors.Wrapf(err, "cannot get REST mapping for %q", gk)
 	}
@@ -180,11 +215,13 @@ func (i *ControlPlaneStateImporter) waitForConditions(ctx context.Context, gk sc
 	timeout := 5 * time.Minute
 	ctx, cancel := context.WithTimeout(ctx, timeout)
 	wait.UntilWithContext(ctx, func(ctx context.Context) {
-		resourceList, err := i.dynamicClient.Resource(rm.Resource).List(ctx, v1.ListOptions{})
+		resourceList, err := im.dynamicClient.Resource(rm.Resource).List(ctx, v1.ListOptions{})
 		if err != nil {
 			fmt.Printf("cannot list packages with error: %v\n", err)
 			return
 		}
+		total := len(resourceList.Items)
+		unmet := 0
 		for _, r := range resourceList.Items {
 			paved := fieldpath.Pave(r.Object)
 			status := xpv1.ConditionedStatus{}
@@ -195,19 +232,39 @@ func (i *ControlPlaneStateImporter) waitForConditions(ctx context.Context, gk sc
 
 			for _, c := range conditions {
 				if status.GetCondition(c).Status != corev1.ConditionTrue {
-					fmt.Printf("%q %q is not %s yet\n", gk.Kind, r.GetName(), c)
-					return
+					unmet++
 				}
 			}
 		}
+		if unmet > 0 {
+			sp.UpdateText(fmt.Sprintf("(%d / %d) Waiting for %s to be %s...", total-unmet, total, rm.Resource.GroupResource().String(), printConditions(conditions)))
+			return
+		}
+
 		success = true
 		cancel()
-		return
 	}, 5*time.Second)
 
 	if !success {
-		return errors.Errorf("timeout waiting for conditions %q to be satisfied for all %q", conditions, gk.Kind)
+		return errors.Errorf("timeout waiting for conditions %q to be satisfied for all %q", printConditions(conditions), gk.Kind)
 	}
 
 	return nil
+}
+
+func printConditions(conditions []xpv1.ConditionType) string {
+	switch len(conditions) {
+	case 0:
+		return ""
+	case 1:
+		return string(conditions[0])
+	case 2:
+		return fmt.Sprintf("%s and %s", conditions[0], conditions[1])
+	default:
+		cs := make([]string, len(conditions))
+		for i, c := range conditions {
+			cs[i] = string(c)
+		}
+		return fmt.Sprintf("%s, and %s", strings.Join(cs[:len(cs)-1], ", "), cs[len(cs)-1])
+	}
 }
