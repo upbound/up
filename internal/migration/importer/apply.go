@@ -17,8 +17,6 @@ package importer
 import (
 	"context"
 
-	"github.com/crossplane/crossplane-runtime/pkg/resource"
-
 	"github.com/crossplane/crossplane-runtime/pkg/errors"
 	"k8s.io/apimachinery/pkg/api/meta"
 	v1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -27,7 +25,7 @@ import (
 )
 
 type ResourceApplier interface {
-	ApplyResources(ctx context.Context, resources []unstructured.Unstructured) error
+	ApplyResources(ctx context.Context, resources []unstructured.Unstructured, applyStatus bool) error
 }
 
 type UnstructuredResourceApplier struct {
@@ -42,7 +40,7 @@ func NewUnstructuredResourceApplier(dynamicClient dynamic.Interface, resourceMap
 	}
 }
 
-func (a *UnstructuredResourceApplier) ApplyResources(ctx context.Context, resources []unstructured.Unstructured) error {
+func (a *UnstructuredResourceApplier) ApplyResources(ctx context.Context, resources []unstructured.Unstructured, applyStatus bool) error {
 	for i := range resources {
 		rm, err := a.resourceMapper.RESTMapping(resources[i].GroupVersionKind().GroupKind(), resources[i].GroupVersionKind().Version)
 		if err != nil {
@@ -58,15 +56,15 @@ func (a *UnstructuredResourceApplier) ApplyResources(ctx context.Context, resour
 			return errors.Wrapf(err, "cannot apply resource %q", resources[i].GetName())
 		}
 
+		if !applyStatus {
+			continue
+		}
 		_, err = a.dynamicClient.Resource(rm.Resource).Namespace(resources[i].GetNamespace()).ApplyStatus(ctx, rs.GetName(), rs, v1.ApplyOptions{
 			FieldManager: "up-controlplane-migrator",
 			Force:        true,
 		})
-		// TODO(turkenh): Not all resources have status subresource, and we will get a NotFound error for those.
-		// 	This is why we ignore NotFound errors here. Alternatively, we can check if the resource has a status
-		// 	subresource before applying the status.
-		if resource.IgnoreNotFound(err) != nil {
-			return errors.Wrapf(err, "cannot apply resource %q", resources[i].GetName())
+		if err != nil {
+			return errors.Wrapf(err, "cannot apply status subresource %q", resources[i].GetName())
 		}
 	}
 

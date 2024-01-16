@@ -39,23 +39,27 @@ func NewPausingResourceImporter(r ResourceReader, a ResourceApplier) *PausingRes
 }
 
 func (im *PausingResourceImporter) ImportResources(ctx context.Context, gr string) (int, error) {
-	categories, resources, err := im.reader.ReadResources(gr)
+	resources, typeMeta, err := im.reader.ReadResources(gr)
 	if err != nil {
 		return 0, errors.Wrapf(err, "cannot get %q resources", gr)
 	}
 
-	for _, c := range categories {
-		if c == "managed" || c == "claim" || c == "composite" {
-			for i := range resources {
-				meta.AddAnnotations(&resources[i], map[string]string{
-					"crossplane.io/paused": "true",
-				})
+	sub := false
+	if typeMeta != nil {
+		sub = typeMeta.WithStatusSubresource
+		for _, c := range typeMeta.Categories {
+			if c == "managed" || c == "claim" || c == "composite" {
+				for i := range resources {
+					meta.AddAnnotations(&resources[i], map[string]string{
+						"crossplane.io/paused": "true",
+					})
+				}
+				break
 			}
-			break
 		}
 	}
 
-	if err := im.applier.ApplyResources(ctx, resources); err != nil {
+	if err = im.applier.ApplyResources(ctx, resources, sub); err != nil {
 		return 0, errors.Wrapf(err, "cannot apply %q resources", gr)
 	}
 

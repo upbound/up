@@ -16,8 +16,9 @@ package exporter
 
 import (
 	"context"
-	"os"
 	"path/filepath"
+
+	"github.com/upbound/up/internal/migration/meta/v1alpha1"
 
 	"github.com/crossplane/crossplane-runtime/pkg/errors"
 	"github.com/spf13/afero"
@@ -33,14 +34,14 @@ type FileSystemPersister struct {
 	fs   afero.Afero
 	root string
 
-	categories []string
+	meta *v1alpha1.TypeMeta
 }
 
-func NewFileSystemPersister(fs afero.Afero, root string, categories []string) *FileSystemPersister {
+func NewFileSystemPersister(fs afero.Afero, root string, m *v1alpha1.TypeMeta) *FileSystemPersister {
 	return &FileSystemPersister{
-		fs:         fs,
-		root:       root,
-		categories: categories,
+		fs:   fs,
+		root: root,
+		meta: m,
 	}
 }
 
@@ -49,7 +50,7 @@ func (p *FileSystemPersister) pathFor(dirs ...string) string {
 	return filepath.Join(dirs...)
 }
 
-func (p *FileSystemPersister) PersistResources(_ context.Context, groupResource string, resources []unstructured.Unstructured) error {
+func (p *FileSystemPersister) PersistResources(_ context.Context, groupResource string, resources []unstructured.Unstructured) error { // nolint:gocyclo // This is slightly over the limit, but it's not too bad.
 	if len(resources) == 0 {
 		return nil
 	}
@@ -58,12 +59,17 @@ func (p *FileSystemPersister) PersistResources(_ context.Context, groupResource 
 		return errors.Wrapf(err, "cannot create directory resource group %q", groupResource)
 	}
 
-	for _, c := range p.categories {
-		f, err := p.fs.OpenFile(p.pathFor(groupResource, c), os.O_RDONLY|os.O_CREATE, 0600)
+	if p.meta != nil {
+		b, err := yaml.Marshal(&p.meta)
 		if err != nil {
-			return errors.Wrapf(err, "cannot touch category file %q", c)
+			return errors.Wrap(err, "cannot marshal type meta to yaml")
 		}
-		_ = f.Close()
+
+		mf := p.pathFor(groupResource, "metadata.yaml")
+		err = p.fs.WriteFile(mf, b, 0600)
+		if err != nil {
+			return errors.Wrapf(err, "cannot write type metadata to %q", mf)
+		}
 	}
 
 	for i := range resources {

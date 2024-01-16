@@ -169,22 +169,26 @@ func (im *ControlPlaneStateImporter) Import(ctx context.Context) error { // noli
 		return errors.Wrap(err, "cannot list group resources")
 	}
 	remainingCounts := make(map[string]int, len(grs))
-	for i, gr := range grs {
-		if !gr.IsDir() {
-			return errors.Errorf("unexpected file %q in root directory of exported state", gr.Name())
+	for i, info := range grs {
+		if info.Name() == "export.yaml" {
+			// This is the top level export metadata file, so nothing to import.
+			continue
+		}
+		if !info.IsDir() {
+			return errors.Errorf("unexpected file %q in root directory of exported state", info.Name())
 		}
 
-		if isBaseResource(gr.Name()) {
+		if isBaseResource(info.Name()) {
 			// We already imported base resources above.
 			continue
 		}
 
-		count, err := r.ImportResources(ctx, gr.Name())
+		count, err := r.ImportResources(ctx, info.Name())
 		if err != nil {
-			return errors.Wrapf(err, "cannot import %q resources", gr.Name())
+			return errors.Wrapf(err, "cannot import %q resources", info.Name())
 		}
-		remainingCounts[gr.Name()] = count
-		s.UpdateText(fmt.Sprintf("(%d / %d) Importing %s...", i, len(grs), gr.Name()))
+		remainingCounts[info.Name()] = count
+		s.UpdateText(fmt.Sprintf("(%d / %d) Importing %s...", i, len(grs), info.Name()))
 	}
 	total = 0
 	for _, count := range remainingCounts {

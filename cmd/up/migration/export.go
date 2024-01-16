@@ -21,6 +21,7 @@ import (
 	"k8s.io/client-go/discovery"
 	"k8s.io/client-go/discovery/cached/memory"
 	"k8s.io/client-go/dynamic"
+	appsv1 "k8s.io/client-go/kubernetes/typed/apps/v1"
 	"k8s.io/client-go/restmapper"
 
 	"github.com/upbound/up/internal/migration"
@@ -45,9 +46,14 @@ func (c *exportCmd) Run(ctx context.Context, migCtx *migration.Context) error {
 	if err != nil {
 		return err
 	}
+	appsClient, err := appsv1.NewForConfig(cfg)
+	if err != nil {
+		return err
+	}
+
 	mapper := restmapper.NewDeferredDiscoveryRESTMapper(memory.NewMemCacheClient(discoveryClient))
 
-	e := exporter.NewControlPlaneStateExporter(crdClient, dynamicClient, mapper, exporter.Options{
+	e := exporter.NewControlPlaneStateExporter(crdClient, dynamicClient, appsClient, mapper, exporter.Options{
 		OutputArchive: "xp-state.tar.gz",
 		// TODO(turkenh): Pass these options from the CLI.
 		ExcludedNamespaces: []string{"kube-system", "kube-public", "kube-node-lease", "local-path-storage"},

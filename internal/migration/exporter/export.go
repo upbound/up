@@ -29,6 +29,9 @@ import (
 	v1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/client-go/dynamic"
+	appsv1 "k8s.io/client-go/kubernetes/typed/apps/v1"
+
+	"github.com/upbound/up/internal/migration/meta/v1alpha1"
 
 	"github.com/upbound/up/internal/upterm"
 )
@@ -46,15 +49,17 @@ type Options struct {
 type ControlPlaneStateExporter struct {
 	crdClient      apiextensionsclientset.Interface
 	dynamicClient  dynamic.Interface
+	appsClient     appsv1.AppsV1Interface
 	resourceMapper meta.RESTMapper
 
 	options Options
 }
 
-func NewControlPlaneStateExporter(crdClient apiextensionsclientset.Interface, dynamicClient dynamic.Interface, mapper meta.RESTMapper, opts Options) *ControlPlaneStateExporter {
+func NewControlPlaneStateExporter(crdClient apiextensionsclientset.Interface, dynamicClient dynamic.Interface, appsClient appsv1.AppsV1Interface, mapper meta.RESTMapper, opts Options) *ControlPlaneStateExporter {
 	return &ControlPlaneStateExporter{
 		crdClient:      crdClient,
 		dynamicClient:  dynamicClient,
+		appsClient:     appsClient,
 		resourceMapper: mapper,
 
 		options: opts,
@@ -96,21 +101,31 @@ func (e *ControlPlaneStateExporter) Export(ctx context.Context) error { // nolin
 	//////////////////////
 
 	// Export Crossplane resources.
-	crCounts := make(map[string]int, len(crdList))
+	crCounts := make(map[string]int, len(exportList))
 	exportCRsMsg := "Exporting Crossplane resources... "
-	s, _ = upterm.CheckmarkSuccessSpinner.Start(exportCRsMsg + fmt.Sprintf("0 / %d", len(crdList)))
-	for i, crd := range crdList {
+	s, _ = upterm.CheckmarkSuccessSpinner.Start(exportCRsMsg + fmt.Sprintf("0 / %d", len(exportList)))
+	for i, crd := range exportList {
 		gvr, err := e.customResourceGVR(crd)
 		if err != nil {
 			s.Fail(exportCRsMsg + "Failed!")
 			return errors.Wrapf(err, "cannot get GVR for %q", crd.GetName())
 		}
 
-		s.UpdateText(fmt.Sprintf("(%d / %d) Exporting %s...", i, len(crdList), gvr.GroupResource()))
+		s.UpdateText(fmt.Sprintf("(%d / %d) Exporting %s...", i, len(exportList), gvr.GroupResource()))
 
+		sub := false
+		for _, vr := range crd.Spec.Versions {
+			if vr.Storage && vr.Subresources != nil && vr.Subresources.Status != nil {
+				sub = true
+				break
+			}
+		}
 		exporter := NewUnstructuredExporter(
 			NewUnstructuredFetcher(e.dynamicClient, e.options),
-			NewFileSystemPersister(fs, tmpDir, crd.Spec.Names.Categories))
+			NewFileSystemPersister(fs, tmpDir, &v1alpha1.TypeMeta{
+				Categories:            crd.Spec.Names.Categories,
+				WithStatusSubresource: sub,
+			}))
 
 		count, err := exporter.ExportResources(ctx, gvr)
 		if err != nil {
@@ -154,6 +169,13 @@ func (e *ControlPlaneStateExporter) Export(ctx context.Context) error { // nolin
 		total += count
 	}
 	s.Success(exportNativeMsg + fmt.Sprintf("%d resources exported! 📤", total))
+	//////////////////////
+
+	// Include export metadata.
+	me := NewPersistentMetadataExporter(e.appsClient, fs, tmpDir)
+	if err = me.ExportMetadata(ctx, e.options, nativeCounts, crCounts); err != nil {
+		return errors.Wrap(err, "cannot write export metadata")
+	}
 	//////////////////////
 
 	// Archive the exported state.
