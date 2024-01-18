@@ -16,6 +16,8 @@ package importer
 
 import (
 	"context"
+	"github.com/crossplane/crossplane-runtime/pkg/resource"
+	"k8s.io/client-go/util/retry"
 
 	"github.com/crossplane/crossplane-runtime/pkg/errors"
 	"k8s.io/apimachinery/pkg/api/meta"
@@ -42,31 +44,35 @@ func NewUnstructuredResourceApplier(dynamicClient dynamic.Interface, resourceMap
 
 func (a *UnstructuredResourceApplier) ApplyResources(ctx context.Context, resources []unstructured.Unstructured, applyStatus bool) error {
 	for i := range resources {
-		rm, err := a.resourceMapper.RESTMapping(resources[i].GroupVersionKind().GroupKind(), resources[i].GroupVersionKind().Version)
-		if err != nil {
-			return errors.Wrap(err, "cannot get REST mapping for resource")
-		}
+		err := retry.OnError(retry.DefaultRetry, resource.IsAPIError, func() error {
+			rm, err := a.resourceMapper.RESTMapping(resources[i].GroupVersionKind().GroupKind(), resources[i].GroupVersionKind().Version)
+			if err != nil {
+				return err
+			}
 
-		rs := resources[i].DeepCopy()
-		_, err = a.dynamicClient.Resource(rm.Resource).Namespace(resources[i].GetNamespace()).Apply(ctx, resources[i].GetName(), &resources[i], v1.ApplyOptions{
-			FieldManager: "up-controlplane-migrator",
-			Force:        true,
+			rs := resources[i].DeepCopy()
+			_, err = a.dynamicClient.Resource(rm.Resource).Namespace(resources[i].GetNamespace()).Apply(ctx, resources[i].GetName(), &resources[i], v1.ApplyOptions{
+				FieldManager: "up-controlplane-migrator",
+				Force:        true,
+			})
+			if err != nil {
+				return err
+			}
+			if !applyStatus {
+				return nil
+			}
+			_, err = a.dynamicClient.Resource(rm.Resource).Namespace(resources[i].GetNamespace()).ApplyStatus(ctx, rs.GetName(), rs, v1.ApplyOptions{
+				FieldManager: "up-controlplane-migrator",
+				Force:        true,
+			})
+			if err != nil {
+				return err
+			}
+			return nil
 		})
 		if err != nil {
-			return errors.Wrapf(err, "cannot apply resource %q", resources[i].GetName())
-		}
-
-		if !applyStatus {
-			continue
-		}
-		_, err = a.dynamicClient.Resource(rm.Resource).Namespace(resources[i].GetNamespace()).ApplyStatus(ctx, rs.GetName(), rs, v1.ApplyOptions{
-			FieldManager: "up-controlplane-migrator",
-			Force:        true,
-		})
-		if err != nil {
-			return errors.Wrapf(err, "cannot apply status subresource %q", resources[i].GetName())
+			return errors.Wrapf(err, "cannot apply resource %s/%s", resources[i].GetKind(), resources[i].GetName())
 		}
 	}
-
 	return nil
 }
