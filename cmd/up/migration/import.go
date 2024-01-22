@@ -16,7 +16,6 @@ package migration
 
 import (
 	"context"
-	"github.com/crossplane/crossplane-runtime/pkg/errors"
 	"k8s.io/client-go/rest"
 	"net/url"
 	"strings"
@@ -36,9 +35,9 @@ type importCmd struct {
 func (c *importCmd) Run(ctx context.Context, migCtx *migration.Context) error {
 	cfg := migCtx.Kubeconfig
 
-	if !isMCP(cfg) {
+	/*if !isMCP(cfg) {
 		return errors.New("not a managed control plane, import not supported!")
-	}
+	}*/
 
 	dynamicClient, err := dynamic.NewForConfig(cfg)
 	if err != nil {
@@ -50,8 +49,10 @@ func (c *importCmd) Run(ctx context.Context, migCtx *migration.Context) error {
 	}
 	mapper := restmapper.NewDeferredDiscoveryRESTMapper(memory.NewMemCacheClient(discoveryClient))
 
-	i := importer.NewControlPlaneStateImporter(dynamicClient, mapper, importer.Options{
+	i := importer.NewControlPlaneStateImporter(dynamicClient, discoveryClient, mapper, importer.Options{
 		InputArchive: "xp-state.tar.gz",
+
+		UnpauseAfterExport: true,
 	})
 	if err = i.Import(ctx); err != nil {
 		return err

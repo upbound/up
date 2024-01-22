@@ -17,9 +17,13 @@ package exporter
 import (
 	"context"
 	"fmt"
+	"github.com/upbound/up/internal/migration/category"
+	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
+	"k8s.io/client-go/discovery"
 	"strings"
 
 	"github.com/crossplane/crossplane-runtime/pkg/errors"
+	xpmeta "github.com/crossplane/crossplane-runtime/pkg/meta"
 	"github.com/mholt/archiver/v4"
 	"github.com/pterm/pterm"
 	"github.com/spf13/afero"
@@ -44,23 +48,27 @@ type Options struct {
 
 	IncludedResources []string // default: namespaces, configmaps, secrets ( + all Crossplane resources)
 	ExcludedResources []string // default: none
+
+	PauseBeforeExport bool // default: false
 }
 
 type ControlPlaneStateExporter struct {
-	crdClient      apiextensionsclientset.Interface
-	dynamicClient  dynamic.Interface
-	appsClient     appsv1.AppsV1Interface
-	resourceMapper meta.RESTMapper
+	crdClient       apiextensionsclientset.Interface
+	dynamicClient   dynamic.Interface
+	discoveryClient discovery.DiscoveryInterface
+	appsClient      appsv1.AppsV1Interface
+	resourceMapper  meta.RESTMapper
 
 	options Options
 }
 
-func NewControlPlaneStateExporter(crdClient apiextensionsclientset.Interface, dynamicClient dynamic.Interface, appsClient appsv1.AppsV1Interface, mapper meta.RESTMapper, opts Options) *ControlPlaneStateExporter {
+func NewControlPlaneStateExporter(crdClient apiextensionsclientset.Interface, dynamicClient dynamic.Interface, discoveryClient discovery.DiscoveryInterface, appsClient appsv1.AppsV1Interface, mapper meta.RESTMapper, opts Options) *ControlPlaneStateExporter {
 	return &ControlPlaneStateExporter{
-		crdClient:      crdClient,
-		dynamicClient:  dynamicClient,
-		appsClient:     appsClient,
-		resourceMapper: mapper,
+		crdClient:       crdClient,
+		dynamicClient:   dynamicClient,
+		discoveryClient: discoveryClient,
+		appsClient:      appsClient,
+		resourceMapper:  mapper,
 
 		options: opts,
 	}
@@ -80,6 +88,21 @@ func (e *ControlPlaneStateExporter) Export(ctx context.Context) error { // nolin
 	defer func() {
 		_ = fs.RemoveAll(tmpDir)
 	}()
+
+	if e.options.PauseBeforeExport {
+		pauseMsg := "Pausing all managed resources before export... "
+		s, _ := upterm.CheckmarkSuccessSpinner.Start(pauseMsg)
+		cm := category.NewAPICategoryModifier(e.dynamicClient, e.discoveryClient)
+		count, err := cm.ModifyResources(ctx, "managed", func(u *unstructured.Unstructured) error {
+			xpmeta.AddAnnotations(u, map[string]string{"crossplane.io/paused": "true"})
+			return nil
+		})
+		if err != nil {
+			s.Fail(pauseMsg + "Failed!")
+			return errors.Wrap(err, "cannot pause managed resources")
+		}
+		s.Success(pauseMsg + fmt.Sprintf("%d resources paused! ⏸️", count))
+	}
 
 	// Scan the control plane for types to export.
 	scanMsg := "Scanning control plane for types to export... "

@@ -18,8 +18,12 @@ import (
 	"compress/gzip"
 	"context"
 	"fmt"
+	xpmeta "github.com/crossplane/crossplane-runtime/pkg/meta"
 	"github.com/mholt/archiver/v4"
+	"github.com/upbound/up/internal/migration/category"
 	"io"
+	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
+	"k8s.io/client-go/discovery"
 	"os"
 	"strings"
 	"time"
@@ -65,20 +69,24 @@ var (
 
 type Options struct {
 	InputArchive string // default: xp-state.tar.gz
+
+	UnpauseAfterExport bool // default: false
 }
 
 type ControlPlaneStateImporter struct {
-	dynamicClient  dynamic.Interface
-	resourceMapper meta.ResettableRESTMapper
+	dynamicClient   dynamic.Interface
+	discoveryClient discovery.DiscoveryInterface
+	resourceMapper  meta.ResettableRESTMapper
 
 	options Options
 }
 
-func NewControlPlaneStateImporter(dynamicClient dynamic.Interface, mapper meta.ResettableRESTMapper, opts Options) *ControlPlaneStateImporter {
+func NewControlPlaneStateImporter(dynamicClient dynamic.Interface, discoveryClient discovery.DiscoveryInterface, mapper meta.ResettableRESTMapper, opts Options) *ControlPlaneStateImporter {
 	return &ControlPlaneStateImporter{
-		dynamicClient:  dynamicClient,
-		resourceMapper: mapper,
-		options:        opts,
+		dynamicClient:   dynamicClient,
+		discoveryClient: discoveryClient,
+		resourceMapper:  mapper,
+		options:         opts,
 	}
 }
 
@@ -186,29 +194,41 @@ func (im *ControlPlaneStateImporter) Import(ctx context.Context) error { // noli
 		total += count
 	}
 
-	// All resources restored, now we can unpause claims/composites, while leaving managed resources to user.
-	grs, err = fs.ReadDir("/")
-
-	for _, info := range grs {
-		if info.Name() == "export.yaml" {
-			// This is the top level export metadata file, so nothing to import.
-			continue
-		}
-		if !info.IsDir() {
-			return errors.Errorf("unexpected file %q in root directory of exported state", info.Name())
-		}
-
-		if isBaseResource(info.Name()) {
-			// We already imported base resources above.
-			continue
-		}
-		_, err := r.UnpauseResources(ctx, info.Name(), []string{"claim", "composite"})
-		if err != nil {
-			return errors.Wrapf(err, "cannot unpause %q resources", info.Name())
-		}
-	}
-
 	s.Success(importRemainingMsg + fmt.Sprintf("%d resources imported! 📥", total))
+	//////////////////////////////////////////
+
+	// Finalize import
+	finalizeMsg := "Finalizing import... "
+	s, _ = upterm.CheckmarkSuccessSpinner.Start(finalizeMsg)
+	cm := category.NewAPICategoryModifier(im.dynamicClient, im.discoveryClient)
+	_, err = cm.ModifyResources(ctx, "claim", func(u *unstructured.Unstructured) error {
+		xpmeta.RemoveAnnotations(u, "crossplane.io/paused")
+		return nil
+	})
+	if err != nil {
+		return errors.Wrap(err, "cannot unpause claims")
+	}
+	_, err = cm.ModifyResources(ctx, "composite", func(u *unstructured.Unstructured) error {
+		xpmeta.RemoveAnnotations(u, "crossplane.io/paused")
+		return nil
+	})
+	if err != nil {
+		return errors.Wrap(err, "cannot unpause composites")
+	}
+	s.Success(finalizeMsg + "Done! 🎉")
+
+	if im.options.UnpauseAfterExport {
+		unpauseMsg := "Unpausing managed resources ... "
+		s, _ := upterm.CheckmarkSuccessSpinner.Start(unpauseMsg)
+		_, err = cm.ModifyResources(ctx, "managed", func(u *unstructured.Unstructured) error {
+			xpmeta.RemoveAnnotations(u, "crossplane.io/paused")
+			return nil
+		})
+		if err != nil {
+			return errors.Wrap(err, "cannot unpause managed resources")
+		}
+		s.Success(unpauseMsg + "Done! ▶️")
+	}
 	//////////////////////////////////////////
 
 	fmt.Println("\nSuccessfully imported control plane state!")

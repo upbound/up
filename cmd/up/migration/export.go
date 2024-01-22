@@ -53,11 +53,13 @@ func (c *exportCmd) Run(ctx context.Context, migCtx *migration.Context) error {
 
 	mapper := restmapper.NewDeferredDiscoveryRESTMapper(memory.NewMemCacheClient(discoveryClient))
 
-	e := exporter.NewControlPlaneStateExporter(crdClient, dynamicClient, appsClient, mapper, exporter.Options{
+	e := exporter.NewControlPlaneStateExporter(crdClient, dynamicClient, discoveryClient, appsClient, mapper, exporter.Options{
 		OutputArchive: "xp-state.tar.gz",
 		// TODO(turkenh): Pass these options from the CLI.
 		ExcludedNamespaces: []string{"kube-system", "kube-public", "kube-node-lease", "local-path-storage"},
 		IncludedResources:  []string{"namespaces", "configmaps", "secrets"}, // + all Crossplane resources
+
+		PauseBeforeExport: true,
 	})
 	if err = e.Export(ctx); err != nil {
 		return err
