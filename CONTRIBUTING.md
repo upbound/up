@@ -16,7 +16,7 @@ under `cmd` folder.
 
 ## Release Process
 
-This is a slimmed-down version of the release process described [here](https://github.com/crossplane/crossplane/blob/master/contributing/release-process.md).
+This is a slimmed-down version of the release process described [here](https://github.com/crossplane/release).
 
 1. **feature freeze**: Merge all completed features into main development branch
    of all repos to begin "feature freeze" period.
