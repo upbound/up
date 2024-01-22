@@ -1,4 +1,4 @@
-// Copyright 2023 Upbound Inc
+// Copyright 2024 Upbound Inc
 //
 // Licensed under the Apache License, Version 2.0 (the "License");
 // you may not use this file except in compliance with the License.
@@ -16,14 +16,14 @@ package importer
 
 import (
 	"context"
-	"github.com/crossplane/crossplane-runtime/pkg/resource"
-	"k8s.io/client-go/util/retry"
 
 	"github.com/crossplane/crossplane-runtime/pkg/errors"
+	"github.com/crossplane/crossplane-runtime/pkg/resource"
 	"k8s.io/apimachinery/pkg/api/meta"
 	v1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 	"k8s.io/client-go/dynamic"
+	"k8s.io/client-go/util/retry"
 )
 
 type ResourceApplier interface {

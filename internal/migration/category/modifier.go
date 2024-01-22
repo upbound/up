@@ -1,7 +1,22 @@
+// Copyright 2024 Upbound Inc
+//
+// Licensed under the Apache License, Version 2.0 (the "License");
+// you may not use this file except in compliance with the License.
+// You may obtain a copy of the License at
+//
+//      http://www.apache.org/licenses/LICENSE-2.0
+//
+// Unless required by applicable law or agreed to in writing, software
+// distributed under the License is distributed on an "AS IS" BASIS,
+// WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+// See the License for the specific language governing permissions and
+// limitations under the License.
+
 package category
 
 import (
 	"context"
+
 	"github.com/crossplane/crossplane-runtime/pkg/errors"
 	"github.com/crossplane/crossplane-runtime/pkg/resource"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -28,7 +43,7 @@ func NewAPICategoryModifier(dyn dynamic.Interface, dis discovery.DiscoveryInterf
 	}
 }
 
-func (a *APICategoryModifier) ModifyResources(ctx context.Context, category string, modify func(*unstructured.Unstructured) error) (int, error) {
+func (a *APICategoryModifier) ModifyResources(ctx context.Context, category string, modify func(*unstructured.Unstructured) error) (int, error) { // nolint:gocyclo // Hard to refactor without losing readability.
 	count := 0
 	apiLists, err := a.discoveryClient.ServerPreferredResources()
 	if err != nil {
@@ -50,20 +65,20 @@ func (a *APICategoryModifier) ModifyResources(ctx context.Context, category stri
 					if err = retry.OnError(retry.DefaultRetry, resource.IsAPIError, func() error {
 						u, err := a.dynamicClient.Resource(gvr).Namespace(item.GetNamespace()).Get(ctx, item.GetName(), metav1.GetOptions{})
 						if err != nil {
-							return errors.Wrapf(err, "cannot get resource %s/%s", item.GetKind(), item.GetName())
+							return err
 						}
 						if err = modify(u); err != nil {
 							return err
 						}
 						_, err = a.dynamicClient.Resource(gvr).Namespace(u.GetNamespace()).Update(ctx, u, metav1.UpdateOptions{})
 						if err != nil {
-							return errors.Wrapf(err, "cannot update resource %s/%s", u.GetKind(), u.GetName())
+							return err
 						}
-						count++
 						return nil
 					}); err != nil {
 						return 0, errors.Wrapf(err, "cannot modify resource %s/%s", item.GetKind(), item.GetName())
 					}
+					count++
 				}
 			}
 		}

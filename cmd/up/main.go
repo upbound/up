@@ -21,8 +21,6 @@ import (
 	"os"
 	"os/signal"
 
-	"github.com/upbound/up/cmd/up/migration"
-
 	"github.com/alecthomas/kong"
 	"github.com/pterm/pterm"
 	"github.com/willabides/kongplete"
@@ -30,6 +28,7 @@ import (
 	"github.com/upbound/up/cmd/up/configuration"
 	"github.com/upbound/up/cmd/up/configuration/template"
 	"github.com/upbound/up/cmd/up/controlplane"
+	"github.com/upbound/up/cmd/up/migration"
 	"github.com/upbound/up/cmd/up/organization"
 	"github.com/upbound/up/cmd/up/profile"
 	"github.com/upbound/up/cmd/up/repository"

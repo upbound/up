@@ -1,4 +1,4 @@
-// Copyright 2023 Upbound Inc
+// Copyright 2024 Upbound Inc
 //
 // Licensed under the Apache License, Version 2.0 (the "License");
 // you may not use this file except in compliance with the License.
@@ -18,12 +18,12 @@ import (
 	"context"
 	"path/filepath"
 
-	"github.com/upbound/up/internal/migration/meta/v1alpha1"
-
 	"github.com/crossplane/crossplane-runtime/pkg/errors"
 	"github.com/spf13/afero"
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 	"sigs.k8s.io/yaml"
+
+	"github.com/upbound/up/internal/migration/meta/v1alpha1"
 )
 
 type ResourcePersister interface {

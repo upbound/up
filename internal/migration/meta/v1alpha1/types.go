@@ -19,35 +19,35 @@ import (
 )
 
 type TypeMeta struct {
-	Categories            []string `json:"categories,omitempty"`
-	WithStatusSubresource bool     `json:"withStatusSubresource,omitempty"`
+	Categories            []string `json:"categories,omitempty" yaml:"categories,omitempty"`
+	WithStatusSubresource bool     `json:"withStatusSubresource,omitempty" yaml:"withStatusSubresource,omitempty"`
 }
 
 type ExportStats struct {
-	Total           int            `json:"total,omitempty"`
-	NativeResources map[string]int `json:"nativeResources,omitempty"`
-	CustomResources map[string]int `json:"customResources,omitempty"`
+	Total           int            `json:"total,omitempty" yaml:"total,omitempty"`
+	NativeResources map[string]int `json:"nativeResources,omitempty" yaml:"nativeResources,omitempty"`
+	CustomResources map[string]int `json:"customResources,omitempty" yaml:"customResources,omitempty"`
 }
 
 type CrossplaneInfo struct {
-	Distribution string   `json:"distribution,omitempty"`
-	Namespace    string   `json:"namespace,omitempty"`
-	Version      string   `json:"version,omitempty"`
-	FeatureFlags []string `json:"featureFlags,omitempty"`
+	Distribution string   `json:"distribution,omitempty" yaml:"distribution,omitempty"`
+	Namespace    string   `json:"namespace,omitempty" yaml:"namespace,omitempty"`
+	Version      string   `json:"version,omitempty" yaml:"version,omitempty"`
+	FeatureFlags []string `json:"featureFlags,omitempty" yaml:"featureFlags,omitempty"`
 }
 
 type ExportOptions struct {
-	IncludedNamespaces []string
-	ExcludedNamespaces []string
+	IncludedNamespaces []string `json:"includedNamespaces,omitempty" yaml:"includedNamespaces,omitempty"`
+	ExcludedNamespaces []string `json:"excludedNamespaces,omitempty" yaml:"excludedNamespaces,omitempty"`
 
-	IncludedResources []string
-	ExcludedResources []string
+	IncludedResources []string `json:"includedResources,omitempty" yaml:"includedResources,omitempty"`
+	ExcludedResources []string `json:"excludedResources,omitempty" yaml:"excludedResources,omitempty"`
 }
 
 type ExportMeta struct {
-	Version    string         `json:"version,omitempty"`
-	ExportedAt time.Time      `json:"exportedAt,omitempty"`
-	Options    ExportOptions  `json:"options,omitempty"`
-	Crossplane CrossplaneInfo `json:"crossplane,omitempty"`
-	Stats      ExportStats    `json:"stats,omitempty"`
+	Version    string         `json:"version,omitempty" yaml:"version,omitempty"`
+	ExportedAt time.Time      `json:"exportedAt,omitempty" yaml:"exportedAt,omitempty"`
+	Options    ExportOptions  `json:"options,omitempty" yaml:"options,omitempty"`
+	Crossplane CrossplaneInfo `json:"crossplane,omitempty" yaml:"crossplane,omitempty"`
+	Stats      ExportStats    `json:"stats,omitempty" yaml:"stats,omitempty"`
 }

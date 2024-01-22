@@ -1,4 +1,4 @@
-// Copyright 2023 Upbound Inc
+// Copyright 2024 Upbound Inc
 //
 // Licensed under the Apache License, Version 2.0 (the "License");
 // you may not use this file except in compliance with the License.
@@ -38,7 +38,7 @@ func (c *Cmd) AfterApply(kongCtx *kong.Context) error {
 
 type Cmd struct {
 	Export exportCmd `cmd:"" help:"Export a control plane."`
-	Import importCmd `cmd:"" help:"Import a control plane."`
+	Import importCmd `cmd:"" help:"Import a control plane into a managed control plane."`
 
 	Kubeconfig string `type:"existingfile" help:"Override default kubeconfig path."`
 	Namespace  string `short:"n" env:"UXP_NAMESPACE" default:"upbound-system" help:"Kubernetes namespace for UXP."`

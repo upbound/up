@@ -17,15 +17,14 @@ package exporter
 import (
 	"context"
 	"path/filepath"
-	"strings"
 	"time"
 
 	"github.com/crossplane/crossplane-runtime/pkg/errors"
 	"github.com/spf13/afero"
 	"gopkg.in/yaml.v3"
-	v1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	appsv1 "k8s.io/client-go/kubernetes/typed/apps/v1"
 
+	"github.com/upbound/up/internal/migration/crossplane"
 	"github.com/upbound/up/internal/migration/meta/v1alpha1"
 )
 
@@ -48,7 +47,7 @@ func NewPersistentMetadataExporter(apps appsv1.AppsV1Interface, fs afero.Afero, 
 }
 
 func (e *PersistentMetadataExporter) ExportMetadata(ctx context.Context, opts Options, native map[string]int, custom map[string]int) error {
-	xp, err := e.crossplaneInfo(ctx)
+	xp, err := crossplane.CollectInfo(ctx, e.appsClient)
 	if err != nil {
 		return errors.Wrap(err, "cannot get Crossplane info")
 	}
@@ -85,34 +84,4 @@ func (e *PersistentMetadataExporter) ExportMetadata(ctx context.Context, opts Op
 		return errors.Wrap(err, "cannot write export metadata")
 	}
 	return nil
-}
-
-func (e *PersistentMetadataExporter) crossplaneInfo(ctx context.Context) (*v1alpha1.CrossplaneInfo, error) {
-	dl, err := e.appsClient.Deployments("").List(ctx, v1.ListOptions{})
-	if err != nil {
-		return nil, errors.Wrap(err, "cannot list deployments to find Crossplane deployment")
-	}
-
-	xp := v1alpha1.CrossplaneInfo{}
-	for _, d := range dl.Items {
-		if d.Name == "crossplane" {
-			xp.Namespace = d.Namespace
-			if d.Labels != nil {
-				xp.Version = d.Labels["app.kubernetes.io/version"]
-				xp.Distribution = d.Labels["app.kubernetes.io/instance"]
-			}
-			for _, c := range d.Spec.Template.Spec.Containers {
-				if c.Name == "crossplane" || c.Name == "universal-crossplane" {
-					for _, a := range c.Args {
-						if strings.HasPrefix(a, "--enable") {
-							xp.FeatureFlags = append(xp.FeatureFlags, a)
-						}
-					}
-					break
-				}
-			}
-			break
-		}
-	}
-	return &xp, nil
 }

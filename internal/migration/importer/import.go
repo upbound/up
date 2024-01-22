@@ -1,4 +1,4 @@
-// Copyright 2023 Upbound Inc
+// Copyright 2024 Upbound Inc
 //
 // Licensed under the Apache License, Version 2.0 (the "License");
 // you may not use this file except in compliance with the License.
@@ -18,30 +18,33 @@ import (
 	"compress/gzip"
 	"context"
 	"fmt"
-	xpmeta "github.com/crossplane/crossplane-runtime/pkg/meta"
-	"github.com/mholt/archiver/v4"
-	"github.com/upbound/up/internal/migration/category"
 	"io"
-	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
-	"k8s.io/client-go/discovery"
 	"os"
 	"strings"
 	"time"
 
-	"github.com/pterm/pterm"
-
-	"github.com/upbound/up/internal/upterm"
-
 	xpv1 "github.com/crossplane/crossplane-runtime/apis/common/v1"
 	"github.com/crossplane/crossplane-runtime/pkg/errors"
 	"github.com/crossplane/crossplane-runtime/pkg/fieldpath"
+	xpmeta "github.com/crossplane/crossplane-runtime/pkg/meta"
+	"github.com/mholt/archiver/v4"
+	"github.com/pterm/pterm"
 	"github.com/spf13/afero"
+	"gopkg.in/yaml.v3"
 	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/meta"
 	v1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/apimachinery/pkg/util/wait"
+	"k8s.io/client-go/discovery"
 	"k8s.io/client-go/dynamic"
+	appsv1 "k8s.io/client-go/kubernetes/typed/apps/v1"
+
+	"github.com/upbound/up/internal/migration/category"
+	"github.com/upbound/up/internal/migration/crossplane"
+	"github.com/upbound/up/internal/migration/meta/v1alpha1"
+	"github.com/upbound/up/internal/upterm"
 )
 
 var (
@@ -76,15 +79,19 @@ type Options struct {
 type ControlPlaneStateImporter struct {
 	dynamicClient   dynamic.Interface
 	discoveryClient discovery.DiscoveryInterface
+	appsClient      appsv1.AppsV1Interface
 	resourceMapper  meta.ResettableRESTMapper
+
+	fs *afero.Afero
 
 	options Options
 }
 
-func NewControlPlaneStateImporter(dynamicClient dynamic.Interface, discoveryClient discovery.DiscoveryInterface, mapper meta.ResettableRESTMapper, opts Options) *ControlPlaneStateImporter {
+func NewControlPlaneStateImporter(dynamicClient dynamic.Interface, discoveryClient discovery.DiscoveryInterface, appsClient appsv1.AppsV1Interface, mapper meta.ResettableRESTMapper, opts Options) *ControlPlaneStateImporter {
 	return &ControlPlaneStateImporter{
 		dynamicClient:   dynamicClient,
 		discoveryClient: discoveryClient,
+		appsClient:      appsClient,
 		resourceMapper:  mapper,
 		options:         opts,
 	}
@@ -99,17 +106,20 @@ func (im *ControlPlaneStateImporter) Import(ctx context.Context) error { // noli
 	// Reading state from the archive
 	unarchiveMsg := "Reading state from the archive... "
 	s, _ := upterm.CheckmarkSuccessSpinner.Start(unarchiveMsg)
-	fs := afero.Afero{Fs: afero.NewMemMapFs()}
 
-	if err := im.unarchive(ctx, fs); err != nil {
-		s.Fail(unarchiveMsg + "Failed!")
-		return errors.Wrap(err, "cannot unarchive export archive")
+	if im.fs == nil {
+		im.fs = &afero.Afero{Fs: afero.NewMemMapFs()}
+
+		if err := im.unarchive(ctx, *im.fs); err != nil {
+			s.Fail(unarchiveMsg + "Failed!")
+			return errors.Wrap(err, "cannot unarchive export archive")
+		}
 	}
 
 	s.Success(unarchiveMsg + "Done! 👀")
 	//////////////////////////////////////////
 
-	r := NewPausingResourceImporter(NewFileSystemReader(fs), NewUnstructuredResourceApplier(im.dynamicClient, im.resourceMapper))
+	r := NewPausingResourceImporter(NewFileSystemReader(*im.fs), NewUnstructuredResourceApplier(im.dynamicClient, im.resourceMapper))
 
 	// Import base resources
 	importBaseMsg := "Importing base resources... "
@@ -162,7 +172,7 @@ func (im *ControlPlaneStateImporter) Import(ctx context.Context) error { // noli
 	// Import remaining resources
 	importRemainingMsg := "Importing remaining resources... "
 	s, _ = upterm.CheckmarkSuccessSpinner.Start(importRemainingMsg)
-	grs, err := fs.ReadDir("/")
+	grs, err := im.fs.ReadDir("/")
 	if err != nil {
 		s.Fail(importRemainingMsg + "Failed!")
 		return errors.Wrap(err, "cannot list group resources")
@@ -201,19 +211,20 @@ func (im *ControlPlaneStateImporter) Import(ctx context.Context) error { // noli
 	finalizeMsg := "Finalizing import... "
 	s, _ = upterm.CheckmarkSuccessSpinner.Start(finalizeMsg)
 	cm := category.NewAPICategoryModifier(im.dynamicClient, im.discoveryClient)
-	_, err = cm.ModifyResources(ctx, "claim", func(u *unstructured.Unstructured) error {
-		xpmeta.RemoveAnnotations(u, "crossplane.io/paused")
-		return nil
-	})
-	if err != nil {
-		return errors.Wrap(err, "cannot unpause claims")
-	}
 	_, err = cm.ModifyResources(ctx, "composite", func(u *unstructured.Unstructured) error {
 		xpmeta.RemoveAnnotations(u, "crossplane.io/paused")
 		return nil
 	})
 	if err != nil {
 		return errors.Wrap(err, "cannot unpause composites")
+	}
+
+	_, err = cm.ModifyResources(ctx, "claim", func(u *unstructured.Unstructured) error {
+		xpmeta.RemoveAnnotations(u, "crossplane.io/paused")
+		return nil
+	})
+	if err != nil {
+		return errors.Wrap(err, "cannot unpause claims")
 	}
 	s.Success(finalizeMsg + "Done! 🎉")
 
@@ -233,6 +244,52 @@ func (im *ControlPlaneStateImporter) Import(ctx context.Context) error { // noli
 
 	fmt.Println("\nSuccessfully imported control plane state!")
 	return nil
+}
+
+func (im *ControlPlaneStateImporter) PreflightChecks(ctx context.Context) []error {
+	observed, err := crossplane.CollectInfo(ctx, im.appsClient)
+	if err != nil {
+		return []error{errors.Wrap(err, "Cannot get Crossplane info")}
+	}
+
+	if im.fs == nil {
+		im.fs = &afero.Afero{Fs: afero.NewMemMapFs()}
+
+		if err := im.unarchive(ctx, *im.fs); err != nil {
+			return []error{errors.Wrap(err, "Cannot unarchive export archive")}
+		}
+	}
+	b, err := im.fs.ReadFile("export.yaml")
+	if err != nil {
+		return []error{errors.Wrap(err, "Cannot read export metadata")}
+	}
+	em := &v1alpha1.ExportMeta{}
+	if err = yaml.Unmarshal(b, em); err != nil {
+		return []error{errors.Wrap(err, "Cannot unmarshal export metadata")}
+	}
+
+	var errs []error
+
+	if observed.Version != em.Crossplane.Version {
+		errs = append(errs, errors.Errorf("Crossplane version %q does not match exported version %q", observed.Version, em.Crossplane.Version))
+	}
+
+	for _, ff := range em.Crossplane.FeatureFlags {
+		if !contains(observed.FeatureFlags, ff) {
+			errs = append(errs, errors.Errorf("Feature flag %q was set in the exported control plane but is not set in the target control plane for import.", ff))
+		}
+	}
+
+	return errs
+}
+
+func contains(ss []string, s string) bool {
+	for _, v := range ss {
+		if v == s {
+			return true
+		}
+	}
+	return false
 }
 
 func (im *ControlPlaneStateImporter) unarchive(ctx context.Context, fs afero.Afero) error {
@@ -304,7 +361,7 @@ func (im *ControlPlaneStateImporter) waitForConditions(ctx context.Context, sp *
 	}
 
 	success := false
-	timeout := 5 * time.Minute
+	timeout := 10 * time.Minute
 	ctx, cancel := context.WithTimeout(ctx, timeout)
 	wait.UntilWithContext(ctx, func(ctx context.Context) {
 		resourceList, err := im.dynamicClient.Resource(rm.Resource).List(ctx, v1.ListOptions{})

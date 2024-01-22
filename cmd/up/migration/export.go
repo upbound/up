@@ -1,4 +1,4 @@
-// Copyright 2023 Upbound Inc
+// Copyright 2024 Upbound Inc
 //
 // Licensed under the Apache License, Version 2.0 (the "License");
 // you may not use this file except in compliance with the License.
@@ -16,15 +16,18 @@ package migration
 
 import (
 	"context"
-	"github.com/upbound/up/internal/input"
-	"github.com/upbound/up/internal/migration"
-	"github.com/upbound/up/internal/migration/exporter"
+	"fmt"
+
 	apiextensionsclientset "k8s.io/apiextensions-apiserver/pkg/client/clientset/clientset"
 	"k8s.io/client-go/discovery"
 	"k8s.io/client-go/discovery/cached/memory"
 	"k8s.io/client-go/dynamic"
 	appsv1 "k8s.io/client-go/kubernetes/typed/apps/v1"
 	"k8s.io/client-go/restmapper"
+
+	"github.com/upbound/up/internal/input"
+	"github.com/upbound/up/internal/migration"
+	"github.com/upbound/up/internal/migration/exporter"
 )
 
 const secretsWarning = `Warning: A functional Crossplane control plane requires cloud provider credentials,
@@ -98,6 +101,8 @@ func (c *exportCmd) Run(ctx context.Context, migCtx *migration.Context) error {
 		if res != "y" {
 			return nil
 		}
+		// Print a newline to separate the prompt from the output.
+		fmt.Println()
 	}
 
 	if err = e.Export(ctx); err != nil {
