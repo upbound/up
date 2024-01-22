@@ -22,5 +22,5 @@ type Options struct {
 
 	Description string
 
-	ConfigurationName string
+	ConfigurationName *string
 }

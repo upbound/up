@@ -270,5 +270,3 @@ replace (
 	github.com/docker/cli => github.com/docker/cli v20.10.19+incompatible
 	github.com/docker/docker => github.com/docker/docker v20.10.19+incompatible
 )
-
-replace github.com/upbound/up-sdk-go => /Users/ben/src/up-sdk-go

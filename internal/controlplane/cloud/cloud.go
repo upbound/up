@@ -124,9 +124,9 @@ func (c *Client) Create(ctx context.Context, name string, opts controlplane.Opti
 		Name:        name,
 		Description: opts.Description,
 	}
-	if opts.ConfigurationName != "" {
+	if opts.ConfigurationName != nil {
 		// Get the UUID from the Configuration name, if it exists.
-		cfg, err := c.cfg.Get(ctx, c.account, opts.ConfigurationName)
+		cfg, err := c.cfg.Get(ctx, c.account, *opts.ConfigurationName)
 		if err != nil {
 			return nil, err
 		}
