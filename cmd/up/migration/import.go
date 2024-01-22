@@ -30,6 +30,9 @@ import (
 )
 
 type importCmd struct {
+	Input string `short:"i" help:"Input archive path." default:"xp-state.tar.gz"`
+
+	UnpauseAfterImport bool `help:"Unpause all managed resources after importing." default:"true"`
 }
 
 func (c *importCmd) Run(ctx context.Context, migCtx *migration.Context) error {
@@ -50,9 +53,9 @@ func (c *importCmd) Run(ctx context.Context, migCtx *migration.Context) error {
 	mapper := restmapper.NewDeferredDiscoveryRESTMapper(memory.NewMemCacheClient(discoveryClient))
 
 	i := importer.NewControlPlaneStateImporter(dynamicClient, discoveryClient, mapper, importer.Options{
-		InputArchive: "xp-state.tar.gz",
+		InputArchive: c.Input,
 
-		UnpauseAfterExport: true,
+		UnpauseAfterImport: true,
 	})
 	if err = i.Import(ctx); err != nil {
 		return err

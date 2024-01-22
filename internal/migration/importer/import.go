@@ -70,7 +70,7 @@ var (
 type Options struct {
 	InputArchive string // default: xp-state.tar.gz
 
-	UnpauseAfterExport bool // default: false
+	UnpauseAfterImport bool // default: false
 }
 
 type ControlPlaneStateImporter struct {
@@ -217,7 +217,7 @@ func (im *ControlPlaneStateImporter) Import(ctx context.Context) error { // noli
 	}
 	s.Success(finalizeMsg + "Done! 🎉")
 
-	if im.options.UnpauseAfterExport {
+	if im.options.UnpauseAfterImport {
 		unpauseMsg := "Unpausing managed resources ... "
 		s, _ := upterm.CheckmarkSuccessSpinner.Start(unpauseMsg)
 		_, err = cm.ModifyResources(ctx, "managed", func(u *unstructured.Unstructured) error {
