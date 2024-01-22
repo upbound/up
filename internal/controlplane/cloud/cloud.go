@@ -120,17 +120,20 @@ func (c *Client) List(ctx context.Context) ([]*controlplane.Response, error) {
 
 // Create a new ControlPlane with the given name and the supplied Options.
 func (c *Client) Create(ctx context.Context, name string, opts controlplane.Options) (*controlplane.Response, error) {
-	// Get the UUID from the Configuration name, if it exists.
-	cfg, err := c.cfg.Get(ctx, c.account, opts.ConfigurationName)
-	if err != nil {
-		return nil, err
+	params := &controlplanes.ControlPlaneCreateParameters{
+		Name:        name,
+		Description: opts.Description,
+	}
+	if opts.ConfigurationName != "" {
+		// Get the UUID from the Configuration name, if it exists.
+		cfg, err := c.cfg.Get(ctx, c.account, opts.ConfigurationName)
+		if err != nil {
+			return nil, err
+		}
+		params.ConfigurationID = &cfg.ID
 	}
 
-	resp, err := c.ctp.Create(ctx, c.account, &controlplanes.ControlPlaneCreateParameters{
-		Name:            name,
-		Description:     opts.Description,
-		ConfigurationID: cfg.ID,
-	})
+	resp, err := c.ctp.Create(ctx, c.account, params)
 	if err != nil {
 		return nil, err
 	}
@@ -158,16 +161,10 @@ func (c *Client) GetKubeConfig(ctx context.Context, name string) (*api.Config, e
 }
 
 func convert(ctp *controlplanes.ControlPlaneResponse) *controlplane.Response {
-
-	var cfgName string
-	var cfgStatus string
-	// All Upbound managed control planes in an account should be associated to a configuration.
-	// However, we should still list all control planes and indicate where this isn't the case.
-	if ctp.ControlPlane.Configuration.Name != nil && ctp.ControlPlane.Configuration != EmptyControlPlaneConfiguration() {
+	cfgName, cfgStatus := notAvailable, notAvailable
+	if ctp.ControlPlane.Configuration != nil {
 		cfgName = *ctp.ControlPlane.Configuration.Name
 		cfgStatus = string(ctp.ControlPlane.Configuration.Status)
-	} else {
-		cfgName, cfgStatus = notAvailable, notAvailable
 	}
 
 	return &controlplane.Response{
@@ -177,11 +174,4 @@ func convert(ctp *controlplanes.ControlPlaneResponse) *controlplane.Response {
 		Cfg:       cfgName,
 		CfgStatus: cfgStatus,
 	}
-}
-
-// EmptyControlPlaneConfiguration returns an empty ControlPlaneConfiguration with default values.
-func EmptyControlPlaneConfiguration() controlplanes.ControlPlaneConfiguration {
-	configuration := controlplanes.ControlPlaneConfiguration{}
-	configuration.Status = controlplanes.ConfigurationInstallationQueued
-	return configuration
 }

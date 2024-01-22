@@ -33,7 +33,7 @@ require (
 	github.com/sourcegraph/jsonrpc2 v0.2.0
 	github.com/spf13/afero v1.10.0
 	github.com/spf13/cobra v1.7.0
-	github.com/upbound/up-sdk-go v0.1.1-0.20230405182644-366f20e6aa5f
+	github.com/upbound/up-sdk-go v0.1.1-0.20240122203953-2d00664aab8e
 	github.com/willabides/kongplete v0.3.0
 	golang.org/x/exp v0.0.0-20230713183714-613f0c0eb8a1
 	golang.org/x/sync v0.3.0
@@ -270,3 +270,5 @@ replace (
 	github.com/docker/cli => github.com/docker/cli v20.10.19+incompatible
 	github.com/docker/docker => github.com/docker/docker v20.10.19+incompatible
 )
+
+replace github.com/upbound/up-sdk-go => /Users/ben/src/up-sdk-go

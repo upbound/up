@@ -38,7 +38,7 @@ type ctpCreator interface {
 type createCmd struct {
 	Name string `arg:"" required:"" help:"Name of control plane."`
 
-	ConfigurationName string `help:"The name of the Configuration. This property is required for cloud control planes."`
+	ConfigurationName string `help:"The optional name of the Configuration."`
 	Description       string `short:"d" help:"Description for control plane."`
 
 	SecretName      string `help:"The name of the control plane's secret. Defaults to 'kubeconfig-{control plane name}'. Only applicable for Space control planes."`
