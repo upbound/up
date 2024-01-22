@@ -16,19 +16,30 @@ package migration
 
 import (
 	"context"
-
+	"github.com/upbound/up/internal/input"
+	"github.com/upbound/up/internal/migration"
+	"github.com/upbound/up/internal/migration/exporter"
 	apiextensionsclientset "k8s.io/apiextensions-apiserver/pkg/client/clientset/clientset"
 	"k8s.io/client-go/discovery"
 	"k8s.io/client-go/discovery/cached/memory"
 	"k8s.io/client-go/dynamic"
 	appsv1 "k8s.io/client-go/kubernetes/typed/apps/v1"
 	"k8s.io/client-go/restmapper"
-
-	"github.com/upbound/up/internal/migration"
-	"github.com/upbound/up/internal/migration/exporter"
 )
 
+const secretsWarning = `Warning: A functional Crossplane control plane requires cloud provider credentials,
+which are stored as Kubernetes secrets. Additionally, some managed resources provide
+connection details exclusively during provisioning, and these details may not be
+reconstructable post-migration. Consequently, the exported archive will incorporate
+those secrets by default. To exclude secrets from the export, please use the
+--excluded-resources flag.
+
+IMPORTANT: The exported archive will contain secrets. Do you wish to proceed? [y/n]`
+
 type exportCmd struct {
+	prompter input.Prompter
+	Yes      bool `help:"Skip confirmation prompts."`
+
 	Output string `short:"o" help:"Output archive path." default:"xp-state.tar.gz"`
 
 	IncludedResources []string `help:"Included additional resources." default:"namespaces,configmaps,secrets"` // + all Crossplane resources
@@ -38,6 +49,12 @@ type exportCmd struct {
 	ExcludedNamespaces []string `help:"Namespaces that should not be exported." default:"kube-system,kube-public,kube-node-lease,local-path-storage"`
 
 	PauseBeforeExport bool `help:"Pause all managed resources before exporting." default:"false"`
+}
+
+// BeforeApply sets default values for the delete command, before assignment and validation.
+func (c *exportCmd) BeforeApply() error {
+	c.prompter = input.NewPrompter()
+	return nil
 }
 
 func (c *exportCmd) Run(ctx context.Context, migCtx *migration.Context) error {
@@ -65,11 +82,24 @@ func (c *exportCmd) Run(ctx context.Context, migCtx *migration.Context) error {
 	e := exporter.NewControlPlaneStateExporter(crdClient, dynamicClient, discoveryClient, appsClient, mapper, exporter.Options{
 		OutputArchive: c.Output,
 
+		IncludedNamespaces: c.IncludedNamespaces,
 		ExcludedNamespaces: c.ExcludedNamespaces,
 		IncludedResources:  c.IncludedResources,
+		ExcludedResources:  c.ExcludedResources,
 
 		PauseBeforeExport: c.PauseBeforeExport,
 	})
+
+	if !c.Yes && e.IncludedExtraResource("secrets") {
+		res, err := c.prompter.Prompt(secretsWarning, false)
+		if err != nil {
+			return err
+		}
+		if res != "y" {
+			return nil
+		}
+	}
+
 	if err = e.Export(ctx); err != nil {
 		return err
 	}

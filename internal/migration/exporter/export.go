@@ -169,12 +169,10 @@ func (e *ControlPlaneStateExporter) Export(ctx context.Context) error { // nolin
 	exportNativeMsg := "Exporting native resources... "
 	s, _ = upterm.CheckmarkSuccessSpinner.Start(exportNativeMsg + fmt.Sprintf("0 / %d", len(e.options.IncludedResources)))
 	nativeCounts := make(map[string]int, len(e.options.IncludedResources))
-	for _, r := range e.options.IncludedResources {
-		// TODO(turkenh): Proper parsing / resolving resources to GVRs.
-		gvr := schema.GroupVersionResource{
-			Group:    "",
-			Version:  "v1",
-			Resource: r,
+	for r := range e.extraResources() {
+		gvr, err := e.resourceMapper.ResourceFor(schema.ParseGroupResource(r).WithVersion(""))
+		if err != nil {
+			return errors.Wrapf(err, "cannot get GVR for %q", r)
 		}
 		exporter := NewUnstructuredExporter(
 			NewUnstructuredFetcher(e.dynamicClient, e.options),
@@ -215,6 +213,16 @@ func (e *ControlPlaneStateExporter) Export(ctx context.Context) error { // nolin
 	return nil
 }
 
+func (e *ControlPlaneStateExporter) IncludedExtraResource(gr string) bool {
+	for r := range e.extraResources() {
+		if gr == r {
+			return true
+		}
+	}
+
+	return false
+}
+
 func (e *ControlPlaneStateExporter) shouldExport(in apiextensionsv1.CustomResourceDefinition) bool {
 	for _, ref := range in.GetOwnerReferences() {
 		if ref.APIVersion == "pkg.crossplane.io/v1" {
@@ -235,14 +243,19 @@ func (e *ControlPlaneStateExporter) shouldExport(in apiextensionsv1.CustomResour
 		return true
 	}
 
+	return e.IncludedExtraResource(in.GetName())
+}
+
+func (e *ControlPlaneStateExporter) extraResources() map[string]struct{} {
+	extra := make(map[string]struct{}, len(e.options.IncludedResources))
 	for _, r := range e.options.IncludedResources {
-		if in.GetName() == r {
-			// If there are any extra CRs that we want to export.
-			return true
-		}
+		extra[r] = struct{}{}
 	}
 
-	return false
+	for _, r := range e.options.ExcludedResources {
+		delete(extra, r)
+	}
+	return extra
 }
 
 func (e *ControlPlaneStateExporter) customResourceGVR(in apiextensionsv1.CustomResourceDefinition) (schema.GroupVersionResource, error) {

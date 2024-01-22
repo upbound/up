@@ -22,9 +22,9 @@ import (
 
 	"github.com/crossplane/crossplane-runtime/pkg/errors"
 	"github.com/spf13/afero"
+	"gopkg.in/yaml.v3"
 	v1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	appsv1 "k8s.io/client-go/kubernetes/typed/apps/v1"
-	"sigs.k8s.io/yaml"
 
 	"github.com/upbound/up/internal/migration/meta/v1alpha1"
 )
