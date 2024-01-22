@@ -15,10 +15,11 @@
 package importer
 
 import (
-	"archive/tar"
 	"compress/gzip"
 	"context"
 	"fmt"
+	"github.com/mholt/archiver/v4"
+	"io"
 	"os"
 	"strings"
 	"time"
@@ -31,7 +32,6 @@ import (
 	"github.com/crossplane/crossplane-runtime/pkg/errors"
 	"github.com/crossplane/crossplane-runtime/pkg/fieldpath"
 	"github.com/spf13/afero"
-	"github.com/spf13/afero/tarfs"
 	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/meta"
 	v1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -91,24 +91,13 @@ func (im *ControlPlaneStateImporter) Import(ctx context.Context) error { // noli
 	// Reading state from the archive
 	unarchiveMsg := "Reading state from the archive... "
 	s, _ := upterm.CheckmarkSuccessSpinner.Start(unarchiveMsg)
-	g, err := os.Open(im.options.InputArchive)
-	if err != nil {
-		s.Fail(unarchiveMsg + "Failed!")
-		return errors.Wrap(err, "cannot open input archive")
-	}
-	defer func() {
-		_ = g.Close()
-	}()
+	fs := afero.Afero{Fs: afero.NewMemMapFs()}
 
-	ur, err := gzip.NewReader(g)
-	if err != nil {
+	if err := im.unarchive(ctx, fs); err != nil {
 		s.Fail(unarchiveMsg + "Failed!")
-		return errors.Wrap(err, "cannot decompress archive")
+		return errors.Wrap(err, "cannot unarchive export archive")
 	}
-	defer func() {
-		_ = ur.Close()
-	}()
-	fs := afero.Afero{Fs: tarfs.New(tar.NewReader(ur))}
+
 	s.Success(unarchiveMsg + "Done! 👀")
 	//////////////////////////////////////////
 
@@ -137,7 +126,7 @@ func (im *ControlPlaneStateImporter) Import(ctx context.Context) error { // noli
 	// Wait for all base resources to be ready
 	waitXRDsMsg := "Waiting for XRDs... "
 	s, _ = upterm.CheckmarkSuccessSpinner.Start(waitXRDsMsg)
-	if err = im.waitForConditions(ctx, s, schema.GroupKind{Group: "apiextensions.crossplane.io", Kind: "CompositeResourceDefinition"}, []xpv1.ConditionType{"Established"}); err != nil {
+	if err := im.waitForConditions(ctx, s, schema.GroupKind{Group: "apiextensions.crossplane.io", Kind: "CompositeResourceDefinition"}, []xpv1.ConditionType{"Established"}); err != nil {
 		s.Fail(waitXRDsMsg + "Failed!")
 		return errors.Wrap(err, "there are unhealthy CompositeResourceDefinitions")
 	}
@@ -150,17 +139,19 @@ func (im *ControlPlaneStateImporter) Import(ctx context.Context) error { // noli
 		{Group: "pkg.crossplane.io", Kind: "Function"},
 		{Group: "pkg.crossplane.io", Kind: "Configuration"},
 	} {
-		if err = im.waitForConditions(ctx, s, k, []xpv1.ConditionType{"Installed", "Healthy"}); err != nil {
+		if err := im.waitForConditions(ctx, s, k, []xpv1.ConditionType{"Installed", "Healthy"}); err != nil {
 			s.Fail(waitPkgsMsg + "Failed!")
 			return errors.Wrapf(err, "there are unhealthy %qs", k.Kind)
 		}
 	}
 	s.Success(waitPkgsMsg + "Installed and Healthy! ⏳")
+	//////////////////////////////////////////
 
 	// Reset the resource mapper to make sure all CRDs introduced by packages
 	// or XRDs are available.
 	im.resourceMapper.Reset()
 
+	// Import remaining resources
 	importRemainingMsg := "Importing remaining resources... "
 	s, _ = upterm.CheckmarkSuccessSpinner.Start(importRemainingMsg)
 	grs, err := fs.ReadDir("/")
@@ -194,10 +185,87 @@ func (im *ControlPlaneStateImporter) Import(ctx context.Context) error { // noli
 	for _, count := range remainingCounts {
 		total += count
 	}
+
+	// All resources restored, now we can unpause claims/composites, while leaving managed resources to user.
+	grs, err = fs.ReadDir("/")
+
+	for _, info := range grs {
+		if info.Name() == "export.yaml" {
+			// This is the top level export metadata file, so nothing to import.
+			continue
+		}
+		if !info.IsDir() {
+			return errors.Errorf("unexpected file %q in root directory of exported state", info.Name())
+		}
+
+		if isBaseResource(info.Name()) {
+			// We already imported base resources above.
+			continue
+		}
+		_, err := r.UnpauseResources(ctx, info.Name(), []string{"claim", "composite"})
+		if err != nil {
+			return errors.Wrapf(err, "cannot unpause %q resources", info.Name())
+		}
+	}
+
 	s.Success(importRemainingMsg + fmt.Sprintf("%d resources imported! 📥", total))
+	//////////////////////////////////////////
 
 	fmt.Println("\nSuccessfully imported control plane state!")
 	return nil
+}
+
+func (im *ControlPlaneStateImporter) unarchive(ctx context.Context, fs afero.Afero) error {
+	g, err := os.Open(im.options.InputArchive)
+	if err != nil {
+		return errors.Wrap(err, "cannot open input archive")
+	}
+	defer func() {
+		_ = g.Close()
+	}()
+
+	ur, err := gzip.NewReader(g)
+	if err != nil {
+		return errors.Wrap(err, "cannot decompress archive")
+	}
+	defer func() {
+		_ = ur.Close()
+	}()
+
+	format := archiver.Tar{}
+
+	handler := func(ctx context.Context, f archiver.File) error {
+		if f.IsDir() {
+			if err = fs.Mkdir(f.NameInArchive, 0700); err != nil {
+				return errors.Wrapf(err, "cannot create directory %q", f.Name())
+			}
+			return nil
+		}
+
+		nf, err := fs.OpenFile(f.NameInArchive, os.O_WRONLY|os.O_CREATE|os.O_TRUNC, 0600)
+		if err != nil {
+			return errors.Wrapf(err, "cannot create file %q", f.Name())
+		}
+		defer func() {
+			_ = nf.Close()
+		}()
+
+		b, err := f.Open()
+		if err != nil {
+			return errors.Wrapf(err, "cannot open file %q", f.Name())
+		}
+		defer func() {
+			_ = b.Close()
+		}()
+		_, err = io.Copy(nf, b)
+		if err != nil {
+			return err
+		}
+
+		return nil
+	}
+
+	return format.Extract(ctx, ur, nil, handler)
 }
 
 func isBaseResource(gr string) bool {
