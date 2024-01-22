@@ -16,6 +16,7 @@ package importer
 
 import (
 	"context"
+	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 
 	"github.com/crossplane/crossplane-runtime/pkg/meta"
 
@@ -24,6 +25,7 @@ import (
 
 type ResourceImporter interface {
 	ImportResources(ctx context.Context, gr string) (int, error)
+	UnpauseResources(ctx context.Context, gr string, withCategories []string) (int, error)
 }
 
 type PausingResourceImporter struct {
@@ -61,6 +63,40 @@ func (im *PausingResourceImporter) ImportResources(ctx context.Context, gr strin
 
 	if err = im.applier.ApplyResources(ctx, resources, sub); err != nil {
 		return 0, errors.Wrapf(err, "cannot apply %q resources", gr)
+	}
+
+	return len(resources), nil
+}
+
+func (im *PausingResourceImporter) UnpauseResources(ctx context.Context, gr string, withCategories []string) (int, error) {
+	resources, typeMeta, err := im.reader.ReadResources(gr)
+	if err != nil {
+		return 0, errors.Wrapf(err, "cannot get %q resources", gr)
+	}
+
+	match := false
+	if typeMeta != nil {
+		for _, wc := range withCategories {
+			for _, c := range typeMeta.Categories {
+				if c == wc {
+					match = true
+					break
+				}
+			}
+		}
+	}
+
+	if !match {
+		return 0, nil
+	}
+
+	// Resources contains the manifests from the export, which doesn't have the paused annotations we added during
+	// import. So, we just need to apply it to get the annotations we added to be removed.
+	if err = im.applier.ModifyResources(ctx, resources, func(u *unstructured.Unstructured) error {
+		meta.RemoveAnnotations(u, "crossplane.io/paused")
+		return nil
+	}); err != nil {
+		return 0, errors.Wrapf(err, "cannot apply %q resources to get paused annotations removed", gr)
 	}
 
 	return len(resources), nil

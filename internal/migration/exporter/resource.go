@@ -63,6 +63,7 @@ func (e *UnstructuredExporter) ExportResources(ctx context.Context, gvr schema.G
 func cleanupClusterSpecificData(u *unstructured.Unstructured) error {
 	paved := fieldpath.Pave(u.Object)
 
+	// Remove cluster specific data. Similar to Velero: https://github.com/vmware-tanzu/velero/blob/a81e049d362557c311cf8615c2c9c8bf77edf969/pkg/restore/restore.go#L2045
 	for _, f := range []string{"generateName", "selfLink", "uid", "resourceVersion", "generation", "creationTimestamp", "ownerReferences", "managedFields"} {
 		err := paved.DeleteField(fmt.Sprintf("metadata.%s", f))
 		if err != nil {

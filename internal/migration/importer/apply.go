@@ -28,6 +28,7 @@ import (
 
 type ResourceApplier interface {
 	ApplyResources(ctx context.Context, resources []unstructured.Unstructured, applyStatus bool) error
+	ModifyResources(ctx context.Context, resources []unstructured.Unstructured, modify func(*unstructured.Unstructured) error) error
 }
 
 type UnstructuredResourceApplier struct {
@@ -65,6 +66,34 @@ func (a *UnstructuredResourceApplier) ApplyResources(ctx context.Context, resour
 				FieldManager: "up-controlplane-migrator",
 				Force:        true,
 			})
+			if err != nil {
+				return err
+			}
+			return nil
+		})
+		if err != nil {
+			return errors.Wrapf(err, "cannot apply resource %s/%s", resources[i].GetKind(), resources[i].GetName())
+		}
+	}
+	return nil
+}
+
+func (a *UnstructuredResourceApplier) ModifyResources(ctx context.Context, resources []unstructured.Unstructured, modify func(*unstructured.Unstructured) error) error {
+	for i := range resources {
+		err := retry.OnError(retry.DefaultRetry, resource.IsAPIError, func() error {
+			rm, err := a.resourceMapper.RESTMapping(resources[i].GroupVersionKind().GroupKind(), resources[i].GroupVersionKind().Version)
+			if err != nil {
+				return err
+			}
+			u, err := a.dynamicClient.Resource(rm.Resource).Namespace(resources[i].GetNamespace()).Get(ctx, resources[i].GetName(), v1.GetOptions{})
+			if err != nil {
+				return err
+			}
+			if err := modify(u); err != nil {
+				return err
+			}
+
+			_, err = a.dynamicClient.Resource(rm.Resource).Namespace(resources[i].GetNamespace()).Update(ctx, u, v1.UpdateOptions{})
 			if err != nil {
 				return err
 			}
