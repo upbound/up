@@ -42,11 +42,11 @@ import (
 type Options struct {
 	OutputArchive string // default: xp-state.tar.gz
 
-	IncludedNamespaces []string // default: none
-	ExcludedNamespaces []string // default: except kube-system, kube-public, kube-node-lease, local-path-storage
+	IncludeNamespaces []string // default: none
+	ExcludeNamespaces []string // default: except kube-system, kube-public, kube-node-lease, local-path-storage
 
-	IncludedResources []string // default: namespaces, configmaps, secrets ( + all Crossplane resources)
-	ExcludedResources []string // default: none
+	IncludeResources []string // default: namespaces, configmaps, secrets ( + all Crossplane resources)
+	ExcludeResources []string // default: none
 
 	PauseBeforeExport bool // default: false
 }
@@ -77,7 +77,7 @@ func (e *ControlPlaneStateExporter) Export(ctx context.Context) error { // nolin
 	pterm.EnableStyling()
 	upterm.DefaultObjPrinter.Pretty = true
 
-	fmt.Println("Exporting control plane state...")
+	pterm.Println("Exporting control plane state...")
 
 	fs := afero.Afero{Fs: afero.NewOsFs()}
 	tmpDir, err := fs.TempDir("", "up")
@@ -166,8 +166,8 @@ func (e *ControlPlaneStateExporter) Export(ctx context.Context) error { // nolin
 
 	// Export native resources.
 	exportNativeMsg := "Exporting native resources... "
-	s, _ = upterm.CheckmarkSuccessSpinner.Start(exportNativeMsg + fmt.Sprintf("0 / %d", len(e.options.IncludedResources)))
-	nativeCounts := make(map[string]int, len(e.options.IncludedResources))
+	s, _ = upterm.CheckmarkSuccessSpinner.Start(exportNativeMsg + fmt.Sprintf("0 / %d", len(e.options.IncludeResources)))
+	nativeCounts := make(map[string]int, len(e.options.IncludeResources))
 	for r := range e.extraResources() {
 		gvr, err := e.resourceMapper.ResourceFor(schema.ParseGroupResource(r).WithVersion(""))
 		if err != nil {
@@ -208,7 +208,7 @@ func (e *ControlPlaneStateExporter) Export(ctx context.Context) error { // nolin
 	s.Success(archiveMsg + fmt.Sprintf("archived to %q! 📦", e.options.OutputArchive))
 	//////////////////////
 
-	fmt.Println("\nSuccessfully exported control plane state!")
+	pterm.Println("\nSuccessfully exported control plane state!")
 	return nil
 }
 
@@ -246,12 +246,12 @@ func (e *ControlPlaneStateExporter) shouldExport(in apiextensionsv1.CustomResour
 }
 
 func (e *ControlPlaneStateExporter) extraResources() map[string]struct{} {
-	extra := make(map[string]struct{}, len(e.options.IncludedResources))
-	for _, r := range e.options.IncludedResources {
+	extra := make(map[string]struct{}, len(e.options.IncludeResources))
+	for _, r := range e.options.IncludeResources {
 		extra[r] = struct{}{}
 	}
 
-	for _, r := range e.options.ExcludedResources {
+	for _, r := range e.options.ExcludeResources {
 		delete(extra, r)
 	}
 	return extra

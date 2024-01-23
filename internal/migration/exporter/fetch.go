@@ -43,12 +43,12 @@ type UnstructuredFetcher struct {
 }
 
 func NewUnstructuredFetcher(kube dynamic.Interface, opts Options) *UnstructuredFetcher {
-	inc := make(map[string]struct{}, len(opts.IncludedNamespaces))
-	for _, ns := range opts.IncludedNamespaces {
+	inc := make(map[string]struct{}, len(opts.IncludeNamespaces))
+	for _, ns := range opts.IncludeNamespaces {
 		inc[ns] = struct{}{}
 	}
-	exc := make(map[string]struct{}, len(opts.ExcludedNamespaces))
-	for _, ns := range opts.ExcludedNamespaces {
+	exc := make(map[string]struct{}, len(opts.ExcludeNamespaces))
+	for _, ns := range opts.ExcludeNamespaces {
 		exc[ns] = struct{}{}
 	}
 

@@ -139,7 +139,7 @@ type alpha struct {
 	ControlPlane controlplane.Cmd `cmd:"" hidden:"" name:"controlplane" aliases:"ctp" help:"Interact with control planes of the current profile, both in the cloud and in a local space."`
 	Upbound      upbound.Cmd      `cmd:"" maturity:"alpha" help:"Interact with Upbound."`
 	XPKG         xpkg.Cmd         `cmd:"" maturity:"alpha" help:"Interact with UXP packages."`
-	Migration    migration.Cmd    `cmd:"" maturity:"alpha" help:"Migrate control planes to Spaces."`
+	Migration    migration.Cmd    `cmd:"" maturity:"alpha" help:"Migrate control planes to Upbound Managed Control Planes."`
 }
 
 func main() {

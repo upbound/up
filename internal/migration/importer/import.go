@@ -71,9 +71,8 @@ var (
 )
 
 type Options struct {
-	InputArchive string // default: xp-state.tar.gz
-
-	UnpauseAfterImport bool // default: false
+	InputArchive       string // default: xp-state.tar.gz
+	UnpauseAfterImport bool   // default: false
 }
 
 type ControlPlaneStateImporter struct {
@@ -101,7 +100,7 @@ func (im *ControlPlaneStateImporter) Import(ctx context.Context) error { // noli
 	pterm.EnableStyling()
 	upterm.DefaultObjPrinter.Pretty = true
 
-	fmt.Println("Importing control plane state...")
+	pterm.Println("Importing control plane state...")
 
 	// Reading state from the archive
 	unarchiveMsg := "Reading state from the archive... "
@@ -242,7 +241,7 @@ func (im *ControlPlaneStateImporter) Import(ctx context.Context) error { // noli
 	}
 	//////////////////////////////////////////
 
-	fmt.Println("\nSuccessfully imported control plane state!")
+	pterm.Println("\nSuccessfully imported control plane state!")
 	return nil
 }
 
@@ -366,7 +365,7 @@ func (im *ControlPlaneStateImporter) waitForConditions(ctx context.Context, sp *
 	wait.UntilWithContext(ctx, func(ctx context.Context) {
 		resourceList, err := im.dynamicClient.Resource(rm.Resource).List(ctx, v1.ListOptions{})
 		if err != nil {
-			fmt.Printf("cannot list packages with error: %v\n", err)
+			pterm.Printf("cannot list packages with error: %v\n", err)
 			return
 		}
 		total := len(resourceList.Items)
@@ -375,7 +374,7 @@ func (im *ControlPlaneStateImporter) waitForConditions(ctx context.Context, sp *
 			paved := fieldpath.Pave(r.Object)
 			status := xpv1.ConditionedStatus{}
 			if err = paved.GetValueInto("status", &status); err != nil {
-				fmt.Printf("cannot get status for %q %q with error: %v\n", gk.Kind, r.GetName(), err)
+				pterm.Printf("cannot get status for %q %q with error: %v\n", gk.Kind, r.GetName(), err)
 				return
 			}
 

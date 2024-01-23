@@ -63,10 +63,10 @@ func (e *PersistentMetadataExporter) ExportMetadata(ctx context.Context, opts Op
 		Version:    "v1alpha1",
 		ExportedAt: time.Now(),
 		Options: v1alpha1.ExportOptions{
-			IncludedNamespaces: opts.IncludedNamespaces,
-			ExcludedNamespaces: opts.ExcludedNamespaces,
-			IncludedResources:  opts.IncludedResources,
-			ExcludedResources:  opts.ExcludedResources,
+			IncludedNamespaces: opts.IncludeNamespaces,
+			ExcludedNamespaces: opts.ExcludeNamespaces,
+			IncludedResources:  opts.IncludeResources,
+			ExcludedResources:  opts.ExcludeResources,
 		},
 		Crossplane: *xp,
 		Stats: v1alpha1.ExportStats{

@@ -35,11 +35,30 @@ import (
 
 type importCmd struct {
 	prompter input.Prompter
-	Yes      bool `help:"Skip confirmation prompts."`
+	Yes      bool `help:"When set to true, automatically accepts any confirmation prompts that may appear during the import process." default:"false"`
 
-	Input string `short:"i" help:"Input archive path." default:"xp-state.tar.gz"`
+	Input string `short:"i" help:"Specifies the file path of the archive to be imported. The default path is 'xp-state.tar.gz'." default:"xp-state.tar.gz"`
 
-	UnpauseAfterImport bool `help:"Unpause all managed resources after importing." default:"true"`
+	UnpauseAfterImport bool `help:"When set to true, automatically unpauses all managed resources that were paused during the import process. This helps in resuming normal operations post-import. Defaults to false, requiring manual unpausing of resources if needed." default:"false"`
+}
+
+func (c *importCmd) Help() string {
+	return `
+Usage:
+    migration import [options]
+
+The 'import' command imports a control plane state from an archive file into an Upbound managed control plane.
+
+By default, all managed resources will be paused during the import process for possible manual inspection/validation.
+You can use the --unpause-after-import flag to automatically unpause all managed resources after the import process completes.
+
+Examples:
+    migration import --input=my-export.tar.gz
+        Imports the control plane state from 'my-export.tar.gz'.
+
+    migration import --unpause-after-import
+        Imports and automatically unpauses managed resources after import.
+`
 }
 
 // BeforeApply sets default values for the delete command, before assignment and validation.

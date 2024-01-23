@@ -41,17 +41,40 @@ IMPORTANT: The exported archive will contain secrets. Do you wish to proceed? [y
 
 type exportCmd struct {
 	prompter input.Prompter
-	Yes      bool `help:"Skip confirmation prompts."`
 
-	Output string `short:"o" help:"Output archive path." default:"xp-state.tar.gz"`
+	Yes bool `help:"When set to true, automatically accepts any confirmation prompts that may appear during the export process." default:"false"`
 
-	IncludedResources []string `help:"Included additional resources." default:"namespaces,configmaps,secrets"` // + all Crossplane resources
-	ExcludedResources []string `help:"Resources that should not be exported."`                                 // default: none
+	Output string `short:"o" help:"Specifies the file path where the exported archive will be saved. Defaults to 'xp-state.tar.gz'." default:"xp-state.tar.gz"`
 
-	IncludedNamespaces []string `help:"Namespaces that should be exported."` // default: none
-	ExcludedNamespaces []string `help:"Namespaces that should not be exported." default:"kube-system,kube-public,kube-node-lease,local-path-storage"`
+	IncludeResources  []string `help:"A list of additional resource types to include in the export in \"resource.group\" format. By default, it includes namespaces, configmaps, secrets, and all Crossplane resources." default:"namespaces,configmaps,secrets"`
+	ExcludeResources  []string `help:"A list of resource types to exclude from the export in \"resource.group\" format. No resources are excluded by default."`
+	IncludeNamespaces []string `help:"A list of specific namespaces to include in the export. If not specified, all namespaces are included by default."`
+	ExcludeNamespaces []string `help:"A list of specific namespaces to exclude from the export. Defaults to 'kube-system', 'kube-public', 'kube-node-lease', and 'local-path-storage'." default:"kube-system,kube-public,kube-node-lease,local-path-storage"`
 
-	PauseBeforeExport bool `help:"Pause all managed resources before exporting." default:"false"`
+	PauseBeforeExport bool `help:"When set to true, pauses all managed resources before starting the export process. This can help ensure a consistent state for the export. Defaults to false." default:"false"`
+}
+
+func (c *exportCmd) Help() string {
+	return `
+Usage:
+    migration export [options]
+
+The 'export' command is used to export the current state of a Crossplane or Universal Crossplane (xp/uxp) control plane
+into an archive file. This file can then be used for migration to Upbound Managed Control Planes.
+
+Use the available options to customize the export process, such as specifying the output file path, including or excluding
+specific resources and namespaces, and deciding whether to pause managed resources before exporting.
+
+Examples:
+	migration export --pause-before-export
+        Pauses all managed resources first and exports the control plane state to the default archive file named 'xp-state.tar.gz'.
+    
+	migration export --output=my-export.tar.gz
+        Exports the control plane state to a specified file 'my-export.tar.gz'.
+
+    migration export --include-resources="customresource.group" --include-namespaces="crossplane-system,team-a,team-b"
+        Exports the control plane state to a default file 'xp-state.tar.gz', with the additional resource specified and only using provided namespaces.
+`
 }
 
 // BeforeApply sets default values for the delete command, before assignment and validation.
@@ -85,10 +108,10 @@ func (c *exportCmd) Run(ctx context.Context, migCtx *migration.Context) error {
 	e := exporter.NewControlPlaneStateExporter(crdClient, dynamicClient, discoveryClient, appsClient, mapper, exporter.Options{
 		OutputArchive: c.Output,
 
-		IncludedNamespaces: c.IncludedNamespaces,
-		ExcludedNamespaces: c.ExcludedNamespaces,
-		IncludedResources:  c.IncludedResources,
-		ExcludedResources:  c.ExcludedResources,
+		IncludeNamespaces: c.IncludeNamespaces,
+		ExcludeNamespaces: c.ExcludeNamespaces,
+		IncludeResources:  c.IncludeResources,
+		ExcludeResources:  c.ExcludeResources,
 
 		PauseBeforeExport: c.PauseBeforeExport,
 	})

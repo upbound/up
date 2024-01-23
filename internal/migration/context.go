@@ -21,5 +21,4 @@ import (
 // Context includes common data that migration commands may utilize.
 type Context struct {
 	Kubeconfig *rest.Config
-	Namespace  string
 }
