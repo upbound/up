@@ -67,6 +67,7 @@ func (e *PersistentMetadataExporter) ExportMetadata(ctx context.Context, opts Op
 			ExcludedNamespaces: opts.ExcludeNamespaces,
 			IncludedResources:  opts.IncludeResources,
 			ExcludedResources:  opts.ExcludeResources,
+			PausedBeforeExport: opts.PauseBeforeExport,
 		},
 		Crossplane: *xp,
 		Stats: v1alpha1.ExportStats{

@@ -70,11 +70,15 @@ var (
 	}
 )
 
+// Options are the options for the import command.
 type Options struct {
-	InputArchive       string // default: xp-state.tar.gz
-	UnpauseAfterImport bool   // default: false
+	// InputArchive is the path to the archive to be imported.
+	InputArchive string // default: xp-state.tar.gz
+	// UnpauseAfterImport indicates whether to unpause all managed resources after import.
+	UnpauseAfterImport bool // default: false
 }
 
+// ControlPlaneStateImporter is the importer for control plane state.
 type ControlPlaneStateImporter struct {
 	dynamicClient   dynamic.Interface
 	discoveryClient discovery.DiscoveryInterface
@@ -86,6 +90,7 @@ type ControlPlaneStateImporter struct {
 	options Options
 }
 
+// NewControlPlaneStateImporter creates a new importer for control plane state.
 func NewControlPlaneStateImporter(dynamicClient dynamic.Interface, discoveryClient discovery.DiscoveryInterface, appsClient appsv1.AppsV1Interface, mapper meta.ResettableRESTMapper, opts Options) *ControlPlaneStateImporter {
 	return &ControlPlaneStateImporter{
 		dynamicClient:   dynamicClient,
@@ -96,6 +101,7 @@ func NewControlPlaneStateImporter(dynamicClient dynamic.Interface, discoveryClie
 	}
 }
 
+// Import imports the control plane state.
 func (im *ControlPlaneStateImporter) Import(ctx context.Context) error { // nolint:gocyclo // This is the high level import command, so it's expected to be a bit complex.
 	pterm.EnableStyling()
 	upterm.DefaultObjPrinter.Pretty = true
@@ -106,7 +112,10 @@ func (im *ControlPlaneStateImporter) Import(ctx context.Context) error { // noli
 	unarchiveMsg := "Reading state from the archive... "
 	s, _ := upterm.CheckmarkSuccessSpinner.Start(unarchiveMsg)
 
+	// If preflight checks were already done, which unarchives to get the `export.yaml`, we don't need to do it again.
 	if im.fs == nil {
+		// We export the archive to a memory map file system. Assuming the archive is not too big
+		// (a bunch of yaml files, this should be fine).
 		im.fs = &afero.Afero{Fs: afero.NewMemMapFs()}
 
 		if err := im.unarchive(ctx, *im.fs); err != nil {
@@ -118,9 +127,13 @@ func (im *ControlPlaneStateImporter) Import(ctx context.Context) error { // noli
 	s.Success(unarchiveMsg + "Done! 👀")
 	//////////////////////////////////////////
 
+	// Pausing resource importer will import all resources.
+	// It will import all Claims, Composites and Managed resource with the `crossplane.io/paused` annotation set to `true`.
 	r := NewPausingResourceImporter(NewFileSystemReader(*im.fs), NewUnstructuredResourceApplier(im.dynamicClient, im.resourceMapper))
 
-	// Import base resources
+	// Import base resources which are defined with the `baseResources` variable.
+	// They could be considered as the custom or native resources that do not depend on any packages (e.g. Managed Resources) or XRDs (e.g. Claims/Composites).
+	// They are imported first to make sure that all the resources that depend on them can be imported at a later stage.
 	importBaseMsg := "Importing base resources... "
 	s, _ = upterm.CheckmarkSuccessSpinner.Start(importBaseMsg + fmt.Sprintf("0 / %d", len(baseResources)))
 	baseCounts := make(map[string]int, len(baseResources))
@@ -140,7 +153,8 @@ func (im *ControlPlaneStateImporter) Import(ctx context.Context) error { // noli
 	s.Success(importBaseMsg + fmt.Sprintf("%d resources imported! 📥", total))
 	//////////////////////////////////////////
 
-	// Wait for all base resources to be ready
+	// Wait for all XRDs and Packages to be ready before importing the resources that depend on them.
+
 	waitXRDsMsg := "Waiting for XRDs... "
 	s, _ = upterm.CheckmarkSuccessSpinner.Start(waitXRDsMsg)
 	if err := im.waitForConditions(ctx, s, schema.GroupKind{Group: "apiextensions.crossplane.io", Kind: "CompositeResourceDefinition"}, []xpv1.ConditionType{"Established"}); err != nil {
@@ -164,11 +178,10 @@ func (im *ControlPlaneStateImporter) Import(ctx context.Context) error { // noli
 	s.Success(waitPkgsMsg + "Installed and Healthy! ⏳")
 	//////////////////////////////////////////
 
-	// Reset the resource mapper to make sure all CRDs introduced by packages
-	// or XRDs are available.
+	// Reset the resource mapper to make sure all CRDs introduced by packages or XRDs are available.
 	im.resourceMapper.Reset()
 
-	// Import remaining resources
+	// Import remaining resources other than the base resources.
 	importRemainingMsg := "Importing remaining resources... "
 	s, _ = upterm.CheckmarkSuccessSpinner.Start(importRemainingMsg)
 	grs, err := im.fs.ReadDir("/")
@@ -206,7 +219,8 @@ func (im *ControlPlaneStateImporter) Import(ctx context.Context) error { // noli
 	s.Success(importRemainingMsg + fmt.Sprintf("%d resources imported! 📥", total))
 	//////////////////////////////////////////
 
-	// Finalize import
+	// At this stage, all the resources are imported, but Claims/Composites and Managed resources are paused.
+	// In the finalization step, we will unpause Claims and Composites but not Managed resources (i.e. not activate the control plane yet).
 	finalizeMsg := "Finalizing import... "
 	s, _ = upterm.CheckmarkSuccessSpinner.Start(finalizeMsg)
 	cm := category.NewAPICategoryModifier(im.dynamicClient, im.discoveryClient)
@@ -246,11 +260,13 @@ func (im *ControlPlaneStateImporter) Import(ctx context.Context) error { // noli
 }
 
 func (im *ControlPlaneStateImporter) PreflightChecks(ctx context.Context) []error {
+	// Read Crossplane information from the target control plane.
 	observed, err := crossplane.CollectInfo(ctx, im.appsClient)
 	if err != nil {
 		return []error{errors.Wrap(err, "Cannot get Crossplane info")}
 	}
 
+	// If the state archive not already unarchived, do it now, so that we can read the export metadata.
 	if im.fs == nil {
 		im.fs = &afero.Afero{Fs: afero.NewMemMapFs()}
 

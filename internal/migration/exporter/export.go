@@ -39,18 +39,26 @@ import (
 	"github.com/upbound/up/internal/upterm"
 )
 
+// Options for the exporter.
 type Options struct {
+	// OutputArchive is the path to the archive file to be created.
 	OutputArchive string // default: xp-state.tar.gz
 
+	// Namespaces to include in the export. If not specified, all namespaces are included.
 	IncludeNamespaces []string // default: none
+	// Namespaces to exclude from the export.
 	ExcludeNamespaces []string // default: except kube-system, kube-public, kube-node-lease, local-path-storage
 
+	// Resource types to include in the export.
 	IncludeResources []string // default: namespaces, configmaps, secrets ( + all Crossplane resources)
+	// Resource types to exclude from the export.
 	ExcludeResources []string // default: none
 
+	// PauseBeforeExport pauses all managed resources before starting the export process.
 	PauseBeforeExport bool // default: false
 }
 
+// ControlPlaneStateExporter exports the state of a Crossplane control plane.
 type ControlPlaneStateExporter struct {
 	crdClient       apiextensionsclientset.Interface
 	dynamicClient   dynamic.Interface
@@ -61,6 +69,7 @@ type ControlPlaneStateExporter struct {
 	options Options
 }
 
+// NewControlPlaneStateExporter returns a new ControlPlaneStateExporter.
 func NewControlPlaneStateExporter(crdClient apiextensionsclientset.Interface, dynamicClient dynamic.Interface, discoveryClient discovery.DiscoveryInterface, appsClient appsv1.AppsV1Interface, mapper meta.RESTMapper, opts Options) *ControlPlaneStateExporter {
 	return &ControlPlaneStateExporter{
 		crdClient:       crdClient,
@@ -73,13 +82,18 @@ func NewControlPlaneStateExporter(crdClient apiextensionsclientset.Interface, dy
 	}
 }
 
+// Export exports the state of the control plane.
 func (e *ControlPlaneStateExporter) Export(ctx context.Context) error { // nolint:gocyclo // This is the high level export command, so it's expected to be a bit complex.
 	pterm.EnableStyling()
 	upterm.DefaultObjPrinter.Pretty = true
 
 	pterm.Println("Exporting control plane state...")
 
+	// TODO(turkenh): Check if we can use `afero.NewMemMapFs()` just like import and avoid the need for a temporary directory.
 	fs := afero.Afero{Fs: afero.NewOsFs()}
+	// We are using a temporary directory to store the exported state before
+	// archiving it. This temporary directory will be deleted after the archive
+	// is created.
 	tmpDir, err := fs.TempDir("", "up")
 	if err != nil {
 		return errors.Wrap(err, "cannot create temporary directory")
@@ -92,6 +106,8 @@ func (e *ControlPlaneStateExporter) Export(ctx context.Context) error { // nolin
 		pauseMsg := "Pausing all managed resources before export... "
 		s, _ := upterm.CheckmarkSuccessSpinner.Start(pauseMsg)
 		cm := category.NewAPICategoryModifier(e.dynamicClient, e.discoveryClient)
+
+		// Modify all managed resources to add the "crossplane.io/paused: true" annotation.
 		count, err := cm.ModifyResources(ctx, "managed", func(u *unstructured.Unstructured) error {
 			xpmeta.AddAnnotations(u, map[string]string{"crossplane.io/paused": "true"})
 			return nil
@@ -113,6 +129,11 @@ func (e *ControlPlaneStateExporter) Export(ctx context.Context) error { // nolin
 	}
 	exportList := make([]apiextensionsv1.CustomResourceDefinition, 0, len(crdList))
 	for _, crd := range crdList {
+		// We only want to export the following types:
+		// - Crossplane Core CRDs - Has suffix ".crossplane.io".
+		// - CRDs owned by Crossplane packages - Has owner reference to a Crossplane package.
+		// - CRDs owned by a CompositeResourceDefinition - Has owner reference to a CompositeResourceDefinition.
+		// - Included extra resources - Specified by the user.
 		if !e.shouldExport(crd) {
 			// Ignore CRDs that we don't want to export.
 			continue
@@ -138,6 +159,8 @@ func (e *ControlPlaneStateExporter) Export(ctx context.Context) error { // nolin
 		sub := false
 		for _, vr := range crd.Spec.Versions {
 			if vr.Storage && vr.Subresources != nil && vr.Subresources.Status != nil {
+				// This CRD has a status subresource. We store this as a metadata per type and use
+				// it during import to determine if we should apply the status subresource.
 				sub = true
 				break
 			}
@@ -149,6 +172,8 @@ func (e *ControlPlaneStateExporter) Export(ctx context.Context) error { // nolin
 				WithStatusSubresource: sub,
 			}))
 
+		// ExportResource will fetch all resources of the given GVR and store them in the
+		// well-known directory structure.
 		count, err := exporter.ExportResources(ctx, gvr)
 		if err != nil {
 			s.Fail(exportCRsMsg + "Failed!")
@@ -168,6 +193,10 @@ func (e *ControlPlaneStateExporter) Export(ctx context.Context) error { // nolin
 	exportNativeMsg := "Exporting native resources... "
 	s, _ = upterm.CheckmarkSuccessSpinner.Start(exportNativeMsg + fmt.Sprintf("0 / %d", len(e.options.IncludeResources)))
 	nativeCounts := make(map[string]int, len(e.options.IncludeResources))
+
+	// In addition to the Crossplane resources, we also need to export some native resources. These are
+	// defaulted as "namespaces", "configmaps" and "secrets". However, the user can also specify additional
+	// resources to include or exclude the default ones.
 	for r := range e.extraResources() {
 		gvr, err := e.resourceMapper.ResourceFor(schema.ParseGroupResource(r).WithVersion(""))
 		if err != nil {
@@ -191,7 +220,10 @@ func (e *ControlPlaneStateExporter) Export(ctx context.Context) error { // nolin
 	s.Success(exportNativeMsg + fmt.Sprintf("%d resources exported! 📤", total))
 	//////////////////////
 
-	// Include export metadata.
+	// Export a top level metadata file. This file contains details like when the export was done,
+	// the version and feature flags of Crossplane and number of resources exported per type.
+	// This metadata file is used during import to determine if the import is compatible with the
+	// current Crossplane version and feature flags and also enables manual inspection the exported state.
 	me := NewPersistentMetadataExporter(e.appsClient, fs, tmpDir)
 	if err = me.ExportMetadata(ctx, e.options, nativeCounts, crCounts); err != nil {
 		return errors.Wrap(err, "cannot write export metadata")
@@ -224,6 +256,7 @@ func (e *ControlPlaneStateExporter) IncludedExtraResource(gr string) bool {
 
 func (e *ControlPlaneStateExporter) shouldExport(in apiextensionsv1.CustomResourceDefinition) bool {
 	for _, ref := range in.GetOwnerReferences() {
+		// Types owned by a Crossplane package.
 		if ref.APIVersion == "pkg.crossplane.io/v1" {
 			// Note: We could also check the kind and ensure it is owned by a
 			// Provider, Function or Configuration. However, this should be
@@ -232,6 +265,7 @@ func (e *ControlPlaneStateExporter) shouldExport(in apiextensionsv1.CustomResour
 			return true
 		}
 
+		// Types owned by a CompositeResourceDefinition, e.g. CRDs for Claims and CompositeResources.
 		if ref.APIVersion == "apiextensions.crossplane.io/v1" && ref.Kind == "CompositeResourceDefinition" {
 			return true
 		}

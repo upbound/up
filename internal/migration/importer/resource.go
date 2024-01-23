@@ -47,6 +47,9 @@ func (im *PausingResourceImporter) ImportResources(ctx context.Context, gr strin
 	if typeMeta != nil {
 		sub = typeMeta.WithStatusSubresource
 		for _, c := range typeMeta.Categories {
+			// We pause all resources that are managed, claim, or composite.
+			// - Claim/Composite: We don't want Crossplane controllers to create new resources before we import all.
+			// - Managed: Same reason as above, but also don't want to take control of cloud resources yet.
 			if c == "managed" || c == "claim" || c == "composite" {
 				for i := range resources {
 					meta.AddAnnotations(&resources[i], map[string]string{
