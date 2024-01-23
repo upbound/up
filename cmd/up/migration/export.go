@@ -46,10 +46,10 @@ type exportCmd struct {
 
 	Output string `short:"o" help:"Specifies the file path where the exported archive will be saved. Defaults to 'xp-state.tar.gz'." default:"xp-state.tar.gz"`
 
-	IncludeResources  []string `help:"A list of additional resource types to include in the export in \"resource.group\" format. By default, it includes namespaces, configmaps, secrets, and all Crossplane resources." default:"namespaces,configmaps,secrets"`
-	ExcludeResources  []string `help:"A list of resource types to exclude from the export in \"resource.group\" format. No resources are excluded by default."`
-	IncludeNamespaces []string `help:"A list of specific namespaces to include in the export. If not specified, all namespaces are included by default."`
-	ExcludeNamespaces []string `help:"A list of specific namespaces to exclude from the export. Defaults to 'kube-system', 'kube-public', 'kube-node-lease', and 'local-path-storage'." default:"kube-system,kube-public,kube-node-lease,local-path-storage"`
+	IncludeExtraResources []string `help:"A list of extra resource types to include in the export in \"resource.group\" format in addition to all Crossplane resources. By default, it includes namespaces, configmaps, secrets." default:"namespaces,configmaps,secrets"`
+	ExcludeResources      []string `help:"A list of resource types to exclude from the export in \"resource.group\" format. No resources are excluded by default."`
+	IncludeNamespaces     []string `help:"A list of specific namespaces to include in the export. If not specified, all namespaces are included by default."`
+	ExcludeNamespaces     []string `help:"A list of specific namespaces to exclude from the export. Defaults to 'kube-system', 'kube-public', 'kube-node-lease', and 'local-path-storage'." default:"kube-system,kube-public,kube-node-lease,local-path-storage"`
 
 	PauseBeforeExport bool `help:"When set to true, pauses all managed resources before starting the export process. This can help ensure a consistent state for the export. Defaults to false." default:"false"`
 }
@@ -72,7 +72,7 @@ Examples:
 	migration export --output=my-export.tar.gz
         Exports the control plane state to a specified file 'my-export.tar.gz'.
 
-    migration export --include-resources="customresource.group" --include-namespaces="crossplane-system,team-a,team-b"
+    migration export --include-extra-resources="customresource.group" --include-namespaces="crossplane-system,team-a,team-b"
         Exports the control plane state to a default file 'xp-state.tar.gz', with the additional resource specified and only using provided namespaces.
 `
 }
@@ -108,10 +108,10 @@ func (c *exportCmd) Run(ctx context.Context, migCtx *migration.Context) error {
 	e := exporter.NewControlPlaneStateExporter(crdClient, dynamicClient, discoveryClient, appsClient, mapper, exporter.Options{
 		OutputArchive: c.Output,
 
-		IncludeNamespaces: c.IncludeNamespaces,
-		ExcludeNamespaces: c.ExcludeNamespaces,
-		IncludeResources:  c.IncludeResources,
-		ExcludeResources:  c.ExcludeResources,
+		IncludeNamespaces:     c.IncludeNamespaces,
+		ExcludeNamespaces:     c.ExcludeNamespaces,
+		IncludeExtraResources: c.IncludeExtraResources,
+		ExcludeResources:      c.ExcludeResources,
 
 		PauseBeforeExport: c.PauseBeforeExport,
 	})

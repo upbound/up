@@ -49,8 +49,8 @@ type Options struct {
 	// Namespaces to exclude from the export.
 	ExcludeNamespaces []string // default: except kube-system, kube-public, kube-node-lease, local-path-storage
 
-	// Resource types to include in the export.
-	IncludeResources []string // default: namespaces, configmaps, secrets ( + all Crossplane resources)
+	// Extra resource types to include in the export.
+	IncludeExtraResources []string // default: namespaces, configmaps, secrets ( + all Crossplane resources)
 	// Resource types to exclude from the export.
 	ExcludeResources []string // default: none
 
@@ -191,8 +191,8 @@ func (e *ControlPlaneStateExporter) Export(ctx context.Context) error { // nolin
 
 	// Export native resources.
 	exportNativeMsg := "Exporting native resources... "
-	s, _ = upterm.CheckmarkSuccessSpinner.Start(exportNativeMsg + fmt.Sprintf("0 / %d", len(e.options.IncludeResources)))
-	nativeCounts := make(map[string]int, len(e.options.IncludeResources))
+	s, _ = upterm.CheckmarkSuccessSpinner.Start(exportNativeMsg + fmt.Sprintf("0 / %d", len(e.options.IncludeExtraResources)))
+	nativeCounts := make(map[string]int, len(e.options.IncludeExtraResources))
 
 	// In addition to the Crossplane resources, we also need to export some native resources. These are
 	// defaulted as "namespaces", "configmaps" and "secrets". However, the user can also specify additional
@@ -280,8 +280,8 @@ func (e *ControlPlaneStateExporter) shouldExport(in apiextensionsv1.CustomResour
 }
 
 func (e *ControlPlaneStateExporter) extraResources() map[string]struct{} {
-	extra := make(map[string]struct{}, len(e.options.IncludeResources))
-	for _, r := range e.options.IncludeResources {
+	extra := make(map[string]struct{}, len(e.options.IncludeExtraResources))
+	for _, r := range e.options.IncludeExtraResources {
 		extra[r] = struct{}{}
 	}
 

@@ -59,8 +59,8 @@ type ExportOptions struct {
 	IncludedNamespaces []string `json:"includedNamespaces,omitempty" yaml:"includedNamespaces,omitempty"`
 	// ExcludedNamespaces are the namespaces excluded from the export.
 	ExcludedNamespaces []string `json:"excludedNamespaces,omitempty" yaml:"excludedNamespaces,omitempty"`
-	// IncludedResources are the resources included in the export.
-	IncludedResources []string `json:"includedResources,omitempty" yaml:"includedResources,omitempty"`
+	// IncludedExtraResources are the resources included in the export.
+	IncludedExtraResources []string `json:"includedExtraResources,omitempty" yaml:"includedResources,omitempty"`
 	// ExcludedResources are the resources excluded from the export.
 	ExcludedResources []string `json:"excludedResources,omitempty" yaml:"excludedResources,omitempty"`
 	// PausedBeforeExport stores whether the resources were paused before the export.
