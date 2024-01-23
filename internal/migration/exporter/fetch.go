@@ -125,7 +125,7 @@ func (e *UnstructuredFetcher) shouldSkip(r unstructured.Unstructured) bool { // 
 	if r.GetKind() == "Secret" {
 		paved := fieldpath.Pave(r.Object)
 		s, _ := paved.GetString("type")
-		if s == "helm.sh/release.v1" {
+		if strings.HasPrefix(s, "helm.sh/release") { // e.g. "helm.sh/release.v1"
 			// We don't want to export Helm secrets.
 			return true
 		}
@@ -150,7 +150,7 @@ func (e *UnstructuredFetcher) shouldSkip(r unstructured.Unstructured) bool { // 
 		}
 	}
 
-	if r.GetKind() == "Lock" && r.GetAPIVersion() == "pkg.crossplane.io/v1beta1" {
+	if r.GetKind() == "Lock" && strings.HasPrefix(r.GetAPIVersion(), "pkg.crossplane.io") {
 		// We don't want to export package manager locks.
 		return true
 	}
