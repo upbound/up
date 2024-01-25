@@ -43,7 +43,7 @@ var (
 		MessageStyle: &pterm.Style{pterm.FgDefault},
 		Prefix: pterm.Prefix{
 			Style: &pterm.Style{pterm.FgLightMagenta},
-			Text:  " √ ",
+			Text:  " ✓ ",
 		},
 	}
 
