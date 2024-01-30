@@ -44,7 +44,7 @@ var (
 	ctp1 = controlplanes.ControlPlane{
 		Name: "ctp1",
 		ID:   uuid.MustParse("00000000-0000-0000-0000-000000000000"),
-		Configuration: controlplanes.ControlPlaneConfiguration{
+		Configuration: &controlplanes.ControlPlaneConfiguration{
 			Name:   pointer.String("cfg1"),
 			Status: controlplanes.ConfigurationReady,
 		},
@@ -53,7 +53,7 @@ var (
 	ctp2 = controlplanes.ControlPlane{
 		Name: "ctp2",
 		ID:   uuid.MustParse("00000000-0000-0000-0000-000000000001"),
-		Configuration: controlplanes.ControlPlaneConfiguration{
+		Configuration: &controlplanes.ControlPlaneConfiguration{
 			Name:   pointer.String("cfg1"),
 			Status: controlplanes.ConfigurationReady,
 		},
@@ -337,9 +337,8 @@ func TestConvert(t *testing.T) {
 			args: args{
 				ctp: &controlplanes.ControlPlaneResponse{
 					ControlPlane: controlplanes.ControlPlane{
-						Name:          "ctp1",
-						ID:            uuid.MustParse("00000000-0000-0000-0000-000000000000"),
-						Configuration: controlplanes.ControlPlaneConfiguration{},
+						Name: "ctp1",
+						ID:   uuid.MustParse("00000000-0000-0000-0000-000000000000"),
 					},
 				},
 			},
