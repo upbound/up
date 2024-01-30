@@ -39,7 +39,7 @@ import (
 
 var (
 	providerName = "provider-kubernetes"
-	version      = "v0.7.0"
+	version      = "v0.11.4"
 	pkgRef, _    = name.ParseReference(fmt.Sprintf("xpkg.upbound.io/crossplane-contrib/provider-kubernetes:%s", version))
 
 	objectsCRD = "objects.kubernetes.crossplane.io"

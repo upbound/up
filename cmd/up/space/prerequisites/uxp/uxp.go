@@ -36,7 +36,7 @@ var (
 	ns        = "upbound-system"
 	// Chart version to be installed. universal-crossplane does not include a
 	// v prefix.
-	version = "1.13.2-up.2"
+	version = "1.14.5-up.1"
 
 	xrdCRD = "compositeresourcedefinitions.apiextensions.crossplane.io"
 
