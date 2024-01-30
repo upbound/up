@@ -36,7 +36,7 @@ var (
 	ns        = "upbound-system"
 	// Chart version to be installed. universal-crossplane does not include a
 	// v prefix.
-	version = "1.13.2-up.2"
+	version = "1.14.5-up.1"
 
 	xrdCRD = "compositeresourcedefinitions.apiextensions.crossplane.io"
 
@@ -105,7 +105,11 @@ func (u *UXP) Install() error {
 	if err != nil && !kerrors.IsAlreadyExists(err) {
 		return errors.Wrap(err, fmt.Sprintf(errFmtCreateNamespace, ns))
 	}
-	return u.mgr.Install(version, map[string]any{})
+	return u.mgr.Install(version, map[string]any{
+		"args": []string{
+			"--enable-usages",
+		},
+	})
 }
 
 // IsInstalled checks if UXP has been installed in the target cluster.
