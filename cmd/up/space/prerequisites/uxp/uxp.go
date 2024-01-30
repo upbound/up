@@ -105,7 +105,11 @@ func (u *UXP) Install() error {
 	if err != nil && !kerrors.IsAlreadyExists(err) {
 		return errors.Wrap(err, fmt.Sprintf(errFmtCreateNamespace, ns))
 	}
-	return u.mgr.Install(version, map[string]any{})
+	return u.mgr.Install(version, map[string]any{
+		"args": []string{
+			"--enable-usages",
+		},
+	})
 }
 
 // IsInstalled checks if UXP has been installed in the target cluster.
