@@ -12,7 +12,7 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-package main
+package login
 
 import (
 	"context"
@@ -36,7 +36,7 @@ const (
 )
 
 // AfterApply sets default values in login after assignment and validation.
-func (c *logoutCmd) AfterApply(kongCtx *kong.Context) error {
+func (c *LogoutCmd) AfterApply(kongCtx *kong.Context) error {
 	upCtx, err := upbound.NewFromFlags(c.Flags)
 	if err != nil {
 		return err
@@ -50,8 +50,8 @@ func (c *logoutCmd) AfterApply(kongCtx *kong.Context) error {
 	return nil
 }
 
-// logoutCmd invalidates a stored session token for a given profile.
-type logoutCmd struct {
+// LogoutCmd invalidates a stored session token for a given profile.
+type LogoutCmd struct {
 	client up.Client
 
 	// Common Upbound API configuration
@@ -59,7 +59,7 @@ type logoutCmd struct {
 }
 
 // Run executes the logout command.
-func (c *logoutCmd) Run(ctx context.Context, p pterm.TextPrinter, upCtx *upbound.Context) error {
+func (c *LogoutCmd) Run(ctx context.Context, p pterm.TextPrinter, upCtx *upbound.Context) error {
 	if upCtx.Profile.IsSpace() {
 		return fmt.Errorf("logout is not supported for space profile %q", upCtx.ProfileName)
 	}

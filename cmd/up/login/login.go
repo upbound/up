@@ -12,7 +12,7 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-package main
+package login
 
 import (
 	"bytes"
@@ -50,13 +50,13 @@ const (
 )
 
 // BeforeApply sets default values in login before assignment and validation.
-func (c *loginCmd) BeforeApply() error { //nolint:unparam
+func (c *LoginCmd) BeforeApply() error { //nolint:unparam
 	c.stdin = os.Stdin
 	c.prompter = input.NewPrompter()
 	return nil
 }
 
-func (c *loginCmd) AfterApply(kongCtx *kong.Context) error {
+func (c *LoginCmd) AfterApply(kongCtx *kong.Context) error {
 	upCtx, err := upbound.NewFromFlags(c.Flags, upbound.AllowMissingProfile())
 	if err != nil {
 		return err
@@ -97,9 +97,9 @@ func (c *loginCmd) AfterApply(kongCtx *kong.Context) error {
 	return nil
 }
 
-// loginCmd adds a user or token profile with session token to the up config
+// LoginCmd adds a user or token profile with session token to the up config
 // file.
-type loginCmd struct {
+type LoginCmd struct {
 	client   uphttp.Client
 	stdin    io.Reader
 	prompter input.Prompter
@@ -113,7 +113,7 @@ type loginCmd struct {
 }
 
 // Run executes the login command.
-func (c *loginCmd) Run(ctx context.Context, p pterm.TextPrinter, upCtx *upbound.Context) error { // nolint:gocyclo
+func (c *LoginCmd) Run(ctx context.Context, p pterm.TextPrinter, upCtx *upbound.Context) error { // nolint:gocyclo
 	if c.Token == "-" {
 		b, err := io.ReadAll(c.stdin)
 		if err != nil {
@@ -150,9 +150,20 @@ func (c *loginCmd) Run(ctx context.Context, p pterm.TextPrinter, upCtx *upbound.
 		return errors.Wrap(err, errLoginFailed)
 	}
 	defer res.Body.Close() // nolint:gosec,errcheck
+	return errors.Wrap(setSession(ctx, p, upCtx, res, profType, auth.ID), errLoginFailed)
+}
+
+// auth is the request body sent to authenticate a user or token.
+type auth struct {
+	ID       string `json:"id"`
+	Password string `json:"password"`
+	Remember bool   `json:"remember"`
+}
+
+func setSession(ctx context.Context, p pterm.TextPrinter, upCtx *upbound.Context, res *http.Response, profType profile.Type, authID string) error {
 	session, err := extractSession(res, upbound.CookieName)
 	if err != nil {
-		return errors.Wrap(err, errLoginFailed)
+		return err
 	}
 
 	// If profile name was not provided and no default exists, set name to 'default'.
@@ -163,7 +174,7 @@ func (c *loginCmd) Run(ctx context.Context, p pterm.TextPrinter, upCtx *upbound.
 	// Re-initialize profile for this login.
 	profile := profile.Profile{
 		Type: profType,
-		ID:   auth.ID,
+		ID:   authID,
 		// Set session early so that it can be used to fetch user info if
 		// necessary.
 		Session: session,
@@ -195,15 +206,8 @@ func (c *loginCmd) Run(ctx context.Context, p pterm.TextPrinter, upCtx *upbound.
 	if err := upCtx.CfgSrc.UpdateConfig(upCtx.Cfg); err != nil {
 		return errors.Wrap(err, errUpdateConfig)
 	}
-	p.Printfln("%s logged in", auth.ID)
+	p.Printfln("%s logged in", authID)
 	return nil
-}
-
-// auth is the request body sent to authenticate a user or token.
-type auth struct {
-	ID       string `json:"id"`
-	Password string `json:"password"`
-	Remember bool   `json:"remember"`
 }
 
 // constructAuth constructs the body of an Upbound Cloud authentication request
