@@ -90,7 +90,7 @@ func New(ctp ctpClient, cfg cfgGetter, account string, opts ...Option) *Client {
 }
 
 // Get the ControlPlane corresponding to the given ControlPlane name.
-func (c *Client) Get(ctx context.Context, name string) (*controlplane.Response, error) {
+func (c *Client) Get(ctx context.Context, name, namespace string) (*controlplane.Response, error) {
 	resp, err := c.ctp.Get(ctx, c.account, name)
 
 	if sdkerrs.IsNotFound(err) {
@@ -105,7 +105,7 @@ func (c *Client) Get(ctx context.Context, name string) (*controlplane.Response, 
 }
 
 // List all ControlPlanes within the Upbound Cloud account.
-func (c *Client) List(ctx context.Context) ([]*controlplane.Response, error) {
+func (c *Client) List(ctx context.Context, namespace string) ([]*controlplane.Response, error) {
 	l, err := c.ctp.List(ctx, c.account, common.WithSize(maxItems))
 	if err != nil {
 		return nil, err
@@ -119,7 +119,7 @@ func (c *Client) List(ctx context.Context) ([]*controlplane.Response, error) {
 }
 
 // Create a new ControlPlane with the given name and the supplied Options.
-func (c *Client) Create(ctx context.Context, name string, opts controlplane.Options) (*controlplane.Response, error) {
+func (c *Client) Create(ctx context.Context, name, namespace string, opts controlplane.Options) (*controlplane.Response, error) {
 	params := &controlplanes.ControlPlaneCreateParameters{
 		Name:        name,
 		Description: opts.Description,
@@ -142,7 +142,7 @@ func (c *Client) Create(ctx context.Context, name string, opts controlplane.Opti
 }
 
 // Delete the ControlPlane corresponding to the given ControlPlane name.
-func (c *Client) Delete(ctx context.Context, name string) error {
+func (c *Client) Delete(ctx context.Context, name, namespace string) error {
 	err := c.ctp.Delete(ctx, c.account, name)
 	if sdkerrs.IsNotFound(err) {
 		return controlplane.NewNotFound(err)
@@ -151,7 +151,7 @@ func (c *Client) Delete(ctx context.Context, name string) error {
 }
 
 // GetKubeConfig for the given Control Plane.
-func (c *Client) GetKubeConfig(ctx context.Context, name string) (*api.Config, error) {
+func (c *Client) GetKubeConfig(ctx context.Context, name, namespace string) (*api.Config, error) {
 	return kube.BuildControlPlaneKubeconfig(
 		c.proxy,
 		path.Join(c.account, name),

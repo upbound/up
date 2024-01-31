@@ -32,7 +32,7 @@ import (
 )
 
 type ctpGetter interface {
-	Get(ctx context.Context, name string) (*controlplane.Response, error)
+	Get(ctx context.Context, name, namespace string) (*controlplane.Response, error)
 }
 
 // AfterApply sets default values in command after assignment and validation.
@@ -65,14 +65,15 @@ func (c *getCmd) AfterApply(kongCtx *kong.Context, upCtx *upbound.Context) error
 
 // getCmd gets a single control plane in an account on Upbound.
 type getCmd struct {
-	Name string `arg:"" required:"" help:"Name of control plane." predictor:"ctps"`
+	Name  string `arg:"" required:"" help:"Name of control plane." predictor:"ctps"`
+	Group string `short:"g" default:"default" help:"The control plane group that the control plane is contained in."`
 
 	client ctpGetter
 }
 
 // Run executes the get command.
 func (c *getCmd) Run(ctx context.Context, printer upterm.ObjectPrinter, p pterm.TextPrinter, upCtx *upbound.Context) error {
-	ctp, err := c.client.Get(ctx, c.Name)
+	ctp, err := c.client.Get(ctx, c.Name, c.Group)
 	if controlplane.IsNotFound(err) {
 		p.Printfln("Control plane %s not found", c.Name)
 		return nil

@@ -148,7 +148,7 @@ func TestGet(t *testing.T) {
 		t.Run(name, func(t *testing.T) {
 
 			c := New(tc.args.ctp, tc.args.cfg, acct)
-			got, err := c.Get(context.Background(), tc.args.name)
+			got, err := c.Get(context.Background(), tc.args.name, "")
 
 			if diff := cmp.Diff(tc.want.err, err, test.EquateErrors()); diff != "" {
 				t.Errorf("\n%s\nGet(...): -want error, +got error:\n%s", tc.reason, diff)
@@ -206,7 +206,7 @@ func TestDelete(t *testing.T) {
 		t.Run(name, func(t *testing.T) {
 
 			c := New(tc.args.ctp, tc.args.cfg, acct)
-			err := c.Delete(context.Background(), tc.args.name)
+			err := c.Delete(context.Background(), tc.args.name, "")
 
 			if diff := cmp.Diff(tc.want.err, err, test.EquateErrors()); diff != "" {
 				t.Errorf("\n%s\nDelete(...): -want error, +got error:\n%s", tc.reason, diff)
@@ -296,7 +296,7 @@ func TestList(t *testing.T) {
 		t.Run(name, func(t *testing.T) {
 
 			c := New(tc.args.ctp, tc.args.cfg, acct)
-			got, err := c.List(context.Background())
+			got, err := c.List(context.Background(), "")
 
 			if diff := cmp.Diff(tc.want.err, err, test.EquateErrors()); diff != "" {
 				t.Errorf("\n%s\nList(...): -want error, +got error:\n%s", tc.reason, diff)

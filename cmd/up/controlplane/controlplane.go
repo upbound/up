@@ -33,7 +33,7 @@ import (
 
 var (
 	cloudfieldNames = []string{"NAME", "ID", "STATUS", "CONFIGURATION", "CONFIGURATION STATUS"}
-	spacefieldNames = []string{"NAME", "ID", "STATUS", "MESSAGE", "CONNECTION NAME", "CONNECTION NAMESPACE"}
+	spacefieldNames = []string{"NAME", "ID", "GROUP", "STATUS", "MESSAGE", "CONNECTION NAME"}
 )
 
 // BeforeReset is the first hook to run.
@@ -143,10 +143,10 @@ func extractSpaceFields(obj any) []string {
 	return []string{
 		resp.Name,
 		resp.ID,
+		resp.Group,
 		resp.Status,
 		resp.Message,
 		resp.ConnName,
-		resp.ConnNamespace,
 	}
 }
 

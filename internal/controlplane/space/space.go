@@ -51,9 +51,10 @@ func New(c dynamic.Interface) *Client {
 }
 
 // Get the ControlPlane corresponding to the given ControlPlane name.
-func (c *Client) Get(ctx context.Context, name string) (*controlplane.Response, error) {
+func (c *Client) Get(ctx context.Context, name, namespace string) (*controlplane.Response, error) {
 	u, err := c.c.
 		Resource(resource).
+		Namespace(namespace).
 		Get(
 			ctx,
 			name,
@@ -71,13 +72,19 @@ func (c *Client) Get(ctx context.Context, name string) (*controlplane.Response, 
 }
 
 // List all ControlPlanes within the Space.
-func (c *Client) List(ctx context.Context) ([]*controlplane.Response, error) {
+func (c *Client) List(ctx context.Context, namespace string) ([]*controlplane.Response, error) {
 	list, err := c.c.
 		Resource(resource).
+		Namespace(namespace).
 		List(
 			ctx,
 			metav1.ListOptions{},
 		)
+
+	if kerrors.IsNotFound(err) {
+		return nil, controlplane.NewNotFound(err)
+	}
+
 	if err != nil {
 		return nil, err
 	}
@@ -91,7 +98,7 @@ func (c *Client) List(ctx context.Context) ([]*controlplane.Response, error) {
 }
 
 // Create a new ControlPlane with the given name and the supplied Options.
-func (c *Client) Create(ctx context.Context, name string, opts controlplane.Options) (*controlplane.Response, error) {
+func (c *Client) Create(ctx context.Context, name, namespace string, opts controlplane.Options) (*controlplane.Response, error) {
 	o := calculateSecret(name, opts)
 
 	ctp := &resources.ControlPlane{}
@@ -103,6 +110,7 @@ func (c *Client) Create(ctx context.Context, name string, opts controlplane.Opti
 
 	u, err := c.c.
 		Resource(resource).
+		Namespace(namespace).
 		Create(
 			ctx,
 			ctp.GetUnstructured(),
@@ -116,9 +124,10 @@ func (c *Client) Create(ctx context.Context, name string, opts controlplane.Opti
 }
 
 // Delete the ControlPlane corresponding to the given ControlPlane name.
-func (c *Client) Delete(ctx context.Context, name string) error {
+func (c *Client) Delete(ctx context.Context, name, namespace string) error {
 	err := c.c.
 		Resource(resource).
+		Namespace(namespace).
 		Delete(
 			ctx,
 			name,
@@ -132,10 +141,10 @@ func (c *Client) Delete(ctx context.Context, name string) error {
 }
 
 // GetKubeConfig for the given Control Plane.
-func (c *Client) GetKubeConfig(ctx context.Context, name string) (*api.Config, error) {
+func (c *Client) GetKubeConfig(ctx context.Context, name, namespace string) (*api.Config, error) {
 
 	// get the control plane
-	r, err := c.Get(ctx, name)
+	r, err := c.Get(ctx, name, namespace)
 	if err != nil {
 		return nil, err
 	}
@@ -147,7 +156,7 @@ func (c *Client) GetKubeConfig(ctx context.Context, name string) (*api.Config, e
 			Version:  "v1",
 			Resource: "secrets",
 		}).
-		Namespace(r.ConnNamespace).
+		Namespace(namespace).
 		Get(
 			ctx,
 			r.ConnName,
@@ -174,12 +183,12 @@ func convert(ctp *resources.ControlPlane) *controlplane.Response {
 	}
 
 	return &controlplane.Response{
-		ID:            ctp.GetControlPlaneID(),
-		Name:          ctp.GetName(),
-		Message:       cnd.Message,
-		Status:        string(cnd.Reason),
-		ConnName:      ref.Name,
-		ConnNamespace: ref.Namespace,
+		ID:       ctp.GetControlPlaneID(),
+		Name:     ctp.GetName(),
+		Group:    ctp.GetNamespace(),
+		Message:  cnd.Message,
+		Status:   string(cnd.Reason),
+		ConnName: ref.Name,
 	}
 }
 

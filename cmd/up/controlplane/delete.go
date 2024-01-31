@@ -31,12 +31,13 @@ import (
 )
 
 type ctpDeleter interface {
-	Delete(ctx context.Context, name string) error
+	Delete(ctx context.Context, name, namespace string) error
 }
 
 // deleteCmd deletes a control plane on Upbound.
 type deleteCmd struct {
-	Name string `arg:"" help:"Name of control plane." predictor:"ctps"`
+	Name  string `arg:"" help:"Name of control plane." predictor:"ctps"`
+	Group string `short:"g" default:"default" help:"The control plane group that the control plane is contained in."`
 
 	client ctpDeleter
 }
@@ -69,7 +70,7 @@ func (c *deleteCmd) AfterApply(kongCtx *kong.Context, upCtx *upbound.Context) er
 
 // Run executes the delete command.
 func (c *deleteCmd) Run(ctx context.Context, p pterm.TextPrinter, upCtx *upbound.Context) error {
-	if err := c.client.Delete(ctx, c.Name); err != nil {
+	if err := c.client.Delete(ctx, c.Name, c.Group); err != nil {
 		if controlplane.IsNotFound(err) {
 			p.Printfln("Control plane %s not found", c.Name)
 			return nil

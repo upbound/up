@@ -47,7 +47,7 @@ const (
 )
 
 type ctpConnector interface {
-	GetKubeConfig(ctx context.Context, name string) (*api.Config, error)
+	GetKubeConfig(ctx context.Context, name, namespace string) (*api.Config, error)
 }
 
 // AfterApply sets default values in command after assignment and validation.
@@ -104,6 +104,8 @@ type connectCmd struct {
 	Name  string `arg:"" required:"" help:"Name of control plane." predictor:"ctps"`
 	Token string `help:"API token used to authenticate. Required for Upbound Cloud; ignored otherwise."`
 
+	Group string `short:"g" default:"default" help:"The control plane group that the control plane is contained in."`
+
 	stdin  io.Reader
 	client ctpConnector
 }
@@ -129,7 +131,7 @@ func (c *connectCmd) Run(ctx context.Context, printer upterm.ObjectPrinter, p pt
 		return nil
 	}
 
-	cfg, err := c.client.GetKubeConfig(ctx, c.Name)
+	cfg, err := c.client.GetKubeConfig(ctx, c.Name, c.Group)
 	if controlplane.IsNotFound(err) {
 		p.Printfln("Control plane %s not found", c.Name)
 		return nil

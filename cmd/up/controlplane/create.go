@@ -31,7 +31,7 @@ import (
 )
 
 type ctpCreator interface {
-	Create(ctx context.Context, name string, opts controlplane.Options) (*controlplane.Response, error)
+	Create(ctx context.Context, name, namespace string, opts controlplane.Options) (*controlplane.Response, error)
 }
 
 // createCmd creates a control plane on Upbound.
@@ -41,8 +41,8 @@ type createCmd struct {
 	ConfigurationName *string `help:"The optional name of the Configuration."`
 	Description       string  `short:"d" help:"Description for control plane."`
 
-	SecretName      string `help:"The name of the control plane's secret. Defaults to 'kubeconfig-{control plane name}'. Only applicable for Space control planes."`
-	SecretNamespace string `default:"default" help:"The name of namespace for the control plane's secret. Only applicable for Space control planes."`
+	SecretName string `help:"The name of the control plane's secret. Defaults to 'kubeconfig-{control plane name}'. Only applicable for Space control planes."`
+	Group      string `short:"g" default:"default" help:"The control plane group that the control plane is contained in."`
 
 	client ctpCreator
 }
@@ -80,9 +80,10 @@ func (c *createCmd) Run(ctx context.Context, p pterm.TextPrinter, upCtx *upbound
 	_, err := c.client.Create(
 		ctx,
 		c.Name,
+		c.Group,
 		controlplane.Options{
 			SecretName:        c.SecretName,
-			SecretNamespace:   c.SecretNamespace,
+			SecretNamespace:   c.Group,
 			ConfigurationName: c.ConfigurationName,
 		},
 	)

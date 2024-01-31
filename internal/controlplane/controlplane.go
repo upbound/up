@@ -20,12 +20,12 @@ package controlplane
 type Response struct {
 	ID      string
 	Name    string
+	Group   string
 	Message string
 	Status  string
 
 	Cfg       string
 	CfgStatus string
 
-	ConnName      string
-	ConnNamespace string
+	ConnName string
 }
