@@ -176,6 +176,20 @@ func (im *ControlPlaneStateImporter) Import(ctx context.Context) error { // noli
 		}
 	}
 	s.Success(waitPkgsMsg + "Installed and Healthy! ⏳")
+
+	waitPkgRevsMsg := "Waiting for PackageRevisions... "
+	s, _ = upterm.CheckmarkSuccessSpinner.Start(waitPkgRevsMsg)
+	for _, k := range []schema.GroupKind{
+		{Group: "pkg.crossplane.io", Kind: "ProviderRevision"},
+		{Group: "pkg.crossplane.io", Kind: "FunctionRevision"},
+		{Group: "pkg.crossplane.io", Kind: "ConfigurationRevision"},
+	} {
+		if err := im.waitForConditions(ctx, s, k, []xpv1.ConditionType{"Healthy"}); err != nil {
+			s.Fail(waitPkgRevsMsg + "Failed!")
+			return errors.Wrapf(err, "there are unhealthy %qs", k.Kind)
+		}
+	}
+	s.Success(waitPkgRevsMsg + "Healthy! ⏳")
 	//////////////////////////////////////////
 
 	// Reset the resource mapper to make sure all CRDs introduced by packages or XRDs are available.
