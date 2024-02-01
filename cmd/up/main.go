@@ -28,6 +28,7 @@ import (
 	"github.com/upbound/up/cmd/up/configuration"
 	"github.com/upbound/up/cmd/up/configuration/template"
 	"github.com/upbound/up/cmd/up/controlplane"
+	"github.com/upbound/up/cmd/up/login"
 	"github.com/upbound/up/cmd/up/migration"
 	"github.com/upbound/up/cmd/up/organization"
 	"github.com/upbound/up/cmd/up/profile"
@@ -103,8 +104,8 @@ type cli struct {
 	License licenseCmd `cmd:"" help:"Print Up license information."`
 
 	Help               helpCmd                      `cmd:"" help:"Show help."`
-	Login              loginCmd                     `cmd:"" help:"Login to Upbound."`
-	Logout             logoutCmd                    `cmd:"" help:"Logout of Upbound."`
+	Login              login.LoginCmd               `cmd:"" help:"Login to Upbound."`
+	Logout             login.LogoutCmd              `cmd:"" help:"Logout of Upbound."`
 	Configuration      configuration.Cmd            `cmd:"" name:"configuration" aliases:"cfg" help:"Interact with configurations."`
 	ControlPlane       controlplane.Cmd             `cmd:"" name:"controlplane" aliases:"ctp" help:"Interact with control planes of the current profile, both in Upbound and local Spaces."`
 	Space              space.Cmd                    `cmd:"" help:"Interact with local Spaces."`
@@ -140,6 +141,8 @@ type alpha struct {
 	Upbound      upbound.Cmd      `cmd:"" maturity:"alpha" help:"Interact with Upbound."`
 	XPKG         xpkg.Cmd         `cmd:"" maturity:"alpha" help:"Interact with UXP packages."`
 	Migration    migration.Cmd    `cmd:"" maturity:"alpha" help:"Migrate control planes to Upbound Managed Control Planes."`
+
+	WebLogin login.LoginWebCmd `cmd:"" maturity:"alpha" help:"Use web browser to login to up cli."`
 }
 
 func main() {

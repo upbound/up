@@ -12,7 +12,7 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-package main
+package login
 
 import (
 	"bytes"
@@ -40,19 +40,19 @@ func TestRun(t *testing.T) {
 
 	cases := map[string]struct {
 		reason string
-		cmd    *loginCmd
+		cmd    *LoginCmd
 		ctx    *upbound.Context
 		err    error
 	}{
 		"ErrorNoUserOrToken": {
 			reason: "If neither user or token is provided an error should be returned.",
-			cmd:    &loginCmd{},
+			cmd:    &LoginCmd{},
 			ctx:    &upbound.Context{},
 			err:    errors.Wrap(errors.New(errNoUserOrToken), errLoginFailed),
 		},
 		"ErrLoginFailed": {
 			reason: "If Upbound Cloud endpoint is ",
-			cmd: &loginCmd{
+			cmd: &LoginCmd{
 				client: &mocks.MockClient{
 					DoFn: func(req *http.Request) (*http.Response, error) {
 						return nil, errBoom
