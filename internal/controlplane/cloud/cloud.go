@@ -200,7 +200,7 @@ func convert(ctp *controlplanes.ControlPlaneResponse) *controlplane.Response {
 }
 
 func formatStatus(status controlplanes.ConfigurationStatus) string {
-	switch status {
+	switch status { // nolint: exhaustive
 	case "":
 		return ""
 	case controlplanes.ConfigurationReady:
@@ -211,7 +211,7 @@ func formatStatus(status controlplanes.ConfigurationStatus) string {
 }
 
 func toMessage(status controlplanes.Status) string {
-	switch status {
+	switch status { // nolint: exhaustive
 	case controlplanes.StatusProvisioning:
 		return "Controlplane is being created"
 	case controlplanes.StatusUpdating:
