@@ -18,15 +18,17 @@ import (
 	"context"
 	"fmt"
 
-	xpcommonv1 "github.com/crossplane/crossplane-runtime/apis/common/v1"
 	corev1 "k8s.io/api/core/v1"
 	kerrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/runtime/schema"
+	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/client-go/dynamic"
 	"k8s.io/client-go/tools/clientcmd"
 	"k8s.io/client-go/tools/clientcmd/api"
+
+	xpcommonv1 "github.com/crossplane/crossplane-runtime/apis/common/v1"
 
 	"github.com/upbound/up/internal/controlplane"
 	"github.com/upbound/up/internal/resources"
@@ -51,13 +53,13 @@ func New(c dynamic.Interface) *Client {
 }
 
 // Get the ControlPlane corresponding to the given ControlPlane name.
-func (c *Client) Get(ctx context.Context, name, namespace string) (*controlplane.Response, error) {
+func (c *Client) Get(ctx context.Context, ctp types.NamespacedName) (*controlplane.Response, error) {
 	u, err := c.c.
 		Resource(resource).
-		Namespace(namespace).
+		Namespace(ctp.Namespace).
 		Get(
 			ctx,
-			name,
+			ctp.Name,
 			metav1.GetOptions{},
 		)
 	if kerrors.IsNotFound(err) {
@@ -89,7 +91,7 @@ func (c *Client) List(ctx context.Context, namespace string) ([]*controlplane.Re
 		return nil, err
 	}
 
-	resps := []*controlplane.Response{}
+	resps := make([]*controlplane.Response, 0, len(list.Items))
 	for _, u := range list.Items {
 		resps = append(resps, convert(&resources.ControlPlane{Unstructured: u}))
 	}
@@ -98,11 +100,11 @@ func (c *Client) List(ctx context.Context, namespace string) ([]*controlplane.Re
 }
 
 // Create a new ControlPlane with the given name and the supplied Options.
-func (c *Client) Create(ctx context.Context, name, namespace string, opts controlplane.Options) (*controlplane.Response, error) {
-	o := calculateSecret(name, opts)
+func (c *Client) Create(ctx context.Context, name types.NamespacedName, opts controlplane.Options) (*controlplane.Response, error) {
+	o := calculateSecret(name.Name, opts)
 
 	ctp := &resources.ControlPlane{}
-	ctp.SetName(name)
+	ctp.SetName(name.Name)
 	ctp.SetWriteConnectionSecretToReference(&xpcommonv1.SecretReference{
 		Name:      o.SecretName,
 		Namespace: o.SecretNamespace,
@@ -110,7 +112,7 @@ func (c *Client) Create(ctx context.Context, name, namespace string, opts contro
 
 	u, err := c.c.
 		Resource(resource).
-		Namespace(namespace).
+		Namespace(name.Namespace).
 		Create(
 			ctx,
 			ctp.GetUnstructured(),
@@ -124,13 +126,13 @@ func (c *Client) Create(ctx context.Context, name, namespace string, opts contro
 }
 
 // Delete the ControlPlane corresponding to the given ControlPlane name.
-func (c *Client) Delete(ctx context.Context, name, namespace string) error {
+func (c *Client) Delete(ctx context.Context, ctp types.NamespacedName) error {
 	err := c.c.
 		Resource(resource).
-		Namespace(namespace).
+		Namespace(ctp.Namespace).
 		Delete(
 			ctx,
-			name,
+			ctp.Name,
 			metav1.DeleteOptions{},
 		)
 	if kerrors.IsNotFound(err) {
@@ -141,10 +143,9 @@ func (c *Client) Delete(ctx context.Context, name, namespace string) error {
 }
 
 // GetKubeConfig for the given Control Plane.
-func (c *Client) GetKubeConfig(ctx context.Context, name, namespace string) (*api.Config, error) {
-
+func (c *Client) GetKubeConfig(ctx context.Context, ctp types.NamespacedName) (*api.Config, error) {
 	// get the control plane
-	r, err := c.Get(ctx, name, namespace)
+	r, err := c.Get(ctx, ctp)
 	if err != nil {
 		return nil, err
 	}
@@ -156,7 +157,7 @@ func (c *Client) GetKubeConfig(ctx context.Context, name, namespace string) (*ap
 			Version:  "v1",
 			Resource: "secrets",
 		}).
-		Namespace(namespace).
+		Namespace(ctp.Name).
 		Get(
 			ctx,
 			r.ConnName,
@@ -176,19 +177,23 @@ func (c *Client) GetKubeConfig(ctx context.Context, name, namespace string) (*ap
 }
 
 func convert(ctp *resources.ControlPlane) *controlplane.Response {
-	cnd := ctp.GetCondition(xpcommonv1.TypeReady)
-	ref := ctp.GetConnectionSecretToReference()
-	if ref == nil {
-		ref = &xpcommonv1.SecretReference{}
+	connRef := ctp.GetConnectionSecretToReference()
+	if connRef == nil {
+		connRef = &xpcommonv1.SecretReference{}
 	}
 
 	return &controlplane.Response{
-		ID:       ctp.GetControlPlaneID(),
-		Name:     ctp.GetName(),
-		Group:    ctp.GetNamespace(),
-		Message:  cnd.Message,
-		Status:   string(cnd.Reason),
-		ConnName: ref.Name,
+		ID:                ctp.GetControlPlaneID(),
+		Group:             ctp.GetNamespace(),
+		Name:              ctp.GetName(),
+		CrossplaneVersion: ctp.GetCrossplaneVersion(),
+		Synced:            string(ctp.GetCondition(xpcommonv1.TypeSynced).Status),
+		Ready:             string(ctp.GetCondition(xpcommonv1.TypeReady).Status),
+		Message:           ctp.GetMessage(),
+		Age:               ctp.GetAge(),
+		Cfg:               "",
+		Updated:           "",
+		ConnName:          connRef.Name,
 	}
 }
 

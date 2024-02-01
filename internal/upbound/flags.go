@@ -47,8 +47,9 @@ type KubeFlags struct {
 	Context string `name:"kubecontext" help:"Override default kubeconfig context."`
 
 	// set by AfterApply
-	config  *rest.Config
-	context string
+	config    *rest.Config
+	context   string
+	namespace string
 }
 
 func (f *KubeFlags) AfterApply() error {
@@ -75,6 +76,12 @@ func (f *KubeFlags) AfterApply() error {
 	}
 	f.config = restConfig
 
+	ns, _, err := loader.Namespace()
+	if err != nil {
+		return err
+	}
+	f.namespace = ns
+
 	return nil
 }
 
@@ -93,4 +100,8 @@ func (f *KubeFlags) GetConfig() *rest.Config {
 // is changed.
 func (f *KubeFlags) GetContext() string {
 	return f.context
+}
+
+func (f *KubeFlags) Namespace() string {
+	return f.namespace
 }

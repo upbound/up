@@ -80,16 +80,28 @@ func (p Profile) IsSpace() bool {
 
 // GetKubeClientConfig returns a *rest.Config loaded from p.Kubeconfig and
 // p.KubeContext. It returns an error if p.IsSpace() is false.
-func (p Profile) GetKubeClientConfig() (*rest.Config, error) {
+func (p Profile) GetKubeClientConfig() (*rest.Config, string, error) {
 	if !p.IsSpace() {
-		return nil, fmt.Errorf("kube client not supported for profile type %q", p.Type)
+		return nil, "", fmt.Errorf("kube client not supported for profile type %q", p.Type)
 	}
 	rules := clientcmd.NewDefaultClientConfigLoadingRules()
 	rules.ExplicitPath = p.Kubeconfig
-	return clientcmd.NewNonInteractiveDeferredLoadingClientConfig(
+	loader := clientcmd.NewNonInteractiveDeferredLoadingClientConfig(
 		rules,
 		&clientcmd.ConfigOverrides{CurrentContext: p.KubeContext},
-	).ClientConfig()
+	)
+
+	cfg, err := loader.ClientConfig()
+	if err != nil {
+		return nil, "", err
+	}
+
+	ns, _, err := loader.Namespace()
+	if err != nil {
+		return nil, "", err
+	}
+
+	return cfg, ns, nil
 }
 
 // Redacted embeds a Upbound Profile for the sole purpose of redacting

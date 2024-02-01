@@ -18,9 +18,10 @@ import (
 	"errors"
 	"testing"
 
-	"github.com/crossplane/crossplane-runtime/pkg/test"
 	"github.com/google/go-cmp/cmp"
 	"k8s.io/client-go/tools/clientcmd/api"
+
+	"github.com/crossplane/crossplane-runtime/pkg/test"
 )
 
 func TestUpdateKubeConfig(t *testing.T) {

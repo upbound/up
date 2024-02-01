@@ -21,12 +21,13 @@ import (
 	"strings"
 
 	"github.com/blang/semver/v4"
-	"github.com/crossplane/crossplane-runtime/pkg/errors"
 	"github.com/pterm/pterm"
 	"helm.sh/helm/v3/pkg/chart"
 	"k8s.io/client-go/kubernetes"
 	"k8s.io/client-go/rest"
 	"sigs.k8s.io/yaml"
+
+	"github.com/crossplane/crossplane-runtime/pkg/errors"
 
 	"github.com/upbound/up/internal/config"
 	"github.com/upbound/up/internal/input"
@@ -166,7 +167,8 @@ func (c *upgradeCmd) getKubeconfig(upCtx *upbound.Context) (*rest.Config, error)
 	if !upCtx.Profile.IsSpace() {
 		return nil, fmt.Errorf("upgrade is not supported for non-space profile %q", upCtx.ProfileName)
 	}
-	return upCtx.Profile.GetKubeClientConfig()
+	cfg, _, err := upCtx.Profile.GetKubeClientConfig()
+	return cfg, err
 }
 
 // Run executes the upgrade command.

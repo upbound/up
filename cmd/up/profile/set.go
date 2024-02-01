@@ -105,7 +105,7 @@ func (c *spaceCmd) Run(ctx context.Context, p pterm.TextPrinter, upCtx *upbound.
 	if prof.Kubeconfig != "" {
 		kubeconfigLocation = fmt.Sprintf("kubeconfig at %q", prof.Kubeconfig)
 	}
-	p.Printf("Profile %q updated to use Kubernetes context %q from the %s", upCtx.ProfileName, prof.KubeContext, kubeconfigLocation)
+	p.Printf("Profile %q updated to use Kubernetes context %q from the %s. Defaulting to group %q.", upCtx.ProfileName, prof.KubeContext, kubeconfigLocation, c.Kube.Namespace())
 	if setDefault {
 		p.Print(" and selected as the default profile")
 	}

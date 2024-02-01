@@ -24,14 +24,13 @@ import (
 
 	"github.com/alecthomas/kong"
 	"github.com/pterm/pterm"
-
+	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/client-go/dynamic"
 	"k8s.io/client-go/tools/clientcmd"
 	"k8s.io/client-go/tools/clientcmd/api"
 
 	"github.com/upbound/up-sdk-go/service/configurations"
 	cp "github.com/upbound/up-sdk-go/service/controlplanes"
-
 	"github.com/upbound/up/internal/controlplane"
 	"github.com/upbound/up/internal/controlplane/cloud"
 	"github.com/upbound/up/internal/controlplane/space"
@@ -47,7 +46,7 @@ const (
 )
 
 type ctpConnector interface {
-	GetKubeConfig(ctx context.Context, name, namespace string) (*api.Config, error)
+	GetKubeConfig(ctx context.Context, ctp types.NamespacedName) (*api.Config, error)
 }
 
 // AfterApply sets default values in command after assignment and validation.
@@ -55,10 +54,14 @@ func (c *connectCmd) AfterApply(kongCtx *kong.Context, upCtx *upbound.Context) e
 	c.stdin = os.Stdin
 
 	if upCtx.Profile.IsSpace() {
-		kubeconfig, err := upCtx.Profile.GetKubeClientConfig()
+		kubeconfig, ns, err := upCtx.Profile.GetKubeClientConfig()
 		if err != nil {
 			return err
 		}
+		if c.Group == "" {
+			c.Group = ns
+		}
+
 		client, err := dynamic.NewForConfig(kubeconfig)
 		if err != nil {
 			return err
@@ -104,7 +107,7 @@ type connectCmd struct {
 	Name  string `arg:"" required:"" help:"Name of control plane." predictor:"ctps"`
 	Token string `help:"API token used to authenticate. Required for Upbound Cloud; ignored otherwise."`
 
-	Group string `short:"g" default:"default" help:"The control plane group that the control plane is contained in."`
+	Group string `short:"g" help:"The control plane group that the control plane is contained in. By default, this is the group specified in the current profile."`
 
 	stdin  io.Reader
 	client ctpConnector
@@ -131,7 +134,7 @@ func (c *connectCmd) Run(ctx context.Context, printer upterm.ObjectPrinter, p pt
 		return nil
 	}
 
-	cfg, err := c.client.GetKubeConfig(ctx, c.Name, c.Group)
+	cfg, err := c.client.GetKubeConfig(ctx, types.NamespacedName{Namespace: c.Group, Name: c.Name})
 	if controlplane.IsNotFound(err) {
 		p.Printfln("Control plane %s not found", c.Name)
 		return nil

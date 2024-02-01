@@ -20,15 +20,16 @@ import (
 	"net/http"
 	"testing"
 
-	"github.com/crossplane/crossplane-runtime/pkg/test"
 	"github.com/google/go-cmp/cmp"
 	"github.com/google/uuid"
+	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/utils/pointer"
+
+	"github.com/crossplane/crossplane-runtime/pkg/test"
 
 	sdkerrs "github.com/upbound/up-sdk-go/errors"
 	"github.com/upbound/up-sdk-go/service/common"
 	"github.com/upbound/up-sdk-go/service/controlplanes"
-
 	"github.com/upbound/up/internal/controlplane"
 )
 
@@ -60,17 +61,21 @@ var (
 	}
 
 	ctp1Resp = &controlplane.Response{
-		Name:      "ctp1",
-		ID:        "00000000-0000-0000-0000-000000000000",
-		Cfg:       "cfg1",
-		CfgStatus: string(controlplanes.ConfigurationReady),
+		Name:    "ctp1",
+		ID:      "00000000-0000-0000-0000-000000000000",
+		Cfg:     "cfg1",
+		Updated: "True",
+		Synced:  "True",
+		Ready:   "False",
 	}
 
 	ctp2Resp = &controlplane.Response{
-		Name:      "ctp2",
-		ID:        "00000000-0000-0000-0000-000000000001",
-		Cfg:       "cfg1",
-		CfgStatus: string(controlplanes.ConfigurationReady),
+		Name:    "ctp2",
+		ID:      "00000000-0000-0000-0000-000000000001",
+		Cfg:     "cfg1",
+		Updated: "True",
+		Synced:  "True",
+		Ready:   "False",
 	}
 )
 
@@ -148,7 +153,7 @@ func TestGet(t *testing.T) {
 		t.Run(name, func(t *testing.T) {
 
 			c := New(tc.args.ctp, tc.args.cfg, acct)
-			got, err := c.Get(context.Background(), tc.args.name, "")
+			got, err := c.Get(context.Background(), types.NamespacedName{Name: tc.args.name})
 
 			if diff := cmp.Diff(tc.want.err, err, test.EquateErrors()); diff != "" {
 				t.Errorf("\n%s\nGet(...): -want error, +got error:\n%s", tc.reason, diff)
@@ -206,7 +211,7 @@ func TestDelete(t *testing.T) {
 		t.Run(name, func(t *testing.T) {
 
 			c := New(tc.args.ctp, tc.args.cfg, acct)
-			err := c.Delete(context.Background(), tc.args.name, "")
+			err := c.Delete(context.Background(), types.NamespacedName{Name: tc.args.name})
 
 			if diff := cmp.Diff(tc.want.err, err, test.EquateErrors()); diff != "" {
 				t.Errorf("\n%s\nDelete(...): -want error, +got error:\n%s", tc.reason, diff)
@@ -344,10 +349,12 @@ func TestConvert(t *testing.T) {
 			},
 			want: want{
 				resp: &controlplane.Response{
-					Name:      "ctp1",
-					ID:        "00000000-0000-0000-0000-000000000000",
-					Cfg:       notAvailable,
-					CfgStatus: notAvailable,
+					Name:    "ctp1",
+					ID:      "00000000-0000-0000-0000-000000000000",
+					Synced:  "True",
+					Ready:   "False",
+					Cfg:     "",
+					Updated: "",
 				},
 			},
 		},
