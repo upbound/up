@@ -16,7 +16,6 @@ package main
 
 import (
 	"context"
-	"fmt"
 	"io"
 	"os"
 	"os/signal"
@@ -32,6 +31,7 @@ import (
 	"github.com/upbound/up/cmd/up/migration"
 	"github.com/upbound/up/cmd/up/organization"
 	"github.com/upbound/up/cmd/up/profile"
+	"github.com/upbound/up/cmd/up/query"
 	"github.com/upbound/up/cmd/up/repository"
 	"github.com/upbound/up/cmd/up/robot"
 	"github.com/upbound/up/cmd/up/space"
@@ -135,8 +135,9 @@ type alpha struct {
 	Migration     migration.Cmd     `cmd:"" maturity:"alpha" help:"Migrate control planes to Upbound Managed Control Planes."`
 	Trace         trace.Cmd         `cmd:"" maturity:"alpha" hidden:"" help:"Trace a Crossplane resource."`
 	TviewTemplate tviewtemplate.Cmd `cmd:"" maturity:"alpha" hidden:"" help:"TView example."`
-
-	WebLogin login.LoginWebCmd `cmd:"" maturity:"alpha" help:"Use web browser to login to up cli."`
+	Query         query.QueryCmd    `cmd:"" maturity:"alpha" hidden:"" help:"Query objects in one or many control planes."`
+	Get           query.GetCmd      `cmd:"" maturity:"alpha" hidden:"" help:"Get objects in the current control plane."`
+	WebLogin      login.LoginWebCmd `cmd:"" maturity:"alpha" help:"Use web browser to login to up cli."`
 }
 
 func main() {
@@ -166,6 +167,7 @@ func main() {
 		kongplete.WithPredictor("profiles", profile.PredictProfiles()),
 		kongplete.WithPredictor("configs", configuration.PredictConfigurations()),
 		kongplete.WithPredictor("templates", template.PredictTemplates()),
+		// TODO(sttts): add get and query
 	)
 
 	if len(os.Args) == 1 {

@@ -61,18 +61,18 @@ require (
 require (
 	github.com/charmbracelet/bubbletea v0.25.0 // indirect
 	github.com/charmbracelet/lipgloss v0.9.1 // indirect
+	github.com/distribution/reference v0.5.0 // indirect
 	github.com/dlclark/regexp2 v1.4.0 // indirect
+	github.com/gobuffalo/flect v1.0.2 // indirect
+	github.com/gorilla/websocket v1.5.0 // indirect
+	github.com/mxk/go-flowrate v0.0.0-20140419014527-cca7078d478f // indirect
 	rsc.io/qr v0.2.0 // indirect
+	sigs.k8s.io/controller-tools v0.14.0 // indirect
 )
 
 require (
 	github.com/Microsoft/hcsshim v0.11.4 // indirect
 	github.com/containerd/log v0.1.0 // indirect
-	github.com/distribution/reference v0.5.0 // indirect
-	github.com/gobuffalo/flect v1.0.2 // indirect
-	github.com/gorilla/websocket v1.5.0 // indirect
-	github.com/mxk/go-flowrate v0.0.0-20140419014527-cca7078d478f // indirect
-	sigs.k8s.io/controller-tools v0.14.0 // indirect
 )
 
 require (
@@ -276,7 +276,7 @@ require (
 	gopkg.in/inf.v0 v0.9.1 // indirect
 	gopkg.in/warnings.v0 v0.1.2 // indirect
 	k8s.io/apiserver v0.29.1 // indirect
-	k8s.io/cli-runtime v0.29.1 // indirect
+	k8s.io/cli-runtime v0.29.1
 	k8s.io/component-base v0.29.1 // indirect
 	k8s.io/klog/v2 v2.120.1 // indirect
 	oras.land/oras-go v1.2.2 // indirect
