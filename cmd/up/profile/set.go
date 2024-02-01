@@ -126,9 +126,14 @@ func (c *spaceCmd) checkForSpaces(ctx context.Context) (bool, error) {
 	if err != nil {
 		return false, err
 	}
-	if _, err := kClient.AppsV1().Deployments("upbound-system").Get(ctx, "mxe-controller", metav1.GetOptions{}); kerrors.IsNotFound(err) {
+	_, err = kClient.AppsV1().Deployments("upbound-system").Get(ctx, "mxe-controller", metav1.GetOptions{})
+	if kerrors.IsNotFound(err) {
+		_, err = kClient.AppsV1().Deployments("upbound-system").Get(ctx, "spaces-controller", metav1.GetOptions{})
+	}
+	if kerrors.IsNotFound(err) {
 		return false, nil
-	} else if err != nil {
+	}
+	if err != nil {
 		return false, errors.Wrap(err, errKubeContact)
 	}
 
