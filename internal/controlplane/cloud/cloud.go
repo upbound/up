@@ -16,6 +16,7 @@ package cloud
 
 import (
 	"context"
+	"errors"
 	"net/url"
 	"path"
 
@@ -91,6 +92,9 @@ func New(ctp ctpClient, cfg cfgGetter, account string, opts ...Option) *Client {
 
 // Get the ControlPlane corresponding to the given ControlPlane name.
 func (c *Client) Get(ctx context.Context, ctp types.NamespacedName) (*controlplane.Response, error) {
+	if ctp.Namespace != "" {
+		return nil, errors.New("namespace is not supported for Upbound Cloud control planes")
+	}
 	resp, err := c.ctp.Get(ctx, c.account, ctp.Name)
 
 	if sdkerrs.IsNotFound(err) {
@@ -106,6 +110,9 @@ func (c *Client) Get(ctx context.Context, ctp types.NamespacedName) (*controlpla
 
 // List all ControlPlanes within the Upbound Cloud account.
 func (c *Client) List(ctx context.Context, namespace string) ([]*controlplane.Response, error) {
+	if namespace != "" {
+		return nil, errors.New("namespace is not supported for Upbound Cloud control planes")
+	}
 	l, err := c.ctp.List(ctx, c.account, common.WithSize(maxItems))
 	if err != nil {
 		return nil, err
@@ -120,6 +127,9 @@ func (c *Client) List(ctx context.Context, namespace string) ([]*controlplane.Re
 
 // Create a new ControlPlane with the given name and the supplied Options.
 func (c *Client) Create(ctx context.Context, ctp types.NamespacedName, opts controlplane.Options) (*controlplane.Response, error) {
+	if ctp.Namespace != "" {
+		return nil, errors.New("namespace is not supported for Upbound Cloud control planes")
+	}
 	params := &controlplanes.ControlPlaneCreateParameters{
 		Name:        ctp.Name,
 		Description: opts.Description,
@@ -143,6 +153,9 @@ func (c *Client) Create(ctx context.Context, ctp types.NamespacedName, opts cont
 
 // Delete the ControlPlane corresponding to the given ControlPlane name.
 func (c *Client) Delete(ctx context.Context, ctp types.NamespacedName) error {
+	if ctp.Namespace != "" {
+		return errors.New("namespace is not supported for Upbound Cloud control planes")
+	}
 	err := c.ctp.Delete(ctx, c.account, ctp.Name)
 	if sdkerrs.IsNotFound(err) {
 		return controlplane.NewNotFound(err)
