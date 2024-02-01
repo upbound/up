@@ -14,18 +14,25 @@
 
 package controlplane
 
+import (
+	"time"
+)
+
 // Response is a normalized ControlPlane response.
 // NOTE(tnthornton) this is expected to be different in the near future as
 // cloud and spaces APIs converge.
 type Response struct {
-	ID      string
-	Name    string
-	Group   string
-	Message string
-	Status  string
+	ID                string
+	Group             string
+	Name              string
+	CrossplaneVersion string
+	Synced            string
+	Ready             string
+	Message           string
+	Age               *time.Duration
 
-	Cfg       string
-	CfgStatus string
+	Cfg     string
+	Updated string
 
 	ConnName string
 }

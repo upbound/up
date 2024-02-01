@@ -61,17 +61,21 @@ var (
 	}
 
 	ctp1Resp = &controlplane.Response{
-		Name:      "ctp1",
-		ID:        "00000000-0000-0000-0000-000000000000",
-		Cfg:       "cfg1",
-		CfgStatus: string(controlplanes.ConfigurationReady),
+		Name:    "ctp1",
+		ID:      "00000000-0000-0000-0000-000000000000",
+		Cfg:     "cfg1",
+		Updated: "True",
+		Synced:  "True",
+		Ready:   "False",
 	}
 
 	ctp2Resp = &controlplane.Response{
-		Name:      "ctp2",
-		ID:        "00000000-0000-0000-0000-000000000001",
-		Cfg:       "cfg1",
-		CfgStatus: string(controlplanes.ConfigurationReady),
+		Name:    "ctp2",
+		ID:      "00000000-0000-0000-0000-000000000001",
+		Cfg:     "cfg1",
+		Updated: "True",
+		Synced:  "True",
+		Ready:   "False",
 	}
 )
 
@@ -345,10 +349,12 @@ func TestConvert(t *testing.T) {
 			},
 			want: want{
 				resp: &controlplane.Response{
-					Name:      "ctp1",
-					ID:        "00000000-0000-0000-0000-000000000000",
-					Cfg:       notAvailable,
-					CfgStatus: notAvailable,
+					Name:    "ctp1",
+					ID:      "00000000-0000-0000-0000-000000000000",
+					Synced:  "True",
+					Ready:   "False",
+					Cfg:     "",
+					Updated: "",
 				},
 			},
 		},

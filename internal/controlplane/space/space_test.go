@@ -106,7 +106,6 @@ func TestGet(t *testing.T) {
 	}
 	for name, tc := range cases {
 		t.Run(name, func(t *testing.T) {
-
 			c := New(tc.args.client)
 			got, err := c.Get(context.Background(), types.NamespacedName{Name: tc.args.name, Namespace: tc.args.namespace})
 
@@ -428,7 +427,9 @@ func TestConvert(t *testing.T) {
 						Name:      "kubeconfig-ctp1",
 						Namespace: "default",
 					})
+					c.SetConditions([]xpcommonv1.Condition{xpcommonv1.ReconcileSuccess()}...)
 					c.SetConditions([]xpcommonv1.Condition{xpcommonv1.Available()}...)
+					c.SetAnnotations(map[string]string{"internal.spaces.upbound.io/message": ""})
 
 					return c
 				}(),
@@ -438,8 +439,10 @@ func TestConvert(t *testing.T) {
 					Name:     "ctp1",
 					ID:       "mxp1",
 					Group:    "default",
-					Status:   string(xpcommonv1.Available().Reason),
+					Synced:   "True",
+					Ready:    "True",
 					ConnName: "kubeconfig-ctp1",
+					Message:  "",
 				},
 			},
 		},
@@ -455,9 +458,9 @@ func TestConvert(t *testing.T) {
 						Name:      "kubeconfig-ctp1",
 						Namespace: "default",
 					})
-					c.SetConditions([]xpcommonv1.Condition{
-						xpcommonv1.Creating().WithMessage("creating..."),
-					}...)
+					c.SetConditions(xpcommonv1.ReconcileSuccess())
+					c.SetConditions(xpcommonv1.Creating().WithMessage("something"))
+					c.SetAnnotations(map[string]string{"internal.spaces.upbound.io/message": "creating..."})
 
 					return c
 				}(),
@@ -467,7 +470,8 @@ func TestConvert(t *testing.T) {
 					Name:     "ctp1",
 					ID:       "mxp1",
 					Group:    "default",
-					Status:   string(xpcommonv1.Creating().Reason),
+					Synced:   "True",
+					Ready:    "False",
 					Message:  "creating...",
 					ConnName: "kubeconfig-ctp1",
 				},
@@ -480,6 +484,7 @@ func TestConvert(t *testing.T) {
 					c := &resources.ControlPlane{}
 					c.SetName("ctp1")
 					c.SetControlPlaneID("mxp1")
+					c.SetConditions(xpcommonv1.ReconcileSuccess())
 					c.SetConditions([]xpcommonv1.Condition{xpcommonv1.Available()}...)
 
 					return c
@@ -489,7 +494,8 @@ func TestConvert(t *testing.T) {
 				resp: &controlplane.Response{
 					Name:   "ctp1",
 					ID:     "mxp1",
-					Status: string(xpcommonv1.Available().Reason),
+					Synced: "True",
+					Ready:  "True",
 				},
 			},
 		},

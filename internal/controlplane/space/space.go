@@ -177,19 +177,23 @@ func (c *Client) GetKubeConfig(ctx context.Context, ctp types.NamespacedName) (*
 }
 
 func convert(ctp *resources.ControlPlane) *controlplane.Response {
-	cnd := ctp.GetCondition(xpcommonv1.TypeReady)
-	ref := ctp.GetConnectionSecretToReference()
-	if ref == nil {
-		ref = &xpcommonv1.SecretReference{}
+	connRef := ctp.GetConnectionSecretToReference()
+	if connRef == nil {
+		connRef = &xpcommonv1.SecretReference{}
 	}
 
 	return &controlplane.Response{
-		ID:       ctp.GetControlPlaneID(),
-		Name:     ctp.GetName(),
-		Group:    ctp.GetNamespace(),
-		Message:  cnd.Message,
-		Status:   string(cnd.Reason),
-		ConnName: ref.Name,
+		ID:                ctp.GetControlPlaneID(),
+		Group:             ctp.GetNamespace(),
+		Name:              ctp.GetName(),
+		CrossplaneVersion: ctp.GetCrossplaneVersion(),
+		Synced:            string(ctp.GetCondition(xpcommonv1.TypeSynced).Status),
+		Ready:             string(ctp.GetCondition(xpcommonv1.TypeReady).Status),
+		Message:           ctp.GetMessage(),
+		Age:               ctp.GetAge(),
+		Cfg:               "",
+		Updated:           "",
+		ConnName:          connRef.Name,
 	}
 }
 

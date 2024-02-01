@@ -19,6 +19,8 @@ import (
 	"errors"
 	"net/url"
 	"path"
+	"strings"
+	"time"
 
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/client-go/tools/clientcmd/api"
@@ -33,8 +35,6 @@ import (
 
 const (
 	maxItems = 100
-
-	notAvailable = "n/a"
 )
 
 type ctpClient interface {
@@ -174,17 +174,58 @@ func (c *Client) GetKubeConfig(ctx context.Context, ctp types.NamespacedName) (*
 }
 
 func convert(ctp *controlplanes.ControlPlaneResponse) *controlplane.Response {
-	cfgName, cfgStatus := notAvailable, notAvailable
+	var cfgName string
+	var cfgStatus controlplanes.ConfigurationStatus
 	if ctp.ControlPlane.Configuration != nil {
 		cfgName = *ctp.ControlPlane.Configuration.Name
-		cfgStatus = string(ctp.ControlPlane.Configuration.Status)
+		cfgStatus = ctp.ControlPlane.Configuration.Status
+	}
+
+	var age *time.Duration
+	if ctp.ControlPlane.CreatedAt != nil {
+		d := time.Since(*ctp.ControlPlane.CreatedAt)
+		age = &d
 	}
 
 	return &controlplane.Response{
-		ID:        ctp.ControlPlane.ID.String(),
-		Name:      ctp.ControlPlane.Name,
-		Status:    string(ctp.Status),
-		Cfg:       cfgName,
-		CfgStatus: cfgStatus,
+		ID:      ctp.ControlPlane.ID.String(),
+		Name:    ctp.ControlPlane.Name,
+		Synced:  toBool(true),
+		Ready:   toBool(ctp.Status == controlplanes.StatusReady),
+		Message: toMessage(ctp.Status),
+		Cfg:     cfgName,
+		Updated: formatStatus(cfgStatus),
+		Age:     age,
 	}
+}
+
+func formatStatus(status controlplanes.ConfigurationStatus) string {
+	switch status {
+	case "":
+		return ""
+	case controlplanes.ConfigurationReady:
+		return "True"
+	default:
+		return strings.ToUpper(string(status)[:1]) + string(status)[1:]
+	}
+}
+
+func toMessage(status controlplanes.Status) string {
+	switch status {
+	case controlplanes.StatusProvisioning:
+		return "Controlplane is being created"
+	case controlplanes.StatusUpdating:
+		return "Controlplane is being updated"
+	case controlplanes.StatusDeleting:
+		return "Controlplane is being deleted"
+	default:
+		return ""
+	}
+}
+
+func toBool(b bool) string {
+	if b {
+		return "True"
+	}
+	return "False"
 }
