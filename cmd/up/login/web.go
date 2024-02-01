@@ -1,4 +1,4 @@
-// Copyright 2022 Upbound Inc
+// Copyright 2024Upbound Inc
 //
 // Licensed under the Apache License, Version 2.0 (the "License");
 // you may not use this file except in compliance with the License.
@@ -24,14 +24,12 @@ import (
 	"net/http"
 	"net/url"
 	"os"
-	"os/exec"
-	"runtime"
 	"strconv"
-	"strings"
 	"time"
 
 	"github.com/alecthomas/kong"
 	"github.com/crossplane/crossplane-runtime/pkg/errors"
+	"github.com/pkg/browser"
 	"github.com/pterm/pterm"
 
 	"github.com/mdp/qrterminal/v3"
@@ -116,8 +114,9 @@ func (c *LoginWebCmd) Run(ctx context.Context, p pterm.TextPrinter, upCtx *upbou
 
 	resultEP := c.accountsEndpoint
 	resultEP.Path = loginResultEndpoint
-
-	if err := openBrowser(getEndpoint(c.accountsEndpoint, *upCtx.APIEndpoint, fmt.Sprintf("http://localhost:%d", cb.port))); err != nil {
+	browser.Stderr = nil
+	browser.Stdout = nil
+	if err := browser.OpenURL(getEndpoint(c.accountsEndpoint, *upCtx.APIEndpoint, fmt.Sprintf("http://localhost:%d", cb.port))); err != nil {
 		ep := getEndpoint(c.accountsEndpoint, *upCtx.APIEndpoint, "")
 		qrterminal.Generate(ep, qrterminal.L, os.Stdout)
 		fmt.Println("Could not open a browser!")
@@ -152,36 +151,6 @@ func (c *LoginWebCmd) Run(ctx context.Context, p pterm.TextPrinter, upCtx *upbou
 	return nil
 }
 
-func openBrowser(url string) error {
-	var cmd *exec.Cmd
-	switch runtime.GOOS {
-	case "openbsd":
-		fallthrough
-	case "linux":
-		cmd = exec.Command("xdg-open", url)
-	case "darwin":
-		cmd = exec.Command("open", url)
-	case "windows":
-		r := strings.NewReplacer("&", "^&")
-		cmd = exec.Command("cmd", "/c", "start", r.Replace(url)) //nolint:gosec
-	}
-	if cmd != nil {
-		cmd.Stdout = nil
-		cmd.Stderr = nil
-		err := cmd.Start()
-		if err != nil {
-			return fmt.Errorf("Failed to open browser: " + err.Error())
-		}
-		err = cmd.Wait()
-		if err != nil {
-			return fmt.Errorf("Failed to wait for open browser command to finish: " + err.Error())
-		}
-		return nil
-	} else {
-		return errors.New("unsupported platform")
-	}
-}
-
 func getEndpoint(account url.URL, api url.URL, local string) string {
 	totp := local
 	if local == "" {
@@ -202,6 +171,7 @@ func getEndpoint(account url.URL, api url.URL, local string) string {
 	}.Encode()
 	return loginEP.String()
 }
+
 func (c *LoginWebCmd) exchangeTokenForSession(ctx context.Context, p pterm.TextPrinter, upCtx *upbound.Context, t string) error {
 	if t == "" {
 		return errors.New("failed to receive callback from web login")
