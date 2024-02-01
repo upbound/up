@@ -19,11 +19,11 @@ import (
 
 	"github.com/alecthomas/kong"
 	"github.com/pterm/pterm"
+	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/client-go/dynamic"
 
 	"github.com/upbound/up-sdk-go/service/configurations"
 	cp "github.com/upbound/up-sdk-go/service/controlplanes"
-
 	"github.com/upbound/up/internal/controlplane"
 	"github.com/upbound/up/internal/controlplane/cloud"
 	"github.com/upbound/up/internal/controlplane/space"
@@ -32,17 +32,20 @@ import (
 )
 
 type ctpGetter interface {
-	Get(ctx context.Context, name string) (*controlplane.Response, error)
+	Get(ctx context.Context, name types.NamespacedName) (*controlplane.Response, error)
 }
 
 // AfterApply sets default values in command after assignment and validation.
 func (c *getCmd) AfterApply(kongCtx *kong.Context, upCtx *upbound.Context) error {
-
 	if upCtx.Profile.IsSpace() {
-		kubeconfig, err := upCtx.Profile.GetKubeClientConfig()
+		kubeconfig, ns, err := upCtx.Profile.GetKubeClientConfig()
 		if err != nil {
 			return err
 		}
+		if c.Group == "" {
+			c.Group = ns
+		}
+
 		client, err := dynamic.NewForConfig(kubeconfig)
 		if err != nil {
 			return err
@@ -65,14 +68,15 @@ func (c *getCmd) AfterApply(kongCtx *kong.Context, upCtx *upbound.Context) error
 
 // getCmd gets a single control plane in an account on Upbound.
 type getCmd struct {
-	Name string `arg:"" required:"" help:"Name of control plane." predictor:"ctps"`
+	Name  string `arg:"" required:"" help:"Name of control plane." predictor:"ctps"`
+	Group string `short:"g" help:"The control plane group that the control plane is contained in. This defaults to the group specified in the current profile."`
 
 	client ctpGetter
 }
 
 // Run executes the get command.
 func (c *getCmd) Run(ctx context.Context, printer upterm.ObjectPrinter, p pterm.TextPrinter, upCtx *upbound.Context) error {
-	ctp, err := c.client.Get(ctx, c.Name)
+	ctp, err := c.client.Get(ctx, types.NamespacedName{Name: c.Name, Namespace: c.Group})
 	if controlplane.IsNotFound(err) {
 		p.Printfln("Control plane %s not found", c.Name)
 		return nil

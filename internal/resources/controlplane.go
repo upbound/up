@@ -15,6 +15,8 @@
 package resources
 
 import (
+	"time"
+
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 	"k8s.io/apimachinery/pkg/runtime/schema"
 
@@ -88,4 +90,30 @@ func (c *ControlPlane) GetConnectionSecretToReference() *xpv1.SecretReference {
 // SetWriteConnectionSecretToReference of this control plane.
 func (c *ControlPlane) SetWriteConnectionSecretToReference(ref *xpv1.SecretReference) {
 	_ = fieldpath.Pave(c.Object).SetValue("spec.writeConnectionSecretToRef", ref)
+}
+
+func (c *ControlPlane) GetCrossplaneVersion() string {
+	out, _ := fieldpath.Pave(c.Object).GetString("spec.crossplane.version")
+	return out
+}
+
+func (c *ControlPlane) GetMessage() string {
+	var ann map[string]string
+	if err := fieldpath.Pave(c.Object).GetValueInto("metadata.annotations", &ann); err != nil {
+		return ""
+	}
+	return ann["internal.spaces.upbound.io/message"]
+}
+
+func (c *ControlPlane) GetAge() *time.Duration {
+	created, _ := fieldpath.Pave(c.Object).GetString("metadata.creationTimestamp")
+	if created == "" {
+		return nil
+	}
+	ts, err := time.Parse(time.RFC3339, created)
+	if err != nil {
+		return nil
+	}
+	age := time.Since(ts)
+	return &age
 }

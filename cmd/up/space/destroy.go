@@ -139,7 +139,8 @@ func (c *destroyCmd) getKubeconfig(upCtx *upbound.Context) (*rest.Config, error)
 	if !upCtx.Profile.IsSpace() {
 		return nil, fmt.Errorf("destroy is not supported for non-space profile %q", upCtx.ProfileName)
 	}
-	return upCtx.Profile.GetKubeClientConfig()
+	cfg, _, err := upCtx.Profile.GetKubeClientConfig()
+	return cfg, err
 }
 
 // Run executes the uninstall command.

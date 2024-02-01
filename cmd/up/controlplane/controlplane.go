@@ -16,9 +16,11 @@ package controlplane
 
 import (
 	"context"
+	"time"
 
 	"github.com/alecthomas/kong"
 	"github.com/posener/complete"
+	"k8s.io/apimachinery/pkg/util/duration"
 
 	cp "github.com/upbound/up-sdk-go/service/controlplanes"
 	"github.com/upbound/up/cmd/up/controlplane/connector"
@@ -32,8 +34,8 @@ import (
 )
 
 var (
-	cloudfieldNames = []string{"NAME", "ID", "STATUS", "CONFIGURATION", "CONFIGURATION STATUS"}
-	spacefieldNames = []string{"NAME", "ID", "STATUS", "MESSAGE", "CONNECTION NAME", "CONNECTION NAMESPACE"}
+	cloudfieldNames = []string{"NAME", "CONFIGURATION", "UPDATED", "SYNCED", "READY", "MESSAGE", "AGE"}
+	spacefieldNames = []string{"GROUP", "NAME", "CROSSPLANE", "SYNCED", "READY", "MESSAGE", "AGE"}
 )
 
 // BeforeReset is the first hook to run.
@@ -116,38 +118,45 @@ between different Upbound profiles or to connect to a local Space.`
 }
 
 func extractCloudFields(obj any) []string {
-	id, readyStatus := "unknown", "unknown"
-
 	resp, ok := obj.(*controlplane.Response)
 	if !ok {
-		return []string{"", id, readyStatus}
+		return []string{"unknown", "unknown", "", "", "", "", ""}
 	}
 
 	return []string{
 		resp.Name,
-		resp.ID,
-		resp.Status,
 		resp.Cfg,
-		resp.CfgStatus,
+		resp.Updated,
+		resp.Synced,
+		resp.Ready,
+		resp.Message,
+		formatAge(resp.Age),
 	}
 }
 
 func extractSpaceFields(obj any) []string {
-	id, readyStatus := "unknown", "unknown"
-
 	resp, ok := obj.(*controlplane.Response)
 	if !ok {
-		return []string{"", id, readyStatus}
+		return []string{"unknown", "unknown", "", "", "", "", ""}
 	}
 
 	return []string{
+		resp.Group,
 		resp.Name,
-		resp.ID,
-		resp.Status,
+		resp.CrossplaneVersion,
+		resp.Synced,
+		resp.Ready,
 		resp.Message,
-		resp.ConnName,
-		resp.ConnNamespace,
+		formatAge(resp.Age),
 	}
+}
+
+func formatAge(age *time.Duration) string {
+	if age == nil {
+		return ""
+	}
+
+	return duration.HumanDuration(*age)
 }
 
 func tabularPrint(obj any, printer upterm.ObjectPrinter, upCtx *upbound.Context) error {

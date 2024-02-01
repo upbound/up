@@ -19,16 +19,18 @@ import (
 	"errors"
 	"testing"
 
-	xpcommonv1 "github.com/crossplane/crossplane-runtime/apis/common/v1"
-	"github.com/crossplane/crossplane-runtime/pkg/test"
 	"github.com/google/go-cmp/cmp"
 	kerrors "k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/runtime/schema"
+	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/client-go/dynamic"
 	"k8s.io/client-go/dynamic/fake"
 	cgotesting "k8s.io/client-go/testing"
+
+	xpcommonv1 "github.com/crossplane/crossplane-runtime/apis/common/v1"
+	"github.com/crossplane/crossplane-runtime/pkg/test"
 
 	"github.com/upbound/up/internal/controlplane"
 	"github.com/upbound/up/internal/resources"
@@ -54,8 +56,9 @@ func TestGet(t *testing.T) {
 	})
 
 	type args struct {
-		client dynamic.Interface
-		name   string
+		client    dynamic.Interface
+		name      string
+		namespace string
 	}
 	type want struct {
 		resp *controlplane.Response
@@ -95,18 +98,16 @@ func TestGet(t *testing.T) {
 			},
 			want: want{
 				resp: &controlplane.Response{
-					Name:          "ctp1",
-					ConnName:      "kubeconfig-ctp1",
-					ConnNamespace: "default",
+					Name:     "ctp1",
+					ConnName: "kubeconfig-ctp1",
 				},
 			},
 		},
 	}
 	for name, tc := range cases {
 		t.Run(name, func(t *testing.T) {
-
 			c := New(tc.args.client)
-			got, err := c.Get(context.Background(), tc.args.name)
+			got, err := c.Get(context.Background(), types.NamespacedName{Name: tc.args.name, Namespace: tc.args.namespace})
 
 			if diff := cmp.Diff(tc.want.err, err, test.EquateErrors()); diff != "" {
 				t.Errorf("\n%s\nGet(...): -want error, +got error:\n%s", tc.reason, diff)
@@ -127,8 +128,9 @@ func TestDelete(t *testing.T) {
 	})
 
 	type args struct {
-		client dynamic.Interface
-		name   string
+		client    dynamic.Interface
+		name      string
+		namespace string
 	}
 	type want struct {
 		err error
@@ -172,7 +174,7 @@ func TestDelete(t *testing.T) {
 		t.Run(name, func(t *testing.T) {
 
 			c := New(tc.args.client)
-			err := c.Delete(context.Background(), tc.args.name)
+			err := c.Delete(context.Background(), types.NamespacedName{Name: tc.args.name, Namespace: tc.args.namespace})
 
 			if diff := cmp.Diff(tc.want.err, err, test.EquateErrors()); diff != "" {
 				t.Errorf("\n%s\nDelete(...): -want error, +got error:\n%s", tc.reason, diff)
@@ -204,7 +206,8 @@ func TestList(t *testing.T) {
 	})
 
 	type args struct {
-		client dynamic.Interface
+		client    dynamic.Interface
+		namespace string
 	}
 	type want struct {
 		resp []*controlplane.Response
@@ -236,9 +239,8 @@ func TestList(t *testing.T) {
 			want: want{
 				resp: []*controlplane.Response{
 					{
-						Name:          "ctp1",
-						ConnName:      "kubeconfig-ctp1",
-						ConnNamespace: "default",
+						Name:     "ctp1",
+						ConnName: "kubeconfig-ctp1",
 					},
 				},
 			},
@@ -255,14 +257,12 @@ func TestList(t *testing.T) {
 			want: want{
 				resp: []*controlplane.Response{
 					{
-						Name:          "ctp1",
-						ConnName:      "kubeconfig-ctp1",
-						ConnNamespace: "default",
+						Name:     "ctp1",
+						ConnName: "kubeconfig-ctp1",
 					},
 					{
-						Name:          "ctp2",
-						ConnName:      "kubeconfig-ctp2",
-						ConnNamespace: "default",
+						Name:     "ctp2",
+						ConnName: "kubeconfig-ctp2",
 					},
 				},
 			},
@@ -272,7 +272,7 @@ func TestList(t *testing.T) {
 		t.Run(name, func(t *testing.T) {
 
 			c := New(tc.args.client)
-			got, err := c.List(context.Background())
+			got, err := c.List(context.Background(), tc.args.namespace)
 
 			if diff := cmp.Diff(tc.want.err, err, test.EquateErrors()); diff != "" {
 				t.Errorf("\n%s\nList(...): -want error, +got error:\n%s", tc.reason, diff)
@@ -293,8 +293,9 @@ func TestGetKubeConfig(t *testing.T) {
 	})
 
 	type args struct {
-		client dynamic.Interface
-		name   string
+		client    dynamic.Interface
+		name      string
+		namespace string
 	}
 	type want struct {
 		err error
@@ -338,7 +339,7 @@ func TestGetKubeConfig(t *testing.T) {
 		t.Run(name, func(t *testing.T) {
 
 			c := New(tc.args.client)
-			err := c.Delete(context.Background(), tc.args.name)
+			err := c.Delete(context.Background(), types.NamespacedName{Name: tc.args.name, Namespace: tc.args.namespace})
 
 			if diff := cmp.Diff(tc.want.err, err, test.EquateErrors()); diff != "" {
 				t.Errorf("\n%s\nDelete(...): -want error, +got error:\n%s", tc.reason, diff)
@@ -421,22 +422,27 @@ func TestConvert(t *testing.T) {
 					c := &resources.ControlPlane{}
 					c.SetName("ctp1")
 					c.SetControlPlaneID("mxp1")
+					c.SetNamespace("default")
 					c.SetWriteConnectionSecretToReference(&xpcommonv1.SecretReference{
 						Name:      "kubeconfig-ctp1",
 						Namespace: "default",
 					})
+					c.SetConditions([]xpcommonv1.Condition{xpcommonv1.ReconcileSuccess()}...)
 					c.SetConditions([]xpcommonv1.Condition{xpcommonv1.Available()}...)
+					c.SetAnnotations(map[string]string{"internal.spaces.upbound.io/message": ""})
 
 					return c
 				}(),
 			},
 			want: want{
 				resp: &controlplane.Response{
-					Name:          "ctp1",
-					ID:            "mxp1",
-					Status:        string(xpcommonv1.Available().Reason),
-					ConnName:      "kubeconfig-ctp1",
-					ConnNamespace: "default",
+					Name:     "ctp1",
+					ID:       "mxp1",
+					Group:    "default",
+					Synced:   "True",
+					Ready:    "True",
+					ConnName: "kubeconfig-ctp1",
+					Message:  "",
 				},
 			},
 		},
@@ -447,25 +453,27 @@ func TestConvert(t *testing.T) {
 					c := &resources.ControlPlane{}
 					c.SetName("ctp1")
 					c.SetControlPlaneID("mxp1")
+					c.SetNamespace("default")
 					c.SetWriteConnectionSecretToReference(&xpcommonv1.SecretReference{
 						Name:      "kubeconfig-ctp1",
 						Namespace: "default",
 					})
-					c.SetConditions([]xpcommonv1.Condition{
-						xpcommonv1.Creating().WithMessage("creating..."),
-					}...)
+					c.SetConditions(xpcommonv1.ReconcileSuccess())
+					c.SetConditions(xpcommonv1.Creating().WithMessage("something"))
+					c.SetAnnotations(map[string]string{"internal.spaces.upbound.io/message": "creating..."})
 
 					return c
 				}(),
 			},
 			want: want{
 				resp: &controlplane.Response{
-					Name:          "ctp1",
-					ID:            "mxp1",
-					Status:        string(xpcommonv1.Creating().Reason),
-					Message:       "creating...",
-					ConnName:      "kubeconfig-ctp1",
-					ConnNamespace: "default",
+					Name:     "ctp1",
+					ID:       "mxp1",
+					Group:    "default",
+					Synced:   "True",
+					Ready:    "False",
+					Message:  "creating...",
+					ConnName: "kubeconfig-ctp1",
 				},
 			},
 		},
@@ -476,6 +484,7 @@ func TestConvert(t *testing.T) {
 					c := &resources.ControlPlane{}
 					c.SetName("ctp1")
 					c.SetControlPlaneID("mxp1")
+					c.SetConditions(xpcommonv1.ReconcileSuccess())
 					c.SetConditions([]xpcommonv1.Condition{xpcommonv1.Available()}...)
 
 					return c
@@ -485,7 +494,8 @@ func TestConvert(t *testing.T) {
 				resp: &controlplane.Response{
 					Name:   "ctp1",
 					ID:     "mxp1",
-					Status: string(xpcommonv1.Available().Reason),
+					Synced: "True",
+					Ready:  "True",
 				},
 			},
 		},

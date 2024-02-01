@@ -105,7 +105,7 @@ func (c *spaceCmd) Run(ctx context.Context, p pterm.TextPrinter, upCtx *upbound.
 	if prof.Kubeconfig != "" {
 		kubeconfigLocation = fmt.Sprintf("kubeconfig at %q", prof.Kubeconfig)
 	}
-	p.Printf("Profile %q updated to use Kubernetes context %q from the %s", upCtx.ProfileName, prof.KubeContext, kubeconfigLocation)
+	p.Printf("Profile %q updated to use Kubernetes context %q from the %s. Defaulting to group %q.", upCtx.ProfileName, prof.KubeContext, kubeconfigLocation, c.Kube.Namespace())
 	if setDefault {
 		p.Print(" and selected as the default profile")
 	}
@@ -126,9 +126,14 @@ func (c *spaceCmd) checkForSpaces(ctx context.Context) (bool, error) {
 	if err != nil {
 		return false, err
 	}
-	if _, err := kClient.AppsV1().Deployments("upbound-system").Get(ctx, "mxe-controller", metav1.GetOptions{}); kerrors.IsNotFound(err) {
+	_, err = kClient.AppsV1().Deployments("upbound-system").Get(ctx, "mxe-controller", metav1.GetOptions{})
+	if kerrors.IsNotFound(err) {
+		_, err = kClient.AppsV1().Deployments("upbound-system").Get(ctx, "spaces-controller", metav1.GetOptions{})
+	}
+	if kerrors.IsNotFound(err) {
 		return false, nil
-	} else if err != nil {
+	}
+	if err != nil {
 		return false, errors.Wrap(err, errKubeContact)
 	}
 

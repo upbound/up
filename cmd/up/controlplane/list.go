@@ -23,7 +23,6 @@ import (
 
 	"github.com/upbound/up-sdk-go/service/configurations"
 	cp "github.com/upbound/up-sdk-go/service/controlplanes"
-
 	"github.com/upbound/up/internal/controlplane"
 	"github.com/upbound/up/internal/controlplane/cloud"
 	"github.com/upbound/up/internal/controlplane/space"
@@ -32,22 +31,28 @@ import (
 )
 
 type ctpLister interface {
-	List(ctx context.Context) ([]*controlplane.Response, error)
+	List(ctx context.Context, namespace string) ([]*controlplane.Response, error)
 }
 
 // listCmd list control planes in an account on Upbound.
 type listCmd struct {
+	Group     string `short:"g" help:"The control plane group that the control plane is contained in. This defaults to the group specified in the current profile."`
+	AllGroups bool   `short:"A" default:"false" help:"List control planes across all groups."`
+
 	client ctpLister
 }
 
 // AfterApply sets default values in command after assignment and validation.
 func (c *listCmd) AfterApply(kongCtx *kong.Context, upCtx *upbound.Context) error {
-
 	if upCtx.Profile.IsSpace() {
-		kubeconfig, err := upCtx.Profile.GetKubeClientConfig()
+		kubeconfig, ns, err := upCtx.Profile.GetKubeClientConfig()
 		if err != nil {
 			return err
 		}
+		if c.Group == "" {
+			c.Group = ns
+		}
+
 		client, err := dynamic.NewForConfig(kubeconfig)
 		if err != nil {
 			return err
@@ -70,7 +75,11 @@ func (c *listCmd) AfterApply(kongCtx *kong.Context, upCtx *upbound.Context) erro
 
 // Run executes the list command.
 func (c *listCmd) Run(ctx context.Context, printer upterm.ObjectPrinter, p pterm.TextPrinter, upCtx *upbound.Context) error {
-	l, err := c.client.List(ctx)
+	l, err := c.client.List(ctx, c.deriveGroup())
+	if controlplane.IsNotFound(err) {
+		p.Printfln("No Control planes found in %s group", c.deriveGroup())
+		return nil
+	}
 	if err != nil {
 		return err
 	}
@@ -81,4 +90,11 @@ func (c *listCmd) Run(ctx context.Context, printer upterm.ObjectPrinter, p pterm
 	}
 
 	return tabularPrint(l, printer, upCtx)
+}
+
+func (c *listCmd) deriveGroup() string {
+	if c.AllGroups {
+		return ""
+	}
+	return c.Group
 }

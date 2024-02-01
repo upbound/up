@@ -19,11 +19,11 @@ import (
 
 	"github.com/alecthomas/kong"
 	"github.com/pterm/pterm"
+	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/client-go/dynamic"
 
 	"github.com/upbound/up-sdk-go/service/configurations"
 	cp "github.com/upbound/up-sdk-go/service/controlplanes"
-
 	"github.com/upbound/up/internal/controlplane"
 	"github.com/upbound/up/internal/controlplane/cloud"
 	"github.com/upbound/up/internal/controlplane/space"
@@ -31,7 +31,7 @@ import (
 )
 
 type ctpCreator interface {
-	Create(ctx context.Context, name string, opts controlplane.Options) (*controlplane.Response, error)
+	Create(ctx context.Context, ctp types.NamespacedName, opts controlplane.Options) (*controlplane.Response, error)
 }
 
 // createCmd creates a control plane on Upbound.
@@ -41,20 +41,23 @@ type createCmd struct {
 	ConfigurationName *string `help:"The optional name of the Configuration."`
 	Description       string  `short:"d" help:"Description for control plane."`
 
-	SecretName      string `help:"The name of the control plane's secret. Defaults to 'kubeconfig-{control plane name}'. Only applicable for Space control planes."`
-	SecretNamespace string `default:"default" help:"The name of namespace for the control plane's secret. Only applicable for Space control planes."`
+	SecretName string `help:"The name of the control plane's secret. Defaults to 'kubeconfig-{control plane name}'. Only applicable for Space control planes."`
+	Group      string `short:"g" help:"The control plane group that the control plane is contained in. This defaults to the group specified in the current profile."`
 
 	client ctpCreator
 }
 
 // AfterApply sets default values in command after assignment and validation.
 func (c *createCmd) AfterApply(kongCtx *kong.Context, upCtx *upbound.Context) error {
-
 	if upCtx.Profile.IsSpace() {
-		kubeconfig, err := upCtx.Profile.GetKubeClientConfig()
+		kubeconfig, ns, err := upCtx.Profile.GetKubeClientConfig()
 		if err != nil {
 			return err
 		}
+		if c.Group == "" {
+			c.Group = ns
+		}
+
 		client, err := dynamic.NewForConfig(kubeconfig)
 		if err != nil {
 			return err
@@ -79,10 +82,10 @@ func (c *createCmd) AfterApply(kongCtx *kong.Context, upCtx *upbound.Context) er
 func (c *createCmd) Run(ctx context.Context, p pterm.TextPrinter, upCtx *upbound.Context) error {
 	_, err := c.client.Create(
 		ctx,
-		c.Name,
+		types.NamespacedName{Name: c.Name, Namespace: c.Group},
 		controlplane.Options{
 			SecretName:        c.SecretName,
-			SecretNamespace:   c.SecretNamespace,
+			SecretNamespace:   c.Group,
 			ConfigurationName: c.ConfigurationName,
 		},
 	)
