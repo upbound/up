@@ -44,8 +44,12 @@ const (
 
 	testProviderConfigsCRD      = "providerconfigs.helm.crossplane.io.yaml"
 	testProviderConfigUsagesCRD = "providerconfigusages.helm.crossplane.io.yaml"
-	testDigestFile              = "sha256:295bcd0e6dc396cf0f5ef638c8a7610a571ff2dcef3aa0447398f25b5a0eafc7"
-	testPackageJSONFile2        = "package2.ndjson"
+
+	// "go get" does require filenames to be cross-platform compatible.
+	// ":" is an invalid character on Windows.
+	testDigestFileOSPath = "sha256_295bcd0e6dc396cf0f5ef638c8a7610a571ff2dcef3aa0447398f25b5a0eafc7"
+	testDigestFile       = "sha256:295bcd0e6dc396cf0f5ef638c8a7610a571ff2dcef3aa0447398f25b5a0eafc7"
+	testPackageJSONFile2 = "package2.ndjson"
 )
 
 var testProviderPkgYaml = filepath.Join(testdata, "provider_package.yaml")
@@ -194,7 +198,7 @@ func TestFromDir(t *testing.T) {
 	defer crd1.Close()
 	crd2, _ := testdatafs.Open(filepath.Join(testdata, testProviderConfigUsagesCRD))
 	defer crd2.Close()
-	sha, _ := testdatafs.Open(filepath.Join(testdata, testDigestFile))
+	sha, _ := testdatafs.Open(filepath.Join(testdata, testDigestFileOSPath))
 	defer sha.Close()
 
 	json2, _ := testdatafs.Open(filepath.Join(testdata, testPackageJSONFile2))
@@ -205,7 +209,7 @@ func TestFromDir(t *testing.T) {
 	defer crd1.Close()
 	crd22, _ := testdatafs.Open(filepath.Join(testdata, testProviderConfigUsagesCRD))
 	defer crd2.Close()
-	sha2, _ := testdatafs.Open(filepath.Join(testdata, testDigestFile))
+	sha2, _ := testdatafs.Open(filepath.Join(testdata, testDigestFileOSPath))
 	defer sha.Close()
 
 	targetPkgJSON, _ := inmemfs.Create(filepath.Join(path1, xpkg.JSONStreamFile))
