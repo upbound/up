@@ -157,7 +157,7 @@ func (c *Client) GetKubeConfig(ctx context.Context, ctp types.NamespacedName) (*
 			Version:  "v1",
 			Resource: "secrets",
 		}).
-		Namespace(ctp.Name).
+		Namespace(ctp.Namespace).
 		Get(
 			ctx,
 			r.ConnName,
