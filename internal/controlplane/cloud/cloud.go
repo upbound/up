@@ -19,13 +19,13 @@ import (
 	"net/url"
 	"path"
 
+	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/client-go/tools/clientcmd/api"
 
 	sdkerrs "github.com/upbound/up-sdk-go/errors"
 	"github.com/upbound/up-sdk-go/service/common"
 	"github.com/upbound/up-sdk-go/service/configurations"
 	"github.com/upbound/up-sdk-go/service/controlplanes"
-
 	"github.com/upbound/up/internal/controlplane"
 	"github.com/upbound/up/internal/kube"
 )
@@ -90,8 +90,8 @@ func New(ctp ctpClient, cfg cfgGetter, account string, opts ...Option) *Client {
 }
 
 // Get the ControlPlane corresponding to the given ControlPlane name.
-func (c *Client) Get(ctx context.Context, name, namespace string) (*controlplane.Response, error) {
-	resp, err := c.ctp.Get(ctx, c.account, name)
+func (c *Client) Get(ctx context.Context, ctp types.NamespacedName) (*controlplane.Response, error) {
+	resp, err := c.ctp.Get(ctx, c.account, ctp.Name)
 
 	if sdkerrs.IsNotFound(err) {
 		return nil, controlplane.NewNotFound(err)
@@ -119,9 +119,9 @@ func (c *Client) List(ctx context.Context, namespace string) ([]*controlplane.Re
 }
 
 // Create a new ControlPlane with the given name and the supplied Options.
-func (c *Client) Create(ctx context.Context, name, namespace string, opts controlplane.Options) (*controlplane.Response, error) {
+func (c *Client) Create(ctx context.Context, ctp types.NamespacedName, opts controlplane.Options) (*controlplane.Response, error) {
 	params := &controlplanes.ControlPlaneCreateParameters{
-		Name:        name,
+		Name:        ctp.Name,
 		Description: opts.Description,
 	}
 	if opts.ConfigurationName != nil {
@@ -142,8 +142,8 @@ func (c *Client) Create(ctx context.Context, name, namespace string, opts contro
 }
 
 // Delete the ControlPlane corresponding to the given ControlPlane name.
-func (c *Client) Delete(ctx context.Context, name, namespace string) error {
-	err := c.ctp.Delete(ctx, c.account, name)
+func (c *Client) Delete(ctx context.Context, ctp types.NamespacedName) error {
+	err := c.ctp.Delete(ctx, c.account, ctp.Name)
 	if sdkerrs.IsNotFound(err) {
 		return controlplane.NewNotFound(err)
 	}
@@ -151,10 +151,10 @@ func (c *Client) Delete(ctx context.Context, name, namespace string) error {
 }
 
 // GetKubeConfig for the given Control Plane.
-func (c *Client) GetKubeConfig(ctx context.Context, name, namespace string) (*api.Config, error) {
+func (c *Client) GetKubeConfig(ctx context.Context, ctp types.NamespacedName) (*api.Config, error) {
 	return kube.BuildControlPlaneKubeconfig(
 		c.proxy,
-		path.Join(c.account, name),
+		path.Join(c.account, ctp.Name),
 		c.token,
 		false,
 	), nil

@@ -19,11 +19,11 @@ import (
 
 	"github.com/alecthomas/kong"
 	"github.com/pterm/pterm"
+	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/client-go/dynamic"
 
 	"github.com/upbound/up-sdk-go/service/configurations"
 	cp "github.com/upbound/up-sdk-go/service/controlplanes"
-
 	"github.com/upbound/up/internal/controlplane"
 	"github.com/upbound/up/internal/controlplane/cloud"
 	"github.com/upbound/up/internal/controlplane/space"
@@ -31,7 +31,7 @@ import (
 )
 
 type ctpDeleter interface {
-	Delete(ctx context.Context, name, namespace string) error
+	Delete(ctx context.Context, ctp types.NamespacedName) error
 }
 
 // deleteCmd deletes a control plane on Upbound.
@@ -44,7 +44,6 @@ type deleteCmd struct {
 
 // AfterApply sets default values in command after assignment and validation.
 func (c *deleteCmd) AfterApply(kongCtx *kong.Context, upCtx *upbound.Context) error {
-
 	if upCtx.Profile.IsSpace() {
 		kubeconfig, err := upCtx.Profile.GetKubeClientConfig()
 		if err != nil {
@@ -70,7 +69,7 @@ func (c *deleteCmd) AfterApply(kongCtx *kong.Context, upCtx *upbound.Context) er
 
 // Run executes the delete command.
 func (c *deleteCmd) Run(ctx context.Context, p pterm.TextPrinter, upCtx *upbound.Context) error {
-	if err := c.client.Delete(ctx, c.Name, c.Group); err != nil {
+	if err := c.client.Delete(ctx, types.NamespacedName{Name: c.Name, Namespace: c.Group}); err != nil {
 		if controlplane.IsNotFound(err) {
 			p.Printfln("Control plane %s not found", c.Name)
 			return nil

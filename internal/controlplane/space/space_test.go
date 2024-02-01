@@ -19,16 +19,18 @@ import (
 	"errors"
 	"testing"
 
-	xpcommonv1 "github.com/crossplane/crossplane-runtime/apis/common/v1"
-	"github.com/crossplane/crossplane-runtime/pkg/test"
 	"github.com/google/go-cmp/cmp"
 	kerrors "k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/runtime/schema"
+	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/client-go/dynamic"
 	"k8s.io/client-go/dynamic/fake"
 	cgotesting "k8s.io/client-go/testing"
+
+	xpcommonv1 "github.com/crossplane/crossplane-runtime/apis/common/v1"
+	"github.com/crossplane/crossplane-runtime/pkg/test"
 
 	"github.com/upbound/up/internal/controlplane"
 	"github.com/upbound/up/internal/resources"
@@ -106,7 +108,7 @@ func TestGet(t *testing.T) {
 		t.Run(name, func(t *testing.T) {
 
 			c := New(tc.args.client)
-			got, err := c.Get(context.Background(), tc.args.name, tc.args.namespace)
+			got, err := c.Get(context.Background(), types.NamespacedName{Name: tc.args.name, Namespace: tc.args.namespace})
 
 			if diff := cmp.Diff(tc.want.err, err, test.EquateErrors()); diff != "" {
 				t.Errorf("\n%s\nGet(...): -want error, +got error:\n%s", tc.reason, diff)
@@ -173,7 +175,7 @@ func TestDelete(t *testing.T) {
 		t.Run(name, func(t *testing.T) {
 
 			c := New(tc.args.client)
-			err := c.Delete(context.Background(), tc.args.name, tc.args.namespace)
+			err := c.Delete(context.Background(), types.NamespacedName{Name: tc.args.name, Namespace: tc.args.namespace})
 
 			if diff := cmp.Diff(tc.want.err, err, test.EquateErrors()); diff != "" {
 				t.Errorf("\n%s\nDelete(...): -want error, +got error:\n%s", tc.reason, diff)
@@ -338,7 +340,7 @@ func TestGetKubeConfig(t *testing.T) {
 		t.Run(name, func(t *testing.T) {
 
 			c := New(tc.args.client)
-			err := c.Delete(context.Background(), tc.args.name, tc.args.namespace)
+			err := c.Delete(context.Background(), types.NamespacedName{Name: tc.args.name, Namespace: tc.args.namespace})
 
 			if diff := cmp.Diff(tc.want.err, err, test.EquateErrors()); diff != "" {
 				t.Errorf("\n%s\nDelete(...): -want error, +got error:\n%s", tc.reason, diff)

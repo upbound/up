@@ -24,14 +24,13 @@ import (
 
 	"github.com/alecthomas/kong"
 	"github.com/pterm/pterm"
-
+	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/client-go/dynamic"
 	"k8s.io/client-go/tools/clientcmd"
 	"k8s.io/client-go/tools/clientcmd/api"
 
 	"github.com/upbound/up-sdk-go/service/configurations"
 	cp "github.com/upbound/up-sdk-go/service/controlplanes"
-
 	"github.com/upbound/up/internal/controlplane"
 	"github.com/upbound/up/internal/controlplane/cloud"
 	"github.com/upbound/up/internal/controlplane/space"
@@ -47,7 +46,7 @@ const (
 )
 
 type ctpConnector interface {
-	GetKubeConfig(ctx context.Context, name, namespace string) (*api.Config, error)
+	GetKubeConfig(ctx context.Context, ctp types.NamespacedName) (*api.Config, error)
 }
 
 // AfterApply sets default values in command after assignment and validation.
@@ -131,7 +130,7 @@ func (c *connectCmd) Run(ctx context.Context, printer upterm.ObjectPrinter, p pt
 		return nil
 	}
 
-	cfg, err := c.client.GetKubeConfig(ctx, c.Name, c.Group)
+	cfg, err := c.client.GetKubeConfig(ctx, types.NamespacedName{Namespace: c.Group, Name: c.Name})
 	if controlplane.IsNotFound(err) {
 		p.Printfln("Control plane %s not found", c.Name)
 		return nil

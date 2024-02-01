@@ -19,11 +19,11 @@ import (
 
 	"github.com/alecthomas/kong"
 	"github.com/pterm/pterm"
+	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/client-go/dynamic"
 
 	"github.com/upbound/up-sdk-go/service/configurations"
 	cp "github.com/upbound/up-sdk-go/service/controlplanes"
-
 	"github.com/upbound/up/internal/controlplane"
 	"github.com/upbound/up/internal/controlplane/cloud"
 	"github.com/upbound/up/internal/controlplane/space"
@@ -32,7 +32,7 @@ import (
 )
 
 type ctpGetter interface {
-	Get(ctx context.Context, name, namespace string) (*controlplane.Response, error)
+	Get(ctx context.Context, name types.NamespacedName) (*controlplane.Response, error)
 }
 
 // AfterApply sets default values in command after assignment and validation.
@@ -73,7 +73,7 @@ type getCmd struct {
 
 // Run executes the get command.
 func (c *getCmd) Run(ctx context.Context, printer upterm.ObjectPrinter, p pterm.TextPrinter, upCtx *upbound.Context) error {
-	ctp, err := c.client.Get(ctx, c.Name, c.Group)
+	ctp, err := c.client.Get(ctx, types.NamespacedName{Name: c.Name, Namespace: c.Group})
 	if controlplane.IsNotFound(err) {
 		p.Printfln("Control plane %s not found", c.Name)
 		return nil
