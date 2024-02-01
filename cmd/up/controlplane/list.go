@@ -23,7 +23,6 @@ import (
 
 	"github.com/upbound/up-sdk-go/service/configurations"
 	cp "github.com/upbound/up-sdk-go/service/controlplanes"
-
 	"github.com/upbound/up/internal/controlplane"
 	"github.com/upbound/up/internal/controlplane/cloud"
 	"github.com/upbound/up/internal/controlplane/space"
@@ -37,7 +36,7 @@ type ctpLister interface {
 
 // listCmd list control planes in an account on Upbound.
 type listCmd struct {
-	Group     string `short:"g" default:"default" help:"The control plane group that the control plane is contained in."`
+	Group     string `short:"g" help:"The control plane group that the control plane is contained in. This defaults to the group specified in the current profile."`
 	AllGroups bool   `short:"A" default:"false" help:"List control planes across all groups."`
 
 	client ctpLister
@@ -45,12 +44,15 @@ type listCmd struct {
 
 // AfterApply sets default values in command after assignment and validation.
 func (c *listCmd) AfterApply(kongCtx *kong.Context, upCtx *upbound.Context) error {
-
 	if upCtx.Profile.IsSpace() {
-		kubeconfig, err := upCtx.Profile.GetKubeClientConfig()
+		kubeconfig, ns, err := upCtx.Profile.GetKubeClientConfig()
 		if err != nil {
 			return err
 		}
+		if c.Group == "" {
+			c.Group = ns
+		}
+
 		client, err := dynamic.NewForConfig(kubeconfig)
 		if err != nil {
 			return err

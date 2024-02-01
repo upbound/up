@@ -37,7 +37,7 @@ type ctpDeleter interface {
 // deleteCmd deletes a control plane on Upbound.
 type deleteCmd struct {
 	Name  string `arg:"" help:"Name of control plane." predictor:"ctps"`
-	Group string `short:"g" default:"default" help:"The control plane group that the control plane is contained in."`
+	Group string `short:"g" help:"The control plane group that the control plane is contained in. This defaults to the group specified in the current profile."`
 
 	client ctpDeleter
 }
@@ -45,10 +45,14 @@ type deleteCmd struct {
 // AfterApply sets default values in command after assignment and validation.
 func (c *deleteCmd) AfterApply(kongCtx *kong.Context, upCtx *upbound.Context) error {
 	if upCtx.Profile.IsSpace() {
-		kubeconfig, err := upCtx.Profile.GetKubeClientConfig()
+		kubeconfig, ns, err := upCtx.Profile.GetKubeClientConfig()
 		if err != nil {
 			return err
 		}
+		if c.Group == "" {
+			c.Group = ns
+		}
+
 		client, err := dynamic.NewForConfig(kubeconfig)
 		if err != nil {
 			return err

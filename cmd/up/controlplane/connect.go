@@ -54,10 +54,14 @@ func (c *connectCmd) AfterApply(kongCtx *kong.Context, upCtx *upbound.Context) e
 	c.stdin = os.Stdin
 
 	if upCtx.Profile.IsSpace() {
-		kubeconfig, err := upCtx.Profile.GetKubeClientConfig()
+		kubeconfig, ns, err := upCtx.Profile.GetKubeClientConfig()
 		if err != nil {
 			return err
 		}
+		if c.Group == "" {
+			c.Group = ns
+		}
+
 		client, err := dynamic.NewForConfig(kubeconfig)
 		if err != nil {
 			return err
@@ -103,7 +107,7 @@ type connectCmd struct {
 	Name  string `arg:"" required:"" help:"Name of control plane." predictor:"ctps"`
 	Token string `help:"API token used to authenticate. Required for Upbound Cloud; ignored otherwise."`
 
-	Group string `short:"g" default:"default" help:"The control plane group that the control plane is contained in."`
+	Group string `short:"g" help:"The control plane group that the control plane is contained in. By default, this is the group specified in the current profile."`
 
 	stdin  io.Reader
 	client ctpConnector

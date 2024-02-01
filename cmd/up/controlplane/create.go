@@ -42,7 +42,7 @@ type createCmd struct {
 	Description       string  `short:"d" help:"Description for control plane."`
 
 	SecretName string `help:"The name of the control plane's secret. Defaults to 'kubeconfig-{control plane name}'. Only applicable for Space control planes."`
-	Group      string `short:"g" default:"default" help:"The control plane group that the control plane is contained in."`
+	Group      string `short:"g" help:"The control plane group that the control plane is contained in. This defaults to the group specified in the current profile."`
 
 	client ctpCreator
 }
@@ -50,10 +50,14 @@ type createCmd struct {
 // AfterApply sets default values in command after assignment and validation.
 func (c *createCmd) AfterApply(kongCtx *kong.Context, upCtx *upbound.Context) error {
 	if upCtx.Profile.IsSpace() {
-		kubeconfig, err := upCtx.Profile.GetKubeClientConfig()
+		kubeconfig, ns, err := upCtx.Profile.GetKubeClientConfig()
 		if err != nil {
 			return err
 		}
+		if c.Group == "" {
+			c.Group = ns
+		}
+
 		client, err := dynamic.NewForConfig(kubeconfig)
 		if err != nil {
 			return err
