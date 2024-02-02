@@ -270,6 +270,6 @@ replace (
 
 replace (
 	// https://github.com/helm/helm/issues/11821
-	github.com/docker/cli => github.com/docker/cli v20.10.19+incompatible
-	github.com/docker/docker => github.com/docker/docker v20.10.19+incompatible
+	github.com/docker/cli => github.com/docker/cli v20.10.27+incompatible
+	github.com/docker/docker => github.com/docker/docker v20.10.27+incompatible
 )
