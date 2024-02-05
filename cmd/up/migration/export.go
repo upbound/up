@@ -16,8 +16,8 @@ package migration
 
 import (
 	"context"
-	"fmt"
 
+	"github.com/pterm/pterm"
 	apiextensionsclientset "k8s.io/apiextensions-apiserver/pkg/client/clientset/clientset"
 	"k8s.io/client-go/discovery"
 	"k8s.io/client-go/discovery/cached/memory"
@@ -37,7 +37,7 @@ reconstructable post-migration. Consequently, the exported archive will incorpor
 those secrets by default. To exclude secrets from the export, please use the
 --excluded-resources flag.
 
-IMPORTANT: The exported archive will contain secrets. Do you wish to proceed? [y/n]`
+IMPORTANT: The exported archive will contain secrets. Do you wish to proceed?`
 
 type exportCmd struct {
 	prompter input.Prompter
@@ -117,15 +117,14 @@ func (c *exportCmd) Run(ctx context.Context, migCtx *migration.Context) error {
 	})
 
 	if !c.Yes && e.IncludedExtraResource("secrets") {
-		res, err := c.prompter.Prompt(secretsWarning, false)
-		if err != nil {
-			return err
-		}
-		if res != "y" {
+		confirm := pterm.DefaultInteractiveConfirm
+		confirm.DefaultText = secretsWarning
+		confirm.DefaultValue = true
+		result, _ := confirm.Show()
+		pterm.Println() // Blank line
+		if !result {
 			return nil
 		}
-		// Print a newline to separate the prompt from the output.
-		fmt.Println()
 	}
 
 	if err = e.Export(ctx); err != nil {
