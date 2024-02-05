@@ -35,6 +35,7 @@ import (
 	"github.com/upbound/up/cmd/up/repository"
 	"github.com/upbound/up/cmd/up/robot"
 	"github.com/upbound/up/cmd/up/space"
+	"github.com/upbound/up/cmd/up/trace"
 	"github.com/upbound/up/cmd/up/upbound"
 	"github.com/upbound/up/cmd/up/uxp"
 	"github.com/upbound/up/cmd/up/xpkg"
@@ -141,6 +142,7 @@ type alpha struct {
 	Upbound      upbound.Cmd      `cmd:"" maturity:"alpha" help:"Interact with Upbound."`
 	XPKG         xpkg.Cmd         `cmd:"" maturity:"alpha" help:"Interact with UXP packages."`
 	Migration    migration.Cmd    `cmd:"" maturity:"alpha" help:"Migrate control planes to Upbound Managed Control Planes."`
+	Trace        trace.Cmd        `cmd:"" help:"Trace a Crossplane resource."`
 
 	WebLogin login.LoginWebCmd `cmd:"" maturity:"alpha" help:"Use web browser to login to up cli."`
 }
