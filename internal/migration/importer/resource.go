@@ -22,7 +22,7 @@ import (
 )
 
 type ResourceImporter interface {
-	ImportResources(ctx context.Context, gr string) (int, error)
+	ImportResources(ctx context.Context, gr string, restoreStatus bool) (int, error)
 }
 
 type PausingResourceImporter struct {
@@ -37,15 +37,15 @@ func NewPausingResourceImporter(r ResourceReader, a ResourceApplier) *PausingRes
 	}
 }
 
-func (im *PausingResourceImporter) ImportResources(ctx context.Context, gr string) (int, error) {
+func (im *PausingResourceImporter) ImportResources(ctx context.Context, gr string, restoreStatus bool) (int, error) {
 	resources, typeMeta, err := im.reader.ReadResources(gr)
 	if err != nil {
 		return 0, errors.Wrapf(err, "cannot get %q resources", gr)
 	}
 
-	sub := false
+	hasSubresource := false
 	if typeMeta != nil {
-		sub = typeMeta.WithStatusSubresource
+		hasSubresource = typeMeta.WithStatusSubresource
 		for _, c := range typeMeta.Categories {
 			// We pause all resources that are managed, claim, or composite.
 			// - Claim/Composite: We don't want Crossplane controllers to create new resources before we import all.
@@ -61,7 +61,7 @@ func (im *PausingResourceImporter) ImportResources(ctx context.Context, gr strin
 		}
 	}
 
-	if err = im.applier.ApplyResources(ctx, resources, sub); err != nil {
+	if err = im.applier.ApplyResources(ctx, resources, restoreStatus && hasSubresource); err != nil {
 		return 0, errors.Wrapf(err, "cannot apply %q resources", gr)
 	}
 
