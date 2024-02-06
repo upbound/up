@@ -21,6 +21,7 @@ import (
 	"strings"
 
 	"github.com/crossplane/crossplane-runtime/pkg/errors"
+	"github.com/pterm/pterm"
 	"k8s.io/client-go/discovery"
 	"k8s.io/client-go/discovery/cached/memory"
 	"k8s.io/client-go/dynamic"
@@ -102,15 +103,16 @@ func (c *importCmd) Run(ctx context.Context, migCtx *migration.Context) error { 
 			fmt.Println("- " + err.Error())
 		}
 		if !c.Yes {
-			res, err := c.prompter.Prompt("Do you still wish to proceed? [y/n]", false)
-			if err != nil {
-				return err
-			}
-			if res != "y" {
+			pterm.Println() // Blank line
+			confirm := pterm.DefaultInteractiveConfirm
+			confirm.DefaultText = "Do you still want to proceed?"
+			confirm.DefaultValue = false
+			result, _ := confirm.Show()
+			pterm.Println() // Blank line
+			if !result {
+				pterm.Error.Println("Preflight checks must pass in order to proceed with the import.")
 				return nil
 			}
-			// Print a newline to separate the prompt from the output.
-			fmt.Println()
 		}
 	}
 
