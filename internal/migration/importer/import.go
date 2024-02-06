@@ -138,7 +138,7 @@ func (im *ControlPlaneStateImporter) Import(ctx context.Context) error { // noli
 	s, _ = upterm.CheckmarkSuccessSpinner.Start(importBaseMsg + fmt.Sprintf("0 / %d", len(baseResources)))
 	baseCounts := make(map[string]int, len(baseResources))
 	for i, gr := range baseResources {
-		count, err := r.ImportResources(ctx, gr)
+		count, err := r.ImportResources(ctx, gr, false)
 		if err != nil {
 			s.Fail(importBaseMsg + "Failed!")
 			return errors.Wrapf(err, "cannot import %q resources", gr)
@@ -175,21 +175,23 @@ func (im *ControlPlaneStateImporter) Import(ctx context.Context) error { // noli
 			return errors.Wrapf(err, "there are unhealthy %qs", k.Kind)
 		}
 	}
-	s.Success(waitPkgsMsg + "Installed and Healthy! ⏳")
 
-	waitPkgRevsMsg := "Waiting for PackageRevisions... "
-	s, _ = upterm.CheckmarkSuccessSpinner.Start(waitPkgRevsMsg)
+	// Note(turkenh): We should not need to wait for ProviderRevision, FunctionRevision, and ConfigurationRevision.
+	// Crossplane should not report packages as ready before revisions are healthy. This is a bug in Crossplane
+	// version <1.14 which was fixed with https://github.com/crossplane/crossplane/pull/4647
+	// Todo(turkenh): Remove these once Crossplane 1.13 is no longer supported.
 	for _, k := range []schema.GroupKind{
 		{Group: "pkg.crossplane.io", Kind: "ProviderRevision"},
 		{Group: "pkg.crossplane.io", Kind: "FunctionRevision"},
 		{Group: "pkg.crossplane.io", Kind: "ConfigurationRevision"},
 	} {
 		if err := im.waitForConditions(ctx, s, k, []xpv1.ConditionType{"Healthy"}); err != nil {
-			s.Fail(waitPkgRevsMsg + "Failed!")
+			s.Fail(waitPkgsMsg + "Failed!")
 			return errors.Wrapf(err, "there are unhealthy %qs", k.Kind)
 		}
 	}
-	s.Success(waitPkgRevsMsg + "Healthy! ⏳")
+
+	s.Success(waitPkgsMsg + "Installed and Healthy! ⏳")
 	//////////////////////////////////////////
 
 	// Reset the resource mapper to make sure all CRDs introduced by packages or XRDs are available.
@@ -218,7 +220,7 @@ func (im *ControlPlaneStateImporter) Import(ctx context.Context) error { // noli
 			continue
 		}
 
-		count, err := r.ImportResources(ctx, info.Name())
+		count, err := r.ImportResources(ctx, info.Name(), true)
 		if err != nil {
 			return errors.Wrapf(err, "cannot import %q resources", info.Name())
 		}
@@ -403,7 +405,7 @@ func (im *ControlPlaneStateImporter) waitForConditions(ctx context.Context, sp *
 		for _, r := range resourceList.Items {
 			paved := fieldpath.Pave(r.Object)
 			status := xpv1.ConditionedStatus{}
-			if err = paved.GetValueInto("status", &status); err != nil {
+			if err = paved.GetValueInto("status", &status); err != nil && !fieldpath.IsNotFound(err) {
 				pterm.Printf("cannot get status for %q %q with error: %v\n", gk.Kind, r.GetName(), err)
 				return
 			}
@@ -411,6 +413,7 @@ func (im *ControlPlaneStateImporter) waitForConditions(ctx context.Context, sp *
 			for _, c := range conditions {
 				if status.GetCondition(c).Status != corev1.ConditionTrue {
 					unmet++
+					break // At least one condition is not met, so we should break and not count the same resource multiple times.
 				}
 			}
 		}
