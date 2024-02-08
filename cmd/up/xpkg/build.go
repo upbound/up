@@ -91,11 +91,6 @@ func (c *buildCmd) AfterApply() error {
 		pp,
 		examples.New(),
 	)
-
-	// NOTE(hasheddan): we currently only support fetching controller image from
-	// daemon, but may opt to support additional sources in the future.
-	c.fetch = daemonFetch
-
 	return nil
 }
 
@@ -104,15 +99,15 @@ type buildCmd struct {
 	fs      afero.Fs
 	builder *xpkg.Builder
 	root    string
-	fetch   fetchFn
 
-	Name         string   `optional:"" xor:"xpkg-build-out" help:"[DEPRECATED: use --output] Name of the package to be built. Uses name in crossplane.yaml if not specified. Does not correspond to package tag."`
-	Output       string   `optional:"" short:"o" xor:"xpkg-build-out" help:"Path for package output."`
-	Controller   string   `help:"Controller image used as base for package."`
-	PackageRoot  string   `short:"f" help:"Path to package directory." default:"."`
-	ExamplesRoot string   `short:"e" help:"Path to package examples directory." default:"./examples"`
-	AuthExt      string   `short:"a" help:"Path to an authentication extension file." default:"auth.yaml"`
-	Ignore       []string `help:"Paths, specified relative to --package-root, to exclude from the package."`
+	Name              string   `optional:"" xor:"xpkg-build-out" help:"[DEPRECATED: use --output] Name of the package to be built. Uses name in crossplane.yaml if not specified. Does not correspond to package tag."`
+	Output            string   `optional:"" short:"o" xor:"xpkg-build-out" help:"Path for package output."`
+	Controller        string   `help:"Controller image used as base for package." xor:"controller-image"`
+	ControllerTarball string   `help:"Controller image from tarball used as base for package." xor:"controller-image"`
+	PackageRoot       string   `short:"f" help:"Path to package directory." default:"."`
+	ExamplesRoot      string   `short:"e" help:"Path to package examples directory." default:"./examples"`
+	AuthExt           string   `short:"a" help:"Path to an authentication extension file." default:"auth.yaml"`
+	Ignore            []string `help:"Paths, specified relative to --package-root, to exclude from the package."`
 }
 
 func (c *buildCmd) Help() string {
@@ -122,7 +117,7 @@ from the local file system. It packages the found YAML files containing Kubernet
 object manifests into the meta data layer of the OCI image. The package manager
 will use this information to install the package into a Crossplane instance.
 
-Only configuration and provider packages are supported at this time. 
+Only configuration and provider packages are supported at this time.
 
 Example claims can be specified in the examples directory.
 
@@ -137,17 +132,11 @@ Even more details can be found in the xpkg reference document.`
 // Run executes the build command.
 func (c *buildCmd) Run(ctx context.Context, p pterm.TextPrinter) error { //nolint:gocyclo
 	var buildOpts []xpkg.BuildOpt
-	if c.Controller != "" {
-		ref, err := name.ParseReference(c.Controller)
-		if err != nil {
-			return err
-		}
-		base, err := c.fetch(ctx, ref)
-		if err != nil {
-			return err
-		}
-		buildOpts = append(buildOpts, xpkg.WithController(base))
+	controllerImageOpt, err := c.fetchControllerImage(ctx)
+	if err != nil {
+		return err
 	}
+	buildOpts = append(buildOpts, controllerImageOpt)
 	img, meta, err := c.builder.Build(ctx, buildOpts...)
 	if err != nil {
 		return errors.Wrap(err, errBuildPackage)
@@ -182,6 +171,30 @@ func (c *buildCmd) Run(ctx context.Context, p pterm.TextPrinter) error { //nolin
 	}
 	p.Printfln("xpkg saved to %s", output)
 	return nil
+}
+
+func (c *buildCmd) fetchControllerImage(ctx context.Context) (xpkg.BuildOpt, error) {
+	fetch := emptyFetch
+	var ref name.Reference = nil
+
+	if c.Controller != "" {
+		// NOTE(hasheddan): we currently only support fetching controller image from
+		// daemon, but may opt to support additional sources in the future.
+		fetch = daemonFetch
+
+		var err error
+		ref, err = name.ParseReference(c.Controller)
+		if err != nil {
+			return nil, err
+		}
+	} else if c.ControllerTarball != "" {
+		fetch = tarballFetch(c.ControllerTarball)
+	}
+	img, err := fetch(ctx, ref)
+	if err != nil {
+		return nil, err
+	}
+	return xpkg.WithController(img), nil
 }
 
 // default build filters skip directories, empty files, and files without YAML

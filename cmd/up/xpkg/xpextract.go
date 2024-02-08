@@ -26,6 +26,7 @@ import (
 	"github.com/google/go-containerregistry/pkg/name"
 	v1 "github.com/google/go-containerregistry/pkg/v1"
 	"github.com/google/go-containerregistry/pkg/v1/daemon"
+	"github.com/google/go-containerregistry/pkg/v1/empty"
 	"github.com/google/go-containerregistry/pkg/v1/mutate"
 	"github.com/google/go-containerregistry/pkg/v1/remote"
 	"github.com/google/go-containerregistry/pkg/v1/tarball"
@@ -59,6 +60,10 @@ const (
 // fetchFn fetches a package from a source.
 type fetchFn func(context.Context, name.Reference) (v1.Image, error)
 
+func emptyFetch(ctx context.Context, r name.Reference) (v1.Image, error) {
+	return empty.Image, nil
+}
+
 // registryFetch fetches a package from the registry.
 func registryFetch(ctx context.Context, r name.Reference) (v1.Image, error) {
 	return remote.Image(r, remote.WithContext(ctx))
@@ -69,7 +74,7 @@ func daemonFetch(ctx context.Context, r name.Reference) (v1.Image, error) {
 	return daemon.Image(r, daemon.WithContext(ctx))
 }
 
-func xpkgFetch(path string) fetchFn {
+func tarballFetch(path string) fetchFn {
 	return func(ctx context.Context, r name.Reference) (v1.Image, error) {
 		return tarball.ImageFromPath(filepath.Clean(path), nil)
 	}
@@ -97,7 +102,7 @@ func (c *xpExtractCmd) AfterApply() error {
 			}
 			c.Package = path
 		}
-		c.fetch = xpkgFetch(c.Package)
+		c.fetch = tarballFetch(c.Package)
 	}
 	if !c.FromXpkg {
 		if c.Package == "" {
