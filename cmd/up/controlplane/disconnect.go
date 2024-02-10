@@ -86,7 +86,7 @@ func (c *disconnectCmd) Run(printer upterm.ObjectPrinter, p pterm.TextPrinter, u
 }
 
 func origContext(currentCtx string) (string, error) {
-	parts := strings.Split(currentCtx, "_")
+	parts := strings.SplitN(currentCtx, "_", 4)
 	if len(parts) != 4 {
 		return "", fmt.Errorf(errFmtContextParts, len(parts))
 	}
