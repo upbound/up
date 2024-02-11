@@ -77,7 +77,12 @@ func (c *disconnectCmd) Run(printer upterm.ObjectPrinter, p pterm.TextPrinter, u
 		return err
 	}
 
-	return clientcmd.ModifyConfig(clientcmd.NewDefaultClientConfigLoadingRules(), modifiedCfg, false)
+	if err := clientcmd.ModifyConfig(clientcmd.NewDefaultClientConfigLoadingRules(), modifiedCfg, false); err != nil {
+		return err
+	}
+
+	p.Printfln("Disconnected from control plane %q. Switch back to context %q.", cptContext, target)
+	return nil
 }
 
 func origContext(currentCtx string) (string, error) {
