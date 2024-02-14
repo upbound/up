@@ -55,6 +55,15 @@ func TestOrigContext(t *testing.T) {
 				result: "kind-kind",
 			},
 		},
+		"SuccessUnderscore": {
+			reason: "A well formed context name should be parsed successfully.",
+			args: args{
+				context: "upbound_demo_cpt1_kind_kind_foo_bar",
+			},
+			want: want{
+				result: "kind_kind_foo_bar",
+			},
+		},
 	}
 
 	for name, tc := range cases {

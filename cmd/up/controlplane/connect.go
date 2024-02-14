@@ -131,7 +131,7 @@ func (c *connectCmd) Run(ctx context.Context, printer upterm.ObjectPrinter, p pt
 	// return early if so.
 	origContext := kcloader.CurrentContext
 	if strings.HasPrefix(origContext, upboundPrefix) {
-		return nil
+		return fmt.Errorf("already connected to a control plane. Disconnect first")
 	}
 
 	cfg, err := c.client.GetKubeConfig(ctx, types.NamespacedName{Namespace: c.Group, Name: c.Name})
@@ -152,6 +152,8 @@ func (c *connectCmd) Run(ctx context.Context, printer upterm.ObjectPrinter, p pt
 	if err := kube.ApplyControlPlaneKubeconfig(modifiedCfg, "", upCtx.WrapTransport); err != nil {
 		return err
 	}
+
+	p.Printfln("Current context set to %s", modifiedCfg.CurrentContext)
 
 	return nil
 }
