@@ -5,11 +5,13 @@ import (
 	"net/url"
 
 	"github.com/alecthomas/kong"
+	"github.com/pterm/pterm"
 	v1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/client-go/kubernetes"
 
 	"github.com/upbound/up/internal/install/helm"
 	"github.com/upbound/up/internal/upbound"
+	"github.com/upbound/up/internal/upterm"
 )
 
 type detachCmd struct {
@@ -26,6 +28,10 @@ func (c *detachCmd) AfterApply(kongCtx *kong.Context) error {
 	if err := c.Kube.AfterApply(); err != nil {
 		return err
 	}
+
+	// NOTE(tnthornton) we currently only have support for stylized output.
+	pterm.EnableStyling()
+	upterm.DefaultObjPrinter.Pretty = true
 
 	upCtx, err := upbound.NewFromFlags(c.Upbound)
 	if err != nil {
@@ -61,9 +67,14 @@ func (c *detachCmd) AfterApply(kongCtx *kong.Context) error {
 
 // Run executes the install command.
 func (c *detachCmd) Run(ctx context.Context, kClient *kubernetes.Clientset, mgr *helm.Installer) error {
+	detachSpinner, _ := upterm.CheckmarkSuccessSpinner.Start("Removing agent from Space...")
 	if err := mgr.Uninstall(); err != nil {
 		return err
 	}
 
-	return kClient.CoreV1().Namespaces().Delete(ctx, "upbound-connect", v1.DeleteOptions{})
+	if err := kClient.CoreV1().Namespaces().Delete(ctx, "upbound-connect", v1.DeleteOptions{}); err != nil {
+		return err
+	}
+	detachSpinner.Success()
+	return nil
 }

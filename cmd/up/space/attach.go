@@ -92,6 +92,7 @@ func (c *attachCmd) AfterApply(kongCtx *kong.Context) error {
 
 // Run executes the install command.
 func (c *attachCmd) Run(ctx context.Context, upCtx *upbound.Context) error {
+	attachSpinner, _ := upterm.CheckmarkSuccessSpinner.Start("Installing agent to connect to Upbound Console...")
 	if err := c.helmMgr.Install(supportedVersion, map[string]any{
 		"nats": map[string]any{
 			"url": devConnectURL,
@@ -100,5 +101,6 @@ func (c *attachCmd) Run(ctx context.Context, upCtx *upbound.Context) error {
 		return err
 	}
 
+	attachSpinner.Success()
 	return nil
 }
