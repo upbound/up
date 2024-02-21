@@ -48,14 +48,14 @@ func (c *createCmd) Run(ctx context.Context, p pterm.TextPrinter, ac *accounts.C
 		return err
 	}
 	if a.Account.Type != accounts.AccountOrganization {
-		return errors.New(errUserAccount)
+		return errors.New(ErrUserAccount)
 	}
 	rs, err := oc.ListRobots(ctx, a.Organization.ID)
 	if err != nil {
 		return err
 	}
 	if len(rs) == 0 {
-		return errors.Errorf(errFindRobotFmt, c.RobotName, upCtx.Account)
+		return errors.Errorf(ErrFindRobotFmt, c.RobotName, upCtx.Account)
 	}
 	// TODO(hasheddan): because this API does not guarantee name uniqueness, we
 	// must guarantee that exactly one robot exists in the specified account
@@ -66,14 +66,14 @@ func (c *createCmd) Run(ctx context.Context, p pterm.TextPrinter, ac *accounts.C
 	for _, r := range rs {
 		if r.Name == c.RobotName {
 			if found {
-				return errors.Errorf(errMultipleRobotFmt, c.RobotName, upCtx.Account)
+				return errors.Errorf(ErrMultipleRobotFmt, c.RobotName, upCtx.Account)
 			}
 			id = r.ID
 			found = true
 		}
 	}
 	if !found {
-		return errors.Errorf(errFindRobotFmt, c.RobotName, upCtx.Account)
+		return errors.Errorf(ErrFindRobotFmt, c.RobotName, upCtx.Account)
 	}
 	res, err := tc.Create(ctx, &tokens.TokenCreateParameters{
 		Attributes: tokens.TokenAttributes{

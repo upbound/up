@@ -48,7 +48,7 @@ func (c *listCmd) Run(ctx context.Context, printer upterm.ObjectPrinter, p pterm
 		return err
 	}
 	if a.Account.Type != accounts.AccountOrganization {
-		return errors.New(errUserAccount)
+		return errors.New(ErrUserAccount)
 	}
 	rs, err := oc.ListRobots(ctx, a.Organization.ID)
 	if err != nil {

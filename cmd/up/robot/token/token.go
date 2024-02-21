@@ -23,11 +23,11 @@ import (
 )
 
 const (
-	errUserAccount      = "robots are not currently supported for user accounts"
-	errMultipleRobotFmt = "found multiple robots with name %s in %s"
-	errMultipleTokenFmt = "found multiple tokens with name %s for robot %s in %s"
-	errFindRobotFmt     = "could not find robot %s in %s"
-	errFindTokenFmt     = "could not find token %s for robot %s in %s"
+	ErrUserAccount      = "robots are not currently supported for user accounts"
+	ErrMultipleRobotFmt = "found multiple robots with name %s in %s"
+	ErrMultipleTokenFmt = "found multiple tokens with name %s for robot %s in %s"
+	ErrFindRobotFmt     = "could not find robot %s in %s"
+	ErrFindTokenFmt     = "could not find token %s for robot %s in %s"
 )
 
 // AfterApply constructs and binds a robots client to any subcommands

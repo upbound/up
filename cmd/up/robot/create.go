@@ -43,7 +43,7 @@ func (c *createCmd) Run(ctx context.Context, p pterm.TextPrinter, ac *accounts.C
 		return err
 	}
 	if a.Account.Type != accounts.AccountOrganization {
-		return errors.New(errUserAccount)
+		return errors.New(ErrUserAccount)
 	}
 	if _, err := rc.Create(ctx, &robots.RobotCreateParameters{
 		Attributes: robots.RobotAttributes{
