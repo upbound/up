@@ -24,6 +24,9 @@ import (
 	"github.com/crossplane/crossplane-runtime/pkg/errors"
 	"github.com/google/uuid"
 	"github.com/pterm/pterm"
+	corev1 "k8s.io/api/core/v1"
+	kerrors "k8s.io/apimachinery/pkg/api/errors"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apiserver/pkg/storage/names"
 	"k8s.io/client-go/dynamic"
 	"k8s.io/client-go/kubernetes"
@@ -157,27 +160,56 @@ func (c *attachCmd) Run(ctx context.Context, p pterm.TextPrinter, upCtx *upbound
 		if err != nil {
 			return err
 		}
-
-		access := res.ID.String()
 		c.Token = fmt.Sprint(res.Meta["jwt"])
-		pterm.Println()
-		p.Printfln(pterm.LightMagenta("Access ID: ") + access)
-		p.Printfln(pterm.LightMagenta("Token: ") + c.Token)
 	}
 
 	attachSpinner, _ := upterm.CheckmarkSuccessSpinner.Start("Installing agent to connect to Upbound Console...")
+
+	if err := c.createNamespace(ctx, "upbound-connect"); err != nil {
+		return err
+	}
+	if err := c.createTokenSecret(ctx, "space-token", "upbound-connect", c.Token); err != nil {
+		return err
+	}
+
 	if err := c.helmMgr.Install(supportedVersion, map[string]any{
 		"nats": map[string]any{
 			"url": devConnectURL,
 		},
-		"space":   c.Space,
-		"account": upCtx.Account,
-		"token":   c.Token,
+		"space":       c.Space,
+		"account":     upCtx.Account,
+		"tokenSecret": "space-token",
 	}); err != nil {
 		return err
 	}
 
 	attachSpinner.Success()
+	return nil
+}
+
+func (c *attachCmd) createNamespace(ctx context.Context, ns string) error {
+	_, err := c.kClient.CoreV1().Namespaces().Create(ctx, &corev1.Namespace{
+		ObjectMeta: metav1.ObjectMeta{
+			Name: ns,
+		},
+	}, metav1.CreateOptions{})
+	if err != nil && !kerrors.IsAlreadyExists(err) {
+		return errors.Wrap(err, fmt.Sprintf(errFmtCreateNamespace, ns))
+	}
+	return nil
+}
+
+func (c *attachCmd) createTokenSecret(ctx context.Context, name, ns, token string) error {
+	s := &corev1.Secret{}
+	s.SetName(name)
+	s.Data = map[string][]byte{
+		"token": []byte(c.Token),
+	}
+	_, err := c.kClient.CoreV1().Secrets(ns).Create(ctx, s, metav1.CreateOptions{})
+	if err != nil {
+		return err
+	}
+
 	return nil
 }
 
