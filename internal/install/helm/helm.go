@@ -116,6 +116,7 @@ type Installer struct {
 	chartName       string
 	releaseName     string
 	alternateChart  string
+	createNamespace bool
 	namespace       string
 	cacheDir        string
 	rollbackOnError bool
@@ -146,6 +147,13 @@ type Installer struct {
 
 // InstallerModifierFn modifies the installer.
 type InstallerModifierFn func(*Installer)
+
+// CreateNamespace toggles namespace creation for the helm installer.
+func CreateNamespace(b bool) InstallerModifierFn {
+	return func(h *Installer) {
+		h.createNamespace = b
+	}
+}
 
 // WithNamespace sets the namespace for the helm installer.
 func WithNamespace(ns string) InstallerModifierFn {
@@ -293,6 +301,7 @@ func NewManager(config *rest.Config, chartName string, repoURL *url.URL, modifie
 	// Install Client
 	ic := action.NewInstall(actionConfig)
 	ic.Namespace = h.namespace
+	ic.CreateNamespace = h.createNamespace
 	ic.ReleaseName = h.chartName
 	ic.Wait = h.wait
 	ic.Timeout = waitTimeout
