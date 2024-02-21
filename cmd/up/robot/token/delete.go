@@ -73,14 +73,14 @@ func (c *deleteCmd) Run(ctx context.Context, p pterm.TextPrinter, ac *accounts.C
 		return err
 	}
 	if a.Account.Type != accounts.AccountOrganization {
-		return errors.New(errUserAccount)
+		return errors.New(ErrUserAccount)
 	}
 	rs, err := oc.ListRobots(ctx, a.Organization.ID)
 	if err != nil {
 		return err
 	}
 	if len(rs) == 0 {
-		return errors.Errorf(errFindRobotFmt, c.RobotName, upCtx.Account)
+		return errors.Errorf(ErrFindRobotFmt, c.RobotName, upCtx.Account)
 	}
 	// TODO(hasheddan): because this API does not guarantee name uniqueness, we
 	// must guarantee that exactly one robot exists in the specified account
@@ -90,7 +90,7 @@ func (c *deleteCmd) Run(ctx context.Context, p pterm.TextPrinter, ac *accounts.C
 	for _, r := range rs {
 		if r.Name == c.RobotName {
 			if rid != nil {
-				return errors.Errorf(errMultipleRobotFmt, c.RobotName, upCtx.Account)
+				return errors.Errorf(ErrMultipleRobotFmt, c.RobotName, upCtx.Account)
 			}
 			// Pin range variable so that we can take address.
 			r := r
@@ -98,7 +98,7 @@ func (c *deleteCmd) Run(ctx context.Context, p pterm.TextPrinter, ac *accounts.C
 		}
 	}
 	if rid == nil {
-		return errors.Errorf(errFindRobotFmt, c.RobotName, upCtx.Account)
+		return errors.Errorf(ErrFindRobotFmt, c.RobotName, upCtx.Account)
 	}
 
 	ts, err := rc.ListTokens(ctx, *rid)
@@ -106,7 +106,7 @@ func (c *deleteCmd) Run(ctx context.Context, p pterm.TextPrinter, ac *accounts.C
 		return err
 	}
 	if len(ts.DataSet) == 0 {
-		return errors.Errorf(errFindTokenFmt, c.TokenName, c.RobotName, upCtx.Account)
+		return errors.Errorf(ErrFindTokenFmt, c.TokenName, c.RobotName, upCtx.Account)
 	}
 
 	// TODO(hasheddan): because this API does not guarantee name uniqueness, we
@@ -117,7 +117,7 @@ func (c *deleteCmd) Run(ctx context.Context, p pterm.TextPrinter, ac *accounts.C
 	for _, t := range ts.DataSet {
 		if fmt.Sprint(t.AttributeSet["name"]) == c.TokenName {
 			if tid != nil && !c.Force {
-				return errors.Errorf(errMultipleTokenFmt, c.TokenName, c.RobotName, upCtx.Account)
+				return errors.Errorf(ErrMultipleTokenFmt, c.TokenName, c.RobotName, upCtx.Account)
 			}
 			// Pin range variable so that we can take address.
 			t := t
@@ -125,7 +125,7 @@ func (c *deleteCmd) Run(ctx context.Context, p pterm.TextPrinter, ac *accounts.C
 		}
 	}
 	if tid == nil {
-		return errors.Errorf(errFindTokenFmt, c.TokenName, c.RobotName, upCtx.Account)
+		return errors.Errorf(ErrFindTokenFmt, c.TokenName, c.RobotName, upCtx.Account)
 	}
 
 	if err := tc.Delete(ctx, *tid); err != nil {

@@ -46,7 +46,7 @@ func (c *getCmd) Run(ctx context.Context, printer upterm.ObjectPrinter, ac *acco
 		return err
 	}
 	if a.Account.Type != accounts.AccountOrganization {
-		return errors.New(errUserAccount)
+		return errors.New(ErrUserAccount)
 	}
 
 	// The get command accepts a name, but the get API call takes an ID

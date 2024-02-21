@@ -52,14 +52,14 @@ func (c *getCmd) Run(ctx context.Context, printer upterm.ObjectPrinter, ac *acco
 		return err
 	}
 	if a.Account.Type != accounts.AccountOrganization {
-		return errors.New(errUserAccount)
+		return errors.New(ErrUserAccount)
 	}
 	rs, err := oc.ListRobots(ctx, a.Organization.ID)
 	if err != nil {
 		return err
 	}
 	if len(rs) == 0 {
-		return errors.Errorf(errFindRobotFmt, c.RobotName, upCtx.Account)
+		return errors.Errorf(ErrFindRobotFmt, c.RobotName, upCtx.Account)
 	}
 
 	// We pick the first robot account with this name, though there
@@ -75,7 +75,7 @@ func (c *getCmd) Run(ctx context.Context, printer upterm.ObjectPrinter, ac *acco
 		}
 	}
 	if rid == nil {
-		return errors.Errorf(errFindRobotFmt, c.RobotName, upCtx.Account)
+		return errors.Errorf(ErrFindRobotFmt, c.RobotName, upCtx.Account)
 	}
 
 	ts, err := rc.ListTokens(ctx, *rid)
@@ -83,7 +83,7 @@ func (c *getCmd) Run(ctx context.Context, printer upterm.ObjectPrinter, ac *acco
 		return err
 	}
 	if len(ts.DataSet) == 0 {
-		return errors.Errorf(errFindTokenFmt, c.TokenName, c.RobotName, upCtx.Account)
+		return errors.Errorf(ErrFindTokenFmt, c.TokenName, c.RobotName, upCtx.Account)
 	}
 
 	// We pick the first token with this name, though there may be more
@@ -99,7 +99,7 @@ func (c *getCmd) Run(ctx context.Context, printer upterm.ObjectPrinter, ac *acco
 		}
 	}
 	if theToken == nil {
-		return errors.Errorf(errFindTokenFmt, c.TokenName, c.RobotName, upCtx.Account)
+		return errors.Errorf(ErrFindTokenFmt, c.TokenName, c.RobotName, upCtx.Account)
 	}
 	return printer.Print(*theToken, fieldNames, extractFields)
 }

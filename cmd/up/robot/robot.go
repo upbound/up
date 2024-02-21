@@ -29,7 +29,7 @@ import (
 )
 
 const (
-	errUserAccount = "robots are not currently supported for user accounts"
+	ErrUserAccount = "robots are not currently supported for user accounts"
 )
 
 // AfterApply constructs and binds a robots client to any subcommands
