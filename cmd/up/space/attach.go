@@ -2,10 +2,12 @@ package space
 
 import (
 	"context"
+	"fmt"
 	"net/url"
 
 	"github.com/alecthomas/kong"
 	"github.com/pterm/pterm"
+	"k8s.io/apiserver/pkg/storage/names"
 	"k8s.io/client-go/dynamic"
 	"k8s.io/client-go/kubernetes"
 
@@ -39,6 +41,10 @@ type attachCmd struct {
 	kClient kubernetes.Interface
 	dClient dynamic.Interface
 	quiet   config.QuietFlag
+
+	ng names.NameGenerator
+
+	Space string `arg:"" optional:"" help:"Name of the Upbound Space. If name is not a supplied, one is generated."`
 }
 
 func (c *attachCmd) AfterApply(kongCtx *kong.Context) error {
@@ -87,16 +93,25 @@ func (c *attachCmd) AfterApply(kongCtx *kong.Context) error {
 	}
 	c.helmMgr = mgr
 
+	c.ng = names.SimpleNameGenerator
+
 	return nil
 }
 
 // Run executes the install command.
 func (c *attachCmd) Run(ctx context.Context, upCtx *upbound.Context) error {
+	if c.Space == "" {
+		c.Space = c.ng.GenerateName("space-")
+	}
+	fmt.Printf("Using Space name: %s\n", c.Space)
+
 	attachSpinner, _ := upterm.CheckmarkSuccessSpinner.Start("Installing agent to connect to Upbound Console...")
 	if err := c.helmMgr.Install(supportedVersion, map[string]any{
 		"nats": map[string]any{
 			"url": devConnectURL,
 		},
+		"space": c.Space,
+		//TODO(tnthornton) reference account from profile.
 	}); err != nil {
 		return err
 	}
