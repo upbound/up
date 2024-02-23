@@ -47,10 +47,11 @@ import (
 
 const (
 	agentChart = "agent"
+	agentNs    = "upbound-system"
 
 	// TODO(tnthornton) these can probably be replaced by our public chart
 	// museum. This would allow us to use wildcards like mxp-connector.
-	supportedVersion = "0.0.0-100.g216e157"
+	supportedVersion = "0.0.0-122.gfa97cca"
 	agentRegistry    = "us-west1-docker.pkg.dev/orchestration-build/connect"
 
 	// TODO(tnthornton) maybe move this to the agent chart?
@@ -119,7 +120,7 @@ func (c *attachCmd) AfterApply(kongCtx *kong.Context) error {
 	mgr, err := helm.NewManager(kubeconfig,
 		agentChart,
 		registryURL,
-		helm.WithNamespace("upbound-connect"),
+		helm.WithNamespace(agentNs),
 		helm.CreateNamespace(true),
 		helm.IsOCI(),
 		helm.Wait(),
@@ -165,10 +166,10 @@ func (c *attachCmd) Run(ctx context.Context, p pterm.TextPrinter, upCtx *upbound
 
 	attachSpinner, _ := upterm.CheckmarkSuccessSpinner.Start("Installing agent to connect to Upbound Console...")
 
-	if err := c.createNamespace(ctx, "upbound-connect"); err != nil {
+	if err := c.createNamespace(ctx, agentNs); err != nil {
 		return err
 	}
-	if err := c.createTokenSecret(ctx, "space-token", "upbound-connect", c.Token); err != nil {
+	if err := c.createTokenSecret(ctx, "space-token", agentNs, c.Token); err != nil {
 		return err
 	}
 
