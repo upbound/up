@@ -62,7 +62,7 @@ func (c *detachCmd) AfterApply(kongCtx *kong.Context) error {
 	kongCtx.Bind(kClient)
 
 	with := []helm.InstallerModifierFn{
-		helm.WithNamespace("upbound-connect"),
+		helm.WithNamespace(agentNs),
 		helm.IsOCI(),
 	}
 
@@ -86,7 +86,7 @@ func (c *detachCmd) Run(ctx context.Context, kClient *kubernetes.Clientset, mgr 
 		return err
 	}
 
-	if err := kClient.CoreV1().Namespaces().Delete(ctx, "upbound-connect", v1.DeleteOptions{}); err != nil {
+	if err := kClient.CoreV1().Namespaces().Delete(ctx, agentNs, v1.DeleteOptions{}); err != nil {
 		return err
 	}
 	detachSpinner.Success()
