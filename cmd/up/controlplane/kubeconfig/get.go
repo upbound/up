@@ -15,54 +15,74 @@
 package kubeconfig
 
 import (
+	"context"
 	"fmt"
-	"io"
-	"os"
-	"path"
-	"strings"
 
+	"github.com/alecthomas/kong"
 	"github.com/pterm/pterm"
+	"k8s.io/apimachinery/pkg/types"
+	"k8s.io/client-go/tools/clientcmd"
 
+	"github.com/crossplane/crossplane-runtime/pkg/errors"
+
+	"github.com/upbound/up/internal/controlplane"
 	"github.com/upbound/up/internal/kube"
 	"github.com/upbound/up/internal/upbound"
 )
 
-// AfterApply sets default values in command after assignment and validation.
-func (c *getCmd) AfterApply(upCtx *upbound.Context) error {
-	c.stdin = os.Stdin
-	return nil
-}
-
 // getCmd gets kubeconfig data for an Upbound control plane.
 type getCmd struct {
-	stdin io.Reader
+	ConnectionSecretCmd
 
-	File  string `type:"path" short:"f" help:"File to merge kubeconfig."`
-	Token string `required:"" help:"API token used to authenticate."`
+	File    string `type:"path" short:"f" help:"File to merge control plane kubeconfig into or to create. By default it is merged into the user's default kubeconfig. Use '-' to print it to stdout.'"`
+	Context string `short:"c" help:"Context to use in the kubeconfig."`
+}
 
-	Name string `arg:"" name:"control-plane-name" required:"" help:"Name of control plane." predictor:"ctps"`
+func (c *getCmd) AfterApply(kongCtx *kong.Context, upCtx *upbound.Context) error {
+	return c.ConnectionSecretCmd.AfterApply(kongCtx, upCtx)
 }
 
 // Run executes the get command.
-func (c *getCmd) Run(p pterm.TextPrinter, upCtx *upbound.Context) error {
-	if upCtx.Profile.IsSpace() {
-		return fmt.Errorf("get is not supported for space profile %q", upCtx.ProfileName)
+func (c *getCmd) Run(ctx context.Context, p pterm.TextPrinter, upCtx *upbound.Context, getter ConnectionSecretGetter) error {
+	if upCtx.Account == "" {
+		return errors.New("error: account is missing from profile")
 	}
 
-	// TODO(hasheddan): consider implementing a custom decoder
-	if c.Token == "-" {
-		b, err := io.ReadAll(c.stdin)
-		if err != nil {
-			return err
-		}
-		c.Token = strings.TrimSpace(string(b))
+	// get kubeconfig from connection secret
+	nname := types.NamespacedName{Namespace: c.Group, Name: c.Name}
+	ctpConfig, err := getter.GetKubeConfig(ctx, nname)
+	if controlplane.IsNotFound(err) {
+		p.Printfln("Control plane %s not found", nname)
+		return nil
 	}
-	mcpConf := kube.BuildControlPlaneKubeconfig(upCtx.ProxyEndpoint, path.Join(upCtx.Account, c.Name), c.Token, true)
-	if err := kube.ApplyControlPlaneKubeconfig(*mcpConf, c.File, upCtx.WrapTransport); err != nil {
+	if err != nil {
 		return err
 	}
 
-	p.Printfln("Current context set to %s", mcpConf.CurrentContext)
+	// extract relevant context
+	contextName := fmt.Sprintf("%s-%s-%s/%s", upCtx.Account, upCtx.ProfileName, c.Group, c.Name)
+	if c.Context != "" {
+		contextName = c.Context
+	}
+	ctpConfig, err = ExtractControlPlaneContext(ctpConfig, ExpectedConnectionSecretContext(upCtx.Account, c.Name), contextName)
+	if err != nil {
+		return err
+	}
+
+	if c.File == "-" {
+		ctpConfig.Kind = "Config"
+		ctpConfig.APIVersion = "v1"
+		bs, err := clientcmd.Write(*ctpConfig)
+		if err != nil {
+			return err
+		}
+		p.Printfln(string(bs))
+	} else {
+		if err := kube.MergeIntoKubeConfig(ctpConfig, c.File, true, kube.VerifyKubeConfig(upCtx.WrapTransport)); err != nil {
+			return err
+		}
+		p.Printfln("Current context set to %s", contextName)
+	}
 
 	return nil
 }

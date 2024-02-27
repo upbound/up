@@ -18,9 +18,10 @@ import (
 	"errors"
 	"testing"
 
-	"github.com/crossplane/crossplane-runtime/pkg/test"
 	"github.com/google/go-cmp/cmp"
 	"k8s.io/client-go/tools/clientcmd/api"
+
+	"github.com/crossplane/crossplane-runtime/pkg/test"
 )
 
 func TestOrigContext(t *testing.T) {
@@ -46,7 +47,7 @@ func TestOrigContext(t *testing.T) {
 				err: errors.New("given context does not have the correct number of parts, expected: 4, got: 1"),
 			},
 		},
-		"Success": {
+		"SuccessNamespaceLess": {
 			reason: "A well formed context name should be parsed successfully.",
 			args: args{
 				context: "upbound_demo_cpt1_kind-kind",
@@ -55,10 +56,28 @@ func TestOrigContext(t *testing.T) {
 				result: "kind-kind",
 			},
 		},
-		"SuccessUnderscore": {
+		"Success": {
+			reason: "A well formed context name should be parsed successfully.",
+			args: args{
+				context: "upbound_demo_default/cpt1_kind-kind",
+			},
+			want: want{
+				result: "kind-kind",
+			},
+		},
+		"SuccessUnderscoreNamespaceLess": {
 			reason: "A well formed context name should be parsed successfully.",
 			args: args{
 				context: "upbound_demo_cpt1_kind_kind_foo_bar",
+			},
+			want: want{
+				result: "kind_kind_foo_bar",
+			},
+		},
+		"SuccessUnderscore": {
+			reason: "A well formed context name should be parsed successfully.",
+			args: args{
+				context: "upbound_demo_default/cpt1_kind_kind_foo_bar",
 			},
 			want: want{
 				result: "kind_kind_foo_bar",
