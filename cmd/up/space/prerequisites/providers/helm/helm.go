@@ -40,7 +40,7 @@ import (
 var (
 	providerName = "provider-helm"
 	// Package version to be installed
-	version   = "v0.16.0"
+	version   = "v0.17.0"
 	pkgRef, _ = name.ParseReference(fmt.Sprintf("xpkg.upbound.io/crossplane-contrib/provider-helm:%s", version))
 
 	objectsCRD = "releases.helm.crossplane.io"
