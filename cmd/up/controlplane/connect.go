@@ -143,7 +143,9 @@ func (c *connectCmd) Run(ctx context.Context, printer upterm.ObjectPrinter, p pt
 		return err
 	}
 
-	modifiedCfg, err := updateKubeConfig(*cfg, upCtx.Account, c.Name, origContext)
+	expectedContextName := defaultContextName(upCtx.Account, c.Name)
+	newKey := controlplaneContextName(upCtx.Account, c.Name, origContext)
+	modifiedCfg, err := extractKubeConfig(*cfg, expectedContextName, newKey)
 	if err != nil {
 		return err
 	}
@@ -158,46 +160,41 @@ func (c *connectCmd) Run(ctx context.Context, printer upterm.ObjectPrinter, p pt
 	return nil
 }
 
-// updateKubeConfig updates the given kubeconfig with new cluster, user, and
-// context keys based on the account, control plane name, and original context
-// that are provided.
-func updateKubeConfig(cfg api.Config, account, ctpName, origContext string) (api.Config, error) {
-	// Grab the context from control plane kubeconfig.
-	sourceKey := defaultContextName(account, ctpName)
-	ctpKey := controlplaneContextName(account, ctpName, origContext)
-
-	// Update the context, cluster, and user names in the control plane
-	// config.
-	cluster, ok := cfg.Clusters[sourceKey]
+// extractKubeConfig prunes the given kubeconfig by extracting the one and only
+// or the preferred context if there are multiple. It renames context, cluster
+// and authInfo to the given key.
+func extractKubeConfig(cfg api.Config, preferredContextName, newKey string) (api.Config, error) {
+	ctx, ok := cfg.Contexts[preferredContextName]
 	if !ok {
-		return api.Config{}, fmt.Errorf(errFmtConfigBroken, "cluster", sourceKey)
-	}
-	cfg.Clusters[ctpKey] = cluster
-	delete(cfg.Clusters, sourceKey)
+		if len(cfg.Contexts) != 1 {
+			return api.Config{}, fmt.Errorf(errFmtConfigBroken, "context", preferredContextName)
+		}
 
-	users, ok := cfg.AuthInfos[sourceKey]
+		// fall back if there is only one
+		for k := range cfg.Contexts {
+			ctx = cfg.Contexts[k]
+		}
+	}
+
+	cluster, ok := cfg.Clusters[ctx.Cluster]
 	if !ok {
-		return api.Config{}, fmt.Errorf(errFmtConfigBroken, "user", sourceKey)
+		return api.Config{}, fmt.Errorf(errFmtConfigBroken, "cluster", ctx.Cluster)
 	}
-	cfg.AuthInfos[ctpKey] = users
-	delete(cfg.AuthInfos, sourceKey)
-
-	// Rename context, move under upbound- namespace.
-	context, ok := cfg.Contexts[sourceKey]
+	auth, ok := cfg.AuthInfos[ctx.AuthInfo]
 	if !ok {
-		return api.Config{}, fmt.Errorf(errFmtConfigBroken, "context", sourceKey)
+		return api.Config{}, fmt.Errorf(errFmtConfigBroken, "user", ctx.AuthInfo)
 	}
-	context.AuthInfo = ctpKey
-	context.Cluster = ctpKey
-	cfg.Contexts[ctpKey] = context
-	delete(cfg.Contexts, sourceKey)
 
-	// Update current context in the config to the built key. The next step
-	// will update the fs kubeconfig based on these details and without this
-	// step the update will fail due to the current context being set to the
-	// sourceKey value above.
-	cfg.CurrentContext = ctpKey
-	return cfg, nil
+	// create new kubeconfig with new keys
+	ctx = ctx.DeepCopy()
+	ctx.Cluster = newKey
+	ctx.AuthInfo = newKey
+	return api.Config{
+		Clusters:       map[string]*api.Cluster{newKey: cluster},
+		AuthInfos:      map[string]*api.AuthInfo{newKey: auth},
+		Contexts:       map[string]*api.Context{newKey: ctx},
+		CurrentContext: newKey,
+	}, nil
 }
 
 func defaultContextName(account, ctpName string) string {

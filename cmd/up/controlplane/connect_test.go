@@ -150,12 +150,53 @@ func TestUpdateKubeConfig(t *testing.T) {
 				},
 			},
 		},
+		"SuccessDifferentContext": {
+			reason: "Supplying an account, control plane name, and context should update the config.",
+			args: args{
+				cfg: api.Config{
+					AuthInfos: map[string]*api.AuthInfo{
+						"cow": {},
+					},
+					Clusters: map[string]*api.Cluster{
+						"elephant": {},
+					},
+					Contexts: map[string]*api.Context{
+						"monkey": {
+							Cluster:  "elephant",
+							AuthInfo: "cow",
+						},
+					},
+					CurrentContext: "monkey",
+				},
+				account: "demo",
+				ctpName: "ctp1",
+				context: "kind-kind",
+			},
+			want: want{
+				cfg: api.Config{
+					AuthInfos: map[string]*api.AuthInfo{
+						"upbound_demo_ctp1_kind-kind": {},
+					},
+					Clusters: map[string]*api.Cluster{
+						"upbound_demo_ctp1_kind-kind": {},
+					},
+					Contexts: map[string]*api.Context{
+						"upbound_demo_ctp1_kind-kind": {
+							Cluster:  "upbound_demo_ctp1_kind-kind",
+							AuthInfo: "upbound_demo_ctp1_kind-kind",
+						},
+					},
+					CurrentContext: "upbound_demo_ctp1_kind-kind",
+				},
+			},
+		},
 	}
 
 	for name, tc := range cases {
 		t.Run(name, func(t *testing.T) {
-
-			got, err := updateKubeConfig(tc.args.cfg, tc.args.account, tc.args.ctpName, tc.args.context)
+			expectedContextName := defaultContextName(tc.args.account, tc.args.ctpName)
+			newKey := controlplaneContextName(tc.args.account, tc.args.ctpName, tc.args.context)
+			got, err := extractKubeConfig(tc.args.cfg, expectedContextName, newKey)
 
 			if diff := cmp.Diff(tc.want.err, err, test.EquateErrors()); diff != "" {
 				t.Errorf("\n%s\nUpdateKubeConfig(...): -want err, +got err:\n%s", tc.reason, diff)
