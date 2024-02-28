@@ -96,7 +96,7 @@ func (c *connectCmd) Run(ctx context.Context, p pterm.TextPrinter, upCtx *upboun
 
 func controlplaneContextName(account string, name types.NamespacedName, origCtx string) string {
 	if name.Namespace == "" {
-		return fmt.Sprintf("%s%s_%s/%s_%s", upboundPrefix, account, "default", name.Name, origCtx)
+		name.Namespace = "default" // passed by value. We can mutate it.
 	}
 	return fmt.Sprintf("%s%s_%s/%s_%s", upboundPrefix, account, name.Namespace, name.Name, origCtx)
 }
