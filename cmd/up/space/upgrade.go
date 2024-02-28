@@ -167,7 +167,7 @@ func (c *upgradeCmd) getKubeconfig(upCtx *upbound.Context) (*rest.Config, error)
 	if !upCtx.Profile.IsSpace() {
 		return nil, fmt.Errorf("upgrade is not supported for non-space profile %q", upCtx.ProfileName)
 	}
-	cfg, _, err := upCtx.Profile.GetKubeClientConfig()
+	cfg, _, err := upCtx.Profile.GetSpaceKubeConfig()
 	return cfg, err
 }
 

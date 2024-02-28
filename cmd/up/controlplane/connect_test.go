@@ -19,9 +19,12 @@ import (
 	"testing"
 
 	"github.com/google/go-cmp/cmp"
+	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/client-go/tools/clientcmd/api"
 
 	"github.com/crossplane/crossplane-runtime/pkg/test"
+
+	"github.com/upbound/up/cmd/up/controlplane/kubeconfig"
 )
 
 func TestUpdateKubeConfig(t *testing.T) {
@@ -32,7 +35,7 @@ func TestUpdateKubeConfig(t *testing.T) {
 		context string
 	}
 	type want struct {
-		cfg api.Config
+		cfg *api.Config
 		err error
 	}
 
@@ -61,7 +64,6 @@ func TestUpdateKubeConfig(t *testing.T) {
 				context: "kind-kind",
 			},
 			want: want{
-				cfg: api.Config{},
 				err: errors.New(`config is broken, missing cluster: "demo-ctp1"`),
 			},
 		},
@@ -85,7 +87,6 @@ func TestUpdateKubeConfig(t *testing.T) {
 				context: "kind-kind",
 			},
 			want: want{
-				cfg: api.Config{},
 				err: errors.New(`config is broken, missing user: "demo-ctp1"`),
 			},
 		},
@@ -106,7 +107,6 @@ func TestUpdateKubeConfig(t *testing.T) {
 				context: "kind-kind",
 			},
 			want: want{
-				cfg: api.Config{},
 				err: errors.New(`config is broken, missing context: "demo-ctp1"`),
 			},
 		},
@@ -133,20 +133,20 @@ func TestUpdateKubeConfig(t *testing.T) {
 				context: "kind-kind",
 			},
 			want: want{
-				cfg: api.Config{
+				cfg: &api.Config{
 					AuthInfos: map[string]*api.AuthInfo{
-						"upbound_demo_ctp1_kind-kind": {},
+						"upbound_demo_default/ctp1_kind-kind": {},
 					},
 					Clusters: map[string]*api.Cluster{
-						"upbound_demo_ctp1_kind-kind": {},
+						"upbound_demo_default/ctp1_kind-kind": {},
 					},
 					Contexts: map[string]*api.Context{
-						"upbound_demo_ctp1_kind-kind": {
-							Cluster:  "upbound_demo_ctp1_kind-kind",
-							AuthInfo: "upbound_demo_ctp1_kind-kind",
+						"upbound_demo_default/ctp1_kind-kind": {
+							Cluster:  "upbound_demo_default/ctp1_kind-kind",
+							AuthInfo: "upbound_demo_default/ctp1_kind-kind",
 						},
 					},
-					CurrentContext: "upbound_demo_ctp1_kind-kind",
+					CurrentContext: "upbound_demo_default/ctp1_kind-kind",
 				},
 			},
 		},
@@ -173,20 +173,20 @@ func TestUpdateKubeConfig(t *testing.T) {
 				context: "kind-kind",
 			},
 			want: want{
-				cfg: api.Config{
+				cfg: &api.Config{
 					AuthInfos: map[string]*api.AuthInfo{
-						"upbound_demo_ctp1_kind-kind": {},
+						"upbound_demo_default/ctp1_kind-kind": {},
 					},
 					Clusters: map[string]*api.Cluster{
-						"upbound_demo_ctp1_kind-kind": {},
+						"upbound_demo_default/ctp1_kind-kind": {},
 					},
 					Contexts: map[string]*api.Context{
-						"upbound_demo_ctp1_kind-kind": {
-							Cluster:  "upbound_demo_ctp1_kind-kind",
-							AuthInfo: "upbound_demo_ctp1_kind-kind",
+						"upbound_demo_default/ctp1_kind-kind": {
+							Cluster:  "upbound_demo_default/ctp1_kind-kind",
+							AuthInfo: "upbound_demo_default/ctp1_kind-kind",
 						},
 					},
-					CurrentContext: "upbound_demo_ctp1_kind-kind",
+					CurrentContext: "upbound_demo_default/ctp1_kind-kind",
 				},
 			},
 		},
@@ -194,9 +194,9 @@ func TestUpdateKubeConfig(t *testing.T) {
 
 	for name, tc := range cases {
 		t.Run(name, func(t *testing.T) {
-			expectedContextName := defaultContextName(tc.args.account, tc.args.ctpName)
-			newKey := controlplaneContextName(tc.args.account, tc.args.ctpName, tc.args.context)
-			got, err := extractKubeConfig(tc.args.cfg, expectedContextName, newKey)
+			expectedContextName := kubeconfig.ExpectedConnectionSecretContext(tc.args.account, tc.args.ctpName)
+			newKey := controlplaneContextName(tc.args.account, types.NamespacedName{Namespace: "default", Name: tc.args.ctpName}, tc.args.context)
+			got, err := kubeconfig.ExtractControlPlaneContext(&tc.args.cfg, expectedContextName, newKey)
 
 			if diff := cmp.Diff(tc.want.err, err, test.EquateErrors()); diff != "" {
 				t.Errorf("\n%s\nUpdateKubeConfig(...): -want err, +got err:\n%s", tc.reason, diff)

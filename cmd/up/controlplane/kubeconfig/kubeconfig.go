@@ -15,10 +15,18 @@
 package kubeconfig
 
 import (
+	"context"
+
 	"github.com/alecthomas/kong"
+	"k8s.io/apimachinery/pkg/types"
+	clientcmdapi "k8s.io/client-go/tools/clientcmd/api"
 
 	"github.com/upbound/up/internal/feature"
 )
+
+type ConnectionSecretGetter interface {
+	GetKubeConfig(ctx context.Context, ctp types.NamespacedName) (*clientcmdapi.Config, error)
+}
 
 // BeforeReset is the first hook to run.
 func (c *Cmd) BeforeReset(p *kong.Path, maturity feature.Maturity) error {
@@ -27,5 +35,5 @@ func (c *Cmd) BeforeReset(p *kong.Path, maturity feature.Maturity) error {
 
 // Cmd contains commands for managing control plane kubeconfig data.
 type Cmd struct {
-	Get getCmd `cmd:"" help:"Get a kubeconfig for a control plane."`
+	Get getCmd `cmd:"" help:"Get a kubeconfig for a control plane and, if not specified otherwise, merge into kubeconfig and select context."`
 }

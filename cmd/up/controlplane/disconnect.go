@@ -81,7 +81,7 @@ func (c *disconnectCmd) Run(printer upterm.ObjectPrinter, p pterm.TextPrinter, u
 		return err
 	}
 
-	p.Printfln("Disconnected from control plane %q. Switch back to context %q.", cptContext, target)
+	p.Printfln("Disconnected from control plane %q and switched back to context %q.", cptContext, target)
 	return nil
 }
 

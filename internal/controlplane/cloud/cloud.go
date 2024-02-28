@@ -165,7 +165,7 @@ func (c *Client) Delete(ctx context.Context, ctp types.NamespacedName) error {
 
 // GetKubeConfig for the given Control Plane.
 func (c *Client) GetKubeConfig(ctx context.Context, ctp types.NamespacedName) (*api.Config, error) {
-	return kube.BuildControlPlaneKubeconfig(
+	return kube.BuildCloudControlPlaneKubeconfig(
 		c.proxy,
 		path.Join(c.account, ctp.Name),
 		c.token,

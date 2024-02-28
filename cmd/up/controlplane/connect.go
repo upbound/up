@@ -18,103 +18,36 @@ import (
 	"context"
 	"errors"
 	"fmt"
-	"io"
-	"os"
 	"strings"
 
 	"github.com/alecthomas/kong"
 	"github.com/pterm/pterm"
 	"k8s.io/apimachinery/pkg/types"
-	"k8s.io/client-go/dynamic"
 	"k8s.io/client-go/tools/clientcmd"
-	"k8s.io/client-go/tools/clientcmd/api"
 
-	"github.com/upbound/up-sdk-go/service/configurations"
-	cp "github.com/upbound/up-sdk-go/service/controlplanes"
+	"github.com/upbound/up/cmd/up/controlplane/kubeconfig"
 	"github.com/upbound/up/internal/controlplane"
-	"github.com/upbound/up/internal/controlplane/cloud"
-	"github.com/upbound/up/internal/controlplane/space"
 	"github.com/upbound/up/internal/kube"
 	"github.com/upbound/up/internal/upbound"
-	"github.com/upbound/up/internal/upterm"
 )
 
 const (
 	upboundPrefix = "upbound_"
-
-	errFmtConfigBroken = "config is broken, missing %s: %q"
 )
 
-type ctpConnector interface {
-	GetKubeConfig(ctx context.Context, ctp types.NamespacedName) (*api.Config, error)
-}
-
-// AfterApply sets default values in command after assignment and validation.
-func (c *connectCmd) AfterApply(kongCtx *kong.Context, upCtx *upbound.Context) error {
-	c.stdin = os.Stdin
-
-	if upCtx.Profile.IsSpace() {
-		kubeconfig, ns, err := upCtx.Profile.GetKubeClientConfig()
-		if err != nil {
-			return err
-		}
-		if c.Group == "" {
-			c.Group = ns
-		}
-
-		client, err := dynamic.NewForConfig(kubeconfig)
-		if err != nil {
-			return err
-		}
-		c.client = space.New(client)
-	} else {
-		if c.Token == "" {
-			return fmt.Errorf("--token must be specified")
-		}
-
-		if c.Token == "-" {
-			b, err := io.ReadAll(c.stdin)
-			if err != nil {
-				return err
-			}
-			c.Token = strings.TrimSpace(string(b))
-		}
-
-		cfg, err := upCtx.BuildSDKConfig()
-		if err != nil {
-			return err
-		}
-		ctpclient := cp.NewClient(cfg)
-		cfgclient := configurations.NewClient(cfg)
-
-		// The cloud client needs the proxy endpoint and a PAT token for
-		// setting up communication with Upbound Cloud.
-		c.client = cloud.New(
-			ctpclient,
-			cfgclient,
-			upCtx.Account,
-			cloud.WithToken(c.Token),
-			cloud.WithProxyEndpoint(upCtx.ProxyEndpoint),
-		)
-	}
-
-	kongCtx.Bind(pterm.DefaultTable.WithWriter(kongCtx.Stdout).WithSeparator("   "))
-	return nil
-}
-
-// getCmd gets a single control plane in an account on Upbound.
+// connectCmd connects to a control plane by updating the current kubeconfig with
+// the control plane's kubeconfig. The disconnect command can be used to restore
+// the old context.
 type connectCmd struct {
-	Name  string `arg:"" required:"" help:"Name of control plane." predictor:"ctps"`
-	Token string `help:"API token used to authenticate. Required for Upbound Cloud; ignored otherwise."`
+	kubeconfig.ConnectionSecretCmd `cmd:""`
+}
 
-	Group string `short:"g" help:"The control plane group that the control plane is contained in. By default, this is the group specified in the current profile."`
-
-	stdin  io.Reader
-	client ctpConnector
+func (c *connectCmd) AfterApply(kongCtx *kong.Context, upCtx *upbound.Context) error {
+	return c.ConnectionSecretCmd.AfterApply(kongCtx, upCtx)
 }
 
 // Run executes the get command.
-func (c *connectCmd) Run(ctx context.Context, printer upterm.ObjectPrinter, p pterm.TextPrinter, upCtx *upbound.Context) error {
+func (c *connectCmd) Run(ctx context.Context, p pterm.TextPrinter, upCtx *upbound.Context, getter kubeconfig.ConnectionSecretGetter) error {
 	if upCtx.Account == "" {
 		return errors.New("error: account is missing from profile")
 	}
@@ -127,80 +60,43 @@ func (c *connectCmd) Run(ctx context.Context, printer upterm.ObjectPrinter, p pt
 	if err != nil {
 		return err
 	}
-	// Check if the fs kubeconfig is already pointing to a control plane and
-	// return early if so.
+
+	// Check if the fs kubeconfig is already pointing to a control plane and return early if so.
 	origContext := kcloader.CurrentContext
 	if strings.HasPrefix(origContext, upboundPrefix) {
 		return fmt.Errorf("already connected to a control plane. Disconnect first")
 	}
 
-	cfg, err := c.client.GetKubeConfig(ctx, types.NamespacedName{Namespace: c.Group, Name: c.Name})
+	nname := types.NamespacedName{Namespace: c.Group, Name: c.Name}
+	ctpConfig, err := getter.GetKubeConfig(ctx, nname)
 	if controlplane.IsNotFound(err) {
-		p.Printfln("Control plane %s not found", c.Name)
+		p.Printfln("Control plane %s not found", nname)
 		return nil
 	}
 	if err != nil {
 		return err
 	}
 
-	expectedContextName := defaultContextName(upCtx.Account, c.Name)
-	newKey := controlplaneContextName(upCtx.Account, c.Name, origContext)
-	modifiedCfg, err := extractKubeConfig(*cfg, expectedContextName, newKey)
+	expectedContextName := kubeconfig.ExpectedConnectionSecretContext(upCtx.Account, c.Name)
+	newKey := controlplaneContextName(upCtx.Account, nname, origContext)
+	ctpConfig, err = kubeconfig.ExtractControlPlaneContext(ctpConfig, expectedContextName, newKey)
 	if err != nil {
 		return err
 	}
-	// NOTE(tnthornton) we don't current support supplying files outside of
-	// the default system kubeconfig.
-	if err := kube.ApplyControlPlaneKubeconfig(modifiedCfg, "", upCtx.WrapTransport); err != nil {
+
+	// NOTE(tnthornton) we don't current support supplying files outside of the default system kubeconfig.
+	if err := kube.MergeIntoKubeConfig(ctpConfig, "", true, kube.VerifyKubeConfig(upCtx.WrapTransport)); err != nil {
 		return err
 	}
 
-	p.Printfln("Current context set to %s", modifiedCfg.CurrentContext)
+	p.Printfln("Current context set to %s", ctpConfig.CurrentContext)
 
 	return nil
 }
 
-// extractKubeConfig prunes the given kubeconfig by extracting the one and only
-// or the preferred context if there are multiple. It renames context, cluster
-// and authInfo to the given key.
-func extractKubeConfig(cfg api.Config, preferredContextName, newKey string) (api.Config, error) {
-	ctx, ok := cfg.Contexts[preferredContextName]
-	if !ok {
-		if len(cfg.Contexts) != 1 {
-			return api.Config{}, fmt.Errorf(errFmtConfigBroken, "context", preferredContextName)
-		}
-
-		// fall back if there is only one
-		for k := range cfg.Contexts {
-			ctx = cfg.Contexts[k]
-		}
+func controlplaneContextName(account string, name types.NamespacedName, origCtx string) string {
+	if name.Namespace == "" {
+		name.Namespace = "default" // passed by value. We can mutate it.
 	}
-
-	cluster, ok := cfg.Clusters[ctx.Cluster]
-	if !ok {
-		return api.Config{}, fmt.Errorf(errFmtConfigBroken, "cluster", ctx.Cluster)
-	}
-	auth, ok := cfg.AuthInfos[ctx.AuthInfo]
-	if !ok {
-		return api.Config{}, fmt.Errorf(errFmtConfigBroken, "user", ctx.AuthInfo)
-	}
-
-	// create new kubeconfig with new keys
-	ctx = ctx.DeepCopy()
-	ctx.Cluster = newKey
-	ctx.AuthInfo = newKey
-	return api.Config{
-		Clusters:       map[string]*api.Cluster{newKey: cluster},
-		AuthInfos:      map[string]*api.AuthInfo{newKey: auth},
-		Contexts:       map[string]*api.Context{newKey: ctx},
-		CurrentContext: newKey,
-	}, nil
-}
-
-func defaultContextName(account, ctpName string) string {
-	return fmt.Sprintf("%s-%s", account, ctpName)
-}
-
-func controlplaneContextName(account, ctpName, origCtx string) string {
-	return fmt.Sprintf("%s%s_%s_%s", upboundPrefix, account, ctpName, origCtx)
+	return fmt.Sprintf("%s%s_%s/%s_%s", upboundPrefix, account, name.Namespace, name.Name, origCtx)
 }

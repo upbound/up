@@ -50,7 +50,7 @@ type createCmd struct {
 // AfterApply sets default values in command after assignment and validation.
 func (c *createCmd) AfterApply(kongCtx *kong.Context, upCtx *upbound.Context) error {
 	if upCtx.Profile.IsSpace() {
-		kubeconfig, ns, err := upCtx.Profile.GetKubeClientConfig()
+		kubeconfig, ns, err := upCtx.Profile.GetSpaceKubeConfig()
 		if err != nil {
 			return err
 		}

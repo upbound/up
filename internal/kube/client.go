@@ -28,10 +28,6 @@ import (
 )
 
 const (
-	// KubeconfigDir is the default kubeconfig directory.
-	KubeconfigDir = ".kube"
-	// KubeconfigFile is the default kubeconfig file.
-	KubeconfigFile = "config"
 	// UpboundKubeconfigKeyFmt is the format for Upbound control plane entries
 	// in a kubeconfig file.
 	UpboundKubeconfigKeyFmt = "upbound-%s"
@@ -48,8 +44,8 @@ func GetKubeConfig(path string) (*rest.Config, error) {
 	return clientcmd.NewNonInteractiveDeferredLoadingClientConfig(rules, &clientcmd.ConfigOverrides{}).ClientConfig()
 }
 
-// BuildControlPlaneKubeconfig builds a kubeconfig entry for a control plane.
-func BuildControlPlaneKubeconfig(proxy *url.URL, id string, token string, includePrefix bool) *api.Config { //nolint:interfacer
+// BuildCloudControlPlaneKubeconfig builds a kubeconfig entry for a control plane.
+func BuildCloudControlPlaneKubeconfig(proxy *url.URL, id string, token string, includePrefix bool) *api.Config { //nolint:interfacer
 	conf := api.NewConfig()
 	key := strings.ReplaceAll(id, "/", "-")
 	if includePrefix {
@@ -70,9 +66,32 @@ func BuildControlPlaneKubeconfig(proxy *url.URL, id string, token string, includ
 	return conf
 }
 
-// ApplyControlPlaneKubeconfig applies a control plane kubeconfig to an existing
+func VerifyKubeConfig(wrapTransport transport.WrapperFunc) func(cfg *api.Config) error {
+	return func(cfg *api.Config) error {
+		clientConfig := clientcmd.NewDefaultClientConfig(*cfg, &clientcmd.ConfigOverrides{
+			CurrentContext: cfg.CurrentContext,
+		})
+		restConfig, err := clientConfig.ClientConfig()
+		if err != nil {
+			return err
+		}
+		if wrapTransport != nil {
+			restConfig.Wrap(wrapTransport)
+		}
+		clientset, err := kubernetes.NewForConfig(restConfig)
+		if err != nil {
+			return err
+		}
+		if _, err := clientset.DiscoveryClient.ServerVersion(); err != nil {
+			return err
+		}
+		return nil
+	}
+}
+
+// MergeIntoKubeConfig applies a control plane kubeconfig to an existing
 // kubeconfig file and sets it as the current context.
-func ApplyControlPlaneKubeconfig(mcpConf api.Config, existingFilePath string, wrapTransport transport.WrapperFunc) error {
+func MergeIntoKubeConfig(mcpConf *api.Config, existingFilePath string, setDefaultContext bool, preCheck ...func(cfg *api.Config) error) error {
 	po := clientcmd.NewDefaultPathOptions()
 	po.LoadingRules.ExplicitPath = existingFilePath
 	conf, err := po.GetStartingConfig()
@@ -88,33 +107,16 @@ func ApplyControlPlaneKubeconfig(mcpConf api.Config, existingFilePath string, wr
 	for k, v := range mcpConf.Contexts {
 		conf.Contexts[k] = v
 	}
-	conf.CurrentContext = mcpConf.CurrentContext
-
-	// In the case of user error, for example providing an invalid access token,
-	// we do not want to set it as the current context as it will be invalid.
-	// A client allows us to verify connectivity in addition to a well-formed config.
-	clientConfig := clientcmd.NewDefaultClientConfig(*conf, &clientcmd.ConfigOverrides{})
-
-	// A rest.Config is required for clients.
-	restConfig, err := clientConfig.ClientConfig()
-	if err != nil {
-		return err
-	}
-	if wrapTransport != nil {
-		restConfig.Wrap(wrapTransport)
+	if setDefaultContext {
+		conf.CurrentContext = mcpConf.CurrentContext
 	}
 
-	clientset, err := kubernetes.NewForConfig(restConfig)
-	if err != nil {
-		// For example, an invalid token was passed.
-		return err
-	}
-
-	// We could use any client for this check, but discovery allows us to perform
-	// additional validation if so desired. For now we perform a lightweight operation.
-	if _, err := clientset.DiscoveryClient.ServerVersion(); err != nil {
-		// For example, the target cluster does not exist.
-		return err
+	for _, check := range preCheck {
+		withDefContext := *conf
+		withDefContext.CurrentContext = mcpConf.CurrentContext
+		if err := check(&withDefContext); err != nil {
+			return err
+		}
 	}
 
 	return clientcmd.ModifyConfig(po, *conf, true)

@@ -54,19 +54,11 @@ func New(c dynamic.Interface) *Client {
 
 // Get the ControlPlane corresponding to the given ControlPlane name.
 func (c *Client) Get(ctx context.Context, ctp types.NamespacedName) (*controlplane.Response, error) {
-	u, err := c.c.
-		Resource(resource).
-		Namespace(ctp.Namespace).
-		Get(
-			ctx,
-			ctp.Name,
-			metav1.GetOptions{},
-		)
-	if kerrors.IsNotFound(err) {
-		return nil, controlplane.NewNotFound(err)
-	}
-
+	u, err := c.c.Resource(resource).Namespace(ctp.Namespace).Get(ctx, ctp.Name, metav1.GetOptions{})
 	if err != nil {
+		if kerrors.IsNotFound(err) {
+			return nil, controlplane.NewNotFound(err)
+		}
 		return nil, err
 	}
 
@@ -75,19 +67,11 @@ func (c *Client) Get(ctx context.Context, ctp types.NamespacedName) (*controlpla
 
 // List all ControlPlanes within the Space.
 func (c *Client) List(ctx context.Context, namespace string) ([]*controlplane.Response, error) {
-	list, err := c.c.
-		Resource(resource).
-		Namespace(namespace).
-		List(
-			ctx,
-			metav1.ListOptions{},
-		)
-
-	if kerrors.IsNotFound(err) {
-		return nil, controlplane.NewNotFound(err)
-	}
-
+	list, err := c.c.Resource(resource).Namespace(namespace).List(ctx, metav1.ListOptions{})
 	if err != nil {
+		if kerrors.IsNotFound(err) {
+			return nil, controlplane.NewNotFound(err)
+		}
 		return nil, err
 	}
 
@@ -110,14 +94,7 @@ func (c *Client) Create(ctx context.Context, name types.NamespacedName, opts con
 		Namespace: o.SecretNamespace,
 	})
 
-	u, err := c.c.
-		Resource(resource).
-		Namespace(name.Namespace).
-		Create(
-			ctx,
-			ctp.GetUnstructured(),
-			metav1.CreateOptions{},
-		)
+	u, err := c.c.Resource(resource).Namespace(name.Namespace).Create(ctx, ctp.GetUnstructured(), metav1.CreateOptions{})
 	if err != nil {
 		return nil, err
 	}
@@ -127,14 +104,7 @@ func (c *Client) Create(ctx context.Context, name types.NamespacedName, opts con
 
 // Delete the ControlPlane corresponding to the given ControlPlane name.
 func (c *Client) Delete(ctx context.Context, ctp types.NamespacedName) error {
-	err := c.c.
-		Resource(resource).
-		Namespace(ctp.Namespace).
-		Delete(
-			ctx,
-			ctp.Name,
-			metav1.DeleteOptions{},
-		)
+	err := c.c.Resource(resource).Namespace(ctp.Namespace).Delete(ctx, ctp.Name, metav1.DeleteOptions{})
 	if kerrors.IsNotFound(err) {
 		return controlplane.NewNotFound(err)
 	}
@@ -151,20 +121,14 @@ func (c *Client) GetKubeConfig(ctx context.Context, ctp types.NamespacedName) (*
 	}
 
 	// get the corresponding kubeconfig secret
-	u, err := c.c.
-		Resource(schema.GroupVersionResource{
-			Group:    "",
-			Version:  "v1",
-			Resource: "secrets",
-		}).
+	u, err := c.c.Resource(schema.GroupVersionResource{Group: "", Version: "v1", Resource: "secrets"}).
 		Namespace(ctp.Namespace).
-		Get(
-			ctx,
-			r.ConnName,
-			metav1.GetOptions{},
-		)
-	if kerrors.IsNotFound(err) {
-		return nil, controlplane.NewNotFound(err)
+		Get(ctx, r.ConnName, metav1.GetOptions{})
+	if err != nil {
+		if kerrors.IsNotFound(err) {
+			return nil, controlplane.NewNotFound(err)
+		}
+		return nil, err
 	}
 
 	// marshal into secret
