@@ -21,6 +21,7 @@ import (
 
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 	"k8s.io/apimachinery/pkg/util/runtime"
+	"k8s.io/apimachinery/pkg/util/sets"
 	"k8s.io/client-go/kubernetes/scheme"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/client/config"
@@ -33,6 +34,15 @@ import (
 func init() {
 	runtime.Must(queryv1alpha1.AddToScheme(scheme.Scheme))
 }
+
+var nativeKinds = sets.New("poddisruptionbudgets", "rolebindings", "endpoints", "apiservices", "pods", "events",
+	"serviceaccounts", "flowschemas", "nodes", "prioritylevelconfigurations", "leases", "validatingwebhookconfigurations",
+	"priorityclasses", "namespaces", "configmaps", "customresourcedefinitions", "clusterrolebindings", "secrets",
+	"services", "endpointslices", "replicasets", "deployments", "roles", "clusterroles",
+	"poddisruptionbudget", "rolebinding", "endpoint", "apiservice", "pod", "event",
+	"serviceaccount", "flowschema", "node", "prioritylevelconfiguration", "lease", "validatingwebhookconfiguration",
+	"priorityclass", "namespace", "configmap", "customresourcedefinition", "clusterrolebinding", "secret",
+	"service", "endpointslice", "replicaset", "deployment", "role", "clusterrole")
 
 type Cmd struct {
 	ControlPlane string `short:"c" long:"controlplane" env:"UPBOUND_CONTROLPLANE" description:"Controlplane to query"`
@@ -72,6 +82,16 @@ func (c *Cmd) Run(ctx context.Context) error {
 	}
 
 	poll := func(group, kind, name string) (*queryv1alpha1.QueryResponse, error) {
+		if kind == "minion" || kind == "minions" {
+			kind = "nodes" // this got renamed ages ago. Etcd path is still "minions".
+		}
+
+		var categories []string
+		if c.Group == "" && !nativeKinds.Has(kind) {
+			categories = append(categories, kind)
+			kind = ""
+		}
+
 		query := &queryv1alpha1.SpaceQuery{
 			Spec: &queryv1alpha1.QuerySpec{
 				QueryTopLevelResources: queryv1alpha1.QueryTopLevelResources{
@@ -81,10 +101,11 @@ func (c *Cmd) Run(ctx context.Context) error {
 							Namespace: c.Group,
 						},
 						QueryFilter: queryv1alpha1.QueryFilter{
-							Kind:      kind,
-							Group:     group,
-							Namespace: c.Namespace,
-							Name:      name,
+							Kind:       kind,
+							Group:      group,
+							Namespace:  c.Namespace,
+							Name:       name,
+							Categories: categories,
 						},
 					},
 					QueryResources: queryv1alpha1.QueryResources{
