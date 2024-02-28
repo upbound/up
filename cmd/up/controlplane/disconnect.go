@@ -22,7 +22,7 @@ import (
 	"github.com/alecthomas/kong"
 	"github.com/pterm/pterm"
 	"k8s.io/client-go/tools/clientcmd"
-	"k8s.io/client-go/tools/clientcmd/api"
+	clientcmdapi "k8s.io/client-go/tools/clientcmd/api"
 
 	"github.com/upbound/up/internal/upbound"
 	"github.com/upbound/up/internal/upterm"
@@ -49,7 +49,7 @@ func (c *disconnectCmd) Run(printer upterm.ObjectPrinter, p pterm.TextPrinter, u
 		return errors.New("error: account is missing from profile")
 	}
 
-	kcloader, err := clientcmd.NewNonInteractiveDeferredLoadingClientConfig(
+	kubeConfig, err := clientcmd.NewNonInteractiveDeferredLoadingClientConfig(
 		clientcmd.NewDefaultClientConfigLoadingRules(),
 		&clientcmd.ConfigOverrides{},
 	).RawConfig()
@@ -57,32 +57,40 @@ func (c *disconnectCmd) Run(printer upterm.ObjectPrinter, p pterm.TextPrinter, u
 		return err
 	}
 
-	cptContext := kcloader.CurrentContext
-	if !strings.HasPrefix(cptContext, upboundPrefix) {
-		return errors.New("current kube context is not a control plane context")
-	}
-
-	target, err := origContext(cptContext)
+	kubeConfig, err = switchToOrigContext(kubeConfig)
 	if err != nil {
 		return err
 	}
 
-	if err := switchContext(kcloader, target); err != nil {
+	if err := clientcmd.ModifyConfig(clientcmd.NewDefaultClientConfigLoadingRules(), kubeConfig, false); err != nil {
 		return err
 	}
 
-	kcloader.CurrentContext = target
-	modifiedCfg, err := removeFromConfig(kcloader, cptContext)
-	if err != nil {
-		return err
-	}
+	p.Printfln("Switched back to context %q.", kubeConfig.CurrentContext)
 
-	if err := clientcmd.ModifyConfig(clientcmd.NewDefaultClientConfigLoadingRules(), modifiedCfg, false); err != nil {
-		return err
-	}
-
-	p.Printfln("Disconnected from control plane %q and switched back to context %q.", cptContext, target)
 	return nil
+}
+
+func switchToOrigContext(kubeConfig clientcmdapi.Config) (clientcmdapi.Config, error) {
+	if !strings.HasPrefix(kubeConfig.CurrentContext, upboundPrefix) {
+		return clientcmdapi.Config{}, errors.New("current kube context is not a control plane context")
+	}
+
+	kubeConfig = *kubeConfig.DeepCopy()
+
+	cptContext := kubeConfig.CurrentContext
+	orig, err := origContext(cptContext)
+	if err != nil {
+		return clientcmdapi.Config{}, err
+	}
+
+	// switch to the original context and remove ctp context, cluster and auth.
+	kubeConfig.CurrentContext = orig
+	delete(kubeConfig.AuthInfos, cptContext)
+	delete(kubeConfig.Clusters, cptContext)
+	delete(kubeConfig.Contexts, cptContext)
+
+	return kubeConfig, nil
 }
 
 func origContext(currentCtx string) (string, error) {
@@ -91,20 +99,4 @@ func origContext(currentCtx string) (string, error) {
 		return "", fmt.Errorf(errFmtContextParts, len(parts))
 	}
 	return parts[len(parts)-1], nil
-}
-
-func switchContext(cfg api.Config, target string) error {
-	cfg.CurrentContext = target
-	return clientcmd.ModifyConfig(clientcmd.NewDefaultClientConfigLoadingRules(), cfg, false)
-}
-
-func removeFromConfig(cfg api.Config, contextName string) (api.Config, error) {
-	if cfg.CurrentContext == contextName {
-		return api.Config{}, fmt.Errorf(errFmtCurrentContext, contextName)
-	}
-
-	delete(cfg.AuthInfos, contextName)
-	delete(cfg.Clusters, contextName)
-	delete(cfg.Contexts, contextName)
-	return cfg, nil
 }
