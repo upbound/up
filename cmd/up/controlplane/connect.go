@@ -61,10 +61,9 @@ func (c *connectCmd) Run(ctx context.Context, p pterm.TextPrinter, upCtx *upboun
 		return err
 	}
 
-	// Check if the fs kubeconfig is already pointing to a control plane and return early if so.
+	// disconnect first if connected
 	oldContext := kubeConfig.CurrentContext
 	if strings.HasPrefix(oldContext, upboundPrefix) {
-		// disconnect first
 		kubeConfig, err = switchToOrigContext(kubeConfig)
 		if err != nil {
 			return fmt.Errorf("context %q seems to be a control plane context, but disconnect failed: %w", oldContext, err)
@@ -73,7 +72,6 @@ func (c *connectCmd) Run(ctx context.Context, p pterm.TextPrinter, upCtx *upboun
 		if err := clientcmd.ModifyConfig(clientcmd.NewDefaultClientConfigLoadingRules(), kubeConfig, false); err != nil {
 			return err
 		}
-		p.Printfln("Switched back to context %q.", oldContext)
 	}
 
 	nname := types.NamespacedName{Namespace: c.Group, Name: c.Name}
