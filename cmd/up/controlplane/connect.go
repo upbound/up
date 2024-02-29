@@ -53,7 +53,7 @@ func (c *connectCmd) Run(ctx context.Context, p pterm.TextPrinter, upCtx *upboun
 	}
 
 	// Load kubeconfig from filesystem.
-	kcloader, err := clientcmd.NewNonInteractiveDeferredLoadingClientConfig(
+	kubeConfig, err := clientcmd.NewNonInteractiveDeferredLoadingClientConfig(
 		clientcmd.NewDefaultClientConfigLoadingRules(),
 		&clientcmd.ConfigOverrides{},
 	).RawConfig()
@@ -61,10 +61,17 @@ func (c *connectCmd) Run(ctx context.Context, p pterm.TextPrinter, upCtx *upboun
 		return err
 	}
 
-	// Check if the fs kubeconfig is already pointing to a control plane and return early if so.
-	origContext := kcloader.CurrentContext
-	if strings.HasPrefix(origContext, upboundPrefix) {
-		return fmt.Errorf("already connected to a control plane. Disconnect first")
+	// disconnect first if connected
+	oldContext := kubeConfig.CurrentContext
+	if strings.HasPrefix(oldContext, upboundPrefix) {
+		kubeConfig, err = switchToOrigContext(kubeConfig)
+		if err != nil {
+			return fmt.Errorf("context %q seems to be a control plane context, but disconnect failed: %w", oldContext, err)
+		}
+		oldContext = kubeConfig.CurrentContext
+		if err := clientcmd.ModifyConfig(clientcmd.NewDefaultClientConfigLoadingRules(), kubeConfig, false); err != nil {
+			return err
+		}
 	}
 
 	nname := types.NamespacedName{Namespace: c.Group, Name: c.Name}
@@ -78,7 +85,7 @@ func (c *connectCmd) Run(ctx context.Context, p pterm.TextPrinter, upCtx *upboun
 	}
 
 	expectedContextName := kubeconfig.ExpectedConnectionSecretContext(upCtx.Account, c.Name)
-	newKey := controlplaneContextName(upCtx.Account, nname, origContext)
+	newKey := controlplaneContextName(upCtx.Account, nname, oldContext)
 	ctpConfig, err = kubeconfig.ExtractControlPlaneContext(ctpConfig, expectedContextName, newKey)
 	if err != nil {
 		return err
@@ -89,7 +96,7 @@ func (c *connectCmd) Run(ctx context.Context, p pterm.TextPrinter, upCtx *upboun
 		return err
 	}
 
-	p.Printfln("Current context set to %s", ctpConfig.CurrentContext)
+	p.Printfln("Connected to control plane %s in context %q.\n\nHint: use \"up ctp disconnect\" to restore the previous context.", nname, ctpConfig.CurrentContext)
 
 	return nil
 }
