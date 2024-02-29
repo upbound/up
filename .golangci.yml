@@ -52,12 +52,6 @@ linters-settings:
     # tokens count to trigger issue, 150 by default
     threshold: 100
 
-  goconst:
-    # minimal length of string constant, 3 by default
-    min-len: 3
-    # minimal occurrences count to trigger, 3 by default
-    min-occurrences: 5
-
   lll:
     # tab width in spaces. Default to 1.
     tab-width: 1
@@ -108,8 +102,6 @@ linters:
     - govet
     - gocyclo
     - gocritic
-    - interfacer
-    - goconst
     - goimports
     - gofmt  # We enable this as well as goimports for its simplify mode.
     - prealloc
@@ -127,6 +119,13 @@ linters:
 issues:
   # Excluding configuration per-path and per-linter
   exclude-rules:
+    # gomodguard panic bug: https://github.com/golangci/golangci-lint/issues/4242
+    - path: ./cmd/up/space/billing
+      linters:
+      - gomodguard
+    - path: ./internal/auth
+      linters:
+      - gomodguard
     # Exclude some linters from running on tests files.
     - path: _test(ing)?\.go
       linters:
@@ -142,7 +141,7 @@ issues:
     - path: _test\.go
       text: "(unnamedResult|exitAfterDefer)"
       linters:
-        - gocritic
+      - gocritic
 
     # These are performance optimisations rather than style issues per se.
     # They warn when function arguments or range values copy a lot of memory
