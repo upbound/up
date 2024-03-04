@@ -51,11 +51,11 @@ const (
 
 	// TODO(tnthornton) these can probably be replaced by our public chart
 	// museum. This would allow us to use wildcards like mxp-connector.
-	supportedVersion = "0.0.0-122.gfa97cca"
+	supportedVersion = "0.0.0-179.g5f7a3e4"
 	agentRegistry    = "us-west1-docker.pkg.dev/orchestration-build/connect"
 
 	// TODO(tnthornton) maybe move this to the agent chart?
-	devConnectURL = "nats://connect.u5d.dev"
+	devConnectURL = "tls://connect.u5d.dev"
 )
 
 type attachCmd struct {
@@ -121,7 +121,6 @@ func (c *attachCmd) AfterApply(kongCtx *kong.Context) error {
 		agentChart,
 		registryURL,
 		helm.WithNamespace(agentNs),
-		helm.CreateNamespace(true),
 		helm.IsOCI(),
 		helm.Wait(),
 	)

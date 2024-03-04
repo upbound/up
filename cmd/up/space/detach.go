@@ -20,7 +20,6 @@ import (
 
 	"github.com/alecthomas/kong"
 	"github.com/pterm/pterm"
-	v1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/client-go/kubernetes"
 
 	"github.com/upbound/up/internal/install/helm"
@@ -86,9 +85,9 @@ func (c *detachCmd) Run(ctx context.Context, kClient *kubernetes.Clientset, mgr 
 		return err
 	}
 
-	if err := kClient.CoreV1().Namespaces().Delete(ctx, agentNs, v1.DeleteOptions{}); err != nil {
-		return err
-	}
+	// if err := kClient.CoreV1().Namespaces().Delete(ctx, agentNs, v1.DeleteOptions{}); err != nil {
+	// 	return err
+	// }
 	detachSpinner.Success()
 	return nil
 }
