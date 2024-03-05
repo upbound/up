@@ -39,7 +39,9 @@ GOLANGCILINT_VERSION = 1.56.2
 
 # ====================================================================================
 # Setup binaries
-ifneq ($(shell type sha256sum 2>/dev/null),)
+ifneq ($(shell type shasum 2>/dev/null),)
+SHA256SUM := shasum -a 256
+else ifneq ($(shell type sha256sum 2>/dev/null),)
 SHA256SUM := sha256sum
 else
 $(error Please install sha256sum)
