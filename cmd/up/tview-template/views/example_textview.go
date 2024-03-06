@@ -18,12 +18,12 @@ import (
 	"github.com/rivo/tview"
 )
 
-type Example struct {
+type ExampleTextView struct {
 	*tview.TextView
 }
 
-func NewExample() *Example {
-	d := &Example{
+func NewExampleTextView() *ExampleTextView {
+	d := &ExampleTextView{
 		TextView: tview.NewTextView().SetText("Hello World"),
 	}
 	return d

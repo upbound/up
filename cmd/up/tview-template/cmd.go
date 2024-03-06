@@ -18,7 +18,7 @@ import (
 	"context"
 	"fmt"
 
-	"sigs.k8s.io/controller-runtime/pkg/client"
+	"k8s.io/client-go/rest"
 	"sigs.k8s.io/controller-runtime/pkg/client/config"
 )
 
@@ -43,11 +43,11 @@ func (c *Cmd) Run(ctx context.Context) error {
 	if err != nil {
 		return fmt.Errorf("failed to get kubeconfig: %w", err)
 	}
-	_, err = client.New(cfg, client.Options{})
+	client, err := rest.TransportFor(cfg)
 	if err != nil {
 		return fmt.Errorf("failed to create client: %w", err)
 	}
 
-	app := NewApp("upbound tview-template")
+	app := NewApp("upbound tview-template", client, cfg.Host)
 	return app.Run(ctx)
 }

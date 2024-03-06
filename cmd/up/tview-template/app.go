@@ -16,6 +16,7 @@ package template
 
 import (
 	"context"
+	"net/http"
 	"time"
 
 	"github.com/gdamore/tcell/v2"
@@ -32,33 +33,36 @@ type App struct {
 	*tview.Application
 	model model.App
 
-	header  *views.Header
-	example *views.Example
+	header   *views.Header
+	textView *views.ExampleTextView
+	graph    *views.ExampleGraph
 
 	grid     *tview.Grid
 	topLevel *upviews.TopLevel
 }
 
-func NewApp(title string) *App {
+func NewApp(title string, client http.RoundTripper, kubeURL string) *App {
 	app := &App{
 		Application: tview.NewApplication(),
 		model:       model.NewApp(),
 	}
 
 	app.header = views.NewHeader()
-	app.example = views.NewExample()
+	app.textView = views.NewExampleTextView()
+	app.graph = views.NewExampleGraph(client, kubeURL)
 
 	app.grid = tview.NewGrid().
-		SetRows(1, 0).
+		SetRows(1, 0, 5).
 		SetColumns(0).
 		SetBorders(true).
 		SetBordersColor(tcell.ColorDarkGray).
 		AddItem(app.header, 0, 0, 1, 1, 0, 0, false).
-		AddItem(app.example, 1, 0, 1, 1, 0, 0, true)
+		AddItem(app.textView, 1, 0, 1, 1, 0, 0, true).
+		AddItem(app.graph, 2, 0, 1, 1, 0, 0, true)
 	app.topLevel = upviews.NewTopLevel(title, app.grid, app.Application).
-		SetTitles(upviews.GridTitle{Col: 0, Row: 1, Text: " Example ", Color: tcell.ColorDarkGray, Align: tview.AlignCenter}).
+		SetTitles(upviews.GridTitle{Col: 0, Row: 1, Text: " ExampleTextView ", Color: tcell.ColorDarkGray, Align: tview.AlignCenter}).
 		SetDelegateInputHandler(app.TopLevelInputHandler).
-		SetCommands("", "Example", "", "", "", "", "", "", "", "Quit")
+		SetCommands("", "ExampleTextView", "", "", "", "", "", "", "", "Quit")
 	app.Application.SetRoot(app.topLevel, true)
 
 	return app
@@ -95,6 +99,10 @@ func (a *App) Run(ctx context.Context) error {
 	go func() {
 		for {
 			time.Sleep(time.Second)
+			err := a.graph.Tick(ctx) // nolint:errcheck
+			if err != nil {
+				a.textView.SetText(a.textView.GetText(false) + "\n" + err.Error())
+			}
 			a.QueueUpdateDraw(func() {})
 		}
 	}()
