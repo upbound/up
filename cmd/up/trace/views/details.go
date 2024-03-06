@@ -78,7 +78,7 @@ func shorten(n int, s string) string {
 	return strings.Repeat(" ", left) + s + strings.Repeat(" ", n-left-len(s))
 }
 
-func conditionStatus(n int, conds ...xpv1.ConditionType) func(o *model.Object) string {
+func conditionStatus(n int, conds ...xpv1.ConditionType) func(o *model.Object) string { // nolint:unparam // ¯\_(ツ)_/¯
 	return conditionFn(func(cond *xpv1.Condition) string {
 		if cond == nil {
 			return "[#626262]" + shorten(n, "n/a")
@@ -227,6 +227,4 @@ func (t detailsContent) InsertColumn(column int) {
 }
 
 func (t detailsContent) Clear() {
-	//TODO implement me
-	panic("implement me")
 }

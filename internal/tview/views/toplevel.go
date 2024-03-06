@@ -100,7 +100,7 @@ func (t *TopLevel) InputHandler() func(event *tcell.EventKey, setFocus func(p tv
 			}
 		}
 
-		switch event.Key() {
+		switch event.Key() { // nolint:exhaustive // there is a default case
 		case tcell.KeyEscape:
 			t.escPending = true
 		case tcell.KeyF10:
@@ -120,7 +120,7 @@ func (t *TopLevel) InteractiveQuit() {
 		Display())
 }
 
-func (t *TopLevel) Draw(screen tcell.Screen) {
+func (t *TopLevel) Draw(screen tcell.Screen) { // nolint:gocyclo // draw methods are always long, splitting does not make them easier
 	t.Grid.Draw(screen)
 
 	// collect grid items

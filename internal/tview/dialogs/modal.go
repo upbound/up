@@ -34,7 +34,7 @@ func ShowModal(app *tview.Application, p tview.Primitive) *Modal {
 
 func GetRoot(app *tview.Application) tview.Primitive {
 	fld := reflect.ValueOf(app).Elem().FieldByName("root")
-	return *(*tview.Primitive)(unsafe.Pointer(fld.UnsafeAddr()))
+	return *(*tview.Primitive)(unsafe.Pointer(fld.UnsafeAddr())) // nolint:gosec // no way around this
 }
 
 type Modal struct {

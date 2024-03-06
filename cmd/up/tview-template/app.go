@@ -31,7 +31,7 @@ import (
 // App represents main application struct.
 type App struct {
 	*tview.Application
-	model model.App
+	model *model.App
 
 	header   *views.Header
 	textView *views.ExampleTextView
@@ -69,7 +69,7 @@ func NewApp(title string, client http.RoundTripper, kubeURL string) *App {
 }
 
 func (a *App) TopLevelInputHandler(event *tcell.EventKey, setFocus func(p tview.Primitive)) bool {
-	switch event.Key() {
+	switch event.Key() { // nolint:exhaustive // there is a default case
 	case tcell.KeyF2:
 		oldRoot := dialogs.GetRoot(a.Application)
 		dialogs.ShowModal(a.Application, dialogs.NewConfirmDialog().
@@ -80,9 +80,10 @@ func (a *App) TopLevelInputHandler(event *tcell.EventKey, setFocus func(p tview.
 			Display())
 		return true
 	case tcell.KeyRune:
-		switch event.Rune() {
+		switch event.Rune() { // nolint:gocritic // this is an example to be extended with more cases
 		case 'q':
 			a.topLevel.InteractiveQuit()
+		default:
 		}
 	default:
 	}

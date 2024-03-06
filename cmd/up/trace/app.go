@@ -38,7 +38,7 @@ import (
 // App represents main application struct.
 type App struct {
 	*tview.Application
-	model model.App
+	model *model.App
 
 	header   *views.Header
 	tree     *views.Tree
@@ -51,8 +51,6 @@ type App struct {
 
 	pollFn  func(group, kind, name string) (*queryv1alpha1.QueryResponse, error)
 	fetchFn func(id string) (*unstructured.Unstructured, error)
-
-	escPending bool // next digit turns key into F1-F10
 }
 
 func NewApp(title string, group, kind, name string, pollFn func(kind, group, name string) (*queryv1alpha1.QueryResponse, error), fetchFn func(id string) (*unstructured.Unstructured, error)) *App {
@@ -65,7 +63,7 @@ func NewApp(title string, group, kind, name string, pollFn func(kind, group, nam
 
 	app.header = views.NewHeader()
 	app.tree = views.NewTree(app.Application, &app.model.Tree)
-	app.timeline = views.NewTimeLine(app.tree, &app.model)
+	app.timeline = views.NewTimeLine(app.tree, app.model)
 	app.status = views.NewStatus(app.tree)
 	app.details = views.NewDetails(app.tree)
 
@@ -138,8 +136,8 @@ func (a *App) Unzoom() {
 	a.model.Zoomed = false
 }
 
-func (a *App) TopLevelInputHandler(event *tcell.EventKey, setFocus func(p tview.Primitive)) bool {
-	switch event.Key() {
+func (a *App) TopLevelInputHandler(event *tcell.EventKey, setFocus func(p tview.Primitive)) bool { // nolint:gocyclo // TODO: split up
+	switch event.Key() { // nolint:exhaustive // there is a default case
 	case tcell.KeyEscape:
 		if a.model.Zoomed {
 			a.Unzoom()
@@ -193,6 +191,7 @@ func (a *App) TopLevelInputHandler(event *tcell.EventKey, setFocus func(p tview.
 				}
 			}
 			return true
+		default:
 		}
 	case tcell.KeyF2:
 		kind := *a.model.Kind.Load()

@@ -48,7 +48,7 @@ func (t *Tree) Update(resp *queryv1alpha1.QueryResponse) {
 	t.update(t.root, resp.Objects, 0)
 }
 
-func (t *Tree) update(parent *tview.TreeNode, respObjs []queryv1alpha1.QueryResponseObject, level int) []*Object {
+func (t *Tree) update(parent *tview.TreeNode, respObjs []queryv1alpha1.QueryResponseObject, level int) []*Object { // nolint:gocyclo // TODO: split up
 	existing := map[string]*tview.TreeNode{}
 	for _, n := range parent.GetChildren() {
 		obj := n.GetReference().(*Object)
@@ -72,13 +72,13 @@ func (t *Tree) update(parent *tview.TreeNode, respObjs []queryv1alpha1.QueryResp
 		creationString, _, _ := unstructured.NestedString(o.Object.Object, "metadata", "creationTimestamp")
 		creationTimestamp, err := time.Parse(time.RFC3339, creationString)
 		if err != nil {
-			continue //should never happen as the kube API is type-safe
+			continue // should never happen as the kube API is type-safe
 		}
 		deletionString, _, _ := unstructured.NestedString(o.Object.Object, "metadata", "deletionTimestamp")
 		var deletionTimestamp time.Time
 		if deletionString != "" {
 			if deletionTimestamp, err = time.Parse(time.RFC3339, deletionString); err != nil {
-				continue //should never happen as the kube API is type-safe
+				continue // should never happen as the kube API is type-safe
 			}
 		}
 		obj := &Object{
@@ -139,7 +139,9 @@ func (t *Tree) update(parent *tview.TreeNode, respObjs []queryv1alpha1.QueryResp
 			count, _, _ := unstructured.NestedInt64(respEv.Object.Object, "count")
 			ev.Count = int(count)
 			ts, _, _ := unstructured.NestedString(respEv.Object.Object, "lastTimestamp")
-			ev.LastTimestamp.Unmarshal([]byte(ts))
+			if err := ev.LastTimestamp.Unmarshal([]byte(ts)); err != nil {
+				continue // ignore this event
+			}
 
 			obj.Events = append(obj.Events, ev)
 		}

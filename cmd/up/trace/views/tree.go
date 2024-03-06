@@ -75,7 +75,7 @@ func (t *Tree) AddScroller(ss ...Scroller) {
 
 func (t *Tree) ObjectAt(line int) *model.Object {
 	fieldValue := reflect.ValueOf(t.TreeView).Elem().FieldByName("nodes")
-	nodes := unsafe.Slice((**tview.TreeNode)(fieldValue.UnsafePointer()), fieldValue.Len())
+	nodes := unsafe.Slice((**tview.TreeNode)(fieldValue.UnsafePointer()), fieldValue.Len()) // nolint:gosec // no way around this
 
 	n := line + t.GetScrollOffset()
 	if n < 0 || n >= len(nodes) {
@@ -88,10 +88,10 @@ func (t *Tree) ObjectAt(line int) *model.Object {
 	return ref.(*model.Object)
 }
 
-func (t *Tree) InputHandler() func(event *tcell.EventKey, setFocus func(p tview.Primitive)) {
+func (t *Tree) InputHandler() func(event *tcell.EventKey, setFocus func(p tview.Primitive)) { // nolint:gocyclo // TODO: split up
 	delegate := t.TreeView.InputHandler()
 
-	return t.WrapInputHandler(func(event *tcell.EventKey, setFocus func(p tview.Primitive)) {
+	return t.WrapInputHandler(func(event *tcell.EventKey, setFocus func(p tview.Primitive)) { // nolint:gocyclo // TODO: split up
 		n := t.TreeView.GetCurrentNode()
 		if n == nil {
 			return

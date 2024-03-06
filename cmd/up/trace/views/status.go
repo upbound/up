@@ -70,7 +70,7 @@ var cell = tview.TableCell{
 	Transparent:     true,
 }
 
-func (t statusContent) GetCell(row, column int) *tview.TableCell {
+func (t statusContent) GetCell(row, column int) *tview.TableCell { // nolint:gocyclo // TODO: split up
 	o := t.scrolling.ObjectAt(row - t.scrolling.GetScrollOffset())
 	if o == nil {
 		cell.Text = ""
@@ -148,6 +148,4 @@ func (t statusContent) InsertColumn(column int) {
 }
 
 func (t statusContent) Clear() {
-	//TODO implement me
-	panic("implement me")
 }

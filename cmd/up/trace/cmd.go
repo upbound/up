@@ -47,7 +47,7 @@ var nativeKinds = sets.New("poddisruptionbudgets", "rolebindings", "endpoints", 
 type Cmd struct {
 	ControlPlane string `short:"c" long:"controlplane" env:"UPBOUND_CONTROLPLANE" description:"Controlplane to query"`
 	Group        string `short:"g" long:"group" env:"UPBOUND_GROUP" description:"Group to query"`
-	Namespace    string `short:"n" long:"namespace" env:"UPBOUND_NAMESPACE" description:"Namespace of objects to query"`
+	Namespace    string `short:"n" long:"namespace" env:"UPBOUND_NAMESPACE" description:"Namespace of objects to query (defaults to all namespaces)"`
 
 	Kind string `arg:"" description:"Kind to trace, accepts the 'KIND[.GROUP][/NAME]' format."`
 	Name string `arg:"" description:"Name to trace" optional:""`
@@ -71,7 +71,7 @@ func (c *Cmd) BeforeApply() error {
 	return nil
 }
 
-func (c *Cmd) Run(ctx context.Context) error {
+func (c *Cmd) Run(ctx context.Context) error { // nolint:gocyclo // TODO: split up
 	cfg, err := config.GetConfig()
 	if err != nil {
 		return fmt.Errorf("failed to get kubeconfig: %w", err)
@@ -259,7 +259,7 @@ func getGroupKindName(kind, name string) (string, string, string, error) {
 	var gk string
 	switch length {
 	case 1:
-		gk, name = ss[0], name
+		gk = ss[0]
 	case 2:
 		// If a name is separately provided, error out
 		if name != "" {

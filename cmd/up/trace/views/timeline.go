@@ -58,7 +58,7 @@ func (t *TimeLine) GetOffset() int {
 	return t.offset
 }
 
-func (t *TimeLine) Draw(screen tcell.Screen) {
+func (t *TimeLine) Draw(screen tcell.Screen) { // nolint:gocyclo // TODO: splitup
 	t.Box.Draw(screen)
 
 	rightTS := t.model.TimeLine.FixedTime
@@ -101,11 +101,12 @@ func (t *TimeLine) Draw(screen tcell.Screen) {
 		}
 		ts := t.mapY(x, x0, w)
 		for ; x <= min(deleted-1, x0+w-1); x++ {
-			if !o.IsSynced(ts) {
+			switch {
+			case !o.IsSynced(ts):
 				screen.SetContent(x, y, ' ', nil, s.NotSynced)
-			} else if !o.IsReady(ts) {
+			case !o.IsReady(ts):
 				screen.SetContent(x, y, ' ', nil, s.NotReady)
-			} else {
+			default:
 				screen.SetContent(x, y, ' ', nil, s.Ready)
 			}
 			ts = ts.Add(t.model.TimeLine.Scale / 10)
