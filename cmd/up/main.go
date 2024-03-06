@@ -35,6 +35,8 @@ import (
 	"github.com/upbound/up/cmd/up/repository"
 	"github.com/upbound/up/cmd/up/robot"
 	"github.com/upbound/up/cmd/up/space"
+	"github.com/upbound/up/cmd/up/trace"
+	tviewtemplate "github.com/upbound/up/cmd/up/tview-template"
 	"github.com/upbound/up/cmd/up/upbound"
 	"github.com/upbound/up/cmd/up/uxp"
 	"github.com/upbound/up/cmd/up/xpkg"
@@ -137,10 +139,12 @@ func (a *alpha) BeforeReset(ctx *kong.Context) error { //nolint:unparam
 type alpha struct {
 	// For now, we maintain compatibility for systems that may still use the alpha variant.
 	// This nudges users towards the stable variant when they attempt to emit help.
-	ControlPlane controlplane.Cmd `cmd:"" hidden:"" name:"controlplane" aliases:"ctp" help:"Interact with control planes of the current profile, both in the cloud and in a local space."`
-	Upbound      upbound.Cmd      `cmd:"" maturity:"alpha" help:"Interact with Upbound."`
-	XPKG         xpkg.Cmd         `cmd:"" maturity:"alpha" help:"Interact with UXP packages."`
-	Migration    migration.Cmd    `cmd:"" maturity:"alpha" help:"Migrate control planes to Upbound Managed Control Planes."`
+	ControlPlane  controlplane.Cmd  `cmd:"" hidden:"" name:"controlplane" aliases:"ctp" help:"Interact with control planes of the current profile, both in the cloud and in a local space."`
+	Upbound       upbound.Cmd       `cmd:"" maturity:"alpha" help:"Interact with Upbound."`
+	XPKG          xpkg.Cmd          `cmd:"" maturity:"alpha" help:"Interact with UXP packages."`
+	Migration     migration.Cmd     `cmd:"" maturity:"alpha" help:"Migrate control planes to Upbound Managed Control Planes."`
+	Trace         trace.Cmd         `cmd:"" maturity:"alpha" hidden:"" help:"Trace a Crossplane resource."`
+	TviewTemplate tviewtemplate.Cmd `cmd:"" maturity:"alpha" hidden:"" help:"TView example."`
 
 	WebLogin login.LoginWebCmd `cmd:"" maturity:"alpha" help:"Use web browser to login to up cli."`
 }
