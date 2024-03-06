@@ -18,18 +18,21 @@ import (
 	"bytes"
 	"context"
 	"fmt"
+	"strings"
 	"time"
 
 	"github.com/alecthomas/chroma/quick"
 	"github.com/gdamore/tcell/v2"
 	"github.com/rivo/tview"
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
+	"k8s.io/apimachinery/pkg/util/duration"
 	"sigs.k8s.io/yaml"
 
-	"github.com/upbound/up/cmd/up/trace/dialogs"
 	"github.com/upbound/up/cmd/up/trace/model"
 	queryv1alpha1 "github.com/upbound/up/cmd/up/trace/query/v1alpha1"
 	"github.com/upbound/up/cmd/up/trace/views"
+	"github.com/upbound/up/internal/tview/dialogs"
+	upviews "github.com/upbound/up/internal/tview/views"
 )
 
 // App represents main application struct.
@@ -44,7 +47,7 @@ type App struct {
 	details  *views.Details
 
 	grid     *tview.Grid
-	topLevel *views.TopLevel
+	topLevel *upviews.TopLevel
 
 	pollFn  func(group, kind, name string) (*queryv1alpha1.QueryResponse, error)
 	fetchFn func(id string) (*unstructured.Unstructured, error)
@@ -78,7 +81,45 @@ func NewApp(title string, group, kind, name string, pollFn func(kind, group, nam
 		AddItem(app.timeline, 1, 1, 1, 1, 0, 0, true).
 		AddItem(app.details, 2, 0, 1, 3, 0, 0, false)
 	app.Unzoom()
-	app.topLevel = views.NewTopLevel(title, &app.model, app.grid, app.TopLevelInputHandler)
+	app.topLevel = upviews.NewTopLevel(title, app.grid, app.Application).
+		SetTitles(
+			upviews.GridTitle{Col: 1, Row: 1, Fn: func(screen tcell.Screen, x0, y, w int) {
+				ts := app.model.TimeLine.Scale
+				if !app.model.TimeLine.FixedTime.IsZero() {
+					ts += time.Since(app.model.TimeLine.FixedTime.Truncate(app.model.TimeLine.Scale / 10))
+				}
+				for x := x0 + w - 14; x > x0-4; x -= 10 {
+					tview.Print(screen, duration.HumanDuration(ts), x, y, 9, tview.AlignCenter, tcell.ColorDarkGray)
+					ts += app.model.TimeLine.Scale
+				}
+				if app.model.TimeLine.FixedTime.IsZero() {
+					tview.Print(screen, "Now", x0+w-2, y, 3, tview.AlignLeft, tcell.ColorDarkGray)
+				} else {
+					screen.SetContent(x0+w, y, '>', nil, tcell.StyleDefault.Foreground(tcell.ColorDarkGray))
+				}
+			}},
+			upviews.GridTitle{Col: 2, Row: 1, Text: "── Progress ── Synced Ready  Message ", Color: tcell.ColorDarkGray, Align: tview.AlignLeft},
+			upviews.GridTitle{Col: 0, Row: 2, Text: " Details ", Color: tcell.ColorDarkGray, Align: tview.AlignCenter},
+			upviews.GridTitle{Col: 0, Row: 2, Fn: func(screen tcell.Screen, x, y, w int) {
+				var b strings.Builder
+				if app.model.Tree.AutoCollapse {
+					b.WriteString("AutoCollapse ")
+				}
+				if app.model.Zoomed {
+					b.WriteString("Zoomed ")
+				}
+
+				if b.Len() > 0 {
+					tview.Print(screen, " [::b]"+b.String(), x, y, w, tview.AlignRight, tcell.ColorYellow)
+				}
+			}},
+		).
+		SetSubTitles(upviews.GridTitle{Col: 0, Row: 2, Fn: func(screen tcell.Screen, x, y, w int) {
+			err := app.model.Error.Load().(string)
+			tview.Print(screen, err, x, y, w, tview.AlignCenter, tcell.ColorHotPink)
+		}}).
+		SetCommands("Help", "Kind", "View", "", "", "", "", "", "", "Quit").
+		SetDelegateInputHandler(app.TopLevelInputHandler)
 	app.Application.SetRoot(app.topLevel, true)
 
 	return app
@@ -97,31 +138,19 @@ func (a *App) Unzoom() {
 	a.model.Zoomed = false
 }
 
-func (a *App) TopLevelInputHandler(event *tcell.EventKey, setFocus func(p tview.Primitive)) {
-	if a.escPending && event.Modifiers() == tcell.ModNone {
-		// turn esc-0 => F10, esc-1 => F1, etc.
-		switch event.Rune() {
-		case '0':
-			event = tcell.NewEventKey(tcell.KeyF10, 0, tcell.ModNone)
-		case '1', '2', '3', '4', '5', '6', '7', '8', '9':
-			event = tcell.NewEventKey(tcell.KeyF1+tcell.Key(event.Rune()-'1'), 0, tcell.ModNone)
-		}
-	}
-	a.escPending = false
-
+func (a *App) TopLevelInputHandler(event *tcell.EventKey, setFocus func(p tview.Primitive)) bool {
 	switch event.Key() {
 	case tcell.KeyEscape:
 		if a.model.Zoomed {
 			a.Unzoom()
-		} else {
-			a.escPending = true
+			return true
 		}
 	case tcell.KeyLeft:
 		if a.model.TimeLine.FixedTime.IsZero() {
 			a.model.TimeLine.FixedTime = time.Now()
 		}
 		a.model.TimeLine.FixedTime = a.model.TimeLine.FixedTime.Add(-a.model.TimeLine.Scale / 10)
-		return
+		return true
 	case tcell.KeyRight:
 		if a.model.TimeLine.FixedTime.IsZero() {
 			a.model.TimeLine.FixedTime = time.Now()
@@ -130,24 +159,20 @@ func (a *App) TopLevelInputHandler(event *tcell.EventKey, setFocus func(p tview.
 		if a.model.TimeLine.FixedTime.After(time.Now()) {
 			a.model.TimeLine.FixedTime = time.Time{} // back to auto-scrolling
 		}
-		return
+		return true
 	case tcell.KeyEnd:
 		a.model.TimeLine.FixedTime = time.Time{}
 	case tcell.KeyRune:
 		switch event.Rune() {
 		case 'q':
-			dialogs.Modal(a.Application, a.topLevel, dialogs.NewConfirmDialog().
-				SetTitle("Quit").
-				SetText("Do you want to quit?").
-				SetSelectedFunc(a.Stop).
-				SetCancelFunc(func() { a.SetFocus(a.topLevel) }).
-				Display())
+			a.topLevel.InteractiveQuit()
 		case 'f':
 			if a.model.Zoomed {
 				a.Unzoom()
 			} else {
 				a.Zoom()
 			}
+			return true
 		case 'T':
 			for i, scale := range model.Scales {
 				if scale == a.model.TimeLine.Scale {
@@ -157,6 +182,7 @@ func (a *App) TopLevelInputHandler(event *tcell.EventKey, setFocus func(p tview.
 					break
 				}
 			}
+			return true
 		case 't':
 			for i, scale := range model.Scales {
 				if scale == a.model.TimeLine.Scale {
@@ -166,6 +192,7 @@ func (a *App) TopLevelInputHandler(event *tcell.EventKey, setFocus func(p tview.
 					break
 				}
 			}
+			return true
 		}
 	case tcell.KeyF2:
 		kind := *a.model.Kind.Load()
@@ -181,7 +208,7 @@ func (a *App) TopLevelInputHandler(event *tcell.EventKey, setFocus func(p tview.
 			s += "/" + name
 		}
 
-		dialogs.Modal(a.Application, a.topLevel, dialogs.NewSimpleInputDialog(s).
+		dialogs.ShowModal(a.Application, dialogs.NewSimpleInputDialog(s).
 			SetTitle("Kind").
 			SetLabel("Kind").
 			SetCancelFunc(func() { a.SetFocus(a.topLevel) }).
@@ -198,6 +225,8 @@ func (a *App) TopLevelInputHandler(event *tcell.EventKey, setFocus func(p tview.
 				}
 			}).
 			Display())
+
+		return true
 	case tcell.KeyF3:
 		n := a.tree.GetCurrentNode()
 		if n == nil {
@@ -205,13 +234,13 @@ func (a *App) TopLevelInputHandler(event *tcell.EventKey, setFocus func(p tview.
 		}
 		ref := n.GetReference()
 		if ref == nil {
-			return
+			return false
 		}
 		o := ref.(*model.Object)
 
 		obj, err := a.fetchFn(o.Id)
 		if err != nil {
-			return
+			return false
 		}
 
 		txt := views.NewYAML(o, renderYAML(obj)).
@@ -219,12 +248,12 @@ func (a *App) TopLevelInputHandler(event *tcell.EventKey, setFocus func(p tview.
 			SetDoneFunc(func(key tcell.Key) { a.SetRoot(a.topLevel, true) })
 		a.ResizeToFullScreen(txt)
 		a.SetRoot(txt, true)
-	case tcell.KeyF10:
-		a.Stop()
+
+		return true
 	default:
 	}
 
-	a.grid.InputHandler()(event, setFocus)
+	return false
 }
 
 func (a *App) Run(ctx context.Context) error {

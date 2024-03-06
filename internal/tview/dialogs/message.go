@@ -51,10 +51,11 @@ const (
 // NewMessageDialog returns new message dialog primitive.
 func NewMessageDialog(text string) *MessageDialog {
 	dialog := &MessageDialog{
-		Box:      tview.NewBox(),
-		infoType: tview.NewInputField(),
-		display:  false,
-		message:  text,
+		Box:           tview.NewBox(),
+		infoType:      tview.NewInputField(),
+		display:       false,
+		message:       text,
+		cancelHandler: func() {},
 	}
 
 	dialog.infoType.SetBackgroundColor(style.DialogBgColor)
@@ -102,8 +103,9 @@ func NewMessageDialog(text string) *MessageDialog {
 }
 
 // Display displays this primitive.
-func (d *MessageDialog) Display() {
+func (d *MessageDialog) Display() *MessageDialog {
 	d.display = true
+	return d
 }
 
 // IsDisplay returns true if primitive is shown.
@@ -119,8 +121,9 @@ func (d *MessageDialog) Hide() {
 }
 
 // SetTitle sets input dialog title.
-func (d *MessageDialog) SetTitle(title string) {
+func (d *MessageDialog) SetTitle(title string) *MessageDialog {
 	d.layout.SetTitle(strings.ToUpper(title))
+	return d
 }
 
 // SetText sets message dialog text messages.
