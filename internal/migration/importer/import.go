@@ -47,6 +47,10 @@ import (
 	"github.com/upbound/up/internal/upterm"
 )
 
+const (
+	stepFailed = "Failed!"
+)
+
 var (
 	baseResources = []string{
 		// Core Kubernetes resources
@@ -119,7 +123,7 @@ func (im *ControlPlaneStateImporter) Import(ctx context.Context) error { // noli
 		im.fs = &afero.Afero{Fs: afero.NewMemMapFs()}
 
 		if err := im.unarchive(ctx, *im.fs); err != nil {
-			s.Fail(unarchiveMsg + "Failed!")
+			s.Fail(unarchiveMsg + stepFailed)
 			return errors.Wrap(err, "cannot unarchive export archive")
 		}
 	}
@@ -140,7 +144,7 @@ func (im *ControlPlaneStateImporter) Import(ctx context.Context) error { // noli
 	for i, gr := range baseResources {
 		count, err := r.ImportResources(ctx, gr, false)
 		if err != nil {
-			s.Fail(importBaseMsg + "Failed!")
+			s.Fail(importBaseMsg + stepFailed)
 			return errors.Wrapf(err, "cannot import %q resources", gr)
 		}
 		s.UpdateText(fmt.Sprintf("(%d / %d) Importing %s...", i, len(baseResources), gr))
@@ -158,7 +162,7 @@ func (im *ControlPlaneStateImporter) Import(ctx context.Context) error { // noli
 	waitXRDsMsg := "Waiting for XRDs... "
 	s, _ = upterm.CheckmarkSuccessSpinner.Start(waitXRDsMsg)
 	if err := im.waitForConditions(ctx, s, schema.GroupKind{Group: "apiextensions.crossplane.io", Kind: "CompositeResourceDefinition"}, []xpv1.ConditionType{"Established"}); err != nil {
-		s.Fail(waitXRDsMsg + "Failed!")
+		s.Fail(waitXRDsMsg + stepFailed)
 		return errors.Wrap(err, "there are unhealthy CompositeResourceDefinitions")
 	}
 	s.Success(waitXRDsMsg + "Established! ⏳")
@@ -171,7 +175,7 @@ func (im *ControlPlaneStateImporter) Import(ctx context.Context) error { // noli
 		{Group: "pkg.crossplane.io", Kind: "Configuration"},
 	} {
 		if err := im.waitForConditions(ctx, s, k, []xpv1.ConditionType{"Installed", "Healthy"}); err != nil {
-			s.Fail(waitPkgsMsg + "Failed!")
+			s.Fail(waitPkgsMsg + stepFailed)
 			return errors.Wrapf(err, "there are unhealthy %qs", k.Kind)
 		}
 	}
@@ -186,7 +190,7 @@ func (im *ControlPlaneStateImporter) Import(ctx context.Context) error { // noli
 		{Group: "pkg.crossplane.io", Kind: "ConfigurationRevision"},
 	} {
 		if err := im.waitForConditions(ctx, s, k, []xpv1.ConditionType{"Healthy"}); err != nil {
-			s.Fail(waitPkgsMsg + "Failed!")
+			s.Fail(waitPkgsMsg + stepFailed)
 			return errors.Wrapf(err, "there are unhealthy %qs", k.Kind)
 		}
 	}
@@ -202,7 +206,7 @@ func (im *ControlPlaneStateImporter) Import(ctx context.Context) error { // noli
 	s, _ = upterm.CheckmarkSuccessSpinner.Start(importRemainingMsg)
 	grs, err := im.fs.ReadDir("/")
 	if err != nil {
-		s.Fail(importRemainingMsg + "Failed!")
+		s.Fail(importRemainingMsg + stepFailed)
 		return errors.Wrap(err, "cannot list group resources")
 	}
 	remainingCounts := make(map[string]int, len(grs))

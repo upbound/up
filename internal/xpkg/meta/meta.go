@@ -19,7 +19,7 @@ import (
 	"errors"
 
 	v1 "k8s.io/apimachinery/pkg/apis/meta/v1"
-	"k8s.io/utils/pointer"
+	"k8s.io/utils/ptr"
 	"sigs.k8s.io/yaml"
 
 	metav1 "github.com/crossplane/crossplane/apis/pkg/meta/v1"
@@ -89,7 +89,7 @@ func NewProviderXPkg(c xpkg.InitContext) ([]byte, error) {
 		},
 		Spec: metav1.ProviderSpec{
 			Controller: metav1.ControllerSpec{
-				Image: pointer.String(c.CtrlImage),
+				Image: ptr.To(c.CtrlImage),
 			},
 		},
 	}

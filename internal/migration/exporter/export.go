@@ -39,6 +39,10 @@ import (
 	"github.com/upbound/up/internal/upterm"
 )
 
+const (
+	stepFailed = "Failed!"
+)
+
 // Options for the exporter.
 type Options struct {
 	// OutputArchive is the path to the archive file to be created.
@@ -113,7 +117,7 @@ func (e *ControlPlaneStateExporter) Export(ctx context.Context) error { // nolin
 			return nil
 		})
 		if err != nil {
-			s.Fail(pauseMsg + "Failed!")
+			s.Fail(pauseMsg + stepFailed)
 			return errors.Wrap(err, "cannot pause managed resources")
 		}
 		s.Success(pauseMsg + fmt.Sprintf("%d resources paused! ⏸️", count))
@@ -124,7 +128,7 @@ func (e *ControlPlaneStateExporter) Export(ctx context.Context) error { // nolin
 	s, _ := upterm.CheckmarkSuccessSpinner.Start(scanMsg)
 	crdList, err := fetchAllCRDs(ctx, e.crdClient)
 	if err != nil {
-		s.Fail(scanMsg + "Failed!")
+		s.Fail(scanMsg + stepFailed)
 		return errors.Wrap(err, "cannot fetch CRDs")
 	}
 	exportList := make([]apiextensionsv1.CustomResourceDefinition, 0, len(crdList))
@@ -150,7 +154,7 @@ func (e *ControlPlaneStateExporter) Export(ctx context.Context) error { // nolin
 	for i, crd := range exportList {
 		gvr, err := e.customResourceGVR(crd)
 		if err != nil {
-			s.Fail(exportCRsMsg + "Failed!")
+			s.Fail(exportCRsMsg + stepFailed)
 			return errors.Wrapf(err, "cannot get GVR for %q", crd.GetName())
 		}
 
@@ -176,7 +180,7 @@ func (e *ControlPlaneStateExporter) Export(ctx context.Context) error { // nolin
 		// well-known directory structure.
 		count, err := exporter.ExportResources(ctx, gvr)
 		if err != nil {
-			s.Fail(exportCRsMsg + "Failed!")
+			s.Fail(exportCRsMsg + stepFailed)
 			return errors.Wrapf(err, "cannot export resources for %q", crd.GetName())
 		}
 		crCounts[gvr.GroupResource().String()] = count
@@ -208,7 +212,7 @@ func (e *ControlPlaneStateExporter) Export(ctx context.Context) error { // nolin
 
 		count, err := exporter.ExportResources(ctx, gvr)
 		if err != nil {
-			s.Fail(exportNativeMsg + "Failed!")
+			s.Fail(exportNativeMsg + stepFailed)
 			return errors.Wrapf(err, "cannot export resources for %q", r)
 		}
 		nativeCounts[gvr.Resource] = count
@@ -234,7 +238,7 @@ func (e *ControlPlaneStateExporter) Export(ctx context.Context) error { // nolin
 	archiveMsg := "Archiving exported state... "
 	s, _ = upterm.CheckmarkSuccessSpinner.Start(archiveMsg)
 	if err = e.archive(ctx, fs, tmpDir); err != nil {
-		s.Fail(archiveMsg + "Failed!")
+		s.Fail(archiveMsg + stepFailed)
 		return errors.Wrap(err, "cannot archive exported state")
 	}
 	s.Success(archiveMsg + fmt.Sprintf("archived to %q! 📦", e.options.OutputArchive))

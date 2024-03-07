@@ -35,7 +35,7 @@ import (
 	apiextv1 "k8s.io/apiextensions-apiserver/pkg/apis/apiextensions/v1"
 	apimetav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
-	"k8s.io/utils/pointer"
+	"k8s.io/utils/ptr"
 	"sigs.k8s.io/yaml"
 
 	"github.com/upbound/up/internal/xpkg"
@@ -118,7 +118,7 @@ func TestResolveTransitiveDependencies(t *testing.T) {
 							MetaSpec: metav1.MetaSpec{
 								DependsOn: []metav1.Dependency{
 									{
-										Provider: pointer.String("crossplane/provider-aws-dependency"),
+										Provider: ptr.To("crossplane/provider-aws-dependency"),
 										Version:  "v1.10.0",
 									},
 								},
