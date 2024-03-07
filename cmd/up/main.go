@@ -25,6 +25,7 @@ import (
 	"github.com/pterm/pterm"
 	"github.com/willabides/kongplete"
 
+	"github.com/upbound/up/cmd/up/common"
 	"github.com/upbound/up/cmd/up/configuration"
 	"github.com/upbound/up/cmd/up/configuration/template"
 	"github.com/upbound/up/cmd/up/controlplane"
@@ -58,7 +59,22 @@ type versionFlag bool
 // BeforeApply indicates that we want to execute the logic before running any
 // commands.
 func (v versionFlag) BeforeApply(ctx *kong.Context) error { // nolint:unparam
-	fmt.Fprintln(ctx.Stdout, version.GetVersion())
+	fmt.Fprintln(ctx.Stdout, "Client Version: "+version.GetVersion())
+
+	if vxp, err := common.FetchCrossplaneVersion(); err != nil {
+		ctx.Exit(1)
+		return err
+	} else if vxp != "" {
+		fmt.Fprintln(ctx.Stdout, "Server Version: "+vxp)
+	}
+
+	if sc, err := common.FetchSpacesVersion(); err != nil {
+		ctx.Exit(1)
+		return err
+	} else if sc != "" {
+		fmt.Fprintln(ctx.Stdout, "Spaces Controller Version: "+sc)
+	}
+
 	ctx.Exit(0)
 	return nil
 }
