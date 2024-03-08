@@ -20,6 +20,8 @@ import (
 
 	"github.com/crossplane/crossplane-runtime/pkg/errors"
 	v1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/runtime/schema"
+	"k8s.io/client-go/dynamic"
 	appsv1 "k8s.io/client-go/kubernetes/typed/apps/v1"
 
 	"github.com/upbound/up/internal/migration/meta/v1alpha1"
@@ -37,7 +39,7 @@ func CollectInfo(ctx context.Context, appsClient appsv1.DeploymentsGetter) (*v1a
 			xp.Namespace = d.Namespace
 			if d.Labels != nil {
 				xp.Version = d.Labels["app.kubernetes.io/version"]
-				xp.Distribution = d.Labels["app.kubernetes.io/instance"]
+				xp.Distribution = d.Labels["helm.sh/chart"]
 			}
 			for _, c := range d.Spec.Template.Spec.Containers {
 				if c.Name == "crossplane" || c.Name == "universal-crossplane" {
@@ -53,4 +55,25 @@ func CollectInfo(ctx context.Context, appsClient appsv1.DeploymentsGetter) (*v1a
 		}
 	}
 	return &xp, nil
+}
+
+func CollectPackageInfo(ctx context.Context, dynamicClient dynamic.Interface, gvr schema.GroupVersionResource) (*[]v1alpha1.PackageInfo, error) {
+	packages, err := dynamicClient.Resource(gvr).Namespace("").List(ctx, v1.ListOptions{})
+	if err != nil {
+		panic(err.Error())
+	}
+
+	packageInfos := make([]v1alpha1.PackageInfo, 0, len(packages.Items))
+	for _, pkg := range packages.Items {
+		spec, _ := pkg.UnstructuredContent()["spec"].(map[string]interface{})
+		packageName, _ := spec["package"].(string)
+
+		pp := v1alpha1.PackageInfo{
+			Name:    pkg.GetName(),
+			Package: packageName,
+		}
+		packageInfos = append(packageInfos, pp)
+	}
+
+	return &packageInfos, nil
 }
