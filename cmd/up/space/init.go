@@ -84,6 +84,7 @@ const (
 	errFmtCreateNamespace     = "failed to create namespace %q"
 	errUpdateConfig           = "unable to update config file"
 	errUpdateProfile          = "unable to update profile"
+	errCreateSpace            = "failed to create space"
 )
 
 // initCmd installs Upbound Spaces.

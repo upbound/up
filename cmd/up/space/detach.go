@@ -16,12 +16,22 @@ package space
 
 import (
 	"context"
+	"errors"
+	"fmt"
 	"net/url"
+	"strings"
 
 	"github.com/alecthomas/kong"
+	"github.com/google/uuid"
 	"github.com/pterm/pterm"
+	"helm.sh/helm/v3/pkg/storage/driver"
+	kerrors "k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/client-go/kubernetes"
 
+	sdkerrs "github.com/upbound/up-sdk-go/errors"
+	"github.com/upbound/up-sdk-go/service/robots"
+	"github.com/upbound/up-sdk-go/service/spaces"
+	"github.com/upbound/up-sdk-go/service/tokens"
 	"github.com/upbound/up/internal/install/helm"
 	"github.com/upbound/up/internal/upbound"
 	"github.com/upbound/up/internal/upterm"
@@ -50,7 +60,14 @@ func (c *detachCmd) AfterApply(kongCtx *kong.Context) error {
 	if err != nil {
 		return err
 	}
+	cfg, err := upCtx.BuildSDKConfig()
+	if err != nil {
+		return err
+	}
 	kongCtx.Bind(upCtx)
+	kongCtx.Bind(tokens.NewClient(cfg))
+	kongCtx.Bind(robots.NewClient(cfg))
+	kongCtx.Bind(spaces.NewClient(cfg))
 
 	kubeconfig := c.Kube.GetConfig()
 
@@ -79,15 +96,65 @@ func (c *detachCmd) AfterApply(kongCtx *kong.Context) error {
 }
 
 // Run executes the install command.
-func (c *detachCmd) Run(ctx context.Context, kClient *kubernetes.Clientset, mgr *helm.Installer) error {
-	detachSpinner, _ := upterm.CheckmarkSuccessSpinner.Start("Removing agent from Space...")
-	if err := mgr.Uninstall(); err != nil {
+func (c *detachCmd) Run(ctx context.Context, kClient *kubernetes.Clientset, mgr *helm.Installer, sc *spaces.Client, rc *robots.Client, tc *tokens.Client) (rErr error) {
+	detachSpinner, err := upterm.CheckmarkSuccessSpinner.Start("Removing agent from Space...")
+	if err != nil {
 		return err
 	}
+	defer func() {
+		if rErr != nil {
+			detachSpinner.Fail(rErr)
+		}
+	}()
+	t, err := getTokenSecret(ctx, kClient, agentNs, agentSecret)
+	if kerrors.IsNotFound(err) {
+		detachSpinner.InfoPrinter.Printfln("Space is not attached, please run %q to attach it first", "up space attach")
+	}
+	if err != nil {
+		return err
+	}
+	if err := c.deleteAgentToken(ctx, detachSpinner.InfoPrinter, tc, t.Data); err != nil {
+		return err
+	}
+	if err := c.deleteGeneratedSpace(ctx, detachSpinner.InfoPrinter, sc, t.Data); err != nil {
+		return err
+	}
+	detachSpinner.InfoPrinter.Println("Uninstalling connect agent...")
+	if err := mgr.Uninstall(); err != nil && !errors.Is(err, driver.ErrReleaseNotFound) {
+		return err
+	}
+	if err := deleteTokenSecret(ctx, detachSpinner.InfoPrinter, kClient, agentNs, agentSecret); err != nil {
+		return err
+	}
+	detachSpinner.Success("Space detached")
+	return nil
+}
 
-	// if err := kClient.CoreV1().Namespaces().Delete(ctx, agentNs, v1.DeleteOptions{}); err != nil {
-	// 	return err
-	// }
-	detachSpinner.Success()
+func (c *detachCmd) deleteAgentToken(ctx context.Context, p pterm.TextPrinter, tc *tokens.Client, data map[string][]byte) error {
+	if v, ok := data[keyTokenID]; ok {
+		tid := uuid.UUID(v)
+		p.Printfln("Deleting agent Token %q...", tid)
+		if err := tc.Delete(ctx, tid); err != nil && !sdkerrs.IsNotFound(err) {
+			return err
+		}
+		p.Printfln("Token %q deleted", tid)
+	}
+	return nil
+}
+
+func (c *detachCmd) deleteGeneratedSpace(ctx context.Context, p pterm.TextPrinter, sc *spaces.Client, data map[string][]byte) error {
+	if v, ok := data[keyGeneratedSpace]; ok {
+		sid := string(v)
+		p.Println("Deleting generated Space %q...", sid)
+		parts := strings.Split(sid, "/")
+		if len(parts) != 2 || parts[0] == "" || parts[1] == "" {
+			return fmt.Errorf("unable to determine organization and space name from %q", sid)
+		}
+		ns, name := parts[0], parts[1]
+		if err := sc.Delete(ctx, ns, name, nil); err != nil && !kerrors.IsNotFound(err) {
+			return err
+		}
+		p.Printfln("Space %q deleted", sid)
+	}
 	return nil
 }
