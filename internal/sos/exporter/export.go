@@ -165,7 +165,7 @@ func (e *ControlPlaneStateExporter) Export(ctx context.Context) error { // nolin
 	}
 	s.Success(archiveMsg + fmt.Sprintf("archived to %q! 📦", e.options.OutputArchive))
 
-	pterm.Println("\nSuccessfully exported sos report!")
+	pterm.Println("\nSuccessfully exported SOS Report!")
 	return nil
 }
 
