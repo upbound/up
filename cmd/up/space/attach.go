@@ -18,6 +18,7 @@ import (
 	"context"
 	"fmt"
 	"net/url"
+	"path"
 	"strconv"
 
 	"github.com/alecthomas/kong"
@@ -27,27 +28,31 @@ import (
 	corev1 "k8s.io/api/core/v1"
 	kerrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
-	"k8s.io/apiserver/pkg/storage/names"
-	"k8s.io/client-go/dynamic"
 	"k8s.io/client-go/kubernetes"
 
+	upboundv1alpha1 "github.com/upbound/up-sdk-go/apis/upbound/v1alpha1"
 	"github.com/upbound/up-sdk-go/service/accounts"
 	"github.com/upbound/up-sdk-go/service/organizations"
 	"github.com/upbound/up-sdk-go/service/robots"
+	"github.com/upbound/up-sdk-go/service/spaces"
 	"github.com/upbound/up-sdk-go/service/tokens"
 	"github.com/upbound/up/cmd/up/robot"
-	"github.com/upbound/up/cmd/up/robot/token"
-	"github.com/upbound/up/cmd/up/space/prerequisites"
-	"github.com/upbound/up/internal/config"
-	"github.com/upbound/up/internal/install"
+	"github.com/upbound/up/internal/cleanup"
 	"github.com/upbound/up/internal/install/helm"
 	"github.com/upbound/up/internal/upbound"
 	"github.com/upbound/up/internal/upterm"
 )
 
 const (
-	agentChart = "agent"
-	agentNs    = "upbound-system"
+	agentChart  = "agent"
+	agentNs     = "upbound-system"
+	agentSecret = "space-token"
+
+	keySpace          = "space"
+	keyToken          = "token"
+	keyRobotID        = "robotID"
+	keyTokenID        = "tokenID"
+	keyGeneratedSpace = "generatedSpace"
 
 	// TODO(tnthornton) these can probably be replaced by our public chart
 	// museum. This would allow us to use wildcards like mxp-connector.
@@ -61,15 +66,6 @@ const (
 type attachCmd struct {
 	Upbound upbound.Flags     `embed:""`
 	Kube    upbound.KubeFlags `embed:""`
-
-	helmMgr install.Manager
-	prereqs *prerequisites.Manager
-	parser  install.ParameterParser
-	kClient kubernetes.Interface
-	dClient dynamic.Interface
-	quiet   config.QuietFlag
-
-	ng names.NameGenerator
 
 	Space string `arg:"" optional:"" help:"Name of the Upbound Space. If name is not a supplied, one is generated."`
 	Token string `name:"robot-token" optional:"" help:"The Upbound robot token contents used to authenticate the connection."`
@@ -95,6 +91,7 @@ func (c *attachCmd) AfterApply(kongCtx *kong.Context) error {
 	kongCtx.Bind(organizations.NewClient(cfg))
 	kongCtx.Bind(robots.NewClient(cfg))
 	kongCtx.Bind(tokens.NewClient(cfg))
+	kongCtx.Bind(spaces.NewClient(cfg))
 
 	if err := c.Kube.AfterApply(); err != nil {
 		return err
@@ -110,13 +107,8 @@ func (c *attachCmd) AfterApply(kongCtx *kong.Context) error {
 	if err != nil {
 		return err
 	}
-	c.kClient = kClient
+	kongCtx.Bind(kClient)
 
-	dClient, err := dynamic.NewForConfig(kubeconfig)
-	if err != nil {
-		return err
-	}
-	c.dClient = dClient
 	mgr, err := helm.NewManager(kubeconfig,
 		agentChart,
 		registryURL,
@@ -127,97 +119,229 @@ func (c *attachCmd) AfterApply(kongCtx *kong.Context) error {
 	if err != nil {
 		return err
 	}
-	c.helmMgr = mgr
-
-	c.ng = names.SimpleNameGenerator
+	kongCtx.Bind(mgr)
 
 	return nil
 }
 
 // Run executes the install command.
-func (c *attachCmd) Run(ctx context.Context, p pterm.TextPrinter, upCtx *upbound.Context, ac *accounts.Client, oc *organizations.Client, tc *tokens.Client, rc *robots.Client) error {
-	if c.Space == "" {
-		c.Space = c.ng.GenerateName("space-")
+func (c *attachCmd) Run(ctx context.Context, mgr *helm.Installer, kClient *kubernetes.Clientset, upCtx *upbound.Context, ac *accounts.Client, oc *organizations.Client, tc *tokens.Client, rc *robots.Client, sc *spaces.Client) (rErr error) {
+	var a *accounts.AccountResponse
+
+	attachSpinner, err := upterm.CheckmarkSuccessSpinner.Start("Connecting space to Upbound Console...")
+	if err != nil {
+		return err
 	}
-	fmt.Printf("Using Space name: %s\n", c.Space)
+	cl := cleanup.New()
+	defer cl.OnError(&rErr)
+	defer func() {
+		if rErr != nil {
+			attachSpinner.Fail(rErr)
+		}
+	}()
+	if t, err := getTokenSecret(ctx, kClient, agentNs, agentSecret); err == nil {
+		attachSpinner.InfoPrinter.Printfln("Space %q is already attached, please run %q to detach it first", t.Data[keySpace], "up space detach")
+		return nil
+	} else if !kerrors.IsNotFound(err) {
+		return err
+	}
 
+	data := make(map[string][]byte)
+	if err := c.prepareSpace(ctx, attachSpinner.InfoPrinter, upCtx, ac, &a, sc, cl, data); err != nil {
+		return err
+	}
+	attachSpinner.UpdateText(fmt.Sprintf("Connecting space %q to Upbound Console...", c.Space))
+
+	if err := c.prepareToken(ctx, attachSpinner.InfoPrinter, upCtx, ac, &a, rc, oc, tc, cl, data); err != nil {
+		return err
+	}
+
+	if err := c.createNamespace(ctx, attachSpinner.InfoPrinter, kClient, agentNs, cl); err != nil {
+		return err
+	}
+	if err := c.createTokenSecret(ctx, attachSpinner.InfoPrinter, kClient, agentNs, agentSecret, cl, data); err != nil {
+		return err
+	}
+	if err := c.installAgent(attachSpinner.InfoPrinter, mgr, a, cl); err != nil {
+		return err
+	}
+	attachSpinner.Success(fmt.Sprintf("Space %q is connected to Upbound Console...", c.Space))
+	return nil
+}
+
+func (c *attachCmd) installAgent(p pterm.TextPrinter, mgr *helm.Installer, a *accounts.AccountResponse, cl *cleanup.Cleaner) error {
+	p.Println("Installing connect agent...")
+	if err := mgr.Install(supportedVersion, map[string]any{
+		"nats": map[string]any{
+			"url": devConnectURL,
+		},
+		"space":       c.Space,
+		"account":     a.Organization.Name,
+		"tokenSecret": agentSecret,
+	}); err != nil {
+		return err
+	}
+	cl.Add(func() error {
+		if err := mgr.Uninstall(); err != nil {
+			return err
+		}
+		p.Printfln(`Chart "%s/%s" uninstalled`, agentNs, agentChart)
+		return nil
+	})
+	p.Printfln(`Chart "%s/%s" installed`, agentNs, agentChart)
+	return nil
+}
+
+func (c *attachCmd) prepareToken(ctx context.Context, p pterm.TextPrinter, upCtx *upbound.Context, ac *accounts.Client, a **accounts.AccountResponse, rc *robots.Client, oc *organizations.Client, tc *tokens.Client, cl *cleanup.Cleaner, data map[string][]byte) error {
 	if c.Token == "" {
+		p.Println("Generating agent Robot and Token...")
+		if err := c.getAccount(ctx, upCtx, ac, a); err != nil {
+			return err
+		}
 
-		p.Println("Generating new Robot and Token to authenticate agent...")
-		a, err := ac.Get(ctx, upCtx.Account)
+		rid, err := c.createRobot(ctx, p, *a, rc, oc, cl, data)
 		if err != nil {
 			return err
 		}
-		if a.Account.Type != accounts.AccountOrganization {
-			return errors.New(robot.ErrUserAccount)
-		}
 
-		if err := c.createRobot(ctx, upCtx, p, a, ac, rc); err != nil {
-			return err
-		}
-
-		res, err := c.createToken(ctx, upCtx, p, a, oc, tc)
+		res, err := c.createToken(ctx, p, tc, rid, cl, data)
 		if err != nil {
 			return err
 		}
 		c.Token = fmt.Sprint(res.Meta["jwt"])
 	}
-
-	attachSpinner, _ := upterm.CheckmarkSuccessSpinner.Start("Installing agent to connect to Upbound Console...")
-
-	if err := c.createNamespace(ctx, agentNs); err != nil {
-		return err
-	}
-	if err := c.createTokenSecret(ctx, "space-token", agentNs, c.Token); err != nil {
-		return err
-	}
-
-	if err := c.helmMgr.Install(supportedVersion, map[string]any{
-		"nats": map[string]any{
-			"url": devConnectURL,
-		},
-		"space":       c.Space,
-		"account":     upCtx.Account,
-		"tokenSecret": "space-token",
-	}); err != nil {
-		return err
-	}
-
-	attachSpinner.Success()
+	data[keyToken] = []byte(c.Token)
 	return nil
 }
 
-func (c *attachCmd) createNamespace(ctx context.Context, ns string) error {
-	_, err := c.kClient.CoreV1().Namespaces().Create(ctx, &corev1.Namespace{
+func (c *attachCmd) prepareSpace(ctx context.Context, p pterm.TextPrinter, upCtx *upbound.Context, ac *accounts.Client, a **accounts.AccountResponse, sc *spaces.Client, cl *cleanup.Cleaner, data map[string][]byte) error {
+	if c.Space == "" {
+		p.Println("Creating a connected Space in Upbound Console...")
+		if err := c.getAccount(ctx, upCtx, ac, a); err != nil {
+			return err
+		}
+		space, err := c.createSpace(ctx, p, *a, sc, data)
+		if err != nil {
+			return err
+		}
+		c.Space = space.Name
+		cl.Add(func() error {
+			return c.deleteSpace(ctx, p, *a, sc)
+		})
+	}
+	data[keySpace] = []byte(c.Space)
+	return nil
+}
+
+func (*attachCmd) createSpace(ctx context.Context, p pterm.TextPrinter, a *accounts.AccountResponse, sc *spaces.Client, data map[string][]byte) (*upboundv1alpha1.Space, error) {
+	space, err := sc.Create(ctx, a.Organization.Name, &upboundv1alpha1.Space{
+		ObjectMeta: metav1.ObjectMeta{
+			GenerateName: "attached-",
+		},
+	}, nil)
+	if err != nil {
+		return nil, errors.Wrap(err, errCreateSpace)
+	}
+	data[keyGeneratedSpace] = []byte(path.Join(a.Organization.Name, space.Name))
+	p.Printfln(`Space "%s/%s" created`, a.Organization.Name, space.Name)
+	return space, nil
+}
+
+func (c *attachCmd) deleteSpace(ctx context.Context, p pterm.TextPrinter, a *accounts.AccountResponse, sc *spaces.Client) error {
+	if err := sc.Delete(ctx, a.Organization.Name, c.Space, nil); err != nil {
+		return err
+	}
+	p.Printfln(`Space "%s/%s" deleted`, a.Organization.Name, c.Space)
+	return nil
+}
+
+func (c *attachCmd) getAccount(ctx context.Context, upCtx *upbound.Context, ac *accounts.Client, aout **accounts.AccountResponse) error {
+	if *aout != nil {
+		return nil
+	}
+	a, err := ac.Get(ctx, upCtx.Account)
+	if err != nil {
+		return err
+	}
+	if a.Account.Type != accounts.AccountOrganization {
+		return errors.New(robot.ErrUserAccount)
+	}
+	*aout = a
+	return nil
+}
+
+func (c *attachCmd) createNamespace(ctx context.Context, p pterm.TextPrinter, kClient *kubernetes.Clientset, ns string, cl *cleanup.Cleaner) error {
+	_, err := kClient.CoreV1().Namespaces().Create(ctx, &corev1.Namespace{
 		ObjectMeta: metav1.ObjectMeta{
 			Name: ns,
 		},
 	}, metav1.CreateOptions{})
-	if err != nil && !kerrors.IsAlreadyExists(err) {
+	if kerrors.IsAlreadyExists(err) {
+		return nil
+	}
+	if err != nil {
 		return errors.Wrap(err, fmt.Sprintf(errFmtCreateNamespace, ns))
 	}
+	cl.Add(func() error {
+		return c.deleteNamespace(ctx, p, kClient, agentNs)
+	})
+	p.Printfln("Agent namespace %q created", ns)
 	return nil
 }
 
-func (c *attachCmd) createTokenSecret(ctx context.Context, name, ns, token string) error {
-	s := &corev1.Secret{}
-	s.SetName(name)
-	s.Data = map[string][]byte{
-		"token": []byte(c.Token),
+func (c *attachCmd) deleteNamespace(ctx context.Context, p pterm.TextPrinter, kClient *kubernetes.Clientset, ns string) error {
+	if err := kClient.CoreV1().Namespaces().Delete(ctx, ns, metav1.DeleteOptions{}); err != nil {
+		return err
 	}
-	_, err := c.kClient.CoreV1().Secrets(ns).Create(ctx, s, metav1.CreateOptions{})
+	p.Printfln("Namespace %q deleted")
+	return nil
+}
+
+func getTokenSecret(ctx context.Context, kClient *kubernetes.Clientset, ns, name string) (*corev1.Secret, error) {
+	return kClient.CoreV1().Secrets(ns).Get(ctx, name, metav1.GetOptions{})
+}
+
+func (c *attachCmd) createTokenSecret(ctx context.Context, p pterm.TextPrinter, kClient *kubernetes.Clientset, ns, name string, cl *cleanup.Cleaner, data map[string][]byte) error {
+	_, err := kClient.CoreV1().Secrets(ns).Create(ctx, &corev1.Secret{
+		ObjectMeta: metav1.ObjectMeta{
+			Name: name,
+		},
+		Data: data,
+	}, metav1.CreateOptions{})
 	if err != nil {
 		return err
 	}
-
+	cl.Add(func() error {
+		return deleteTokenSecret(ctx, p, kClient, agentNs, agentSecret)
+	})
+	p.Printfln(`Secret "%s/%s" created`, ns, name)
 	return nil
 }
 
-func (c *attachCmd) createRobot(ctx context.Context, upCtx *upbound.Context, p pterm.TextPrinter, ar *accounts.AccountResponse, ac *accounts.Client, rc *robots.Client) error {
-	if _, err := rc.Create(ctx, &robots.RobotCreateParameters{
+func deleteTokenSecret(ctx context.Context, p pterm.TextPrinter, kClient *kubernetes.Clientset, ns, name string) error {
+	if err := kClient.CoreV1().Secrets(ns).Delete(ctx, name, metav1.DeleteOptions{}); err != nil {
+		return err
+	}
+	p.Printfln(`Secret "%s/%s" deleted`, ns, name)
+	return nil
+}
+
+func (c *attachCmd) createRobot(ctx context.Context, p pterm.TextPrinter, ar *accounts.AccountResponse, rc *robots.Client, oc *organizations.Client, cl *cleanup.Cleaner, data map[string][]byte) (uuid.UUID, error) {
+	rs, err := oc.ListRobots(ctx, ar.Organization.ID)
+	if err != nil {
+		return uuid.UUID{}, err
+	}
+	// find an existing robot token.
+	for _, r := range rs {
+		if r.Name == c.Space {
+			return r.ID, nil
+		}
+	}
+
+	rr, err := rc.Create(ctx, &robots.RobotCreateParameters{
 		Attributes: robots.RobotAttributes{
 			Name:        c.Space,
-			Description: fmt.Sprintf("Robot used for authenticating Space %s with Upbound Connect", c.Space),
+			Description: fmt.Sprintf("Robot used for authenticating Space %q with Upbound Connect", c.Space),
 		},
 		Relationships: robots.RobotRelationships{
 			Owner: robots.RobotOwner{
@@ -227,43 +351,27 @@ func (c *attachCmd) createRobot(ctx context.Context, upCtx *upbound.Context, p p
 				},
 			},
 		},
-	}); err != nil {
+	})
+	if err != nil {
+		return uuid.UUID{}, err
+	}
+	cl.Add(func() error {
+		return c.deleteRobot(ctx, p, ar, rc, rr.ID)
+	})
+	data[keyRobotID] = rr.ID[:]
+	p.Printfln(`Robot "%s/%s" created`, ar.Organization.Name, rr.ID)
+	return rr.ID, nil
+}
+
+func (c *attachCmd) deleteRobot(ctx context.Context, p pterm.TextPrinter, ar *accounts.AccountResponse, rc *robots.Client, rid uuid.UUID) error {
+	if err := rc.Delete(ctx, rid); err != nil {
 		return err
 	}
-
-	p.Printfln("Robot %s/%s created", upCtx.Account, c.Space)
+	p.Printfln(`Robot "%s/%s" deleted`, ar.Organization.Name, rid)
 	return nil
 }
 
-func (c *attachCmd) createToken(ctx context.Context, upCtx *upbound.Context, p pterm.TextPrinter, ar *accounts.AccountResponse, oc *organizations.Client, tc *tokens.Client) (*tokens.TokenResponse, error) {
-	// NOTE(tnthornton): the API does not yet support a way to get a Robot via
-	// it's name, only its ID. Resorting to ListRobots like we do in other
-	// places until this is sorted out.
-	rs, err := oc.ListRobots(ctx, ar.Organization.ID)
-	if err != nil {
-		return nil, err
-	}
-	if len(rs) == 0 {
-		return nil, errors.Errorf(token.ErrFindRobotFmt, c.Space, upCtx.Account)
-	}
-	// TODO(tnthornton): because this API does not guarantee name uniqueness, we
-	// must guarantee that exactly one robot exists in the specified account
-	// with the provided name. Logic should be simplified when the API is
-	// updated.
-	var id uuid.UUID
-	found := false
-	for _, r := range rs {
-		if r.Name == c.Space {
-			if found {
-				return nil, errors.Errorf(token.ErrMultipleRobotFmt, c.Space, upCtx.Account)
-			}
-			id = r.ID
-			found = true
-		}
-	}
-	if !found {
-		return nil, errors.Errorf(token.ErrFindRobotFmt, c.Space, upCtx.Account)
-	}
+func (c *attachCmd) createToken(ctx context.Context, p pterm.TextPrinter, tc *tokens.Client, rid uuid.UUID, cl *cleanup.Cleaner, data map[string][]byte) (*tokens.TokenResponse, error) {
 	// TODO(tnthornton): maybe we want to allow more than 1 token to be
 	// generated for a given Space. If so, we should generate the name
 	// similar to what we do with the Space name.
@@ -275,7 +383,7 @@ func (c *attachCmd) createToken(ctx context.Context, upCtx *upbound.Context, p p
 			Owner: tokens.TokenOwner{
 				Data: tokens.TokenOwnerData{
 					Type: tokens.TokenOwnerRobot,
-					ID:   id.String(),
+					ID:   rid.String(),
 				},
 			},
 		},
@@ -283,6 +391,14 @@ func (c *attachCmd) createToken(ctx context.Context, upCtx *upbound.Context, p p
 	if err != nil {
 		return nil, err
 	}
-	p.Printfln("Token %s/%s/%s created", upCtx.Account, c.Space, c.Space)
+	cl.Add(func() error {
+		if err := tc.Delete(ctx, res.ID); err != nil {
+			return err
+		}
+		p.Printfln("Token %q deleted", res.ID)
+		return nil
+	})
+	data[keyTokenID] = res.ID[:]
+	p.Printfln("Token %q created", res.ID)
 	return res, nil
 }
