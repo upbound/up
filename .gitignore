@@ -13,3 +13,4 @@ cover.out
 
 # ignore direnv files
 .envrc
+.DS_Store

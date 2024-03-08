@@ -53,6 +53,13 @@ type CrossplaneInfo struct {
 	FeatureFlags []string `json:"featureFlags,omitempty" yaml:"featureFlags,omitempty"`
 }
 
+type PackageInfo struct {
+	// Name is the Name of the Package
+	Name string `json:"name,omitempty" yaml:"name,omitempty"`
+	// Package is the Package Source of the Package
+	Package string `json:"package,omitempty" yaml:"package,omitempty"`
+}
+
 // ExportOptions are the options used to create the export.
 type ExportOptions struct {
 	// IncludedNamespaces are the namespaces included in the export.
@@ -78,6 +85,10 @@ type ExportMeta struct {
 	Options ExportOptions `json:"options,omitempty" yaml:"options,omitempty"`
 	// Crossplane is the information about the Crossplane instance on the exported control plane.
 	Crossplane CrossplaneInfo `json:"crossplane,omitempty" yaml:"crossplane,omitempty"`
+	// Providers is the information about the Providers on the control plane.
+	Providers []PackageInfo `json:"providers,omitempty" yaml:"providers,omitempty"`
+	// Functions is the information about the Functions on the control plane.
+	Functions []PackageInfo `json:"functions,omitempty" yaml:"functions,omitempty"`
 	// Stats are the statistics about the exported resources.
 	Stats ExportStats `json:"stats,omitempty" yaml:"stats,omitempty"`
 }

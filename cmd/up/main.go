@@ -34,6 +34,7 @@ import (
 	"github.com/upbound/up/cmd/up/profile"
 	"github.com/upbound/up/cmd/up/repository"
 	"github.com/upbound/up/cmd/up/robot"
+	"github.com/upbound/up/cmd/up/sos"
 	"github.com/upbound/up/cmd/up/space"
 	"github.com/upbound/up/cmd/up/trace"
 	tviewtemplate "github.com/upbound/up/cmd/up/tview-template"
@@ -145,6 +146,7 @@ type alpha struct {
 	Migration     migration.Cmd     `cmd:"" maturity:"alpha" help:"Migrate control planes to Upbound Managed Control Planes."`
 	Trace         trace.Cmd         `cmd:"" maturity:"alpha" hidden:"" help:"Trace a Crossplane resource."`
 	TviewTemplate tviewtemplate.Cmd `cmd:"" maturity:"alpha" hidden:"" help:"TView example."`
+	SOS           sos.Cmd           `cmd:"" maturity:"alpha" help:"Create SOS Report"`
 
 	WebLogin login.LoginWebCmd `cmd:"" maturity:"alpha" help:"Use web browser to login to up cli."`
 }
