@@ -12,8 +12,8 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-// Package common contains common functions
-package common
+// Package version contains common functions to get versions
+package version
 
 import (
 	"context"
@@ -35,7 +35,7 @@ const (
 // FetchCrossplaneVersion initializes a Kubernetes client and fetches
 // and returns the version of the Crossplane deployment. If the version
 // does not have a leading 'v', it prepends it.
-func FetchCrossplaneVersion() (string, error) {
+func FetchCrossplaneVersion(ctx context.Context) (string, error) {
 	var version string
 	config, err := ctrl.GetConfig()
 	if err != nil {
@@ -47,7 +47,7 @@ func FetchCrossplaneVersion() (string, error) {
 		return "", errors.Wrap(err, errCreateK8sClientset)
 	}
 
-	deployments, err := clientset.AppsV1().Deployments("").List(context.TODO(), v1.ListOptions{
+	deployments, err := clientset.AppsV1().Deployments("").List(ctx, v1.ListOptions{
 		LabelSelector: "app=crossplane",
 	})
 	if err != nil {
@@ -81,7 +81,7 @@ func FetchCrossplaneVersion() (string, error) {
 
 // FetchSpacesVersion initializes a Kubernetes client and fetches
 // and returns the version of the spaces-controller deployment.
-func FetchSpacesVersion() (string, error) {
+func FetchSpacesVersion(ctx context.Context) (string, error) {
 	config, err := ctrl.GetConfig()
 	if err != nil {
 		return "", errors.Wrap(err, errKubeConfig)
@@ -92,7 +92,7 @@ func FetchSpacesVersion() (string, error) {
 		return "", errors.Wrap(err, errCreateK8sClientset)
 	}
 
-	deployments, err := clientset.AppsV1().Deployments("").List(context.TODO(), v1.ListOptions{
+	deployments, err := clientset.AppsV1().Deployments("").List(ctx, v1.ListOptions{
 		LabelSelector: "app=spaces-controller",
 	})
 	if err != nil {
