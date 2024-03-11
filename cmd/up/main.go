@@ -39,12 +39,12 @@ import (
 	tviewtemplate "github.com/upbound/up/cmd/up/tview-template"
 	"github.com/upbound/up/cmd/up/upbound"
 	"github.com/upbound/up/cmd/up/uxp"
+	v "github.com/upbound/up/cmd/up/version"
 	"github.com/upbound/up/cmd/up/xpkg"
 	"github.com/upbound/up/cmd/up/xpls"
 	"github.com/upbound/up/internal/config"
 	"github.com/upbound/up/internal/feature"
 	"github.com/upbound/up/internal/upterm"
-	"github.com/upbound/up/internal/version"
 
 	// TODO(epk): Remove this once we upgrade kubernetes deps to 1.25
 	// TODO(epk): Specifically, get rid of the k8s.io/client-go/client/auth/azure
@@ -52,16 +52,6 @@ import (
 	// Embed Kubernetes client auth plugins.
 	_ "k8s.io/client-go/plugin/pkg/client/auth"
 )
-
-type versionFlag bool
-
-// BeforeApply indicates that we want to execute the logic before running any
-// commands.
-func (v versionFlag) BeforeApply(ctx *kong.Context) error { // nolint:unparam
-	fmt.Fprintln(ctx.Stdout, version.GetVersion())
-	ctx.Exit(0)
-	return nil
-}
 
 // AfterApply configures global settings before executing commands.
 func (c *cli) AfterApply(ctx *kong.Context) error { //nolint:unparam
@@ -98,10 +88,9 @@ func (c *cli) BeforeReset(ctx *kong.Context, p *kong.Path) error {
 }
 
 type cli struct {
-	Format  config.Format    `name:"format" enum:"default,json,yaml" default:"default" help:"Format for get/list commands. Can be: json, yaml, default"`
-	Version versionFlag      `short:"v" name:"version" help:"Print version and exit."`
-	Quiet   config.QuietFlag `short:"q" name:"quiet" help:"Suppress all output."`
-	Pretty  bool             `name:"pretty" help:"Pretty print output."`
+	Format config.Format    `name:"format" enum:"default,json,yaml" default:"default" help:"Format for get/list commands. Can be: json, yaml, default"`
+	Quiet  config.QuietFlag `short:"q" name:"quiet" help:"Suppress all output."`
+	Pretty bool             `name:"pretty" help:"Pretty print output."`
 
 	License licenseCmd `cmd:"" help:"Print Up license information."`
 
@@ -120,6 +109,7 @@ type cli struct {
 	XPLS               xpls.Cmd                     `cmd:"" help:"Start xpls language server."`
 	Alpha              alpha                        `cmd:"" help:"Alpha features. Commands may be removed in future releases."`
 	InstallCompletions kongplete.InstallCompletions `cmd:"" help:"Install shell completions"`
+	Version            v.Cmd                        `cmd:"" help:"Print the client and server version information for the current context."`
 }
 
 type helpCmd struct{}
