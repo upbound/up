@@ -24,8 +24,8 @@ import (
 	"gopkg.in/yaml.v3"
 	appsv1 "k8s.io/client-go/kubernetes/typed/apps/v1"
 
-	"github.com/upbound/up/internal/migration/crossplane"
-	"github.com/upbound/up/internal/migration/meta/v1alpha1"
+	"github.com/upbound/up/pkg/migration/crossplane"
+	"github.com/upbound/up/pkg/migration/meta/v1alpha1"
 )
 
 type MetadataExporter interface {

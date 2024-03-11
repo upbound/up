@@ -30,8 +30,9 @@ import (
 	"k8s.io/client-go/restmapper"
 
 	"github.com/upbound/up/internal/input"
-	"github.com/upbound/up/internal/migration"
-	"github.com/upbound/up/internal/migration/importer"
+	"github.com/upbound/up/internal/upterm"
+	"github.com/upbound/up/pkg/migration"
+	"github.com/upbound/up/pkg/migration/importer"
 )
 
 type importCmd struct {
@@ -116,9 +117,16 @@ func (c *importCmd) Run(ctx context.Context, migCtx *migration.Context) error { 
 		}
 	}
 
+	pterm.EnableStyling()
+	upterm.DefaultObjPrinter.Pretty = true
+
+	pterm.Println("Importing control plane state...")
+	migration.DefaultSpinner = &spinner{upterm.CheckmarkSuccessSpinner}
+
 	if err = i.Import(ctx); err != nil {
 		return err
 	}
+	pterm.Println("\nfully imported control plane state!")
 
 	return nil
 }

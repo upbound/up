@@ -15,14 +15,17 @@
 package exporter
 
 import (
+	"archive/tar"
+	"compress/gzip"
 	"context"
 	"fmt"
+	"io"
+	"os"
+	"path/filepath"
 	"strings"
 
 	"github.com/crossplane/crossplane-runtime/pkg/errors"
 	xpmeta "github.com/crossplane/crossplane-runtime/pkg/meta"
-	"github.com/mholt/archiver/v4"
-	"github.com/pterm/pterm"
 	"github.com/spf13/afero"
 	apiextensionsv1 "k8s.io/apiextensions-apiserver/pkg/apis/apiextensions/v1"
 	apiextensionsclientset "k8s.io/apiextensions-apiserver/pkg/client/clientset/clientset"
@@ -34,9 +37,9 @@ import (
 	"k8s.io/client-go/dynamic"
 	appsv1 "k8s.io/client-go/kubernetes/typed/apps/v1"
 
-	"github.com/upbound/up/internal/migration/category"
-	"github.com/upbound/up/internal/migration/meta/v1alpha1"
-	"github.com/upbound/up/internal/upterm"
+	"github.com/upbound/up/pkg/migration"
+	"github.com/upbound/up/pkg/migration/category"
+	"github.com/upbound/up/pkg/migration/meta/v1alpha1"
 )
 
 const (
@@ -88,10 +91,6 @@ func NewControlPlaneStateExporter(crdClient apiextensionsclientset.Interface, dy
 
 // Export exports the state of the control plane.
 func (e *ControlPlaneStateExporter) Export(ctx context.Context) error { // nolint:gocyclo // This is the high level export command, so it's expected to be a bit complex.
-	pterm.EnableStyling()
-	upterm.DefaultObjPrinter.Pretty = true
-
-	pterm.Println("Exporting control plane state...")
 
 	// TODO(turkenh): Check if we can use `afero.NewMemMapFs()` just like import and avoid the need for a temporary directory.
 	fs := afero.Afero{Fs: afero.NewOsFs()}
@@ -108,7 +107,7 @@ func (e *ControlPlaneStateExporter) Export(ctx context.Context) error { // nolin
 
 	if e.options.PauseBeforeExport {
 		pauseMsg := "Pausing all managed resources before export... "
-		s, _ := upterm.CheckmarkSuccessSpinner.Start(pauseMsg)
+		s, _ := migration.DefaultSpinner.Start(pauseMsg)
 		cm := category.NewAPICategoryModifier(e.dynamicClient, e.discoveryClient)
 
 		// Modify all managed resources to add the "crossplane.io/paused: true" annotation.
@@ -125,7 +124,7 @@ func (e *ControlPlaneStateExporter) Export(ctx context.Context) error { // nolin
 
 	// Scan the control plane for types to export.
 	scanMsg := "Scanning control plane for types to export... "
-	s, _ := upterm.CheckmarkSuccessSpinner.Start(scanMsg)
+	s, _ := migration.DefaultSpinner.Start(scanMsg)
 	crdList, err := fetchAllCRDs(ctx, e.crdClient)
 	if err != nil {
 		s.Fail(scanMsg + stepFailed)
@@ -150,7 +149,7 @@ func (e *ControlPlaneStateExporter) Export(ctx context.Context) error { // nolin
 	// Export Crossplane resources.
 	crCounts := make(map[string]int, len(exportList))
 	exportCRsMsg := "Exporting Crossplane resources... "
-	s, _ = upterm.CheckmarkSuccessSpinner.Start(exportCRsMsg + fmt.Sprintf("0 / %d", len(exportList)))
+	s, _ = migration.DefaultSpinner.Start(exportCRsMsg + fmt.Sprintf("0 / %d", len(exportList)))
 	for i, crd := range exportList {
 		gvr, err := e.customResourceGVR(crd)
 		if err != nil {
@@ -195,7 +194,7 @@ func (e *ControlPlaneStateExporter) Export(ctx context.Context) error { // nolin
 
 	// Export native resources.
 	exportNativeMsg := "Exporting native resources... "
-	s, _ = upterm.CheckmarkSuccessSpinner.Start(exportNativeMsg + fmt.Sprintf("0 / %d", len(e.options.IncludeExtraResources)))
+	s, _ = migration.DefaultSpinner.Start(exportNativeMsg + fmt.Sprintf("0 / %d", len(e.options.IncludeExtraResources)))
 	nativeCounts := make(map[string]int, len(e.options.IncludeExtraResources))
 
 	// In addition to the Crossplane resources, we also need to export some native resources. These are
@@ -236,7 +235,7 @@ func (e *ControlPlaneStateExporter) Export(ctx context.Context) error { // nolin
 
 	// Archive the exported state.
 	archiveMsg := "Archiving exported state... "
-	s, _ = upterm.CheckmarkSuccessSpinner.Start(archiveMsg)
+	s, _ = migration.DefaultSpinner.Start(archiveMsg)
 	if err = e.archive(ctx, fs, tmpDir); err != nil {
 		s.Fail(archiveMsg + stepFailed)
 		return errors.Wrap(err, "cannot archive exported state")
@@ -244,7 +243,6 @@ func (e *ControlPlaneStateExporter) Export(ctx context.Context) error { // nolin
 	s.Success(archiveMsg + fmt.Sprintf("archived to %q! 📦", e.options.OutputArchive))
 	//////////////////////
 
-	pterm.Println("\nSuccessfully exported control plane state!")
 	return nil
 }
 
@@ -316,13 +314,7 @@ func (e *ControlPlaneStateExporter) customResourceGVR(in apiextensionsv1.CustomR
 }
 
 func (e *ControlPlaneStateExporter) archive(ctx context.Context, fs afero.Afero, dir string) error {
-	files, err := archiver.FilesFromDisk(nil, map[string]string{
-		dir + "/": "",
-	})
-	if err != nil {
-		return err
-	}
-
+	// Create the output file
 	out, err := fs.Create(e.options.OutputArchive)
 	if err != nil {
 		return err
@@ -331,16 +323,84 @@ func (e *ControlPlaneStateExporter) archive(ctx context.Context, fs afero.Afero,
 		_ = out.Close()
 	}()
 
+	// Apply the appropriate permissions to the output file
 	if err = fs.Chmod(e.options.OutputArchive, 0600); err != nil {
 		return err
 	}
 
-	format := archiver.CompressedArchive{
-		Compression: archiver.Gz{},
-		Archival:    archiver.Tar{},
-	}
+	// Create a new gzip writer
+	gw := gzip.NewWriter(out)
+	defer gw.Close()
 
-	return format.Archive(ctx, out, files)
+	// Create a new tar writer
+	tw := tar.NewWriter(gw)
+	defer tw.Close()
+
+	// Walk the directory and add each file to the tar archive
+	err = filepath.Walk(dir, func(file string, fi os.FileInfo, err error) error {
+		// exit if context is done
+		select {
+		case <-ctx.Done():
+			return ctx.Err()
+		default:
+		}
+
+		if err != nil {
+			return err
+		}
+
+		if fi.IsDir() && file == dir {
+			return nil
+		}
+
+		// Get the relative path of the file from the root directory
+		relPath, err := filepath.Rel(dir, file)
+		if err != nil {
+			return err
+		}
+
+		// If it is a directory, add it to the tar archive and return
+		if fi.IsDir() {
+			header, err := tar.FileInfoHeader(fi, relPath)
+			if err != nil {
+				return err
+			}
+			header.Name = relPath
+			if err := tw.WriteHeader(header); err != nil {
+				return err
+			}
+			return nil
+		}
+
+		// Open the file
+		f, err := os.Open(file)
+		if err != nil {
+			return err
+		}
+		defer f.Close()
+
+		// Create a new tar header with the relative path
+		header, err := tar.FileInfoHeader(fi, relPath)
+		if err != nil {
+			return err
+		}
+		header.Name = relPath
+
+		// Write the header to the tar archive
+		if err := tw.WriteHeader(header); err != nil {
+			return err
+		}
+
+		// Copy the file data to the tar archive
+		if _, err := io.Copy(tw, f); err != nil {
+			return err
+		}
+
+		return nil
+	})
+
+	// Return any errors encountered while creating the archive
+	return err
 }
 
 func fetchAllCRDs(ctx context.Context, kube apiextensionsclientset.Interface) ([]apiextensionsv1.CustomResourceDefinition, error) {
