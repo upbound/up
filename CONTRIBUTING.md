@@ -24,8 +24,6 @@ This is a slimmed-down version of the release process described [here](https://g
    depend on stable versions of dependencies if needed.
 1. **branch repo**: Create a new release branch using the GitHub UI for the
    repo.
-1. **release branch prep**: Make any release-specific updates on the release
-   branch (typically documentation).
 1. **tag release**: Run the `Tag` action on the _release branch_ with the
    desired version (e.g. `v0.14.0`).
 1. **build/publish**: Run the `CI` action on the release branch with the version
