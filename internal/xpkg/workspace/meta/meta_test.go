@@ -22,7 +22,7 @@ import (
 	"github.com/google/go-cmp/cmp/cmpopts"
 	apimetav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
-	"k8s.io/utils/pointer"
+	"k8s.io/utils/ptr"
 
 	"github.com/crossplane/crossplane-runtime/pkg/test"
 	metav1 "github.com/crossplane/crossplane/apis/pkg/meta/v1"
@@ -140,7 +140,7 @@ func TestUpsert(t *testing.T) {
 							},
 							DependsOn: []metav1.Dependency{
 								{
-									Provider: pointer.String("crossplane/provider-aws"),
+									Provider: ptr.To("crossplane/provider-aws"),
 									Version:  ">=1.0.5",
 								},
 							},
@@ -185,7 +185,7 @@ func TestUpsert(t *testing.T) {
 							},
 							DependsOn: []metav1alpha1.Dependency{
 								{
-									Provider: pointer.String("crossplane/provider-aws"),
+									Provider: ptr.To("crossplane/provider-aws"),
 									Version:  ">=1.0.5",
 								},
 							},
@@ -267,7 +267,7 @@ func TestUpsertDeps(t *testing.T) {
 			want: want{
 				deps: []metav1.Dependency{
 					{
-						Provider: pointer.String("crossplane/provider-aws"),
+						Provider: ptr.To("crossplane/provider-aws"),
 						Version:  "v1.0.0",
 					},
 				},
@@ -291,7 +291,7 @@ func TestUpsertDeps(t *testing.T) {
 			want: want{
 				deps: []metav1.Dependency{
 					{
-						Provider: pointer.String("crossplane/provider-aws"),
+						Provider: ptr.To("crossplane/provider-aws"),
 						Version:  "v1.0.0",
 					},
 				},
@@ -309,7 +309,7 @@ func TestUpsertDeps(t *testing.T) {
 						MetaSpec: metav1.MetaSpec{
 							DependsOn: []metav1.Dependency{
 								{
-									Configuration: pointer.String("crossplane/provider-aws"),
+									Configuration: ptr.To("crossplane/provider-aws"),
 									Version:       "v1.0.0",
 								},
 							},
@@ -320,11 +320,11 @@ func TestUpsertDeps(t *testing.T) {
 			want: want{
 				deps: []metav1.Dependency{
 					{
-						Configuration: pointer.String("crossplane/provider-aws"),
+						Configuration: ptr.To("crossplane/provider-aws"),
 						Version:       "v1.0.0",
 					},
 					{
-						Provider: pointer.String("crossplane/provider-gcp"),
+						Provider: ptr.To("crossplane/provider-gcp"),
 						Version:  "v1.0.1",
 					},
 				},
@@ -342,7 +342,7 @@ func TestUpsertDeps(t *testing.T) {
 						MetaSpec: metav1alpha1.MetaSpec{
 							DependsOn: []metav1alpha1.Dependency{
 								{
-									Configuration: pointer.String("crossplane/provider-aws"),
+									Configuration: ptr.To("crossplane/provider-aws"),
 									Version:       "v1.0.0",
 								},
 							},
@@ -353,11 +353,11 @@ func TestUpsertDeps(t *testing.T) {
 			want: want{
 				deps: []metav1.Dependency{
 					{
-						Configuration: pointer.String("crossplane/provider-aws"),
+						Configuration: ptr.To("crossplane/provider-aws"),
 						Version:       "v1.0.0",
 					},
 					{
-						Provider: pointer.String("crossplane/provider-gcp"),
+						Provider: ptr.To("crossplane/provider-gcp"),
 						Version:  "v1.0.1",
 					},
 				},
@@ -375,7 +375,7 @@ func TestUpsertDeps(t *testing.T) {
 						MetaSpec: metav1.MetaSpec{
 							DependsOn: []metav1.Dependency{
 								{
-									Configuration: pointer.String("crossplane/provider-aws"),
+									Configuration: ptr.To("crossplane/provider-aws"),
 									Version:       "v1.0.0",
 								},
 							},
@@ -386,7 +386,7 @@ func TestUpsertDeps(t *testing.T) {
 			want: want{
 				deps: []metav1.Dependency{
 					{
-						Configuration: pointer.String("crossplane/provider-aws"),
+						Configuration: ptr.To("crossplane/provider-aws"),
 						Version:       "v1.0.1",
 					},
 				},
@@ -404,7 +404,7 @@ func TestUpsertDeps(t *testing.T) {
 						MetaSpec: metav1alpha1.MetaSpec{
 							DependsOn: []metav1alpha1.Dependency{
 								{
-									Configuration: pointer.String("crossplane/provider-aws"),
+									Configuration: ptr.To("crossplane/provider-aws"),
 									Version:       "v1.0.0",
 								},
 							},
@@ -415,7 +415,7 @@ func TestUpsertDeps(t *testing.T) {
 			want: want{
 				deps: []metav1.Dependency{
 					{
-						Configuration: pointer.String("crossplane/provider-aws"),
+						Configuration: ptr.To("crossplane/provider-aws"),
 						Version:       "v1.0.1",
 					},
 				},
@@ -433,7 +433,7 @@ func TestUpsertDeps(t *testing.T) {
 						MetaSpec: metav1.MetaSpec{
 							DependsOn: []metav1.Dependency{
 								{
-									Provider: pointer.String("crossplane/provider-aws"),
+									Provider: ptr.To("crossplane/provider-aws"),
 									Version:  "v1.0.0",
 								},
 							},
@@ -444,7 +444,7 @@ func TestUpsertDeps(t *testing.T) {
 			want: want{
 				deps: []metav1.Dependency{
 					{
-						Provider: pointer.String("crossplane/provider-aws"),
+						Provider: ptr.To("crossplane/provider-aws"),
 						Version:  image.DefaultVer,
 					},
 				},
@@ -462,7 +462,7 @@ func TestUpsertDeps(t *testing.T) {
 						MetaSpec: metav1alpha1.MetaSpec{
 							DependsOn: []metav1alpha1.Dependency{
 								{
-									Provider: pointer.String("crossplane/provider-aws"),
+									Provider: ptr.To("crossplane/provider-aws"),
 									Version:  "v1.0.0",
 								},
 							},
@@ -473,7 +473,7 @@ func TestUpsertDeps(t *testing.T) {
 			want: want{
 				deps: []metav1.Dependency{
 					{
-						Provider: pointer.String("crossplane/provider-aws"),
+						Provider: ptr.To("crossplane/provider-aws"),
 						Version:  image.DefaultVer,
 					},
 				},
@@ -491,11 +491,11 @@ func TestUpsertDeps(t *testing.T) {
 						MetaSpec: metav1.MetaSpec{
 							DependsOn: []metav1.Dependency{
 								{
-									Provider: pointer.String("crossplane/provider-aws"),
+									Provider: ptr.To("crossplane/provider-aws"),
 									Version:  "v1.0.0",
 								},
 								{
-									Provider: pointer.String("crossplane/provider-aws"),
+									Provider: ptr.To("crossplane/provider-aws"),
 									Version:  "v1.0.1",
 								},
 							},
@@ -519,11 +519,11 @@ func TestUpsertDeps(t *testing.T) {
 						MetaSpec: metav1alpha1.MetaSpec{
 							DependsOn: []metav1alpha1.Dependency{
 								{
-									Provider: pointer.String("crossplane/provider-aws"),
+									Provider: ptr.To("crossplane/provider-aws"),
 									Version:  "v1.0.0",
 								},
 								{
-									Provider: pointer.String("crossplane/provider-aws"),
+									Provider: ptr.To("crossplane/provider-aws"),
 									Version:  "v1.0.1",
 								},
 							},
@@ -589,7 +589,7 @@ func TestDependsOn(t *testing.T) {
 							},
 							DependsOn: []metav1.Dependency{
 								{
-									Provider: pointer.String("crossplane/provider-aws"),
+									Provider: ptr.To("crossplane/provider-aws"),
 									Version:  "v1.0.0",
 								},
 							},
@@ -625,7 +625,7 @@ func TestDependsOn(t *testing.T) {
 							},
 							DependsOn: []metav1alpha1.Dependency{
 								{
-									Provider: pointer.String("crossplane/provider-aws"),
+									Provider: ptr.To("crossplane/provider-aws"),
 									Version:  "v1.0.0",
 								},
 							},
@@ -661,11 +661,11 @@ func TestDependsOn(t *testing.T) {
 							},
 							DependsOn: []metav1.Dependency{
 								{
-									Configuration: pointer.String("crossplane/provider-gcp"),
+									Configuration: ptr.To("crossplane/provider-gcp"),
 									Version:       ">=v1.0.1",
 								},
 								{
-									Provider: pointer.String("crossplane/provider-aws"),
+									Provider: ptr.To("crossplane/provider-aws"),
 									Version:  "v1.0.0",
 								},
 							},

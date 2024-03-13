@@ -20,7 +20,7 @@ import (
 
 	"github.com/Azure/azure-sdk-for-go/sdk/storage/azblob/container"
 	clock "k8s.io/utils/clock/testing"
-	"k8s.io/utils/pointer"
+	"k8s.io/utils/ptr"
 
 	"github.com/upbound/up/internal/usage/event"
 	"github.com/upbound/up/internal/usage/event/reader"
@@ -109,7 +109,7 @@ func (i *ListBlobsOptionsIterator) Next() ([]container.ListBlobsFlatOptions, usa
 			break
 		}
 		lbo = append(lbo, container.ListBlobsFlatOptions{
-			Prefix: pointer.String(fmt.Sprintf(
+			Prefix: ptr.To(fmt.Sprintf(
 				"account=%s/date=%s/hour=%02d/",
 				i.Account,
 				usagetime.FormatDateUTC(now),

@@ -101,20 +101,22 @@ func validatorsFromV1Beta1CRD(c *extv1beta1.CustomResourceDefinition, acc map[sc
 	}
 
 	if internal.Spec.Validation != nil {
-		sv, _, err := validation.NewSchemaValidator(internal.Spec.Validation.OpenAPIV3Schema)
-		if err != nil {
+		openapiSchema := &spec.Schema{}
+		if err := validation.ConvertJSONSchemaPropsWithPostProcess(internal.Spec.Validation.OpenAPIV3Schema, openapiSchema, validation.StripUnsupportedFormatsPostProcess); err != nil {
 			return err
 		}
+		sv := validate.NewSchemaValidator(openapiSchema, nil, "", strfmt.Default)
 		for _, v := range internal.Spec.Versions {
 			appendToValidators(gvk(internal.Spec.Group, v.Name, internal.Spec.Names.Kind), acc, validator.NewUsingContext(sv))
 		}
 		return nil
 	}
 	for _, v := range internal.Spec.Versions {
-		sv, _, err := validation.NewSchemaValidator(v.Schema.OpenAPIV3Schema)
-		if err != nil {
+		openapiSchema := &spec.Schema{}
+		if err := validation.ConvertJSONSchemaPropsWithPostProcess(v.Schema.OpenAPIV3Schema, openapiSchema, validation.StripUnsupportedFormatsPostProcess); err != nil {
 			return err
 		}
+		sv := validate.NewSchemaValidator(openapiSchema, nil, "", strfmt.Default)
 		appendToValidators(gvk(internal.Spec.Group, v.Name, internal.Spec.Names.Kind), acc, validator.NewUsingContext(sv))
 	}
 

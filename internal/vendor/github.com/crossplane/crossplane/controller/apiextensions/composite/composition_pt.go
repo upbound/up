@@ -22,7 +22,7 @@ import (
 
 	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/util/json"
-	"k8s.io/utils/pointer"
+	"k8s.io/utils/ptr"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 
 	"github.com/crossplane/crossplane-runtime/pkg/errors"
@@ -179,7 +179,7 @@ func (c *PTComposer) Compose(ctx context.Context, xr resource.Composite, req Com
 		ta := tas[i]
 
 		// If this resource is anonymous its "name" is just its index.
-		name := pointer.StringDeref(ta.Template.Name, strconv.Itoa(i))
+		name := ptr.Deref(ta.Template.Name, strconv.Itoa(i))
 		r := composed.New(composed.FromReference(ta.Reference))
 
 		rerr := c.composed.Render(ctx, xr, r, ta.Template, req.Environment)

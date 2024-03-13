@@ -23,7 +23,7 @@ import (
 	"github.com/google/go-cmp/cmp"
 	"github.com/google/uuid"
 	"k8s.io/apimachinery/pkg/types"
-	"k8s.io/utils/pointer"
+	"k8s.io/utils/ptr"
 
 	"github.com/crossplane/crossplane-runtime/pkg/test"
 
@@ -38,7 +38,7 @@ var (
 
 	sdkNotFound = &sdkerrs.Error{
 		Status: http.StatusNotFound,
-		Detail: pointer.String(`control plane "ctp-dne" not found`),
+		Detail: ptr.To(`control plane "ctp-dne" not found`),
 		Title:  http.StatusText(http.StatusNotFound),
 	}
 
@@ -46,7 +46,7 @@ var (
 		Name: "ctp1",
 		ID:   uuid.MustParse("00000000-0000-0000-0000-000000000000"),
 		Configuration: &controlplanes.ControlPlaneConfiguration{
-			Name:   pointer.String("cfg1"),
+			Name:   ptr.To("cfg1"),
 			Status: controlplanes.ConfigurationReady,
 		},
 	}
@@ -55,7 +55,7 @@ var (
 		Name: "ctp2",
 		ID:   uuid.MustParse("00000000-0000-0000-0000-000000000001"),
 		Configuration: &controlplanes.ControlPlaneConfiguration{
-			Name:   pointer.String("cfg1"),
+			Name:   ptr.To("cfg1"),
 			Status: controlplanes.ConfigurationReady,
 		},
 	}

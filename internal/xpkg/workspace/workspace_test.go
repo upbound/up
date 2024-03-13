@@ -29,7 +29,7 @@ import (
 	apimetav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/runtime/schema"
-	"k8s.io/utils/pointer"
+	"k8s.io/utils/ptr"
 
 	"github.com/crossplane/crossplane-runtime/pkg/test"
 	xpextv1 "github.com/crossplane/crossplane/apis/apiextensions/v1"
@@ -190,7 +190,7 @@ func TestRWMetaFile(t *testing.T) {
 				},
 				DependsOn: []metav1.Dependency{
 					{
-						Configuration: pointer.String("crossplane/provider-aws"),
+						Configuration: ptr.To("crossplane/provider-aws"),
 						Version:       "v1.0.0",
 					},
 				},
@@ -208,7 +208,7 @@ func TestRWMetaFile(t *testing.T) {
 		},
 		Spec: metav1.ProviderSpec{
 			Controller: metav1.ControllerSpec{
-				Image: pointer.String("crossplane/provider-aws"),
+				Image: ptr.To("crossplane/provider-aws"),
 			},
 			MetaSpec: metav1.MetaSpec{
 				Crossplane: &metav1.CrossplaneConstraints{
@@ -216,7 +216,7 @@ func TestRWMetaFile(t *testing.T) {
 				},
 				DependsOn: []metav1.Dependency{
 					{
-						Provider: pointer.String("crossplane/provider-aws"),
+						Provider: ptr.To("crossplane/provider-aws"),
 						Version:  "v1.0.0",
 					},
 				},

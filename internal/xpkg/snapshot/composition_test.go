@@ -26,7 +26,7 @@ import (
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/kube-openapi/pkg/validation/validate"
-	"k8s.io/utils/pointer"
+	"k8s.io/utils/ptr"
 
 	"github.com/crossplane/crossplane-runtime/pkg/logging"
 	"github.com/crossplane/crossplane-runtime/pkg/test"
@@ -166,13 +166,13 @@ func TestCompositionValidation(t *testing.T) {
 								}`)},
 								Patches: []v1.Patch{
 									{
-										FromFieldPath: pointer.String("metadata.uid"),
-										ToFieldPath:   pointer.String("spec.writeConnectionSecretToRef.name"),
+										FromFieldPath: ptr.To("metadata.uid"),
+										ToFieldPath:   ptr.To("spec.writeConnectionSecretToRef.name"),
 										Transforms: []v1.Transform{
 											{
 												Type: "string",
 												String: &v1.StringTransform{
-													Format: pointer.String("%s-postgresql"),
+													Format: ptr.To("%s-postgresql"),
 												},
 											},
 										},
@@ -205,13 +205,13 @@ func TestCompositionValidation(t *testing.T) {
 								Name: "connectionSecretRef",
 								Patches: []v1.Patch{
 									{
-										FromFieldPath: pointer.String("metadata.uid"),
-										ToFieldPath:   pointer.String("spec.writeConnectionSecretToRef.name"),
+										FromFieldPath: ptr.To("metadata.uid"),
+										ToFieldPath:   ptr.To("spec.writeConnectionSecretToRef.name"),
 										Transforms: []v1.Transform{
 											{
 												Type: "string",
 												String: &v1.StringTransform{
-													Format: pointer.String("%s-postgresql"),
+													Format: ptr.To("%s-postgresql"),
 												},
 											},
 										},
@@ -240,7 +240,7 @@ func TestCompositionValidation(t *testing.T) {
 								Patches: []v1.Patch{
 									{
 										Type:         v1.PatchTypePatchSet,
-										PatchSetName: pointer.String("connectionSecretRef"),
+										PatchSetName: ptr.To("connectionSecretRef"),
 									},
 								},
 							},
@@ -285,8 +285,8 @@ func TestCompositionValidation(t *testing.T) {
 								}`)},
 								Patches: []v1.Patch{
 									{
-										FromFieldPath: pointer.String("spec.writeConnectionSecretToRef.name"),
-										ToFieldPath:   pointer.String("spec.writeConnectionSecretToRef.name"),
+										FromFieldPath: ptr.To("spec.writeConnectionSecretToRef.name"),
+										ToFieldPath:   ptr.To("spec.writeConnectionSecretToRef.name"),
 									},
 								},
 							},
@@ -315,7 +315,7 @@ func TestCompositionValidation(t *testing.T) {
 					Spec: v1.CompositionSpec{
 						Resources: []v1.ComposedTemplate{
 							{
-								Name: pointer.String("r1"),
+								Name: ptr.To("r1"),
 							},
 							{},
 						},
@@ -349,10 +349,10 @@ func TestCompositionValidation(t *testing.T) {
 					Spec: v1.CompositionSpec{
 						Resources: []v1.ComposedTemplate{
 							{
-								Name: pointer.String("r1"),
+								Name: ptr.To("r1"),
 							},
 							{
-								Name: pointer.String("r1"),
+								Name: ptr.To("r1"),
 							},
 						},
 					},
