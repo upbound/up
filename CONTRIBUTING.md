@@ -41,12 +41,12 @@ This is a slimmed-down version of the release process described [here](https://g
 1. **update homebrew**: Run [`Bump Formula`](https://github.com/upbound/homebrew-tap/actions/workflows/bump-formula.yaml) action to open a PR in Homebrew 
    for the new version. Self-approve and merge.
 1. **release notes**: 
-   - Open the new release tag in https://github.com/upbound/up/tags and "create
+   - Open the new release tag in https://github.com/upbound/up/tags and click "Create
      release from tag".
    - "Generate release notes" from previous release ("auto" might not work).
    - Make sure the release notes are complete, presize and well formatted.
    - Publish the well authored Github release.
-1. **wait for CND**: Wait for CloudFront to distribute the artifacts, e.g. wait
+1. **wait for CDN**: Wait for CloudFront to distribute the artifacts, e.g. wait
    until `curl -sL https://cli.upbound.io | sh -x && ./up version` gives the new
    release.
 1. **announce**: Announce the release on Twitter, Slack, etc.
