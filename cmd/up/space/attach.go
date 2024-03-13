@@ -59,8 +59,8 @@ const (
 
 	// TODO(tnthornton) these can probably be replaced by our public chart
 	// museum. This would allow us to use wildcards like mxp-connector.
-	supportedVersion = "0.0.0-179.g5f7a3e4"
-	agentRegistry    = "us-west1-docker.pkg.dev/orchestration-build/connect"
+	agentVersion  = "0.0.0-236.gc394d73"
+	agentRegistry = "us-west1-docker.pkg.dev/orchestration-build/connect"
 
 	// TODO(tnthornton) maybe move this to the agent chart?
 	devConnectURL = "tls://connect.u5d.dev"
@@ -162,7 +162,7 @@ func (c *attachCmd) Run(ctx context.Context, mgr *helm.Installer, kClient *kuber
 		if err := c.createTokenSecret(ctx, attachSpinner.InfoPrinter, kClient, agentNs, agentSecret, u); err != nil {
 			return err
 		}
-		if err := c.installAgent(attachSpinner.InfoPrinter, mgr, a, u); err != nil {
+		if err := c.installAgent(ctx, attachSpinner.InfoPrinter, mgr, upCtx, ac, &a, u); err != nil {
 			return err
 		}
 		attachSpinner.Success(fmt.Sprintf("Space %q is connected to Upbound Console", c.Space))
@@ -170,19 +170,22 @@ func (c *attachCmd) Run(ctx context.Context, mgr *helm.Installer, kClient *kuber
 	})
 }
 
-func (c *attachCmd) installAgent(p pterm.TextPrinter, mgr *helm.Installer, a *accounts.AccountResponse, u undo.Undoer) error {
+func (c *attachCmd) installAgent(ctx context.Context, p pterm.TextPrinter, mgr *helm.Installer, upCtx *upbound.Context, ac *accounts.Client, a **accounts.AccountResponse, u undo.Undoer) error {
 	if v, err := mgr.GetCurrentVersion(); err == nil {
 		p.Printfln(`Chart "%s/%s" already installed with version %s`, agentNs, agentChart, v)
 		return nil
 	}
+	if err := c.getAccount(ctx, upCtx, ac, a); err != nil {
+		return err
+	}
 	p.Printfln(`Installing Chart "%s/%s"`, agentNs, agentChart)
-	if err := mgr.Install(supportedVersion, map[string]any{
+	if err := mgr.Install(agentVersion, map[string]any{
 		"nats": map[string]any{
 			"url": devConnectURL,
 		},
-		"space":       c.Space,
-		"account":     a.Organization.Name,
-		"tokenSecret": agentSecret,
+		"space":        c.Space,
+		"organization": (*a).Organization.Name,
+		"tokenSecret":  agentSecret,
 	}); err != nil {
 		return errors.Wrapf(err, `failed to install Chart "%s/%s"`, agentNs, agentChart)
 	}
@@ -193,7 +196,7 @@ func (c *attachCmd) installAgent(p pterm.TextPrinter, mgr *helm.Installer, a *ac
 		p.Printfln(`Chart "%s/%s" uninstalled`, agentNs, agentChart)
 		return nil
 	})
-	p.Printfln(`Chart "%s/%s" version %s installed`, agentNs, agentChart, supportedVersion)
+	p.Printfln(`Chart "%s/%s" version %s installed`, agentNs, agentChart, agentVersion)
 	return nil
 }
 
@@ -292,7 +295,7 @@ func (c *attachCmd) getAccount(ctx context.Context, upCtx *upbound.Context, ac *
 	}
 	a, err := ac.Get(ctx, upCtx.Account)
 	if err != nil {
-		return err
+		return errors.Wrapf(err, "failed to get Account %q", upCtx.Account)
 	}
 	if a.Account.Type != accounts.AccountOrganization {
 		return errors.New(robot.ErrUserAccount)
