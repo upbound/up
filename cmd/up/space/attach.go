@@ -128,8 +128,6 @@ func (c *attachCmd) AfterApply(kongCtx *kong.Context) error {
 
 // Run executes the install command.
 func (c *attachCmd) Run(ctx context.Context, mgr *helm.Installer, kClient *kubernetes.Clientset, upCtx *upbound.Context, ac *accounts.Client, oc *organizations.Client, tc *tokens.Client, rc *robots.Client, sc *spaces.Client) (rErr error) {
-	var a *accounts.AccountResponse
-
 	attachSpinner, err := upterm.CheckmarkSuccessSpinner.Start("Connecting space to Upbound Console...")
 	if err != nil {
 		return err
@@ -140,17 +138,22 @@ func (c *attachCmd) Run(ctx context.Context, mgr *helm.Installer, kClient *kuber
 		}
 	}()
 	return undo.Do(func(u undo.Undoer) error {
+		a, err := c.getAccount(ctx, upCtx, ac)
+		if err != nil {
+			return err
+		}
+
 		cc, err := createConnectConfigmap(ctx, attachSpinner.InfoPrinter, kClient, agentNs, connConfMap, u)
 		if err != nil {
 			return err
 		}
 
-		if err := c.prepareSpace(ctx, attachSpinner.InfoPrinter, kClient, upCtx, ac, &a, sc, u, &cc); err != nil {
+		if err := c.prepareSpace(ctx, attachSpinner.InfoPrinter, kClient, a, sc, u, &cc); err != nil {
 			return err
 		}
 		attachSpinner.UpdateText(fmt.Sprintf("Connecting space %q to Upbound Console...", cc.Data[keySpace]))
 
-		if err := c.prepareToken(ctx, attachSpinner.InfoPrinter, kClient, upCtx, ac, &a, rc, oc, tc, u, &cc); err != nil {
+		if err := c.prepareToken(ctx, attachSpinner.InfoPrinter, kClient, a, rc, oc, tc, u, &cc); err != nil {
 			return err
 		}
 
@@ -161,7 +164,7 @@ func (c *attachCmd) Run(ctx context.Context, mgr *helm.Installer, kClient *kuber
 		if err := c.createTokenSecret(ctx, attachSpinner.InfoPrinter, kClient, agentNs, agentSecret, u); err != nil {
 			return err
 		}
-		if err := c.installAgent(ctx, attachSpinner.InfoPrinter, mgr, upCtx, ac, &a, u); err != nil {
+		if err := c.installAgent(attachSpinner.InfoPrinter, mgr, a, u); err != nil {
 			return err
 		}
 		attachSpinner.Success(fmt.Sprintf("Space %q is connected to Upbound Console", c.Space))
@@ -169,13 +172,10 @@ func (c *attachCmd) Run(ctx context.Context, mgr *helm.Installer, kClient *kuber
 	})
 }
 
-func (c *attachCmd) installAgent(ctx context.Context, p pterm.TextPrinter, mgr *helm.Installer, upCtx *upbound.Context, ac *accounts.Client, a **accounts.AccountResponse, u undo.Undoer) error {
+func (c *attachCmd) installAgent(p pterm.TextPrinter, mgr *helm.Installer, a *accounts.AccountResponse, u undo.Undoer) error {
 	if v, err := mgr.GetCurrentVersion(); err == nil {
 		p.Printfln(`Chart "%s/%s" already installed with version %s`, agentNs, agentChart, v)
 		return nil
-	}
-	if err := c.getAccount(ctx, upCtx, ac, a); err != nil {
-		return err
 	}
 	p.Printfln(`Installing Chart "%s/%s"`, agentNs, agentChart)
 	if err := mgr.Install(agentVersion, map[string]any{
@@ -183,7 +183,7 @@ func (c *attachCmd) installAgent(ctx context.Context, p pterm.TextPrinter, mgr *
 			"url": devConnectURL,
 		},
 		"space":        c.Space,
-		"organization": (*a).Organization.Name,
+		"organization": a.Organization.Name,
 		"tokenSecret":  agentSecret,
 	}); err != nil {
 		return errors.Wrapf(err, `failed to install Chart "%s/%s"`, agentNs, agentChart)
@@ -199,19 +199,16 @@ func (c *attachCmd) installAgent(ctx context.Context, p pterm.TextPrinter, mgr *
 	return nil
 }
 
-func (c *attachCmd) prepareToken(ctx context.Context, p pterm.TextPrinter, kClient *kubernetes.Clientset, upCtx *upbound.Context, ac *accounts.Client, a **accounts.AccountResponse, rc *robots.Client, oc *organizations.Client, tc *tokens.Client, u undo.Undoer, cmr **corev1.ConfigMap) error {
+func (c *attachCmd) prepareToken(ctx context.Context, p pterm.TextPrinter, kClient *kubernetes.Clientset, a *accounts.AccountResponse, rc *robots.Client, oc *organizations.Client, tc *tokens.Client, u undo.Undoer, cmr **corev1.ConfigMap) error {
 	if c.Token == "" {
 		p.Println("Generating agent Robot and Token...")
-		if err := c.getAccount(ctx, upCtx, ac, a); err != nil {
-			return err
-		}
 
-		rid, err := c.createRobot(ctx, p, kClient, *a, rc, oc, u, cmr)
+		rid, err := c.createRobot(ctx, p, kClient, a, rc, oc, u, cmr)
 		if err != nil {
 			return err
 		}
 
-		res, err := c.createToken(ctx, p, kClient, *a, rc, tc, rid, u, cmr)
+		res, err := c.createToken(ctx, p, kClient, a, rc, tc, rid, u, cmr)
 		if err != nil {
 			return err
 		}
@@ -220,19 +217,7 @@ func (c *attachCmd) prepareToken(ctx context.Context, p pterm.TextPrinter, kClie
 	return nil
 }
 
-func (c *attachCmd) prepareSpace(ctx context.Context, p pterm.TextPrinter, kClient *kubernetes.Clientset, upCtx *upbound.Context, ac *accounts.Client, a **accounts.AccountResponse, sc *spaces.Client, u undo.Undoer, cmr **corev1.ConfigMap) error {
-	if err := c.getAccount(ctx, upCtx, ac, a); err != nil {
-		return err
-	}
-	space, err := c.createSpace(ctx, p, kClient, *a, sc, u, cmr)
-	if err != nil {
-		return err
-	}
-	c.Space = space
-	return nil
-}
-
-func (c *attachCmd) createSpace(ctx context.Context, p pterm.TextPrinter, kClient *kubernetes.Clientset, a *accounts.AccountResponse, sc *spaces.Client, u undo.Undoer, cmr **corev1.ConfigMap) (string, error) { //nolint:gocyclo
+func (c *attachCmd) prepareSpace(ctx context.Context, p pterm.TextPrinter, kClient *kubernetes.Clientset, a *accounts.AccountResponse, sc *spaces.Client, u undo.Undoer, cmr **corev1.ConfigMap) error { //nolint:gocyclo
 	cm := *cmr
 	space := &upboundv1alpha1.Space{
 		ObjectMeta: metav1.ObjectMeta{
@@ -247,7 +232,7 @@ func (c *attachCmd) createSpace(ctx context.Context, p pterm.TextPrinter, kClien
 	if v, ok := cm.Data[keySpace]; ok {
 		parts := strings.Split(v, "/")
 		if len(parts) != 2 || parts[0] == "" || parts[1] == "" {
-			return "", fmt.Errorf("invalid space name %q", v)
+			return fmt.Errorf("invalid space name %q", v)
 		}
 		ns, name := parts[0], parts[1]
 		if space.Namespace == ns && (space.Name == "" || space.Name == name) {
@@ -255,17 +240,28 @@ func (c *attachCmd) createSpace(ctx context.Context, p pterm.TextPrinter, kClien
 			u.Undo(func() error {
 				return c.deleteSpace(ctx, p, a, sc)
 			})
-			return name, nil
+			c.Space = name
+			return nil
 		}
 		p.Printfln("Not using Space %q", v)
 		delete(cm.Data, keySpace)
 		var err error
 		cm, err = kClient.CoreV1().ConfigMaps(agentNs).Update(ctx, cm, metav1.UpdateOptions{})
 		if err != nil {
-			return "", errors.Wrapf(err, `failed to update ConfigMap "%s/%s"`, agentNs, connConfMap)
+			return errors.Wrapf(err, `failed to update ConfigMap "%s/%s"`, agentNs, connConfMap)
 		}
 		*cmr = cm
 	}
+	name, err := c.createSpace(ctx, p, kClient, a, space, sc, u, cmr)
+	if err != nil {
+		return err
+	}
+	c.Space = name
+	return nil
+}
+
+func (c *attachCmd) createSpace(ctx context.Context, p pterm.TextPrinter, kClient *kubernetes.Clientset, a *accounts.AccountResponse, space *upboundv1alpha1.Space, sc *spaces.Client, u undo.Undoer, cmr **corev1.ConfigMap) (string, error) {
+	cm := *cmr
 	p.Printfln("Creating a new Space in Upbound Console in organization %q...", a.Organization.Name)
 	space, err := sc.Create(ctx, a.Organization.Name, space, nil)
 	if err != nil {
@@ -292,19 +288,15 @@ func (c *attachCmd) deleteSpace(ctx context.Context, p pterm.TextPrinter, a *acc
 	return nil
 }
 
-func (c *attachCmd) getAccount(ctx context.Context, upCtx *upbound.Context, ac *accounts.Client, aout **accounts.AccountResponse) error {
-	if *aout != nil {
-		return nil
-	}
+func (c *attachCmd) getAccount(ctx context.Context, upCtx *upbound.Context, ac *accounts.Client) (*accounts.AccountResponse, error) {
 	a, err := ac.Get(ctx, upCtx.Account)
 	if err != nil {
-		return errors.Wrapf(err, "failed to get Account %q", upCtx.Account)
+		return nil, errors.Wrapf(err, "failed to get Account %q", upCtx.Account)
 	}
 	if a.Account.Type != accounts.AccountOrganization {
-		return fmt.Errorf("account %q is not an organization", upCtx.Account)
+		return nil, fmt.Errorf("account %q is not an organization", upCtx.Account)
 	}
-	*aout = a
-	return nil
+	return a, nil
 }
 
 func (c *attachCmd) createNamespace(ctx context.Context, p pterm.TextPrinter, kClient *kubernetes.Clientset, ns string, u undo.Undoer) error {
