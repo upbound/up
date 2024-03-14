@@ -76,7 +76,7 @@ if [ $BIN = "up" ]; then
   echo "Run the following commands to finish installation:"
   echo
   echo sudo mv up /usr/local/bin/
-  echo up --version
+  echo up version
   echo
   echo "Visit https://upbound.io to get started. 🚀"
   echo "Have a nice day! 👋\n"
