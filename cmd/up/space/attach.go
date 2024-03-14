@@ -222,35 +222,43 @@ func (c *attachCmd) prepareToken(ctx context.Context, p pterm.TextPrinter, kClie
 }
 
 func (c *attachCmd) prepareSpace(ctx context.Context, p pterm.TextPrinter, kClient *kubernetes.Clientset, upCtx *upbound.Context, ac *accounts.Client, a **accounts.AccountResponse, sc *spaces.Client, u undo.Undoer, cmr **corev1.ConfigMap) error {
-	if c.Space == "" {
-		if err := c.getAccount(ctx, upCtx, ac, a); err != nil {
-			return err
-		}
-		space, err := c.createSpace(ctx, p, kClient, *a, sc, u, cmr)
-		if err != nil {
-			return err
-		}
-		c.Space = space
+	if err := c.getAccount(ctx, upCtx, ac, a); err != nil {
+		return err
 	}
+	space, err := c.createSpace(ctx, p, kClient, *a, sc, u, cmr)
+	if err != nil {
+		return err
+	}
+	c.Space = space
 	return nil
 }
 
-func (c *attachCmd) createSpace(ctx context.Context, p pterm.TextPrinter, kClient *kubernetes.Clientset, a *accounts.AccountResponse, sc *spaces.Client, u undo.Undoer, cmr **corev1.ConfigMap) (string, error) {
+func (c *attachCmd) createSpace(ctx context.Context, p pterm.TextPrinter, kClient *kubernetes.Clientset, a *accounts.AccountResponse, sc *spaces.Client, u undo.Undoer, cmr **corev1.ConfigMap) (string, error) { //nolint:gocyclo
 	cm := *cmr
+	space := &upboundv1alpha1.Space{
+		ObjectMeta: metav1.ObjectMeta{
+			Namespace: a.Organization.Name,
+			Name:      c.Space,
+		},
+	}
+	// auto generate space name if none given.
+	if space.Name == "" {
+		space.GenerateName = "attached-"
+	}
 	if v, ok := cm.Data[keySpace]; ok {
 		parts := strings.Split(v, "/")
 		if len(parts) != 2 || parts[0] == "" || parts[1] == "" {
 			return "", fmt.Errorf("invalid space name %q", v)
 		}
 		ns, name := parts[0], parts[1]
-		if a.Organization.Name == ns {
-			p.Printfln("Reusing existing Space %q", v)
+		if space.Namespace == ns && (space.Name == "" || space.Name == name) {
+			p.Printfln("Using Space %q", v)
 			u.Undo(func() error {
 				return c.deleteSpace(ctx, p, a, sc)
 			})
 			return name, nil
 		}
-		p.Printfln("Found existing Space %q, will create a new Space in organization %q", v, a.Organization.Name)
+		p.Printfln("Not using Space %q", v)
 		delete(cm.Data, keySpace)
 		var err error
 		cm, err = kClient.CoreV1().ConfigMaps(agentNs).Update(ctx, cm, metav1.UpdateOptions{})
@@ -260,11 +268,7 @@ func (c *attachCmd) createSpace(ctx context.Context, p pterm.TextPrinter, kClien
 		*cmr = cm
 	}
 	p.Printfln("Creating a new Space in Upbound Console in organization %q...", a.Organization.Name)
-	space, err := sc.Create(ctx, a.Organization.Name, &upboundv1alpha1.Space{
-		ObjectMeta: metav1.ObjectMeta{
-			GenerateName: "attached-",
-		},
-	}, nil)
+	space, err := sc.Create(ctx, a.Organization.Name, space, nil)
 	if err != nil {
 		return "", errors.Wrapf(err, errCreateSpace)
 	}
