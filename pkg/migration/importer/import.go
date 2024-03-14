@@ -324,7 +324,7 @@ func contains(ss []string, s string) bool {
 func (im *ControlPlaneStateImporter) unarchive(ctx context.Context, fs afero.Afero) error {
 	g, err := os.Open(im.options.InputArchive)
 	if err != nil {
-		return errors.Wrap(err, "cannot open input archive")
+		return errors.Wrapf(err, "cannot open archive %q", im.options.InputArchive)
 	}
 	defer func() {
 		_ = g.Close()
@@ -332,7 +332,7 @@ func (im *ControlPlaneStateImporter) unarchive(ctx context.Context, fs afero.Afe
 
 	gr, err := gzip.NewReader(g)
 	if err != nil {
-		return errors.Wrap(err, "cannot create gzip reader")
+		return errors.Wrapf(err, "cannot create gzip reader for %q", im.options.InputArchive)
 	}
 	defer gr.Close()
 
@@ -349,7 +349,7 @@ func (im *ControlPlaneStateImporter) unarchive(ctx context.Context, fs afero.Afe
 			break // End of archive
 		}
 		if err != nil {
-			return errors.Wrap(err, "cannot read archive")
+			return errors.Wrapf(err, "cannot read archive %q", im.options.InputArchive)
 		}
 
 		if hdr.FileInfo().IsDir() {

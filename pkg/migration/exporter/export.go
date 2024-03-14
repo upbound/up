@@ -317,7 +317,7 @@ func (e *ControlPlaneStateExporter) archive(ctx context.Context, fs afero.Afero,
 	// Create the output file
 	out, err := fs.Create(e.options.OutputArchive)
 	if err != nil {
-		return err
+		return errors.Wrapf(err, "cannot create output file %q", e.options.OutputArchive)
 	}
 	defer func() {
 		_ = out.Close()
@@ -325,7 +325,7 @@ func (e *ControlPlaneStateExporter) archive(ctx context.Context, fs afero.Afero,
 
 	// Apply the appropriate permissions to the output file
 	if err = fs.Chmod(e.options.OutputArchive, 0600); err != nil {
-		return err
+		return errors.Wrapf(err, "cannot set permissions for %q", e.options.OutputArchive)
 	}
 
 	// Create a new gzip writer
@@ -346,9 +346,12 @@ func (e *ControlPlaneStateExporter) archive(ctx context.Context, fs afero.Afero,
 		}
 
 		if err != nil {
+			// We got an error from walking the directory, return it so that we
+			// don't get down the folder.
 			return err
 		}
 
+		// Skip the root directory
 		if fi.IsDir() && file == dir {
 			return nil
 		}
@@ -356,18 +359,18 @@ func (e *ControlPlaneStateExporter) archive(ctx context.Context, fs afero.Afero,
 		// Get the relative path of the file from the root directory
 		relPath, err := filepath.Rel(dir, file)
 		if err != nil {
-			return err
+			return errors.Wrapf(err, "cannot get relative path for %q", file)
 		}
 
 		// If it is a directory, add it to the tar archive and return
 		if fi.IsDir() {
 			header, err := tar.FileInfoHeader(fi, relPath)
 			if err != nil {
-				return err
+				return errors.Wrapf(err, "cannot create tar header for %q", file)
 			}
 			header.Name = relPath
 			if err := tw.WriteHeader(header); err != nil {
-				return err
+				return errors.Wrapf(err, "cannot write tar header for %q", file)
 			}
 			return nil
 		}
@@ -375,32 +378,32 @@ func (e *ControlPlaneStateExporter) archive(ctx context.Context, fs afero.Afero,
 		// Open the file
 		f, err := os.Open(file)
 		if err != nil {
-			return err
+			return errors.Wrapf(err, "cannot open file %q", file)
 		}
 		defer f.Close()
 
 		// Create a new tar header with the relative path
 		header, err := tar.FileInfoHeader(fi, relPath)
 		if err != nil {
-			return err
+			return errors.Wrapf(err, "cannot create tar header for %q", file)
 		}
 		header.Name = relPath
 
 		// Write the header to the tar archive
 		if err := tw.WriteHeader(header); err != nil {
-			return err
+			return errors.Wrapf(err, "cannot write tar header for %q", file)
 		}
 
 		// Copy the file data to the tar archive
 		if _, err := io.Copy(tw, f); err != nil {
-			return err
+			return errors.Wrapf(err, "cannot copy file data for %q", file)
 		}
 
 		return nil
 	})
 
 	// Return any errors encountered while creating the archive
-	return err
+	return errors.Wrapf(err, "walking directory %q", dir)
 }
 
 func fetchAllCRDs(ctx context.Context, kube apiextensionsclientset.Interface) ([]apiextensionsv1.CustomResourceDefinition, error) {
