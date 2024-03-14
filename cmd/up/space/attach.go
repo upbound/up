@@ -39,7 +39,6 @@ import (
 	"github.com/upbound/up-sdk-go/service/robots"
 	"github.com/upbound/up-sdk-go/service/spaces"
 	"github.com/upbound/up-sdk-go/service/tokens"
-	"github.com/upbound/up/cmd/up/robot"
 	"github.com/upbound/up/internal/install/helm"
 	"github.com/upbound/up/internal/undo"
 	"github.com/upbound/up/internal/upbound"
@@ -302,7 +301,7 @@ func (c *attachCmd) getAccount(ctx context.Context, upCtx *upbound.Context, ac *
 		return errors.Wrapf(err, "failed to get Account %q", upCtx.Account)
 	}
 	if a.Account.Type != accounts.AccountOrganization {
-		return errors.New(robot.ErrUserAccount)
+		return fmt.Errorf("account %q is not an organization", upCtx.Account)
 	}
 	*aout = a
 	return nil
