@@ -54,14 +54,14 @@ func (c *listCmd) Run(ctx context.Context, printer upterm.ObjectPrinter, p pterm
 		return err
 	}
 	if a.Account.Type != accounts.AccountOrganization {
-		return errors.New(ErrUserAccount)
+		return errors.New(errUserAccount)
 	}
 	rs, err := oc.ListRobots(ctx, a.Organization.ID)
 	if err != nil {
 		return err
 	}
 	if len(rs) == 0 {
-		return errors.Errorf(ErrFindRobotFmt, c.RobotName, upCtx.Account)
+		return errors.Errorf(errFindRobotFmt, c.RobotName, upCtx.Account)
 	}
 	// TODO(hasheddan): because this API does not guarantee name uniqueness, we
 	// must guarantee that exactly one robot exists in the specified account
@@ -71,7 +71,7 @@ func (c *listCmd) Run(ctx context.Context, printer upterm.ObjectPrinter, p pterm
 	for _, r := range rs {
 		if r.Name == c.RobotName {
 			if rid != nil {
-				return errors.Errorf(ErrMultipleRobotFmt, c.RobotName, upCtx.Account)
+				return errors.Errorf(errMultipleRobotFmt, c.RobotName, upCtx.Account)
 			}
 			// Pin range variable so that we can take address.
 			r := r
@@ -79,7 +79,7 @@ func (c *listCmd) Run(ctx context.Context, printer upterm.ObjectPrinter, p pterm
 		}
 	}
 	if rid == nil {
-		return errors.Errorf(ErrFindRobotFmt, c.RobotName, upCtx.Account)
+		return errors.Errorf(errFindRobotFmt, c.RobotName, upCtx.Account)
 	}
 
 	ts, err := rc.ListTokens(ctx, *rid)

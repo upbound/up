@@ -76,7 +76,7 @@ func (c *deleteCmd) Run(ctx context.Context, p pterm.TextPrinter, ac *accounts.C
 		return err
 	}
 	if a.Account.Type != accounts.AccountOrganization {
-		return errors.New(ErrUserAccount)
+		return errors.New(errUserAccount)
 	}
 	rs, err := oc.ListRobots(ctx, a.Organization.ID)
 	if err != nil {
