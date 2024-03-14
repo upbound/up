@@ -95,7 +95,7 @@ func (c *detachCmd) AfterApply(kongCtx *kong.Context) error {
 	return nil
 }
 
-// Run executes the install command.
+// Run executes the detach command.
 func (c *detachCmd) Run(ctx context.Context, kClient *kubernetes.Clientset, mgr *helm.Installer, sc *spaces.Client, rc *robots.Client) (rErr error) {
 	detachSpinner, err := upterm.CheckmarkSuccessSpinner.Start("Disconnecting Space from Upbound Console...")
 	if err != nil {
@@ -116,7 +116,7 @@ func (c *detachCmd) Run(ctx context.Context, kClient *kubernetes.Clientset, mgr 
 	if err := deleteTokenSecret(ctx, detachSpinner.InfoPrinter, kClient, agentNs, agentSecret); err != nil && !kerrors.IsNotFound(err) {
 		return err
 	}
-	detachSpinner.Success("Space is not connected to Upbound Console")
+	detachSpinner.Success("Space has been successfully disconnected from Upbound Console")
 	return nil
 }
 
