@@ -4,7 +4,7 @@
 // you may not use this file except in compliance with the License.
 // You may obtain a copy of the License at
 //
-//     http://www.apache.org/licenses/LICENSE-2.0
+//      http://www.apache.org/licenses/LICENSE-2.0
 //
 // Unless required by applicable law or agreed to in writing, software
 // distributed under the License is distributed on an "AS IS" BASIS,
@@ -12,4 +12,24 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-package v1alpha1
+package trace
+
+import (
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/runtime"
+	"k8s.io/apimachinery/pkg/runtime/schema"
+	kruntime "k8s.io/apimachinery/pkg/util/runtime"
+
+	"github.com/upbound/up/cmd/up/query/resource"
+)
+
+var (
+	queryScheme = runtime.NewScheme()
+)
+
+func init() {
+	kruntime.Must(resource.AddToScheme(queryScheme))
+	kruntime.Must(metav1.AddMetaToScheme(queryScheme))
+
+	metav1.AddToGroupVersion(queryScheme, schema.GroupVersion{Version: "v1"})
+}

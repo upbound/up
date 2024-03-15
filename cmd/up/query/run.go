@@ -81,6 +81,7 @@ func (c *cmd) Run(ctx context.Context, kongCtx *kong.Context, upCtx *upbound.Con
 	if len(errs) > 0 {
 		return kerrors.NewAggregate(errs)
 	}
+	gkNames, categoryNames := SplitGroupKindAndCategories(tgns)
 
 	if upCtx.WrapTransport != nil {
 		kubeconfig.Wrap(upCtx.WrapTransport)
@@ -88,19 +89,6 @@ func (c *cmd) Run(ctx context.Context, kongCtx *kong.Context, upCtx *upbound.Con
 	kc, err := client.New(kubeconfig, client.Options{Scheme: queryScheme})
 	if err != nil {
 		return fmt.Errorf("failed to create client: %w", err)
-	}
-
-	// collect group kinds and categories we want to query
-	categoryNames := map[string][]string{}
-	gkNames := map[metav1.GroupKind][]string{}
-	for _, tgn := range tgns {
-		kind, cat := tgn.Map()
-		if cat != "" {
-			categoryNames[cat] = append(categoryNames[cat], tgn.Names...)
-		} else {
-			gk := metav1.GroupKind{Group: tgn.Group, Kind: kind}
-			gkNames[gk] = append(gkNames[gk], tgn.Names...)
-		}
 	}
 
 	// create queries

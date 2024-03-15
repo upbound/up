@@ -22,6 +22,7 @@ import (
 
 	apiextensionsv1 "k8s.io/apiextensions-apiserver/pkg/apis/apiextensions/v1"
 	apiextensionsv1beta1 "k8s.io/apiextensions-apiserver/pkg/apis/apiextensions/v1beta1"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 	kruntime "k8s.io/apimachinery/pkg/util/runtime"
 	"k8s.io/cli-runtime/pkg/resource"
@@ -48,6 +49,27 @@ type typeGroupNames struct {
 	Type  string
 	Group string
 	Names []string
+}
+
+type GroupKindNames map[metav1.GroupKind][]string
+type CategoryNames map[string][]string
+
+// SplitGroupKindAndCategories splits specified types into fully qualified GroupKinds and categories.
+func SplitGroupKindAndCategories(tgns []typeGroupNames) (GroupKindNames, CategoryNames) {
+	// collect group kinds and categories we want to query
+	categoryNames := map[string][]string{}
+	gkNames := map[metav1.GroupKind][]string{}
+	for _, tgn := range tgns {
+		kind, cat := tgn.Map()
+		if cat != "" {
+			categoryNames[cat] = append(categoryNames[cat], tgn.Names...)
+		} else {
+			gk := metav1.GroupKind{Group: tgn.Group, Kind: kind}
+			gkNames[gk] = append(gkNames[gk], tgn.Names...)
+		}
+	}
+
+	return gkNames, categoryNames
 }
 
 // ParseTypesAndNames parses

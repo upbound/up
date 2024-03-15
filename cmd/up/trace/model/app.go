@@ -29,6 +29,8 @@ package model
 import (
 	"sync/atomic"
 	"time"
+
+	"github.com/upbound/up/cmd/up/query"
 )
 
 const DefaultScale = time.Second * 10
@@ -48,12 +50,12 @@ type App struct {
 	Error    atomic.Value
 	Zoomed   bool
 
-	Kind  atomic.Pointer[string]
-	Group atomic.Pointer[string]
-	Name  atomic.Pointer[string]
+	Resources      atomic.Pointer[[]string]
+	GroupKindNames atomic.Pointer[query.GroupKindNames]
+	CategoryNames  atomic.Pointer[query.CategoryNames]
 }
 
-func NewApp(kind, group, name string) *App {
+func NewApp(resources []string, gkns query.GroupKindNames, cns query.CategoryNames) *App {
 	a := &App{
 		Tree: NewTree(),
 		TimeLine: TimeLine{
@@ -63,9 +65,9 @@ func NewApp(kind, group, name string) *App {
 
 	a.Error.Store("")
 
-	a.Kind.Store(&kind)
-	a.Group.Store(&group)
-	a.Name.Store(&name)
+	a.Resources.Store(&resources)
+	a.GroupKindNames.Store(&gkns)
+	a.CategoryNames.Store(&cns)
 
 	return a
 }
