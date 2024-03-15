@@ -121,6 +121,7 @@ func NewApp(title string, resources []string, gkns query.GroupKindNames, cns que
 		SetCommands("Help", "Kind", "View", "", "", "", "", "", "", "Quit").
 		SetDelegateInputHandler(app.TopLevelInputHandler)
 	app.Application.SetRoot(app.topLevel, true)
+	app.Application.SetFocus(app.tree)
 
 	return app
 }
@@ -143,6 +144,16 @@ func (a *App) TopLevelInputHandler(event *tcell.EventKey, setFocus func(p tview.
 	case tcell.KeyEscape:
 		if a.model.Zoomed {
 			a.Unzoom()
+			return true
+		}
+	case tcell.KeyUp:
+		if a.GetFocus() == a.topLevel || a.GetFocus() == a.tree {
+			a.tree.InputHandler()(event, setFocus)
+			return true
+		}
+	case tcell.KeyDown:
+		if a.GetFocus() == a.topLevel || a.GetFocus() == a.tree {
+			a.tree.InputHandler()(event, setFocus)
 			return true
 		}
 	case tcell.KeyLeft:
