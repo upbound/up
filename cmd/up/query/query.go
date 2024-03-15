@@ -1,4 +1,5 @@
 // Copyright 2024 Upbound Inc
+// Copyright 2014-2024 The Kubernetes Authors.
 //
 // Licensed under the Apache License, Version 2.0 (the "License");
 // you may not use this file except in compliance with the License.
@@ -117,7 +118,7 @@ func (c *QueryCmd) AfterApply(kongCtx *kong.Context) error { // nolint:gocyclo /
 }
 
 func (c *QueryCmd) Help() string {
-	s, err := help("up alpha query", "Query objects in one or many control planes.") // nolint:errcheck // nothing we can do here.
+	s, err := help("up alpha query") // nolint:errcheck // nothing we can do here.
 	if err != nil {
 		return err.Error()
 	}

@@ -118,7 +118,7 @@ func (c *GetCmd) AfterApply(kongCtx *kong.Context) error {
 }
 
 func (c *GetCmd) Help() string {
-	s, err := help("up alpha get", "Get objects in the current control plane.") // nolint:errcheck // nothing we can do here.
+	s, err := help("up alpha get") // nolint:errcheck // nothing we can do here.
 	if err != nil {
 		return err.Error()
 	}

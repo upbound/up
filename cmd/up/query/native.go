@@ -15,33 +15,7 @@
 package query
 
 var (
-	nativeKinds = map[string]string{
-		"poddisruptionbudgets":            "PodDisruptionBudget",
-		"rolebindings":                    "RoleBinding",
-		"endpoints":                       "Endpoints",
-		"apiservices":                     "APIService",
-		"pods":                            "Pod",
-		"events":                          "Event",
-		"serviceaccounts":                 "ServiceAccount",
-		"flowschemas":                     "FlowSchema",
-		"nodes":                           "Node",
-		"prioritylevelconfigurations":     "PriorityLevelConfiguration",
-		"leases":                          "Lease",
-		"validatingwebhookconfigurations": "ValidatingWebhookConfiguration",
-		"priorityclasses":                 "PriorityClass",
-		"namespaces":                      "Namespace",
-		"configmaps":                      "ConfigMap",
-		"customresourcedefinitions":       "CustomResourceDefinition",
-		"clusterrolebindings":             "ClusterRoleBinding",
-		"secrets":                         "Secret",
-		"services":                        "Service",
-		"endpointslices":                  "EndpointSlice",
-		"replicasets":                     "ReplicaSet",
-		"deployments":                     "Deployment",
-		"roles":                           "Role",
-		"clusterroles":                    "ClusterRole",
-	}
-
+	nativeKinds     = map[string]string{}
 	nativeResources = map[string]string{
 		"PodDisruptionBudget":            "poddisruptionbudgets",
 		"RoleBinding":                    "rolebindings",
@@ -67,5 +41,61 @@ var (
 		"Deployment":                     "deployments",
 		"Role":                           "roles",
 		"ClusterRole":                    "clusterroles",
+
+		"Binding":                          "bindings",
+		"CSIDriver":                        "csidrivers",
+		"CSINode":                          "csinodes",
+		"CSIStorageCapacity":               "csistoragecapacities",
+		"CertificateSigningRequest":        "certificatesigningrequests",
+		"ClusterTrustBundle":               "clustertrustbundles",
+		"ComponentStatus":                  "componentstatuses",
+		"ControllerRevision":               "controllerrevisions",
+		"ConversionReview":                 "conversionreviews",
+		"CronJob":                          "cronjobs",
+		"DaemonSet":                        "daemonsets",
+		"DeploymentRollback":               "deploymentrollbacks",
+		"Eviction":                         "evictions",
+		"HorizontalPodAutoscaler":          "horizontalpodautoscalers",
+		"IPAddress":                        "ipaddresses",
+		"Ingress":                          "ingresses",
+		"IngressClass":                     "ingressclasses",
+		"Job":                              "jobs",
+		"LimitRange":                       "limitranges",
+		"LocalSubjectAccessReview":         "localsubjectaccessreviews",
+		"MutatingWebhookConfiguration":     "mutatingwebhookconfigurations",
+		"NetworkPolicy":                    "networkpolicies",
+		"PersistentVolume":                 "persistentvolumes",
+		"PersistentVolumeClaim":            "persistentvolumeclaims",
+		"PodSchedulingContext":             "podscchedulingcontexts",
+		"PodStatusResult":                  "podstatusresults",
+		"PodTemplate":                      "podtemplates",
+		"RangeAllocation":                  "rangeallocations",
+		"ReplicationController":            "replicationcontrollers",
+		"ResourceClaim":                    "resourceclaims",
+		"ResourceClaimTemplate":            "resourceclaimtemplates",
+		"ResourceClass":                    "resourceclasses",
+		"ResourceQuota":                    "resourcequotas",
+		"RuntimeClass":                     "runtimeclasses",
+		"SelfSubjectAccessReview":          "selfsubjectaccessreviews",
+		"SelfSubjectReview":                "selfsubjectreviews",
+		"SelfSubjectRulesReview":           "selfsubjectrulesreviews",
+		"SerializedReference":              "serializedreferences",
+		"ServiceCIDR":                      "servicecidrs",
+		"StatefulSet":                      "statefulsets",
+		"StorageClass":                     "storageclasses",
+		"StorageVersion":                   "storageversions",
+		"SubjectAccessReview":              "subjectaccessreviews",
+		"TokenRequest":                     "tokenrequests",
+		"TokenReview":                      "tokenreviews",
+		"ValidatingAdmissionPolicy":        "validatingadmissionpolicies",
+		"ValidatingAdmissionPolicyBinding": "validatingadmissionpolicybindings",
+		"VolumeAttachment":                 "volumeattachments",
+		"VolumeAttributesClass":            "volumeattributesclasses",
 	}
 )
+
+func init() {
+	for k, v := range nativeResources {
+		nativeKinds[v] = k
+	}
+}

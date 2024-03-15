@@ -15,10 +15,14 @@
 package query
 
 import (
+	"fmt"
+	"sort"
+	"strings"
 	"testing"
 
 	apiextensionsv1 "k8s.io/apiextensions-apiserver/pkg/apis/apiextensions/v1"
 	kruntime "k8s.io/apimachinery/pkg/runtime"
+	"k8s.io/apimachinery/pkg/util/sets"
 	clientgoscheme "k8s.io/client-go/kubernetes/scheme"
 )
 
@@ -31,13 +35,31 @@ func TestNativeResources(t *testing.T) {
 		t.Fatalf("failed to add Kubernetes types to scheme: %v", err)
 	}
 
+	missingKinds := sets.New[string]()
+	special := sets.New[string](
+		"WatchEvent",
+		"Scale",
+		"Status",
+		"APIGroup",
+		"APIVersion",
+		"APIVersions",
+	)
 	for gvk := range scheme.AllKnownTypes() {
+		if strings.HasSuffix(gvk.Kind, "List") || special.Has(gvk.Kind) || strings.HasSuffix(gvk.Kind, "Options") {
+			continue
+		}
 		if _, found := nativeResources[gvk.Kind]; !found {
-			t.Errorf("native kind mapping not found in nativeResources map: %v", gvk)
+			missingKinds.Insert(fmt.Sprintf(`"%s":"",\n`, gvk.Kind))
 		}
 	}
+	if len(missingKinds) > 0 {
+		l := missingKinds.UnsortedList()
+		sort.Strings(l)
+		t.Errorf("missing native kinds")
+		t.Log(strings.Join(l, ""))
+	}
 
-	if len(nativeResources) != len(scheme.AllKnownTypes()) {
-		t.Errorf("nativeKinds map does not contain all known types or vice-versa")
+	if len(nativeResources) != len(nativeKinds) {
+		t.Errorf("nativeKinds map does not contain all known types or vice-versa: len(nativeResources) = %d != %d = len(nativeKinds)", len(nativeResources), len(nativeKinds))
 	}
 }

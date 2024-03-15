@@ -1,4 +1,5 @@
 // Copyright 2024 Upbound Inc
+// Copyright 2014-2024 The Kubernetes Authors.
 //
 // Licensed under the Apache License, Version 2.0 (the "License");
 // you may not use this file except in compliance with the License.
@@ -21,6 +22,7 @@ package query
 import (
 	"context"
 	"fmt"
+	"strings"
 
 	"github.com/alecthomas/kong"
 	"github.com/pterm/pterm"
@@ -39,6 +41,7 @@ import (
 	"k8s.io/client-go/kubernetes/scheme"
 	"k8s.io/client-go/rest"
 	"k8s.io/kubectl/pkg/cmd/get"
+	"k8s.io/utils/ptr"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/yaml"
 
@@ -56,7 +59,7 @@ func (c *cmd) afterApply() error {
 
 	c.printFlags = get.NewGetPrintFlags()
 	c.printFlags.NoHeaders = &c.NoHeaders
-	c.printFlags.OutputFormat = &c.OutputFormat
+	c.printFlags.OutputFormat = ptr.To(strings.TrimPrefix(c.OutputFormat, "="))
 
 	c.printFlags.CustomColumnsFlags.NoHeaders = c.NoHeaders
 

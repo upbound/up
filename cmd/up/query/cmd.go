@@ -61,12 +61,8 @@ type cmd struct {
 	namespace  string // inside the control plane
 }
 
-func help(cmdName, synopsis string) (string, error) {
-	t, err := template.New("help").Parse(`{{.Synopsis}}
-
-  {{.CmdName}} [(-o|--output=){{.Formats}}] (TYPE[.GROUP] [NAME ...] | TYPE[.GROUP]/NAME ...) [flags]
-
-Examples:
+func help(cmdName string) (string, error) {
+	t, err := template.New("help").Parse(`Examples:
   # List all S3 buckets in ps output format
   {{.CmdName}} buckets
 
@@ -99,16 +95,14 @@ Examples:
 	}
 
 	type Data struct {
-		CmdName  string
-		Synopsis string
-		Formats  string
+		CmdName string
+		Formats string
 	}
 
 	output := new(bytes.Buffer)
 	if err := t.Execute(output, Data{
-		CmdName:  cmdName,
-		Synopsis: synopsis,
-		Formats:  strings.Join(printFlags.AllowedFormats(), "|"),
+		CmdName: cmdName,
+		Formats: strings.Join(printFlags.AllowedFormats(), "|"),
 	}); err != nil {
 		return "", fmt.Errorf("error executing template: %w", err)
 	}

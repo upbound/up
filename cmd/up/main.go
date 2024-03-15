@@ -146,14 +146,6 @@ func main() {
 	parser := kong.Must(&c,
 		kong.Name("up"),
 		kong.Description("The Upbound CLI"),
-		kong.Help(func(options kong.HelpOptions, ctx *kong.Context) error {
-			// Do not emit help if command is hidden.
-			if ctx.Selected() != nil && ctx.Selected().Hidden {
-				fmt.Fprintf(ctx.Stdout, "Refusing to emit help for hidden command. See %s variant.\n", feature.GetMaturity(ctx.Selected()))
-				return nil
-			}
-			return kong.DefaultHelpPrinter(options, ctx)
-		}),
 		kong.ConfigureHelp(kong.HelpOptions{
 			Compact:             true,
 			NoExpandSubcommands: true,
