@@ -291,6 +291,9 @@ func (c *attachCmd) createSpace(ctx context.Context, p pterm.TextPrinter, kClien
 	p.Printfln("Creating a new Space in Upbound Console in organization %q...", a.Organization.Name)
 	space, err := sc.Create(ctx, a.Organization.Name, space, nil)
 	if err != nil {
+		if kerrors.IsAlreadyExists(err) && c.Space != "" {
+			return c.Space, nil
+		}
 		return "", errors.Wrapf(err, errCreateSpace)
 	}
 	u.Undo(func() error {
