@@ -60,9 +60,13 @@ const (
 	// museum. This would allow us to use wildcards like mxp-connector.
 	agentVersion  = "0.0.0-236.gc394d73"
 	agentRegistry = "us-west1-docker.pkg.dev/orchestration-build/connect"
+)
 
+const (
 	// TODO(tnthornton) maybe move this to the agent chart?
-	devConnectURL = "tls://connect.u5d.dev"
+	devConnect  = "tls://connect.u5d.dev"
+	stagConnect = "tls://connect.staging-eikeagoo.upbound.services"
+	prodConnect = "tls://connect.upbound.io"
 )
 
 type attachCmd struct {
@@ -71,6 +75,8 @@ type attachCmd struct {
 
 	Space string `arg:"" optional:"" help:"Name of the Upbound Space. If name is not a supplied, one is generated."`
 	Token string `name:"robot-token" optional:"" help:"The Upbound robot token contents used to authenticate the connection."`
+
+	Environment string `name:"up-environment" env:"UP_ENVIRONMENT" default:"prod" hidden:"" help:"Override the default Upbound Environment."`
 }
 
 func (c *attachCmd) AfterApply(kongCtx *kong.Context) error {
@@ -177,15 +183,9 @@ func (c *attachCmd) installAgent(p pterm.TextPrinter, mgr *helm.Installer, a *ac
 		p.Printfln(`Chart "%s/%s" already installed with version %s`, agentNs, agentChart, v)
 		return nil
 	}
+
 	p.Printfln(`Installing Chart "%s/%s"`, agentNs, agentChart)
-	if err := mgr.Install(agentVersion, map[string]any{
-		"nats": map[string]any{
-			"url": devConnectURL,
-		},
-		"space":        c.Space,
-		"organization": a.Organization.Name,
-		"tokenSecret":  agentSecret,
-	}); err != nil {
+	if err := mgr.Install(agentVersion, c.deriveParams(a)); err != nil {
 		return errors.Wrapf(err, `failed to install Chart "%s/%s"`, agentNs, agentChart)
 	}
 	u.Undo(func() error {
@@ -197,6 +197,32 @@ func (c *attachCmd) installAgent(p pterm.TextPrinter, mgr *helm.Installer, a *ac
 	})
 	p.Printfln(`Chart "%s/%s" version %s installed`, agentNs, agentChart, agentVersion)
 	return nil
+}
+
+func (c *attachCmd) deriveParams(a *accounts.AccountResponse) map[string]any {
+	connectURL := prodConnect
+	switch c.Environment {
+	case "dev":
+		connectURL = devConnect
+	case "staging":
+		connectURL = stagConnect
+	}
+
+	params := map[string]any{
+		"nats": map[string]any{
+			"url": connectURL,
+		},
+		"space":        c.Space,
+		"organization": a.Organization.Name,
+		"tokenSecret":  agentSecret,
+	}
+
+	if c.Environment != "prod" {
+		params["extraArgs"] = []string{
+			fmt.Sprintf("--env=%s", c.Environment),
+		}
+	}
+	return params
 }
 
 func (c *attachCmd) prepareToken(ctx context.Context, p pterm.TextPrinter, kClient *kubernetes.Clientset, a *accounts.AccountResponse, rc *robots.Client, oc *organizations.Client, tc *tokens.Client, u undo.Undoer, cmr **corev1.ConfigMap) error {
