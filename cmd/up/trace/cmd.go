@@ -19,16 +19,17 @@ import (
 	"fmt"
 	"strings"
 
+	"github.com/alecthomas/kong"
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 	"k8s.io/apimachinery/pkg/util/runtime"
 	"k8s.io/apimachinery/pkg/util/sets"
 	"k8s.io/client-go/kubernetes/scheme"
 	"sigs.k8s.io/controller-runtime/pkg/client"
-	"sigs.k8s.io/controller-runtime/pkg/client/config"
 
 	"github.com/crossplane/crossplane-runtime/pkg/errors"
 
 	queryv1alpha1 "github.com/upbound/up/cmd/up/trace/query/v1alpha1"
+	"github.com/upbound/up/internal/upbound"
 )
 
 func init() {
@@ -48,9 +49,12 @@ type Cmd struct {
 	ControlPlane string `short:"c" long:"controlplane" env:"UPBOUND_CONTROLPLANE" description:"Controlplane to query"`
 	Group        string `short:"g" long:"group" env:"UPBOUND_GROUP" description:"Group to query"`
 	Namespace    string `short:"n" long:"namespace" env:"UPBOUND_NAMESPACE" description:"Namespace of objects to query (defaults to all namespaces)"`
+	AllGroups    bool   `short:"A" name:"all-groups" help:"Query in all groups."`
 
 	Kind string `arg:"" description:"Kind to trace, accepts the 'KIND[.GROUP][/NAME]' format."`
 	Name string `arg:"" description:"Name to trace" optional:""`
+
+	Flags upbound.Flags `embed:""`
 }
 
 func (c *Cmd) Help() string {
@@ -66,17 +70,29 @@ Examples:
 `
 }
 
-// BeforeApply sets default values for the delete command, before assignment and validation.
-func (c *Cmd) BeforeApply() error {
+// AfterApply constructs and binds Upbound-specific context to any subcommands
+// that have Run() methods that receive it.
+func (c *Cmd) AfterApply(kongCtx *kong.Context) error {
+	upCtx, err := upbound.NewFromFlags(c.Flags, upbound.AllowMissingProfile())
+	if err != nil {
+		return err
+	}
+	kongCtx.Bind(upCtx)
+
 	return nil
 }
 
-func (c *Cmd) Run(ctx context.Context) error { // nolint:gocyclo // TODO: split up
-	cfg, err := config.GetConfig()
+func (c *Cmd) Run(ctx context.Context, upCtx *upbound.Context) error { // nolint:gocyclo // TODO: split up
+	kubeconfig, ns, err := upCtx.Profile.GetSpaceKubeConfig()
 	if err != nil {
-		return fmt.Errorf("failed to get kubeconfig: %w", err)
+		return err
 	}
-	kc, err := client.New(cfg, client.Options{})
+	if c.Group == "" {
+		if !c.AllGroups {
+			c.Group = ns
+		}
+	}
+	kc, err := client.New(kubeconfig, client.Options{})
 	if err != nil {
 		return fmt.Errorf("failed to create client: %w", err)
 	}
