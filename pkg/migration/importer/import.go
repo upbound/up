@@ -15,6 +15,7 @@
 package importer
 
 import (
+	"archive/tar"
 	"compress/gzip"
 	"context"
 	"fmt"
@@ -27,7 +28,6 @@ import (
 	"github.com/crossplane/crossplane-runtime/pkg/errors"
 	"github.com/crossplane/crossplane-runtime/pkg/fieldpath"
 	xpmeta "github.com/crossplane/crossplane-runtime/pkg/meta"
-	"github.com/mholt/archiver/v4"
 	"github.com/pterm/pterm"
 	"github.com/spf13/afero"
 	"gopkg.in/yaml.v3"
@@ -41,10 +41,10 @@ import (
 	"k8s.io/client-go/dynamic"
 	appsv1 "k8s.io/client-go/kubernetes/typed/apps/v1"
 
-	"github.com/upbound/up/internal/migration/category"
-	"github.com/upbound/up/internal/migration/crossplane"
-	"github.com/upbound/up/internal/migration/meta/v1alpha1"
-	"github.com/upbound/up/internal/upterm"
+	"github.com/upbound/up/pkg/migration"
+	"github.com/upbound/up/pkg/migration/category"
+	"github.com/upbound/up/pkg/migration/crossplane"
+	"github.com/upbound/up/pkg/migration/meta/v1alpha1"
 )
 
 const (
@@ -107,14 +107,9 @@ func NewControlPlaneStateImporter(dynamicClient dynamic.Interface, discoveryClie
 
 // Import imports the control plane state.
 func (im *ControlPlaneStateImporter) Import(ctx context.Context) error { // nolint:gocyclo // This is the high level import command, so it's expected to be a bit complex.
-	pterm.EnableStyling()
-	upterm.DefaultObjPrinter.Pretty = true
-
-	pterm.Println("Importing control plane state...")
-
 	// Reading state from the archive
 	unarchiveMsg := "Reading state from the archive... "
-	s, _ := upterm.CheckmarkSuccessSpinner.Start(unarchiveMsg)
+	s, _ := migration.DefaultSpinner.Start(unarchiveMsg)
 
 	// If preflight checks were already done, which unarchives to get the `export.yaml`, we don't need to do it again.
 	if im.fs == nil {
@@ -139,7 +134,7 @@ func (im *ControlPlaneStateImporter) Import(ctx context.Context) error { // noli
 	// They could be considered as the custom or native resources that do not depend on any packages (e.g. Managed Resources) or XRDs (e.g. Claims/Composites).
 	// They are imported first to make sure that all the resources that depend on them can be imported at a later stage.
 	importBaseMsg := "Importing base resources... "
-	s, _ = upterm.CheckmarkSuccessSpinner.Start(importBaseMsg + fmt.Sprintf("0 / %d", len(baseResources)))
+	s, _ = migration.DefaultSpinner.Start(importBaseMsg + fmt.Sprintf("0 / %d", len(baseResources)))
 	baseCounts := make(map[string]int, len(baseResources))
 	for i, gr := range baseResources {
 		count, err := r.ImportResources(ctx, gr, false)
@@ -160,7 +155,7 @@ func (im *ControlPlaneStateImporter) Import(ctx context.Context) error { // noli
 	// Wait for all XRDs and Packages to be ready before importing the resources that depend on them.
 
 	waitXRDsMsg := "Waiting for XRDs... "
-	s, _ = upterm.CheckmarkSuccessSpinner.Start(waitXRDsMsg)
+	s, _ = migration.DefaultSpinner.Start(waitXRDsMsg)
 	if err := im.waitForConditions(ctx, s, schema.GroupKind{Group: "apiextensions.crossplane.io", Kind: "CompositeResourceDefinition"}, []xpv1.ConditionType{"Established"}); err != nil {
 		s.Fail(waitXRDsMsg + stepFailed)
 		return errors.Wrap(err, "there are unhealthy CompositeResourceDefinitions")
@@ -168,7 +163,7 @@ func (im *ControlPlaneStateImporter) Import(ctx context.Context) error { // noli
 	s.Success(waitXRDsMsg + "Established! ⏳")
 
 	waitPkgsMsg := "Waiting for Packages... "
-	s, _ = upterm.CheckmarkSuccessSpinner.Start(waitPkgsMsg)
+	s, _ = migration.DefaultSpinner.Start(waitPkgsMsg)
 	for _, k := range []schema.GroupKind{
 		{Group: "pkg.crossplane.io", Kind: "Provider"},
 		{Group: "pkg.crossplane.io", Kind: "Function"},
@@ -203,7 +198,7 @@ func (im *ControlPlaneStateImporter) Import(ctx context.Context) error { // noli
 
 	// Import remaining resources other than the base resources.
 	importRemainingMsg := "Importing remaining resources... "
-	s, _ = upterm.CheckmarkSuccessSpinner.Start(importRemainingMsg)
+	s, _ = migration.DefaultSpinner.Start(importRemainingMsg)
 	grs, err := im.fs.ReadDir("/")
 	if err != nil {
 		s.Fail(importRemainingMsg + stepFailed)
@@ -242,7 +237,7 @@ func (im *ControlPlaneStateImporter) Import(ctx context.Context) error { // noli
 	// At this stage, all the resources are imported, but Claims/Composites and Managed resources are paused.
 	// In the finalization step, we will unpause Claims and Composites but not Managed resources (i.e. not activate the control plane yet).
 	finalizeMsg := "Finalizing import... "
-	s, _ = upterm.CheckmarkSuccessSpinner.Start(finalizeMsg)
+	s, _ = migration.DefaultSpinner.Start(finalizeMsg)
 	cm := category.NewAPICategoryModifier(im.dynamicClient, im.discoveryClient)
 	_, err = cm.ModifyResources(ctx, "composite", func(u *unstructured.Unstructured) error {
 		xpmeta.RemoveAnnotations(u, "crossplane.io/paused")
@@ -263,7 +258,7 @@ func (im *ControlPlaneStateImporter) Import(ctx context.Context) error { // noli
 
 	if im.options.UnpauseAfterImport {
 		unpauseMsg := "Unpausing managed resources ... "
-		s, _ := upterm.CheckmarkSuccessSpinner.Start(unpauseMsg)
+		s, _ := migration.DefaultSpinner.Start(unpauseMsg)
 		_, err = cm.ModifyResources(ctx, "managed", func(u *unstructured.Unstructured) error {
 			xpmeta.RemoveAnnotations(u, "crossplane.io/paused")
 			return nil
@@ -275,7 +270,6 @@ func (im *ControlPlaneStateImporter) Import(ctx context.Context) error { // noli
 	}
 	//////////////////////////////////////////
 
-	pterm.Println("\nSuccessfully imported control plane state!")
 	return nil
 }
 
@@ -330,54 +324,53 @@ func contains(ss []string, s string) bool {
 func (im *ControlPlaneStateImporter) unarchive(ctx context.Context, fs afero.Afero) error {
 	g, err := os.Open(im.options.InputArchive)
 	if err != nil {
-		return errors.Wrap(err, "cannot open input archive")
+		return errors.Wrapf(err, "cannot open archive %q", im.options.InputArchive)
 	}
 	defer func() {
 		_ = g.Close()
 	}()
 
-	ur, err := gzip.NewReader(g)
+	gr, err := gzip.NewReader(g)
 	if err != nil {
-		return errors.Wrap(err, "cannot decompress archive")
+		return errors.Wrapf(err, "cannot create gzip reader for %q", im.options.InputArchive)
 	}
-	defer func() {
-		_ = ur.Close()
-	}()
+	defer gr.Close()
 
-	format := archiver.Tar{}
+	tr := tar.NewReader(gr)
 
-	handler := func(ctx context.Context, f archiver.File) error {
-		if f.IsDir() {
-			if err = fs.Mkdir(f.NameInArchive, 0700); err != nil {
-				return errors.Wrapf(err, "cannot create directory %q", f.Name())
+	for {
+		select {
+		case <-ctx.Done():
+			return ctx.Err()
+		default:
+		}
+		hdr, err := tr.Next()
+		if err == io.EOF {
+			break // End of archive
+		}
+		if err != nil {
+			return errors.Wrapf(err, "cannot read archive %q", im.options.InputArchive)
+		}
+
+		if hdr.FileInfo().IsDir() {
+			if err = fs.Mkdir(hdr.Name, 0700); err != nil {
+				return errors.Wrapf(err, "cannot create directory %q", hdr.Name)
 			}
-			return nil
+			continue
 		}
 
-		nf, err := fs.OpenFile(f.NameInArchive, os.O_WRONLY|os.O_CREATE|os.O_TRUNC, 0600)
+		nf, err := fs.OpenFile(hdr.Name, os.O_WRONLY|os.O_CREATE|os.O_TRUNC, 0600)
 		if err != nil {
-			return errors.Wrapf(err, "cannot create file %q", f.Name())
+			return errors.Wrapf(err, "cannot create file %q", hdr.Name)
 		}
-		defer func() {
-			_ = nf.Close()
-		}()
+		defer nf.Close()
 
-		b, err := f.Open()
-		if err != nil {
-			return errors.Wrapf(err, "cannot open file %q", f.Name())
+		if _, err := io.Copy(nf, tr); err != nil {
+			return errors.Wrapf(err, "cannot write file %q", hdr.Name)
 		}
-		defer func() {
-			_ = b.Close()
-		}()
-		_, err = io.Copy(nf, b)
-		if err != nil {
-			return err
-		}
-
-		return nil
 	}
 
-	return format.Extract(ctx, ur, nil, handler)
+	return nil
 }
 
 func isBaseResource(gr string) bool {
@@ -389,7 +382,7 @@ func isBaseResource(gr string) bool {
 	return false
 }
 
-func (im *ControlPlaneStateImporter) waitForConditions(ctx context.Context, sp *pterm.SpinnerPrinter, gk schema.GroupKind, conditions []xpv1.ConditionType) error {
+func (im *ControlPlaneStateImporter) waitForConditions(ctx context.Context, sp migration.Printer, gk schema.GroupKind, conditions []xpv1.ConditionType) error {
 	rm, err := im.resourceMapper.RESTMapping(gk)
 	if err != nil {
 		return errors.Wrapf(err, "cannot get REST mapping for %q", gk)

@@ -17,8 +17,7 @@ package migration
 import (
 	"context"
 	"fmt"
-	"net/url"
-	"strings"
+	"regexp"
 
 	"github.com/crossplane/crossplane-runtime/pkg/errors"
 	"github.com/pterm/pterm"
@@ -26,12 +25,19 @@ import (
 	"k8s.io/client-go/discovery/cached/memory"
 	"k8s.io/client-go/dynamic"
 	appsv1 "k8s.io/client-go/kubernetes/typed/apps/v1"
-	"k8s.io/client-go/rest"
 	"k8s.io/client-go/restmapper"
 
 	"github.com/upbound/up/internal/input"
-	"github.com/upbound/up/internal/migration"
-	"github.com/upbound/up/internal/migration/importer"
+	"github.com/upbound/up/internal/upterm"
+	"github.com/upbound/up/pkg/migration"
+	"github.com/upbound/up/pkg/migration/importer"
+)
+
+var (
+	// Matches https://00.000.000.0.nip.io/apis/spaces.upbound.io/v1beta1/namespaces/default/controlplanes/ctp1/k8s
+	newControlPlanePathRE = regexp.MustCompile(`^(?P<base>.+)/apis/spaces.upbound.io/(?P<version>v[^/]+)/namespaces/(?P<namespace>[^/]+)/controlplanes/(?P<controlplane>[^/]+)/k8s$`)
+	// Matches https://spaces-foo.upboundrocks.cloud/v1/controlplanes/acmeco/default/ctp/k8s
+	oldControlPlanePathRE = regexp.MustCompile(`^(?P<base>.+)/v1/control[pP]lanes/(?P<namespace>[^/]+)/(?P<controlplane>[^/]+)/ctp/k8s$`)
 )
 
 type importCmd struct {
@@ -71,7 +77,7 @@ func (c *importCmd) BeforeApply() error {
 func (c *importCmd) Run(ctx context.Context, migCtx *migration.Context) error { //nolint:gocyclo // Just a lot of error handling.
 	cfg := migCtx.Kubeconfig
 
-	if !isMCP(cfg) {
+	if !isMCP(cfg.Host) {
 		return errors.New("not a managed control plane, import not supported!")
 	}
 
@@ -116,17 +122,20 @@ func (c *importCmd) Run(ctx context.Context, migCtx *migration.Context) error { 
 		}
 	}
 
+	pterm.EnableStyling()
+	upterm.DefaultObjPrinter.Pretty = true
+
+	pterm.Println("Importing control plane state...")
+	migration.DefaultSpinner = &spinner{upterm.CheckmarkSuccessSpinner}
+
 	if err = i.Import(ctx); err != nil {
 		return err
 	}
+	pterm.Println("\nfully imported control plane state!")
 
 	return nil
 }
 
-func isMCP(cfg *rest.Config) bool {
-	u, err := url.Parse(cfg.Host)
-	if err != nil {
-		return false
-	}
-	return (strings.HasPrefix(u.Path, "/v1/controlplanes") || strings.HasPrefix(u.Path, "/v1/controlPlanes")) && strings.HasSuffix(u.Path, "/k8s")
+func isMCP(host string) bool {
+	return newControlPlanePathRE.MatchString(host) || oldControlPlanePathRE.MatchString(host)
 }

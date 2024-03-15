@@ -23,7 +23,7 @@ import (
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 	"sigs.k8s.io/yaml"
 
-	"github.com/upbound/up/internal/migration/meta/v1alpha1"
+	"github.com/upbound/up/pkg/migration/meta/v1alpha1"
 )
 
 type ResourcePersister interface {

@@ -26,8 +26,9 @@ import (
 	"k8s.io/client-go/restmapper"
 
 	"github.com/upbound/up/internal/input"
-	"github.com/upbound/up/internal/migration"
-	"github.com/upbound/up/internal/migration/exporter"
+	"github.com/upbound/up/internal/upterm"
+	"github.com/upbound/up/pkg/migration"
+	"github.com/upbound/up/pkg/migration/exporter"
 )
 
 const secretsWarning = `Warning: A functional Crossplane control plane requires cloud provider credentials,
@@ -127,8 +128,26 @@ func (c *exportCmd) Run(ctx context.Context, migCtx *migration.Context) error {
 		}
 	}
 
+	pterm.EnableStyling()
+	upterm.DefaultObjPrinter.Pretty = true
+
+	pterm.Println("Exporting control plane state...")
+
+	migration.DefaultSpinner = &spinner{upterm.CheckmarkSuccessSpinner}
+
 	if err = e.Export(ctx); err != nil {
 		return err
 	}
+	pterm.Println("\nSuccessfully exported control plane state!")
 	return nil
+}
+
+// NOTE(phisco): this is required to avoid having the pkg/migration depend on upterm to
+// allow exporting it
+type spinner struct {
+	*pterm.SpinnerPrinter
+}
+
+func (s spinner) Start(text ...interface{}) (migration.Printer, error) {
+	return s.SpinnerPrinter.Start(text...)
 }

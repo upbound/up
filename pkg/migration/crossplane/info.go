@@ -22,7 +22,7 @@ import (
 	v1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	appsv1 "k8s.io/client-go/kubernetes/typed/apps/v1"
 
-	"github.com/upbound/up/internal/migration/meta/v1alpha1"
+	"github.com/upbound/up/pkg/migration/meta/v1alpha1"
 )
 
 func CollectInfo(ctx context.Context, appsClient appsv1.DeploymentsGetter) (*v1alpha1.CrossplaneInfo, error) {
