@@ -39,6 +39,8 @@ This is a slimmed-down version of the release process described [here](https://g
 1. **promote**: Run the `Promote` action on the release branch with the release 
    version being the tag name (e.g. `v0.25.0`) and the channel being
    `alpha` or `stable`.
+1. **verify promotion**: Check that https://cli.upbound.io/stable?prefix=stable/v0.25.0/ 
+   has the new version.
 1. **update homebrew**: Run [`Bump Formula`](https://github.com/upbound/homebrew-tap/actions/workflows/bump-formula.yaml) action to open a PR in Homebrew 
    for the new version. Get approval and merge.
 1. **release notes**: 
