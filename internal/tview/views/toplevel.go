@@ -32,6 +32,7 @@ type TopLevel struct {
 	Titles    []GridTitle
 	SubTitles []GridTitle
 	Commands  []string
+	Error     func() error
 
 	delegate func(event *tcell.EventKey, setFocus func(p tview.Primitive)) bool
 
@@ -63,6 +64,11 @@ func (t *TopLevel) SetSubTitles(titles ...GridTitle) *TopLevel {
 
 func (t *TopLevel) SetCommands(commands ...string) *TopLevel {
 	t.Commands = commands
+	return t
+}
+
+func (t *TopLevel) SetError(f func() error) *TopLevel {
+	t.Error = f
 	return t
 }
 
@@ -171,6 +177,20 @@ func (t *TopLevel) Draw(screen tcell.Screen) { // nolint:gocyclo // draw methods
 		if title.Fn != nil {
 			title.Fn(screen, int(x), int(y)+int(h)-1, int(w))
 		}
+	}
+
+	// draw error and keep it up at least for errorHideInterval
+	var err error
+	if t.Error != nil {
+		err = t.Error()
+	}
+	if err != nil {
+		w, h := screen.Size()
+		for x := 0; x < w; x++ {
+			screen.SetCell(x, h-1, tcell.StyleDefault.Background(style.ErrorBarBackground), ' ')
+		}
+		tview.Print(screen, err.Error(), 0, h-1, w, tview.AlignCenter, style.ErrorBarForeground)
+		return
 	}
 
 	// draw F1-F10 hints

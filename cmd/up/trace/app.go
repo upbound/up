@@ -17,7 +17,6 @@ package trace
 import (
 	"bytes"
 	"context"
-	"fmt"
 	"strings"
 	"time"
 
@@ -28,6 +27,8 @@ import (
 	"k8s.io/apimachinery/pkg/util/duration"
 	kerrors "k8s.io/apimachinery/pkg/util/errors"
 	"sigs.k8s.io/yaml"
+
+	"github.com/crossplane/crossplane-runtime/pkg/errors"
 
 	queryv1alpha1 "github.com/upbound/up-sdk-go/apis/query/v1alpha1"
 	"github.com/upbound/up/cmd/up/query"
@@ -114,10 +115,7 @@ func NewApp(title string, resources []string, gkns query.GroupKindNames, cns que
 				}
 			}},
 		).
-		SetSubTitles(upviews.GridTitle{Col: 0, Row: 2, Fn: func(screen tcell.Screen, x, y, w int) {
-			err := app.model.Error.Load().(string)
-			tview.Print(screen, err, x, y-1, w, tview.AlignCenter, tcell.ColorHotPink)
-		}}).
+		SetError(app.model.TopLevel.Error).
 		SetCommands("Help", "Kind", "View", "", "", "", "", "", "", "Quit").
 		SetDelegateInputHandler(app.TopLevelInputHandler)
 	app.Application.SetRoot(app.topLevel, true)
@@ -218,14 +216,14 @@ func (a *App) TopLevelInputHandler(event *tcell.EventKey, setFocus func(p tview.
 			SetSelectedFunc(func(value string) {
 				value = strings.TrimSpace(value)
 				if value == "" {
-					a.model.Error.Store("No resources specified")
+					a.model.TopLevel.SetError(errors.New("No resources specified"))
 					return
 				}
 
 				resources := strings.Split(value, " ")
 				tgns, errs := query.ParseTypesAndNames(resources...)
 				if err := kerrors.NewAggregate(errs); err != nil {
-					a.model.Error.Store(err.Error())
+					a.model.TopLevel.SetError(err)
 					return
 				}
 				gkns, cns := query.SplitGroupKindAndCategories(tgns)
@@ -293,16 +291,9 @@ func (a *App) Run(ctx context.Context) error {
 			time.Sleep(time.Second * 1)
 			objs, err := a.pollFn(*a.model.GroupKindNames.Load(), *a.model.CategoryNames.Load())
 			if err != nil {
-				a.model.Error.Store(fmt.Sprintf(" Error: %v ", err))
+				a.model.TopLevel.SetError(errors.Errorf(" Error: %v ", err))
 				continue
 			}
-
-			go func(old string) {
-				time.Sleep(time.Second * 5)
-				if a.model.Error.Load().(string) == old {
-					a.model.Error.Store("")
-				}
-			}(a.model.Error.Load().(string))
 
 			a.QueueUpdateDraw(func() {
 				a.model.Tree.Update(objs)

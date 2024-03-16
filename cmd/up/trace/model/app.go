@@ -31,6 +31,7 @@ import (
 	"time"
 
 	"github.com/upbound/up/cmd/up/query"
+	"github.com/upbound/up/internal/tview/model"
 )
 
 const DefaultScale = time.Second * 10
@@ -45,9 +46,9 @@ var Scales = []time.Duration{
 }
 
 type App struct {
+	TopLevel model.TopLevel
 	Tree     Tree
 	TimeLine TimeLine
-	Error    atomic.Value
 	Zoomed   bool
 
 	Resources      atomic.Pointer[[]string]
@@ -62,8 +63,6 @@ func NewApp(resources []string, gkns query.GroupKindNames, cns query.CategoryNam
 			Scale: DefaultScale,
 		},
 	}
-
-	a.Error.Store("")
 
 	a.Resources.Store(&resources)
 	a.GroupKindNames.Store(&gkns)
