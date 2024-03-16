@@ -131,13 +131,17 @@ func (c *Cmd) Run(ctx context.Context, upCtx *upbound.Context) error { // nolint
 			}
 		}
 		for cat, names := range cns {
+			catList := []string{cat}
+			if cat == query.AllCategory {
+				catList = nil
+			}
 			if len(names) == 0 {
-				query := createQuerySpec(types.NamespacedName{Namespace: c.Namespace}, metav1.GroupKind{}, []string{cat})
+				query := createQuerySpec(types.NamespacedName{Namespace: c.Namespace}, metav1.GroupKind{}, catList)
 				querySpecs = append(querySpecs, query)
 				continue
 			}
 			for _, name := range names {
-				query := createQuerySpec(types.NamespacedName{Namespace: c.Namespace, Name: name}, metav1.GroupKind{}, []string{cat})
+				query := createQuerySpec(types.NamespacedName{Namespace: c.Namespace, Name: name}, metav1.GroupKind{}, catList)
 				querySpecs = append(querySpecs, query)
 			}
 		}

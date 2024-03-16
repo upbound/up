@@ -29,6 +29,8 @@ import (
 	clientgoscheme "k8s.io/client-go/kubernetes/scheme"
 )
 
+const AllCategory = "all"
+
 var nativeScheme = runtime.NewScheme()
 
 func init() {

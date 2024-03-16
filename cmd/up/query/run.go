@@ -105,24 +105,19 @@ func (c *cmd) Run(ctx context.Context, kongCtx *kong.Context, upCtx *upbound.Con
 		}
 	}
 	for cat, names := range categoryNames {
+		catList := []string{cat}
+		if cat == AllCategory {
+			catList = nil
+		}
 		if len(names) == 0 {
-			query := createQuerySpec(types.NamespacedName{Namespace: c.namespace}, metav1.GroupKind{}, []string{cat}, c.OutputFormat)
+			query := createQuerySpec(types.NamespacedName{Namespace: c.namespace}, metav1.GroupKind{}, catList, c.OutputFormat)
 			querySpecs = append(querySpecs, query)
 			continue
 		}
 		for _, name := range names {
-			query := createQuerySpec(types.NamespacedName{Namespace: c.namespace, Name: name}, metav1.GroupKind{}, []string{cat}, c.OutputFormat)
+			query := createQuerySpec(types.NamespacedName{Namespace: c.namespace, Name: name}, metav1.GroupKind{}, catList, c.OutputFormat)
 			querySpecs = append(querySpecs, query)
 		}
-	}
-	if len(querySpecs) == 0 && len(categoryNames) == 0 {
-		if !c.AllResources {
-			return fmt.Errorf("no resource type specified. Use --all-resources to query all resources")
-		}
-		query := createQuerySpec(types.NamespacedName{Namespace: c.namespace}, metav1.GroupKind{}, nil, c.OutputFormat)
-		querySpecs = append(querySpecs, query)
-	} else if c.AllResources {
-		return fmt.Errorf("cannot use --all-resources with specific resources")
 	}
 
 	// send queries and collect objects
