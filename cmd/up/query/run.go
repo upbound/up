@@ -129,8 +129,15 @@ func (c *cmd) Run(ctx context.Context, kongCtx *kong.Context, upCtx *upbound.Con
 		query.SetSpec(spec)
 
 		if c.Flags.Debug > 0 {
+			kinds, _, err := queryScheme.ObjectKinds(query)
+			if err != nil {
+				return fmt.Errorf("failed to get object kinds: %w", err)
+			}
+			if len(kinds) != 1 {
+				return fmt.Errorf("expected exactly one kind, got %d", len(kinds))
+			}
 			query := query.DeepCopyQueryObject()
-			query.GetObjectKind().SetGroupVersionKind(queryv1alpha1.SchemeGroupVersion.WithKind(fmt.Sprintf("%T", query)))
+			query.GetObjectKind().SetGroupVersionKind(queryv1alpha1.SchemeGroupVersion.WithKind(kinds[0].Kind))
 			bs, err := yaml.Marshal(query)
 			if err != nil {
 				return fmt.Errorf("failed to marshal query: %w", err)
