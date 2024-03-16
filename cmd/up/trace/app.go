@@ -17,7 +17,6 @@ package trace
 import (
 	"bytes"
 	"context"
-	"fmt"
 	"strings"
 	"time"
 
@@ -26,10 +25,14 @@ import (
 	"github.com/rivo/tview"
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 	"k8s.io/apimachinery/pkg/util/duration"
+	kerrors "k8s.io/apimachinery/pkg/util/errors"
 	"sigs.k8s.io/yaml"
 
+	"github.com/crossplane/crossplane-runtime/pkg/errors"
+
+	queryv1alpha1 "github.com/upbound/up-sdk-go/apis/query/v1alpha1"
+	"github.com/upbound/up/cmd/up/query"
 	"github.com/upbound/up/cmd/up/trace/model"
-	queryv1alpha1 "github.com/upbound/up/cmd/up/trace/query/v1alpha1"
 	"github.com/upbound/up/cmd/up/trace/views"
 	"github.com/upbound/up/internal/tview/dialogs"
 	upviews "github.com/upbound/up/internal/tview/views"
@@ -49,14 +52,14 @@ type App struct {
 	grid     *tview.Grid
 	topLevel *upviews.TopLevel
 
-	pollFn  func(group, kind, name string) (*queryv1alpha1.QueryResponse, error)
+	pollFn  func(gkns query.GroupKindNames, cns query.CategoryNames) ([]queryv1alpha1.QueryResponseObject, error)
 	fetchFn func(id string) (*unstructured.Unstructured, error)
 }
 
-func NewApp(title string, group, kind, name string, pollFn func(kind, group, name string) (*queryv1alpha1.QueryResponse, error), fetchFn func(id string) (*unstructured.Unstructured, error)) *App {
+func NewApp(title string, resources []string, gkns query.GroupKindNames, cns query.CategoryNames, pollFn func(gkns query.GroupKindNames, cns query.CategoryNames) ([]queryv1alpha1.QueryResponseObject, error), fetchFn func(id string) (*unstructured.Unstructured, error)) *App {
 	app := &App{
 		Application: tview.NewApplication(),
-		model:       model.NewApp(kind, group, name),
+		model:       model.NewApp(resources, gkns, cns),
 		pollFn:      pollFn,
 		fetchFn:     fetchFn,
 	}
@@ -112,13 +115,11 @@ func NewApp(title string, group, kind, name string, pollFn func(kind, group, nam
 				}
 			}},
 		).
-		SetSubTitles(upviews.GridTitle{Col: 0, Row: 2, Fn: func(screen tcell.Screen, x, y, w int) {
-			err := app.model.Error.Load().(string)
-			tview.Print(screen, err, x, y, w, tview.AlignCenter, tcell.ColorHotPink)
-		}}).
+		SetError(app.model.TopLevel.Error).
 		SetCommands("Help", "Kind", "View", "", "", "", "", "", "", "Quit").
 		SetDelegateInputHandler(app.TopLevelInputHandler)
 	app.Application.SetRoot(app.topLevel, true)
+	app.Application.SetFocus(app.tree)
 
 	return app
 }
@@ -141,6 +142,16 @@ func (a *App) TopLevelInputHandler(event *tcell.EventKey, setFocus func(p tview.
 	case tcell.KeyEscape:
 		if a.model.Zoomed {
 			a.Unzoom()
+			return true
+		}
+	case tcell.KeyUp:
+		if a.GetFocus() == a.topLevel || a.GetFocus() == a.tree {
+			a.tree.InputHandler()(event, setFocus)
+			return true
+		}
+	case tcell.KeyDown:
+		if a.GetFocus() == a.topLevel || a.GetFocus() == a.tree {
+			a.tree.InputHandler()(event, setFocus)
 			return true
 		}
 	case tcell.KeyLeft:
@@ -194,36 +205,36 @@ func (a *App) TopLevelInputHandler(event *tcell.EventKey, setFocus func(p tview.
 		default:
 		}
 	case tcell.KeyF2:
-		kind := *a.model.Kind.Load()
-		group := *a.model.Group.Load()
-		name := *a.model.Name.Load()
+		resources := *a.model.Resources.Load()
 
-		s := kind
-		if group != "" {
-			s += "." + group
-		}
-
-		if name != "" {
-			s += "/" + name
-		}
-
-		dialogs.ShowModal(a.Application, dialogs.NewSimpleInputDialog(s).
-			SetTitle("Kind").
+		oldRoot := dialogs.GetRoot(a.Application)
+		dlg := dialogs.NewSimpleInputDialog(strings.Join(resources, " ")).
+			SetTitle("Types").
 			SetLabel("Kind").
-			SetCancelFunc(func() { a.SetFocus(a.topLevel) }).
+			SetDescription("Format: TYPE[.GROUP][,TYPE[.GROUP]...] [NAME ...] | TYPE[.GROUP]/NAME ...").
+			SetCancelFunc(func() { a.SetRoot(oldRoot, true) }).
 			SetSelectedFunc(func(value string) {
-				group, kind, name, err := getGroupKindName(value, "")
-				if err == nil {
-					a.model.Kind.Store(&kind)
-					a.model.Group.Store(&group)
-					a.model.Name.Store(&name)
-					a.model.Error.Store("")
-					a.SetRoot(a.topLevel, true)
-				} else {
-					a.model.Error.Store(fmt.Sprintf(" Error: %v ", err))
+				value = strings.TrimSpace(value)
+				if value == "" {
+					a.model.TopLevel.SetError(errors.New("No resources specified"))
+					return
 				}
-			}).
-			Display())
+
+				resources := strings.Split(value, " ")
+				tgns, errs := query.ParseTypesAndNames(resources...)
+				if err := kerrors.NewAggregate(errs); err != nil {
+					a.model.TopLevel.SetError(err)
+					return
+				}
+				gkns, cns := query.SplitGroupKindAndCategories(tgns)
+
+				a.model.Resources.Store(&resources)
+				a.model.GroupKindNames.Store(&gkns)
+				a.model.CategoryNames.Store(&cns)
+
+				a.SetRoot(oldRoot, true)
+			})
+		dialogs.ShowModal(a.Application, dlg.Display())
 
 		return true
 	case tcell.KeyF3:
@@ -268,7 +279,7 @@ func (a *App) Run(ctx context.Context) error {
 		}
 	}()
 
-	resp, err := a.pollFn(*a.model.Group.Load(), *a.model.Kind.Load(), *a.model.Name.Load())
+	resp, err := a.pollFn(*a.model.GroupKindNames.Load(), *a.model.CategoryNames.Load())
 	if err != nil {
 		return err
 	}
@@ -278,14 +289,14 @@ func (a *App) Run(ctx context.Context) error {
 	go func() {
 		for {
 			time.Sleep(time.Second * 1)
-			resp, err := a.pollFn(*a.model.Group.Load(), *a.model.Kind.Load(), *a.model.Name.Load())
+			objs, err := a.pollFn(*a.model.GroupKindNames.Load(), *a.model.CategoryNames.Load())
 			if err != nil {
-				a.model.Error.Store(fmt.Sprintf(" Error: %v ", err))
+				a.model.TopLevel.SetError(errors.Errorf(" Error: %v ", err))
 				continue
 			}
-			a.model.Error.Store("")
+
 			a.QueueUpdateDraw(func() {
-				a.model.Tree.Update(resp)
+				a.model.Tree.Update(objs)
 			})
 		}
 	}()

@@ -14,8 +14,8 @@ type QueryObject interface {
 	client.Object
 
 	GetSpec() *queryv1alpha1.QuerySpec
-	SetSpec(spec *queryv1alpha1.QuerySpec)
-	SetResponse(response *queryv1alpha1.QueryResponse)
+	SetSpec(spec *queryv1alpha1.QuerySpec) QueryObject
+	SetResponse(response *queryv1alpha1.QueryResponse) QueryObject
 	GetResponse() *queryv1alpha1.QueryResponse
 	DeepCopyQueryObject() QueryObject
 }
@@ -78,13 +78,15 @@ func (q *SpaceQuery) GetSpec() *queryv1alpha1.QuerySpec {
 }
 
 // SetSpec sets the spec of the query.
-func (q *SpaceQuery) SetSpec(spec *queryv1alpha1.QuerySpec) {
+func (q *SpaceQuery) SetSpec(spec *queryv1alpha1.QuerySpec) QueryObject {
 	q.Spec = spec
+	return q
 }
 
 // SetResponse sets the response of the query.
-func (q *SpaceQuery) SetResponse(response *queryv1alpha1.QueryResponse) {
+func (q *SpaceQuery) SetResponse(response *queryv1alpha1.QueryResponse) QueryObject {
 	q.Response = response
+	return q
 }
 
 // GetResponse gets the response of the query.
@@ -98,13 +100,15 @@ func (q *GroupQuery) GetSpec() *queryv1alpha1.QuerySpec {
 }
 
 // SetSpec sets the spec of the query.
-func (q *GroupQuery) SetSpec(spec *queryv1alpha1.QuerySpec) {
+func (q *GroupQuery) SetSpec(spec *queryv1alpha1.QuerySpec) QueryObject {
 	q.Spec = spec
+	return q
 }
 
 // SetResponse sets the response of the query.
-func (q *GroupQuery) SetResponse(response *queryv1alpha1.QueryResponse) {
+func (q *GroupQuery) SetResponse(response *queryv1alpha1.QueryResponse) QueryObject {
 	q.Response = response
+	return q
 }
 
 // GetResponse gets the response of the query.
@@ -118,13 +122,15 @@ func (q *Query) GetSpec() *queryv1alpha1.QuerySpec {
 }
 
 // SetSpec sets the spec of the query.
-func (q *Query) SetSpec(spec *queryv1alpha1.QuerySpec) {
+func (q *Query) SetSpec(spec *queryv1alpha1.QuerySpec) QueryObject {
 	q.Spec = spec
+	return q
 }
 
 // SetResponse sets the response of the query.
-func (q *Query) SetResponse(response *queryv1alpha1.QueryResponse) {
+func (q *Query) SetResponse(response *queryv1alpha1.QueryResponse) QueryObject {
 	q.Response = response
+	return q
 }
 
 // GetResponse gets the response of the query.
