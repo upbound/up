@@ -39,7 +39,7 @@ This is a slimmed-down version of the release process described [here](https://g
 1. **promote**: Run the `Promote` action on the release version to promote 
    to desired channel(s) (e.g. `alpha` or `stable`).
 1. **update homebrew**: Run [`Bump Formula`](https://github.com/upbound/homebrew-tap/actions/workflows/bump-formula.yaml) action to open a PR in Homebrew 
-   for the new version. Self-approve and merge.
+   for the new version. Get approval and merge.
 1. **release notes**: 
    - Open the new release tag in https://github.com/upbound/up/tags and click "Create
      release from tag".
