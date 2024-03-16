@@ -24,7 +24,7 @@ This is a slimmed-down version of the release process described [here](https://g
    repo (e.g. `release-0.25`).
 1. **tag release**: Run the `Tag` action on the _release branch_ with the
    desired version (e.g. `v0.25.0`).
-1. **build/publish**: Run the `CI` action on the tag that was just created.
+1. **build/publish**: Run the `CI` action on the release-branch (**not on the tag!**).
 1. **tag next pre-release**: Run the `tag` action on the main development branch
    with the `rc.0` for the next release (e.g. `v0.26.0-rc.0`).
 1. **verify**: Verify all artifacts have been published successfully, perform
