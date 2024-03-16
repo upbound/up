@@ -105,77 +105,93 @@ func (c *cmd) Run(ctx context.Context, kongCtx *kong.Context, upCtx *upbound.Con
 		}
 	}
 	for cat, names := range categoryNames {
+		catList := []string{cat}
+		if cat == AllCategory {
+			catList = nil
+		}
 		if len(names) == 0 {
-			query := createQuerySpec(types.NamespacedName{Namespace: c.namespace}, metav1.GroupKind{}, []string{cat}, c.OutputFormat)
+			query := createQuerySpec(types.NamespacedName{Namespace: c.namespace}, metav1.GroupKind{}, catList, c.OutputFormat)
 			querySpecs = append(querySpecs, query)
 			continue
 		}
 		for _, name := range names {
-			query := createQuerySpec(types.NamespacedName{Namespace: c.namespace, Name: name}, metav1.GroupKind{}, []string{cat}, c.OutputFormat)
+			query := createQuerySpec(types.NamespacedName{Namespace: c.namespace, Name: name}, metav1.GroupKind{}, catList, c.OutputFormat)
 			querySpecs = append(querySpecs, query)
 		}
-	}
-	if len(querySpecs) == 0 && len(categoryNames) == 0 {
-		if !c.AllResources {
-			return fmt.Errorf("no resource type specified. Use --all-resources to query all resources")
-		}
-		query := createQuerySpec(types.NamespacedName{Namespace: c.namespace}, metav1.GroupKind{}, nil, c.OutputFormat)
-		querySpecs = append(querySpecs, query)
-	} else if c.AllResources {
-		return fmt.Errorf("cannot use --all-resources with specific resources")
 	}
 
 	// send queries and collect objects
 	var infos []*cliresource.Info
 	gks := sets.New[runtimeschema.GroupKind]()
 	for _, spec := range querySpecs {
-		// create query for the right scope
-		query := queryTemplate.DeepCopyQueryObject()
-		query.SetSpec(spec)
+		var cursor string
+		var page int
+		for {
+			spec := spec.DeepCopy()
+			spec.QueryTopLevelResources.QueryResources.Page.Cursor = cursor
+			query := queryTemplate.DeepCopyQueryObject().SetSpec(spec)
 
-		if c.Flags.Debug > 0 {
-			query := query.DeepCopyQueryObject()
-			query.GetObjectKind().SetGroupVersionKind(queryv1alpha1.SchemeGroupVersion.WithKind(fmt.Sprintf("%T", query)))
-			bs, err := yaml.Marshal(query)
-			if err != nil {
-				return fmt.Errorf("failed to marshal query: %w", err)
-			}
-			fmt.Fprintf(kongCtx.Stderr, "Sending query:\n\n%s\n", string(bs)) // nolint:errcheck // just debug output
-		}
-
-		// send request
-		// TODO(sttts): add paging
-		if err := kc.Create(ctx, query); err != nil {
-			return fmt.Errorf("SpaceQuery request failed: %w", err)
-		}
-		resp := query.GetResponse()
-		for _, w := range resp.Warnings {
-			pterm.Warning.Printfln("Warning: %s", w)
-		}
-
-		// collect objects
-		for _, obj := range resp.Objects {
-			if obj.Object == nil {
-				return fmt.Errorf("received unexpected nil object in response")
+			// print query for debugging
+			if c.Flags.Debug > 0 {
+				kinds, _, err := queryScheme.ObjectKinds(query)
+				if err != nil {
+					return fmt.Errorf("failed to get object kinds: %w", err)
+				}
+				if len(kinds) != 1 {
+					return fmt.Errorf("expected exactly one kind, got %d", len(kinds))
+				}
+				query := query.DeepCopyQueryObject()
+				query.GetObjectKind().SetGroupVersionKind(queryv1alpha1.SchemeGroupVersion.WithKind(kinds[0].Kind))
+				bs, err := yaml.Marshal(query)
+				if err != nil {
+					return fmt.Errorf("failed to marshal query: %w", err)
+				}
+				fmt.Fprintf(kongCtx.Stderr, "Sending query:\n\n%s\n", string(bs)) // nolint:errcheck // just debug output
 			}
 
-			u := &unstructured.Unstructured{Object: obj.Object.Object}
-			infos = append(infos, &cliresource.Info{
-				Client: nil,
-				Mapping: &meta.RESTMapping{
-					Resource: runtimeschema.GroupVersionResource{
-						Group: u.GroupVersionKind().Group,
+			// send request
+			if err := kc.Create(ctx, query); err != nil {
+				return fmt.Errorf("SpaceQuery request failed: %w", err)
+			}
+			resp := query.GetResponse()
+			for _, w := range resp.Warnings {
+				pterm.Warning.Printfln("Warning: %s", w)
+			}
+
+			// collect objects
+			for _, obj := range resp.Objects {
+				if obj.Object == nil {
+					return fmt.Errorf("received unexpected nil object in response")
+				}
+
+				u := &unstructured.Unstructured{Object: obj.Object.Object}
+				infos = append(infos, &cliresource.Info{
+					Client: nil,
+					Mapping: &meta.RESTMapping{
+						Resource: runtimeschema.GroupVersionResource{
+							Group: u.GroupVersionKind().Group,
+						},
+						GroupVersionKind: u.GroupVersionKind(),
+						Scope:            RESTScopeNameFunc(u.GetNamespace()),
 					},
-					GroupVersionKind: u.GroupVersionKind(),
-					Scope:            RESTScopeNameFunc(u.GetNamespace()),
-				},
-				Namespace:       u.GetNamespace(),
-				Name:            u.GetName(),
-				Source:          types.NamespacedName{Namespace: obj.ControlPlane.Namespace, Name: obj.ControlPlane.Name}.String(),
-				Object:          u,
-				ResourceVersion: u.GetResourceVersion(),
-			})
-			gks.Insert(u.GroupVersionKind().GroupKind())
+					Namespace:       u.GetNamespace(),
+					Name:            u.GetName(),
+					Source:          types.NamespacedName{Namespace: obj.ControlPlane.Namespace, Name: obj.ControlPlane.Name}.String(),
+					Object:          u,
+					ResourceVersion: u.GetResourceVersion(),
+				})
+				gks.Insert(u.GroupVersionKind().GroupKind())
+			}
+
+			// do paging
+			cursor = resp.Cursor.Next
+			page++
+			if cursor == "" {
+				break
+			}
+			if c.Flags.Debug > 0 {
+				fmt.Fprintf(kongCtx.Stderr, "Fetching page %d\n", page) // nolint:errcheck // just debug output
+			}
 		}
 	}
 
@@ -439,6 +455,8 @@ func createQuerySpec(obj types.NamespacedName, gk metav1.GroupKind, categories [
 				},
 			},
 			QueryResources: queryv1alpha1.QueryResources{
+				Limit:  500,
+				Cursor: true,
 				Objects: &queryv1alpha1.QueryObjects{
 					ControlPlane: true,
 					Object: &queryv1alpha1.JSON{

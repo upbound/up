@@ -35,8 +35,6 @@ var printFlags = get.NewGetPrintFlags()
 
 // QueryCmd contains commands for querying control plane objects.
 type cmd struct {
-	AllResources bool `name:"all-resources" help:"Query all resources in the control plane."`
-
 	// general printer flags
 	OutputFormat string   `short:"o" name:"output" help:"Output format. One of: json,yaml,name,go-template,go-template-file,template,templatefile,jsonpath,jsonpath-as-json,jsonpath-file,custom-columns,custom-columns-file,wide"`
 	NoHeaders    bool     `help:"When using the default or custom-column output format, don't print headers."`
@@ -53,7 +51,7 @@ type cmd struct {
 	ShowManagedFields bool `name:"show-managed-fields" help:"If true, keep the managedFields when printing objects in JSON or YAML format."`
 
 	// positional arguments
-	Resources []string `arg:"" optional:"" help:"Type(s) (resource, singular or plural, category, short-name) and names: TYPE[.GROUP][,TYPE[.GROUP]...] [NAME ...] | TYPE[.GROUP]/NAME .... If no resource is specified, all resources are queried, but --all-resources must be specified."`
+	Resources []string `arg:"" help:"Type(s) (resource, singular or plural, category, short-name) and names: TYPE[.GROUP][,TYPE[.GROUP]...] [NAME ...] | TYPE[.GROUP]/NAME .... If no resource is specified, all resources are queried, but --all-resources must be specified."`
 
 	Flags upbound.Flags `embed:""`
 

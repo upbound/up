@@ -15,7 +15,6 @@
 package views
 
 import (
-	"fmt"
 	"reflect"
 	"unsafe"
 
@@ -41,6 +40,7 @@ type Scrolling interface {
 	GetCurrentNode() *tview.TreeNode
 	GetRowCount() int
 	GetScrollOffset() int
+	GetCurrentLine() int
 
 	AddScroller(s ...Scroller)
 }
@@ -88,9 +88,28 @@ func (t *Tree) ObjectAt(line int) *model.Object {
 	return ref.(*model.Object)
 }
 
-func (t *Tree) InputHandler() func(event *tcell.EventKey, setFocus func(p tview.Primitive)) { // nolint:gocyclo // TODO: split up
-	delegate := t.TreeView.InputHandler()
+func (t *Tree) GetCurrentLine() int {
+	// find the current line, from the first visible node
+	found := false
+	line := -1 // skip root
+	current := t.GetCurrentNode()
+	t.GetRoot().Walk(func(node, parent *tview.TreeNode) bool {
+		if node == current {
+			found = true
+			return false
+		}
 
+		if !found {
+			line++
+		}
+
+		return node.IsExpanded() && !found
+	})
+
+	return line
+}
+
+func (t *Tree) InputHandler() func(event *tcell.EventKey, setFocus func(p tview.Primitive)) { // nolint:gocyclo // TODO: split up
 	return t.WrapInputHandler(func(event *tcell.EventKey, setFocus func(p tview.Primitive)) { // nolint:gocyclo // TODO: split up
 		n := t.TreeView.GetCurrentNode()
 		if n == nil {
@@ -127,34 +146,16 @@ func (t *Tree) InputHandler() func(event *tcell.EventKey, setFocus func(p tview.
 			t.model.AutoCollapse = !t.model.AutoCollapse
 		}
 
-		delegate(event, setFocus)
+		t.TreeView.InputHandler()(event, setFocus)
 	})
 }
 
 func (t *Tree) updateScrollers() {
-	go t.app.QueueUpdateDraw(func() {
-		for _, s := range t.scrollers {
-			s.SetOffset(t.GetScrollOffset())
-		}
+	offset := t.GetScrollOffset()
+	line := t.GetCurrentLine()
 
-		// select the current node in all scrollers
-		line := -1 // skip root
-		current := t.GetCurrentNode()
-		hidden := map[string]bool{}
-		t.GetRoot().Walk(func(node, parent *tview.TreeNode) bool {
-			if node == current {
-				for _, s := range t.scrollers {
-					s.Select(line)
-				}
-				return false
-			}
-			// count only if visible
-			if parent == nil || (parent.IsExpanded() && !hidden[fmt.Sprintf("%p", parent)]) {
-				line++
-			} else {
-				hidden[fmt.Sprintf("%p", node)] = true
-			}
-			return true
-		})
-	})
+	for _, s := range t.scrollers {
+		s.SetOffset(offset)
+		s.Select(line)
+	}
 }

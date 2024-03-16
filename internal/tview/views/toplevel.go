@@ -87,7 +87,7 @@ type GridTitle struct {
 	Align int
 }
 
-func (t *TopLevel) InputHandler() func(event *tcell.EventKey, setFocus func(p tview.Primitive)) {
+func (t *TopLevel) InputHandler() func(event *tcell.EventKey, setFocus func(p tview.Primitive)) { // nolint:gocyclo // input handlers don't get easier to read when split.
 	return func(event *tcell.EventKey, setFocus func(p tview.Primitive)) {
 		if t.escPending && event.Modifiers() == tcell.ModNone {
 			// turn esc-0 => F10, esc-1 => F1, etc.
@@ -112,6 +112,10 @@ func (t *TopLevel) InputHandler() func(event *tcell.EventKey, setFocus func(p tv
 		case tcell.KeyF10:
 			t.app.Stop()
 		default:
+		}
+
+		if f := t.app.GetFocus(); f != nil && f != t {
+			f.InputHandler()(event, setFocus)
 		}
 	}
 }

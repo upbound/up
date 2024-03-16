@@ -74,7 +74,7 @@ func (c *Cmd) AfterApply(kongCtx *kong.Context) error {
 	return nil
 }
 
-func (c *Cmd) Run(ctx context.Context, upCtx *upbound.Context) error { // nolint:gocyclo // TODO: split up
+func (c *Cmd) Run(ctx context.Context, kongCtx *kong.Context, upCtx *upbound.Context) error { // nolint:gocyclo // TODO: split up
 	// create client
 	kubeconfig, ns, err := upCtx.Profile.GetSpaceKubeConfig()
 	if err != nil {
@@ -131,24 +131,43 @@ func (c *Cmd) Run(ctx context.Context, upCtx *upbound.Context) error { // nolint
 			}
 		}
 		for cat, names := range cns {
+			catList := []string{cat}
+			if cat == query.AllCategory {
+				catList = nil
+			}
 			if len(names) == 0 {
-				query := createQuerySpec(types.NamespacedName{Namespace: c.Namespace}, metav1.GroupKind{}, []string{cat})
+				query := createQuerySpec(types.NamespacedName{Namespace: c.Namespace}, metav1.GroupKind{}, catList)
 				querySpecs = append(querySpecs, query)
 				continue
 			}
 			for _, name := range names {
-				query := createQuerySpec(types.NamespacedName{Namespace: c.Namespace, Name: name}, metav1.GroupKind{}, []string{cat})
+				query := createQuerySpec(types.NamespacedName{Namespace: c.Namespace, Name: name}, metav1.GroupKind{}, catList)
 				querySpecs = append(querySpecs, query)
 			}
 		}
 
 		var objs []queryv1alpha1.QueryResponseObject
 		for _, spec := range querySpecs {
-			query := queryObject.DeepCopyQueryObject().SetSpec(spec)
-			if err := kc.Create(ctx, query); err != nil {
-				return nil, fmt.Errorf("%T request failed: %w", query, err)
+			var cursor string
+			var page int
+			for {
+				spec := spec.DeepCopy()
+				spec.QueryTopLevelResources.QueryResources.Page.Cursor = cursor
+				query := queryObject.DeepCopyQueryObject().SetSpec(spec)
+
+				if err := kc.Create(ctx, query); err != nil {
+					return nil, fmt.Errorf("%T request failed: %w", query, err)
+				}
+				resp := query.GetResponse()
+				objs = append(objs, resp.Objects...)
+
+				// do paging
+				cursor = resp.Cursor.Next
+				page++
+				if cursor == "" {
+					break
+				}
 			}
-			objs = append(objs, query.GetResponse().Objects...)
 		}
 
 		return objs, nil
@@ -200,6 +219,8 @@ func createQuerySpec(obj types.NamespacedName, gk metav1.GroupKind, categories [
 				},
 			},
 			QueryResources: queryv1alpha1.QueryResources{
+				Limit:  500,
+				Cursor: true,
 				Objects: &queryv1alpha1.QueryObjects{
 					ID:           true,
 					ControlPlane: true,
