@@ -43,6 +43,7 @@ import (
 	"github.com/upbound/up/internal/undo"
 	"github.com/upbound/up/internal/upbound"
 	"github.com/upbound/up/internal/upterm"
+	"github.com/upbound/up/internal/version"
 )
 
 const (
@@ -58,7 +59,6 @@ const (
 
 	// TODO(tnthornton) these can probably be replaced by our public chart
 	// museum. This would allow us to use wildcards like mxp-connector.
-	agentVersion  = "0.0.0-236.gc394d73"
 	agentRegistry = "us-west1-docker.pkg.dev/orchestration-build/connect"
 )
 
@@ -185,7 +185,7 @@ func (c *attachCmd) installAgent(p pterm.TextPrinter, mgr *helm.Installer, a *ac
 	}
 
 	p.Printfln(`Installing Chart "%s/%s"`, agentNs, agentChart)
-	if err := mgr.Install(agentVersion, c.deriveParams(a)); err != nil {
+	if err := mgr.Install(version.GetAgentVersion(), c.deriveParams(a)); err != nil {
 		return errors.Wrapf(err, `failed to install Chart "%s/%s"`, agentNs, agentChart)
 	}
 	u.Undo(func() error {
