@@ -37,11 +37,19 @@ const (
 	errNotSemVerFmt           = "%s; couldn't covert version to semver"
 )
 
-var version string
+var (
+	version      string
+	agentVersion string
+)
 
 // GetVersion returns the current build version.
 func GetVersion() string {
 	return version
+}
+
+// GetAgentVersion returns the connect agent version.
+func GetAgentVersion() string {
+	return agentVersion
 }
 
 type client interface {
