@@ -138,7 +138,7 @@ func (c *attachCmd) AfterApply(kongCtx *kong.Context) error {
 
 // Run executes the install command.
 func (c *attachCmd) Run(ctx context.Context, mgr *helm.Installer, kClient *kubernetes.Clientset, upCtx *upbound.Context, ac *accounts.Client, oc *organizations.Client, tc *tokens.Client, rc *robots.Client, sc *spaces.Client) (rErr error) {
-	attachSpinner, err := upterm.CheckmarkSuccessSpinner.Start("Connecting space to Upbound Console...")
+	attachSpinner, err := upterm.CheckmarkSuccessSpinner.Start("Connecting Space to Upbound Console...")
 	if err != nil {
 		return err
 	}
@@ -161,13 +161,13 @@ func (c *attachCmd) Run(ctx context.Context, mgr *helm.Installer, kClient *kuber
 		if err := c.prepareSpace(ctx, attachSpinner.InfoPrinter, kClient, a, sc, u, &cc); err != nil {
 			return err
 		}
-		attachSpinner.UpdateText(fmt.Sprintf("Connecting space %q to Upbound Console...", cc.Data[keySpace]))
+		attachSpinner.UpdateText(fmt.Sprintf("Connecting Space %q to Upbound Console...", cc.Data[keySpace]))
 
 		if err := c.prepareToken(ctx, attachSpinner.InfoPrinter, kClient, a, rc, oc, tc, u, &cc); err != nil {
 			return err
 		}
 
-		attachSpinner.UpdateText("Installing connect agent...")
+		attachSpinner.UpdateText("Installing agent...")
 		if err := c.createNamespace(ctx, attachSpinner.InfoPrinter, kClient, agentNs, u); err != nil {
 			return err
 		}
