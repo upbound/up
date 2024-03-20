@@ -23,10 +23,12 @@ import (
 	"strconv"
 	"strings"
 
+	"github.com/Masterminds/semver/v3"
 	"github.com/alecthomas/kong"
 	"github.com/crossplane/crossplane-runtime/pkg/errors"
 	"github.com/google/uuid"
 	"github.com/pterm/pterm"
+	"helm.sh/helm/v3/pkg/storage/driver"
 	corev1 "k8s.io/api/core/v1"
 	kerrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -123,6 +125,8 @@ func (c *attachCmd) AfterApply(kongCtx *kong.Context) error {
 		helm.WithNamespace(agentNs),
 		helm.IsOCI(),
 		helm.Wait(),
+		helm.Force(true),
+		helm.RollbackOnError(true),
 	)
 	if err != nil {
 		return err
@@ -179,9 +183,12 @@ func (c *attachCmd) Run(ctx context.Context, mgr *helm.Installer, kClient *kuber
 }
 
 func (c *attachCmd) installAgent(p pterm.TextPrinter, mgr *helm.Installer, a *accounts.AccountResponse, u undo.Undoer) error {
-	if v, err := mgr.GetCurrentVersion(); err == nil {
-		p.Printfln(`Chart "%s/%s" already installed with version %s`, agentNs, agentChart, v)
-		return nil
+	v, err := mgr.GetCurrentVersion()
+	if err == nil {
+		return c.upgradeAgent(p, mgr, a, v, u)
+	}
+	if !errors.Is(err, driver.ErrReleaseNotFound) {
+		return errors.Wrapf(err, `failed to lookup Chart "%s/%s"`, agentNs, agentChart)
 	}
 
 	p.Printfln(`Installing Chart "%s/%s"`, agentNs, agentChart)
@@ -195,7 +202,35 @@ func (c *attachCmd) installAgent(p pterm.TextPrinter, mgr *helm.Installer, a *ac
 		p.Printfln(`Chart "%s/%s" uninstalled`, agentNs, agentChart)
 		return nil
 	})
-	p.Printfln(`Chart "%s/%s" version %s installed`, agentNs, agentChart, agentVersion)
+	p.Printfln(`Chart "%s/%s" version %s installed`, agentNs, agentChart, version.GetAgentVersion())
+	return nil
+}
+
+func (c *attachCmd) upgradeAgent(p pterm.TextPrinter, mgr *helm.Installer, a *accounts.AccountResponse, currentVersion string, u undo.Undoer) error {
+	cv, err := semver.NewVersion(currentVersion)
+	if err != nil {
+		return errors.Wrapf(err, "failed to parse current version %s", currentVersion)
+	}
+	tv, err := semver.NewVersion(version.GetAgentVersion())
+	if err != nil {
+		return errors.Wrapf(err, "failed to parse agent version %s", version.GetAgentVersion())
+	}
+	// skip upgrade if at least the specified version.
+	if !tv.GreaterThan(cv) {
+		p.Printfln(`Chart "%s/%s" already installed with version %s`, agentNs, agentChart, currentVersion)
+		return nil
+	}
+	p.Printfln(`Upgrading Chart "%s/%s" %s => %s`, agentNs, agentChart, currentVersion, version.GetAgentVersion())
+	if err := mgr.Upgrade(version.GetAgentVersion(), c.deriveParams(a)); err != nil {
+		return errors.Wrapf(err, `failed to upgrade Chart "%s/%s"`, agentNs, agentChart)
+	}
+	u.Undo(func() error {
+		if err := mgr.Rollback(); err != nil {
+			return errors.Wrapf(err, `failed to rollback Chart "%s/%s"`, agentNs, agentChart)
+		}
+		p.Printfln(`Chart "%s/%s" rolled back`, agentNs, agentChart)
+		return nil
+	})
 	return nil
 }
 

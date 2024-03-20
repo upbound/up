@@ -61,6 +61,7 @@ const (
 	errUpgradeFromAlternateVersionFmt = "cannot upgrade %s to %s with version mismatch"
 	errFailedUpgradeFailedRollback    = "failed upgrade resulted in a failed rollback"
 	errFailedUpgradeRollback          = "failed upgrade was rolled back"
+	errFailedRollback                 = "failed roll back"
 )
 
 type helmPuller interface {
@@ -432,6 +433,11 @@ func (h *Installer) Upgrade(version string, parameters map[string]any, opts ...i
 		return errors.Wrap(upErr, errFailedUpgradeRollback)
 	}
 	return upErr
+}
+
+// Rollback rolls back an existing installation to a previous version.
+func (h *Installer) Rollback() error {
+	return errors.Wrap(h.rollbackClient.Run(h.releaseName), errFailedRollback)
 }
 
 // Uninstall uninstalls an installation.
