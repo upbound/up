@@ -360,6 +360,9 @@ func (c *attachCmd) getAccount(ctx context.Context, upCtx *upbound.Context, ac *
 	if a.Account.Type != accounts.AccountOrganization {
 		return nil, fmt.Errorf("account %q is not an organization", upCtx.Account)
 	}
+	if a.Organization == nil {
+		return nil, fmt.Errorf("account %q does not have an organization", upCtx.Account)
+	}
 	return a, nil
 }
 
