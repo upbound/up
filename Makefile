@@ -11,7 +11,7 @@ PLATFORMS ?= linux_amd64 linux_arm64 linux_arm darwin_amd64 darwin_arm64 windows
 -include build/makelib/common.mk
 
 # Connect agent version
-UP_CONNECT_AGENT_VERSION = 0.0.0-247.g989e9b9
+UP_CONNECT_AGENT_VERSION = 0.0.0-249.g559bc60
 
 # ====================================================================================
 # Setup Output
