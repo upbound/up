@@ -41,6 +41,13 @@ func TestIsMCP(t *testing.T) {
 			},
 			want: true,
 		},
+		"OldWithDifferentNames": {
+			reason: "Should match with the old format with lowercase controplanes, even with a different account/ctp name",
+			args: args{
+				host: "https://spaces-foo.upboundrocks.cloud/v1/controlplanes/mycompany/default/ctp1/k8s",
+			},
+			want: true,
+		},
 		"OldCamelCase": {
 			reason: "Should match with the old format with camelcase controlPlanes",
 			args: args{
