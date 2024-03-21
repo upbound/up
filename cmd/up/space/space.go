@@ -34,8 +34,8 @@ func (c *Cmd) BeforeReset(p *kong.Path, maturity feature.Maturity) error {
 
 // Cmd contains commands for interacting with spaces.
 type Cmd struct {
-	Attach  attachCmd  `cmd:"" help:"Connect an Upbound Space to the Upbound web console."`
-	Detach  detachCmd  `cmd:"" help:"Detach an Upbound Space from the Upbound web console."`
+	Attach  attachCmd  `cmd:"" maturity:"alpha" help:"Connect an Upbound Space to the Upbound web console."`
+	Detach  detachCmd  `cmd:"" maturity:"alpha" help:"Detach an Upbound Space from the Upbound web console."`
 	Init    initCmd    `cmd:"" help:"Initialize an Upbound Spaces deployment."`
 	Destroy destroyCmd `cmd:"" help:"Remove the Upbound Spaces deployment."`
 	Upgrade upgradeCmd `cmd:"" help:"Upgrade the Upbound Spaces deployment."`
