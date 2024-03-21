@@ -138,6 +138,7 @@ type alpha struct {
 	Query         query.QueryCmd    `cmd:"" maturity:"alpha" hidden:"" help:"Query objects in one or many control planes."`
 	Get           query.GetCmd      `cmd:"" maturity:"alpha" hidden:"" help:"Get objects in the current control plane."`
 	WebLogin      login.LoginWebCmd `cmd:"" maturity:"alpha" help:"Use web browser to login to up cli."`
+	Space         space.Cmd         `cmd:"" maturity:"alpha" help:"Interact with local Spaces."`
 }
 
 func main() {
