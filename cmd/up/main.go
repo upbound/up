@@ -27,6 +27,7 @@ import (
 	"github.com/upbound/up/cmd/up/configuration"
 	"github.com/upbound/up/cmd/up/configuration/template"
 	"github.com/upbound/up/cmd/up/controlplane"
+	"github.com/upbound/up/cmd/up/ctx"
 	"github.com/upbound/up/cmd/up/login"
 	"github.com/upbound/up/cmd/up/migration"
 	"github.com/upbound/up/cmd/up/organization"
@@ -102,6 +103,7 @@ type cli struct {
 	Space              space.Cmd                    `cmd:"" help:"Interact with local Spaces."`
 	Organization       organization.Cmd             `cmd:"" name:"organization" aliases:"org" help:"Interact with Upbound organizations."`
 	Profile            profile.Cmd                  `cmd:"" help:"Interact with Upbound profiles or local Spaces."`
+	Ctx                ctx.Cmd                      `cmd:"" maturity:"alpha" hidden:"" help:"Select an Upbound kubeconfig context."`
 	Repository         repository.Cmd               `cmd:"" name:"repository" aliases:"repo" help:"Interact with repositories."`
 	Robot              robot.Cmd                    `cmd:"" name:"robot" help:"Interact with robots."`
 	UXP                uxp.Cmd                      `cmd:"" help:"Interact with UXP."`
@@ -139,6 +141,7 @@ type alpha struct {
 	Get           query.GetCmd      `cmd:"" maturity:"alpha" hidden:"" help:"Get objects in the current control plane."`
 	WebLogin      login.LoginWebCmd `cmd:"" maturity:"alpha" help:"Use web browser to login to up cli."`
 	Space         space.Cmd         `cmd:"" maturity:"alpha" help:"Interact with local Spaces."`
+	Ctx           ctx.Cmd           `cmd:"" maturity:"alpha" help:"Select an Upbound kubeconfig context."`
 }
 
 func main() {
