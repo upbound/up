@@ -55,7 +55,7 @@ func (c *QueryCmd) AfterApply(kongCtx *kong.Context) error { // nolint:gocyclo /
 	kongCtx.Bind(upCtx)
 
 	// create Spaces API kubeconfig
-	kubeconfig, ns, err := upCtx.Profile.GetSpaceKubeConfig()
+	kubeconfig, ns, err := upCtx.Profile.GetSpaceRestConfig()
 	if err != nil {
 		return err
 	}
