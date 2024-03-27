@@ -61,6 +61,7 @@ const (
 	errUpgradeFromAlternateVersionFmt = "cannot upgrade %s to %s with version mismatch"
 	errFailedUpgradeFailedRollback    = "failed upgrade resulted in a failed rollback"
 	errFailedUpgradeRollback          = "failed upgrade was rolled back"
+	errFailedRollback                 = "failed roll back"
 )
 
 type helmPuller interface {
@@ -116,6 +117,7 @@ type Installer struct {
 	chartName       string
 	releaseName     string
 	alternateChart  string
+	createNamespace bool
 	namespace       string
 	cacheDir        string
 	rollbackOnError bool
@@ -146,6 +148,13 @@ type Installer struct {
 
 // InstallerModifierFn modifies the installer.
 type InstallerModifierFn func(*Installer)
+
+// CreateNamespace toggles namespace creation for the helm installer.
+func CreateNamespace(b bool) InstallerModifierFn {
+	return func(h *Installer) {
+		h.createNamespace = b
+	}
+}
 
 // WithNamespace sets the namespace for the helm installer.
 func WithNamespace(ns string) InstallerModifierFn {
@@ -293,6 +302,7 @@ func NewManager(config *rest.Config, chartName string, repoURL *url.URL, modifie
 	// Install Client
 	ic := action.NewInstall(actionConfig)
 	ic.Namespace = h.namespace
+	ic.CreateNamespace = h.createNamespace
 	ic.ReleaseName = h.chartName
 	ic.Wait = h.wait
 	ic.Timeout = waitTimeout
@@ -423,6 +433,11 @@ func (h *Installer) Upgrade(version string, parameters map[string]any, opts ...i
 		return errors.Wrap(upErr, errFailedUpgradeRollback)
 	}
 	return upErr
+}
+
+// Rollback rolls back an existing installation to a previous version.
+func (h *Installer) Rollback() error {
+	return errors.Wrap(h.rollbackClient.Run(h.releaseName), errFailedRollback)
 }
 
 // Uninstall uninstalls an installation.
