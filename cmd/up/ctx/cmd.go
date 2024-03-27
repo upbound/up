@@ -85,20 +85,25 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 
 		case "enter":
 			if i, ok := m.list.SelectedItem().(item); ok && i.action != nil {
-				newState, term, err := i.action.Exec(context.Background(), m.state)
-				m.err = err
-				if term != nil {
-					m.termination = term
-					return m, tea.Quit
+				newState, err := i.action.Exec(context.Background(), m)
+				if err != nil {
+					m.err = err
+					return m, nil
 				}
-				if newState != nil {
-					m.state = newState
-					items, err := m.state.Items(context.Background())
-					if err != nil {
-						m.err = err
-					}
-					m.list.SetItems(items)
-					m.list.SetHeight(min(m.windowHeight-2, len(m.list.Items())))
+
+				m = newState
+
+				items, err := m.state.Items(context.Background())
+				if err != nil {
+					m.err = err
+					return m, nil
+				}
+
+				m.list.SetItems(items)
+				m.list.SetHeight(min(m.windowHeight-2, len(m.list.Items())))
+
+				if m.termination != nil {
+					return m, tea.Quit
 				}
 			}
 		}
@@ -110,10 +115,6 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 }
 
 func (m model) View() string {
-	if m.termination != nil {
-		return m.termination.Message
-	}
-
 	l := m.list.View()
 	if m.err != nil {
 		return fmt.Sprintf("%s\nError: %v", l, m.err)
@@ -146,6 +147,9 @@ func (c *Cmd) Run(ctx context.Context, upCtx *upbound.Context) error {
 	}
 	result, err := tea.NewProgram(m).Run()
 	if m := result.(model); m.termination != nil {
+		if m.termination.Message != "" {
+			fmt.Println(m.termination.Message)
+		}
 		return m.termination.Err
 	}
 	return nil

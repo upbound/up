@@ -29,13 +29,13 @@ type base struct {
 }
 
 type Action interface {
-	Exec(ctx context.Context, state State) (State, *Termination, error)
+	Exec(ctx context.Context, m model) (model, error)
 }
 
-type ActionFunc func(ctx context.Context, state State) (State, *Termination, error)
+type ActionFunc func(ctx context.Context, m model) (model, error)
 
-func (f ActionFunc) Exec(ctx context.Context, s State) (State, *Termination, error) {
-	return f(ctx, s)
+func (f ActionFunc) Exec(ctx context.Context, m model) (model, error) {
+	return f(ctx, m)
 }
 
 type Termination struct {
@@ -65,8 +65,9 @@ func (sg *Space) Items(ctx context.Context) ([]list.Item, error) {
 	items := make([]list.Item, 0, len(nss.Items)+1)
 	//items = append(items, item{text: "..", kind: "profiles"})
 	for _, ns := range nss.Items {
-		items = append(items, item{text: ns.Name, kind: "group", action: ActionFunc(func(ctx context.Context, s State) (State, *Termination, error) {
-			return &Group{kubeconfig: sg.spaceKubeconfig, name: ns.Name, base: base{upCtx: sg.upCtx}}, nil, nil
+		items = append(items, item{text: ns.Name, kind: "group", action: ActionFunc(func(ctx context.Context, m model) (model, error) {
+			m.state = &Group{kubeconfig: sg.spaceKubeconfig, name: ns.Name, base: base{upCtx: sg.upCtx}}
+			return m, nil
 		})})
 	}
 
@@ -101,30 +102,34 @@ func (sg *Group) Items(ctx context.Context) ([]list.Item, error) {
 
 	items := make([]list.Item, 0, len(ctps.Items)+2)
 
-	items = append(items, item{text: "Save as kubectl context", action: ActionFunc(func(ctx context.Context, s State) (State, *Termination, error) {
+	items = append(items, item{text: "Save as kubectl context", action: ActionFunc(func(ctx context.Context, m model) (model, error) {
 		raw, err := sg.kubeconfig.RawConfig()
 		if err != nil {
-			return nil, nil, err
+			return m, err
 		}
 		if err := clientcmdapi.MinifyConfig(&raw); err != nil {
-			return nil, nil, err
+			return m, err
 		}
+		raw.Contexts[raw.CurrentContext].Namespace = sg.name
 		if err := kube.MergeIntoKubeConfig(&raw, "", true, kube.VerifyKubeConfig(sg.upCtx.WrapTransport)); err != nil {
-			return nil, nil, err
+			return m, err
 		}
-		return nil, &Termination{
+		m.termination = &Termination{
 			// TODO: print available Upbound kinds
 			Message: fmt.Sprintf("Current context set to %s pointing to grouop %q.", raw.CurrentContext, sg.name),
-		}, nil
+		}
+		return m, nil
 	}), padding: []int{1, 0}})
 
-	items = append(items, item{text: "..", kind: "groups", action: ActionFunc(func(ctx context.Context, s State) (State, *Termination, error) {
-		return &Space{spaceKubeconfig: sg.kubeconfig, base: base{upCtx: sg.upCtx}}, nil, nil
+	items = append(items, item{text: "..", kind: "groups", action: ActionFunc(func(ctx context.Context, m model) (model, error) {
+		m.state = &Space{spaceKubeconfig: sg.kubeconfig, base: base{upCtx: sg.upCtx}}
+		return m, nil
 	})})
 
 	for _, ctp := range ctps.Items {
-		items = append(items, item{text: ctp.Name, kind: "controlplane", action: ActionFunc(func(ctx context.Context, s State) (State, *Termination, error) {
-			return &ControlPlane{ctp: types.NamespacedName{Name: ctp.Name, Namespace: sg.name}, kubeconfig: sg.kubeconfig, base: base{upCtx: sg.upCtx}}, nil, nil
+		items = append(items, item{text: ctp.Name, kind: "controlplane", action: ActionFunc(func(ctx context.Context, m model) (model, error) {
+			m.state = &ControlPlane{ctp: types.NamespacedName{Name: ctp.Name, Namespace: sg.name}, kubeconfig: sg.kubeconfig, base: base{upCtx: sg.upCtx}}
+			return m, nil
 		})})
 	}
 
@@ -144,20 +149,20 @@ type ControlPlane struct {
 
 func (sg *ControlPlane) Items(ctx context.Context) ([]list.Item, error) {
 	return []list.Item{
-		item{text: fmt.Sprintf("Connect to %s", sg.ctp), action: ActionFunc(func(ctx context.Context, s State) (State, *Termination, error) {
+		item{text: fmt.Sprintf("Connect to %s", sg.ctp), action: ActionFunc(func(ctx context.Context, m model) (model, error) {
 			// get connection secret
 			config, err := sg.kubeconfig.ClientConfig()
 			if err != nil {
-				return nil, nil, err
+				return m, err
 			}
 			cl, err := dynamic.NewForConfig(config)
 			if err != nil {
-				return nil, nil, err
+				return m, err
 			}
 			getter := space.New(cl)
 			ctpConfig, err := getter.GetKubeConfig(ctx, sg.ctp)
 			if err != nil {
-				return nil, nil, err
+				return m, err
 			}
 
 			// load user kubeconfig from filesystem.
@@ -166,23 +171,25 @@ func (sg *ControlPlane) Items(ctx context.Context) ([]list.Item, error) {
 				&clientcmd.ConfigOverrides{},
 			).RawConfig()
 			if err != nil {
-				return nil, nil, err
+				return m, err
 			}
 
 			connectContextName := ctpcmd.ConnectControlplaneContextName(sg.upCtx.Account, sg.ctp, userKubeConfig.CurrentContext)
 			ctpConfig, err = kubeconfig.ExtractControlPlaneContext(ctpConfig, kubeconfig.ExpectedConnectionSecretContext(sg.upCtx.Account, sg.ctp.Name), connectContextName)
 			if err != nil {
-				return nil, nil, err
+				return m, err
 			}
 			if err := kube.MergeIntoKubeConfig(ctpConfig, "", true, kube.VerifyKubeConfig(sg.upCtx.WrapTransport)); err != nil {
-				return nil, nil, err
+				return m, err
 			}
-			return nil, &Termination{
+			m.termination = &Termination{
 				Message: fmt.Sprintf("Current context set to %s", connectContextName),
-			}, nil
+			}
+			return m, nil
 		}), padding: []int{1, 0}},
-		item{text: "..", kind: "group", action: ActionFunc(func(ctx context.Context, s State) (State, *Termination, error) {
-			return &Group{kubeconfig: sg.kubeconfig, name: sg.ctp.Namespace, base: base{upCtx: sg.upCtx}}, nil, nil
+		item{text: "..", kind: "group", action: ActionFunc(func(ctx context.Context, m model) (model, error) {
+			m.state = &Group{kubeconfig: sg.kubeconfig, name: sg.ctp.Namespace, base: base{upCtx: sg.upCtx}}
+			return m, nil
 		})},
 	}, nil
 }
