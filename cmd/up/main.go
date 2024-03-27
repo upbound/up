@@ -27,6 +27,7 @@ import (
 	"github.com/upbound/up/cmd/up/configuration"
 	"github.com/upbound/up/cmd/up/configuration/template"
 	"github.com/upbound/up/cmd/up/controlplane"
+	"github.com/upbound/up/cmd/up/ctx"
 	"github.com/upbound/up/cmd/up/login"
 	"github.com/upbound/up/cmd/up/migration"
 	"github.com/upbound/up/cmd/up/organization"
@@ -138,6 +139,7 @@ type alpha struct {
 	Query         query.QueryCmd    `cmd:"" maturity:"alpha" hidden:"" help:"Query objects in one or many control planes."`
 	Get           query.GetCmd      `cmd:"" maturity:"alpha" hidden:"" help:"Get objects in the current control plane."`
 	WebLogin      login.LoginWebCmd `cmd:"" maturity:"alpha" help:"Use web browser to login to up cli."`
+	Ctx           ctx.Cmd           `cmd:"" maturity:"alpha" help:"Select an Upbound kubeconfig context."`
 }
 
 func main() {
