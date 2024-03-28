@@ -22,4 +22,6 @@ var (
 	BottomKeys         = tcell.NewRGBColor(98, 0, 140)
 	ErrorBarBackground = tcell.ColorDarkRed
 	ErrorBarForeground = tcell.ColorWhite
+
+	UpboundHeader = tcell.GetColor("#af7efd")
 )

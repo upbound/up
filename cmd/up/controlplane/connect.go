@@ -85,7 +85,7 @@ func (c *connectCmd) Run(ctx context.Context, p pterm.TextPrinter, upCtx *upboun
 	}
 
 	expectedContextName := kubeconfig.ExpectedConnectionSecretContext(upCtx.Account, c.Name)
-	newKey := controlplaneContextName(upCtx.Account, nname, oldContext)
+	newKey := ConnectControlplaneContextName(upCtx.Account, nname, oldContext)
 	ctpConfig, err = kubeconfig.ExtractControlPlaneContext(ctpConfig, expectedContextName, newKey)
 	if err != nil {
 		return err
@@ -101,7 +101,7 @@ func (c *connectCmd) Run(ctx context.Context, p pterm.TextPrinter, upCtx *upboun
 	return nil
 }
 
-func controlplaneContextName(account string, name types.NamespacedName, origCtx string) string {
+func ConnectControlplaneContextName(account string, name types.NamespacedName, origCtx string) string {
 	if name.Namespace == "" {
 		name.Namespace = "default" // passed by value. We can mutate it.
 	}

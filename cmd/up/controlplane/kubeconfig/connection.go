@@ -47,7 +47,7 @@ type ConnectionSecretCmd struct {
 func (c *ConnectionSecretCmd) AfterApply(kongCtx *kong.Context, upCtx *upbound.Context) error {
 	var getter ConnectionSecretGetter
 	if upCtx.Profile.IsSpace() {
-		kubeconfig, ns, err := upCtx.Profile.GetSpaceKubeConfig()
+		kubeconfig, ns, err := upCtx.Profile.GetSpaceRestConfig()
 		if err != nil {
 			return err
 		}

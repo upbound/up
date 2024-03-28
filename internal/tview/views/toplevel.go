@@ -44,7 +44,7 @@ func NewTopLevel(title string, grid *tview.Grid, app *tview.Application) *TopLev
 		Grid: grid,
 		app:  app,
 		Titles: []GridTitle{
-			{Col: 0, Row: 0, Text: fmt.Sprintf(" [::b]%s ", title), Color: tcell.GetColor("#af7efd"), Align: tview.AlignCenter},
+			{Col: 0, Row: 0, Text: fmt.Sprintf(" [::b]%s ", title), Color: style.UpboundHeader, Align: tview.AlignCenter},
 		},
 		Commands: []string{"", "", "", "", "", "", "", "", "", "Quit"},
 	}

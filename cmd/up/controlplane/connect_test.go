@@ -195,7 +195,7 @@ func TestUpdateKubeConfig(t *testing.T) {
 	for name, tc := range cases {
 		t.Run(name, func(t *testing.T) {
 			expectedContextName := kubeconfig.ExpectedConnectionSecretContext(tc.args.account, tc.args.ctpName)
-			newKey := controlplaneContextName(tc.args.account, types.NamespacedName{Namespace: "default", Name: tc.args.ctpName}, tc.args.context)
+			newKey := ConnectControlplaneContextName(tc.args.account, types.NamespacedName{Namespace: "default", Name: tc.args.ctpName}, tc.args.context)
 			got, err := kubeconfig.ExtractControlPlaneContext(&tc.args.cfg, expectedContextName, newKey)
 
 			if diff := cmp.Diff(tc.want.err, err, test.EquateErrors()); diff != "" {

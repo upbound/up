@@ -45,7 +45,7 @@ type deleteCmd struct {
 // AfterApply sets default values in command after assignment and validation.
 func (c *deleteCmd) AfterApply(kongCtx *kong.Context, upCtx *upbound.Context) error {
 	if upCtx.Profile.IsSpace() {
-		kubeconfig, ns, err := upCtx.Profile.GetSpaceKubeConfig()
+		kubeconfig, ns, err := upCtx.Profile.GetSpaceRestConfig()
 		if err != nil {
 			return err
 		}
