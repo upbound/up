@@ -37,7 +37,7 @@ func (g *Group) Accept(ctx context.Context, upCtx *upbound.Context) (msg string,
 	}
 
 	// TODO: print available Upbound kinds
-	return fmt.Sprintf("Kubeconfig context \"upbound\" switched to %s %s \"%s\".", upboundRootStyle.Render("Upbound"), pathSegmentStyle.Render("group"), pathSegmentStyle.Render(g.name)), nil
+	return fmt.Sprintf("Kubeconfig context \"upbound\" switched to: %s", g.Breadcrumbs()), nil
 }
 
 // Accept upserts a controlplane context to the current kubeconfig.
@@ -70,7 +70,7 @@ func (ctp *ControlPlane) Accept(ctx context.Context, upCtx *upbound.Context) (ms
 		// ignore error because now everything has happened already.
 	}
 
-	return fmt.Sprintf("Kubeconfig context \"upbound\" switched to %s %s %s.", upboundRootStyle.Render("Upbound"), pathSegmentStyle.Render("control plane"), pathSegmentStyle.Render(ctp.Namespace)+pathSeparatorStyle.Render("/")+pathSegmentStyle.Render(ctp.Name)), nil
+	return fmt.Sprintf("Kubeconfig context \"upbound\" switched to: %s", ctp.Breadcrumbs()), nil
 }
 
 // mergeIntoKubeConfig merges the current context of the passed kubeconfig into
