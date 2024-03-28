@@ -1,12 +1,16 @@
 package ctx
 
 import (
+	"context"
 	"fmt"
 	"io"
 
+	"github.com/charmbracelet/bubbles/key"
 	"github.com/charmbracelet/bubbles/list"
 	tea "github.com/charmbracelet/bubbletea"
 	"github.com/charmbracelet/lipgloss"
+
+	"github.com/upbound/up/internal/upbound"
 )
 
 var (
@@ -15,11 +19,18 @@ var (
 	selectedItemStyle = lipgloss.NewStyle().Foreground(lipgloss.Color("170"))
 )
 
+var quitBinding = key.NewBinding(
+	key.WithKeys("q", "f10"),
+	key.WithHelp("q/f10", "switch context & quit"),
+)
+
+type KeyFunc func(ctx context.Context, upCtx *upbound.Context, m model) (model, error)
+
 type item struct {
 	text string
 	kind string
 
-	action Action
+	onEnter KeyFunc
 
 	padding []int
 }
@@ -60,11 +71,13 @@ func NewList(items []list.Item) list.Model {
 	l := list.New(items, itemDelegate{}, 80, 3)
 	//l.Title = "What do you want for dinner?"
 	l.SetShowTitle(false)
-	l.SetShowHelp(false)
+	l.SetShowHelp(true)
 	l.SetShowStatusBar(false)
 	l.SetFilteringEnabled(false)
 	l.SetShowPagination(false)
 	l.SetShowFilter(false)
+
+	l.KeyMap.ShowFullHelp = key.NewBinding(key.WithDisabled())
 
 	return l
 }

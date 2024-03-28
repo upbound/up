@@ -19,8 +19,10 @@ import (
 	"errors"
 	"fmt"
 	"io"
+	"strings"
 
 	"github.com/alecthomas/kong"
+	"github.com/charmbracelet/bubbles/key"
 	"github.com/charmbracelet/bubbles/list"
 	tea "github.com/charmbracelet/bubbletea"
 	"k8s.io/apimachinery/pkg/util/runtime"
@@ -55,14 +57,28 @@ func (c *Cmd) AfterApply(kongCtx *kong.Context) error {
 	return nil
 }
 
+// Termination is a model state that indicates the command should be terminated,
+// optionally with a message and an error.
+type Termination struct {
+	Err     error
+	Message string
+}
+
 type model struct {
 	windowHeight int
 	list         list.Model
 
-	state State
+	state NavigationState
 	err   error
 
 	termination *Termination
+
+	upCtx *upbound.Context
+}
+
+func (m model) WithTermination(msg string, err error) model {
+	m.termination = &Termination{Message: msg, Err: err}
+	return m
 }
 
 func (m model) Init() tea.Cmd {
@@ -74,23 +90,43 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 	case tea.WindowSizeMsg:
 		m.windowHeight = msg.Height
 		m.list.SetWidth(msg.Width)
-		m.list.SetHeight(min(m.windowHeight-2, len(m.list.Items())))
+		m.list.SetHeight(min(m.windowHeight-4, m.ListHeight()))
 		return m, nil
 
 	case tea.KeyMsg:
 		switch keypress := msg.String(); keypress {
-		case "q", "ctrl+c", "f10":
+		case "ctrl+c", "esc":
 			m.termination = &Termination{}
 			return m, tea.Quit
 
-		case "enter":
-			if i, ok := m.list.SelectedItem().(item); ok && i.action != nil {
-				newState, err := i.action.Exec(context.Background(), m)
+		case "q", "f10":
+			if state, ok := m.state.(Accepting); ok {
+				msg, err := state.Accept(context.Background(), m.upCtx)
 				if err != nil {
 					m.err = err
 					return m, nil
 				}
+				return m.WithTermination(msg, nil), tea.Quit
+			}
 
+		case "enter", "left":
+			var fn KeyFunc
+			switch keypress {
+			case "left":
+				if state, ok := m.state.(Back); ok {
+					fn = state.Back
+				}
+			case "enter":
+				if i, ok := m.list.SelectedItem().(item); ok {
+					fn = i.onEnter
+				}
+			}
+			if fn != nil {
+				newState, err := fn(context.Background(), m.upCtx, m)
+				if err != nil {
+					m.err = err
+					return m, nil
+				}
 				m = newState
 
 				items, err := m.state.Items(context.Background())
@@ -100,12 +136,18 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 				}
 
 				m.list.SetItems(items)
-				m.list.SetHeight(min(m.windowHeight-2, len(m.list.Items())))
+				m.list.SetHeight(min(m.windowHeight-2, m.ListHeight()))
+				if _, ok := m.state.(Accepting); ok {
+					m.list.KeyMap.Quit = quitBinding
+				} else {
+					m.list.KeyMap.Quit = key.NewBinding(key.WithDisabled())
+				}
 
 				if m.termination != nil {
 					return m, tea.Quit
 				}
 			}
+			return m, nil
 		}
 	}
 
@@ -114,12 +156,33 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 	return m, cmd
 }
 
+func (m model) ListHeight() int {
+	lines := 0
+	for _, i := range m.list.Items() {
+		itm := i.(item)
+		lines += 1 + strings.Count(itm.text, "\n")
+		switch len(itm.padding) {
+		case 1, 2:
+			lines += itm.padding[0]
+		case 3, 4:
+			lines += itm.padding[0] + itm.padding[2]
+		}
+	}
+	lines += 2 // help text
+
+	return lines
+}
+
 func (m model) View() string {
+	if m.termination != nil {
+		return ""
+	}
+
 	l := m.list.View()
 	if m.err != nil {
-		return fmt.Sprintf("%s\nError: %v", l, m.err)
+		return fmt.Sprintf("%s\n\n%s\nError: %v", m.state.Breadcrumbs(), l, m.err)
 	}
-	return l
+	return fmt.Sprintf("%s\n\n%s", m.state.Breadcrumbs(), l)
 }
 
 func (c *Cmd) Run(ctx context.Context, upCtx *upbound.Context) error {
@@ -130,21 +193,23 @@ func (c *Cmd) Run(ctx context.Context, upCtx *upbound.Context) error {
 		return err
 	}
 
-	initial := &Space{
-		spaceKubeconfig: kubeconfig,
-		base: base{
-			upCtx: upCtx,
+	m := model{
+		state: &Space{
+			spaceKubeconfig: kubeconfig,
 		},
+		upCtx: upCtx,
 	}
-	items, err := initial.Items(ctx)
+
+	items, err := m.state.Items(ctx)
 	if err != nil {
 		return err
 	}
-
-	m := model{
-		list:  NewList(items),
-		state: initial,
+	m.list = NewList(items)
+	m.list.KeyMap.Quit = key.NewBinding(key.WithDisabled())
+	if _, ok := m.state.(Accepting); ok {
+		m.list.KeyMap.Quit = quitBinding
 	}
+
 	result, err := tea.NewProgram(m).Run()
 	if m := result.(model); m.termination != nil {
 		if m.termination.Message != "" {
