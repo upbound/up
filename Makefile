@@ -10,6 +10,9 @@ PLATFORMS ?= linux_amd64 linux_arm64 linux_arm darwin_amd64 darwin_arm64 windows
 # to run a target until the include commands succeeded.
 -include build/makelib/common.mk
 
+# Connect agent version
+UP_CONNECT_AGENT_VERSION = 0.0.0-282.g2d9dfcc
+
 # ====================================================================================
 # Setup Output
 
@@ -30,6 +33,7 @@ GO_TEST_PARALLEL := $(shell echo $$(( $(NPROCS) / 2 )))
 
 GO_STATIC_PACKAGES = $(GO_PROJECT)/cmd/up $(GO_PROJECT)/cmd/docker-credential-up
 GO_LDFLAGS += -X $(GO_PROJECT)/internal/version.version=$(VERSION)
+GO_LDFLAGS += -X $(GO_PROJECT)/internal/version.agentVersion=$(UP_CONNECT_AGENT_VERSION)
 GO_SUBDIRS += cmd internal
 GO111MODULE = on
 GO_REQUIRED_VERSION = 1.22
@@ -39,7 +43,9 @@ GOLANGCILINT_VERSION = 1.56.2
 
 # ====================================================================================
 # Setup binaries
-ifneq ($(shell type sha256sum 2>/dev/null),)
+ifneq ($(shell type shasum 2>/dev/null),)
+SHA256SUM := shasum -a 256
+else ifneq ($(shell type sha256sum 2>/dev/null),)
 SHA256SUM := sha256sum
 else
 $(error Please install sha256sum)
