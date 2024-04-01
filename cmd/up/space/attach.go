@@ -148,7 +148,7 @@ func (c *attachCmd) Run(ctx context.Context, mgr *helm.Installer, kClient *kuber
 		}
 	}()
 	return undo.Do(func(u undo.Undoer) error {
-		a, err := c.getAccount(ctx, upCtx, ac)
+		a, err := getAccount(ctx, upCtx, ac)
 		if err != nil {
 			return err
 		}
@@ -352,7 +352,7 @@ func (c *attachCmd) deleteSpace(ctx context.Context, p pterm.TextPrinter, a *acc
 	return nil
 }
 
-func (c *attachCmd) getAccount(ctx context.Context, upCtx *upbound.Context, ac *accounts.Client) (*accounts.AccountResponse, error) {
+func getAccount(ctx context.Context, upCtx *upbound.Context, ac *accounts.Client) (*accounts.AccountResponse, error) {
 	a, err := ac.Get(ctx, upCtx.Account)
 	if err != nil {
 		return nil, errors.Wrapf(err, "failed to get Account %q", upCtx.Account)

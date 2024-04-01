@@ -31,6 +31,8 @@ import (
 	"k8s.io/client-go/kubernetes"
 
 	sdkerrs "github.com/upbound/up-sdk-go/errors"
+	"github.com/upbound/up-sdk-go/service/accounts"
+	"github.com/upbound/up-sdk-go/service/organizations"
 	"github.com/upbound/up-sdk-go/service/robots"
 	"github.com/upbound/up-sdk-go/service/spaces"
 	"github.com/upbound/up/internal/install/helm"
@@ -41,6 +43,8 @@ import (
 type detachCmd struct {
 	Upbound upbound.Flags     `embed:""`
 	Kube    upbound.KubeFlags `embed:""`
+
+	Space string `arg:"" optional:"" help:"Name of the Upbound Space. If name is not a supplied, it will be determined from the connection info in the space."`
 }
 
 func (c *detachCmd) AfterApply(kongCtx *kong.Context) error {
@@ -49,8 +53,12 @@ func (c *detachCmd) AfterApply(kongCtx *kong.Context) error {
 		return err
 	}
 
+	needsKube := true
 	if err := c.Kube.AfterApply(); err != nil {
-		return err
+		if c.Space == "" {
+			return errors.Wrap(err, "failed to get kube config")
+		}
+		needsKube = false
 	}
 
 	// NOTE(tnthornton) we currently only have support for stylized output.
@@ -68,12 +76,20 @@ func (c *detachCmd) AfterApply(kongCtx *kong.Context) error {
 	kongCtx.Bind(upCtx)
 	kongCtx.Bind(robots.NewClient(cfg))
 	kongCtx.Bind(spaces.NewClient(cfg))
+	kongCtx.Bind(accounts.NewClient(cfg))
+	kongCtx.Bind(organizations.NewClient(cfg))
 
+	// bind nils as k8s client and helm manager
+	if !needsKube {
+		kongCtx.Bind((*kubernetes.Clientset)(nil))
+		kongCtx.Bind((*helm.Installer)(nil))
+		return nil
+	}
 	kubeconfig := c.Kube.GetConfig()
 
 	kClient, err := kubernetes.NewForConfig(kubeconfig)
 	if err != nil {
-		return err
+		return errors.Wrap(err, "failed to create kube client")
 	}
 	kongCtx.Bind(kClient)
 
@@ -96,8 +112,12 @@ func (c *detachCmd) AfterApply(kongCtx *kong.Context) error {
 }
 
 // Run executes the detach command.
-func (c *detachCmd) Run(ctx context.Context, kClient *kubernetes.Clientset, mgr *helm.Installer, sc *spaces.Client, rc *robots.Client) (rErr error) {
-	detachSpinner, err := upterm.CheckmarkSuccessSpinner.Start("Disconnecting Space from Upbound Console...")
+func (c *detachCmd) Run(ctx context.Context, upCtx *upbound.Context, ac *accounts.Client, oc *organizations.Client, kClient *kubernetes.Clientset, mgr *helm.Installer, sc *spaces.Client, rc *robots.Client) (rErr error) {
+	msg := "Disconnecting Space from Upbound Console..."
+	if c.Space != "" {
+		msg = fmt.Sprintf("Disconnecting Space %q from Upbound Console...", c.Space)
+	}
+	detachSpinner, err := upterm.CheckmarkSuccessSpinner.Start(msg)
 	if err != nil {
 		return err
 	}
@@ -106,21 +126,68 @@ func (c *detachCmd) Run(ctx context.Context, kClient *kubernetes.Clientset, mgr 
 			detachSpinner.Fail(rErr)
 		}
 	}()
-	if err := c.deleteResources(ctx, detachSpinner.InfoPrinter, kClient, rc, sc); err != nil {
+	if err := c.detachSpace(ctx, detachSpinner.InfoPrinter, upCtx, ac, oc, kClient, mgr, rc, sc); err != nil {
 		return err
 	}
-	detachSpinner.InfoPrinter.Println("Uninstalling connect agent...")
-	if err := mgr.Uninstall(); err != nil && !errors.Is(err, driver.ErrReleaseNotFound) {
-		return errors.Wrapf(err, `failed to uninstall Chart "%s/%s"`, agentNs, agentChart)
+	msg = "Space has been successfully disconnected from Upbound Console"
+	if c.Space != "" {
+		msg = fmt.Sprintf("Space %q has been successfully disconnected from Upbound Console", c.Space)
 	}
-	if err := deleteTokenSecret(ctx, detachSpinner.InfoPrinter, kClient, agentNs, agentSecret); err != nil && !kerrors.IsNotFound(err) {
-		return err
-	}
-	detachSpinner.Success("Space has been successfully disconnected from Upbound Console")
+	detachSpinner.Success(msg)
 	return nil
 }
 
-func (c *detachCmd) deleteResources(ctx context.Context, p pterm.TextPrinter, kClient *kubernetes.Clientset, rc *robots.Client, sc *spaces.Client) error {
+func (c *detachCmd) detachSpace(ctx context.Context, p pterm.TextPrinter, upCtx *upbound.Context, ac *accounts.Client, oc *organizations.Client, kClient *kubernetes.Clientset, mgr *helm.Installer, rc *robots.Client, sc *spaces.Client) error {
+	if kClient == nil {
+		p.Printfln("Not connected to a Space cluster, deleting API resources only...")
+		a, err := getAccount(ctx, upCtx, ac)
+		if err != nil {
+			return err
+		}
+		if err := c.deleteRobot(ctx, p, oc, rc, a); err != nil {
+			return err
+		}
+		if err := c.deleteSpace(ctx, p, sc, a); err != nil {
+			return err
+		}
+		return nil
+	}
+	return c.deleteResources(ctx, p, kClient, mgr, rc, sc)
+}
+
+func (c *detachCmd) deleteSpace(ctx context.Context, p pterm.TextPrinter, sc *spaces.Client, ar *accounts.AccountResponse) error {
+	p.Printf(`Deleting Space "%s/%s"`, ar.Organization.Name, c.Space)
+	if err := sc.Delete(ctx, ar.Organization.Name, c.Space, nil); err != nil && !kerrors.IsNotFound(err) {
+		return errors.Wrapf(err, `failed to delete Space "%s/%s"`, ar.Organization.Name, c.Space)
+	}
+	p.Printfln(`Space "%s/%s" deleted`, ar.Organization.Name, c.Space)
+	// replace space with full name for display purposes
+	c.Space = fmt.Sprintf("%s/%s", ar.Organization.Name, c.Space)
+	return nil
+}
+
+func (c *detachCmd) deleteRobot(ctx context.Context, p pterm.TextPrinter, oc *organizations.Client, rc *robots.Client, ar *accounts.AccountResponse) error {
+	p.Printf("Looking for robot token for Space %q", c.Space)
+	rr, err := oc.ListRobots(ctx, ar.Organization.ID)
+	if err != nil {
+		return errors.Wrap(err, "failed to list Robots")
+	}
+	for _, r := range rr {
+		if r.Name != c.Space {
+			continue
+		}
+		p.Printfln(`Deleting Robot "%s/%s"`, ar.Organization.Name, c.Space)
+		if err := rc.Delete(ctx, r.ID); err != nil && !sdkerrs.IsNotFound(err) {
+			return errors.Wrapf(err, `failed to delete Robot "%s/%s"`, ar.Organization.Name, c.Space)
+		}
+		p.Printfln(`Robot "%s/%s" deleted`, ar.Organization.Name, c.Space)
+		return nil
+	}
+	p.Printf("No robot token for Space %q, skipping...", c.Space)
+	return nil
+}
+
+func (c *detachCmd) deleteResources(ctx context.Context, p pterm.TextPrinter, kClient *kubernetes.Clientset, mgr *helm.Installer, rc *robots.Client, sc *spaces.Client) error {
 	cm, err := getConnectConfigmap(ctx, kClient, agentNs, connConfMap)
 	if kerrors.IsNotFound(err) {
 		return nil
@@ -129,13 +196,20 @@ func (c *detachCmd) deleteResources(ctx context.Context, p pterm.TextPrinter, kC
 		return errors.Wrapf(err, `failed to get ConfigMap "%s/%s"`, agentNs, agentSecret)
 	}
 	p.Printfln(`ConfigMap "%s/%s" found, deleting resources in Upbound Console...`, agentNs, agentSecret)
-	if err := c.deleteAgentRobot(ctx, p, kClient, rc, &cm); err != nil {
-		return err
-	}
 	if err := c.deleteGeneratedSpace(ctx, p, kClient, sc, &cm); err != nil {
 		return err
 	}
+	if err := c.deleteAgentRobot(ctx, p, kClient, rc, &cm); err != nil {
+		return err
+	}
 	if err := deleteConnectConfigmap(ctx, p, kClient, agentNs, connConfMap); err != nil {
+		return err
+	}
+	p.Println("Uninstalling connect agent...")
+	if err := mgr.Uninstall(); err != nil && !errors.Is(err, driver.ErrReleaseNotFound) {
+		return errors.Wrapf(err, `failed to uninstall Chart "%s/%s"`, agentNs, agentChart)
+	}
+	if err := deleteTokenSecret(ctx, p, kClient, agentNs, agentSecret); err != nil && !kerrors.IsNotFound(err) {
 		return err
 	}
 	return nil
@@ -175,10 +249,14 @@ func (c *detachCmd) deleteGeneratedSpace(ctx context.Context, p pterm.TextPrinte
 	if len(parts) != 2 || parts[0] == "" || parts[1] == "" {
 		return fmt.Errorf("invalid space %q", v)
 	}
-	p.Printfln("Deleting Space %q", v)
 	ns, name := parts[0], parts[1]
+	if c.Space != "" && c.Space != name {
+		return fmt.Errorf("connected Space %q does not match specified name %q", name, c.Space)
+	}
+	c.Space = name
+	p.Printfln("Deleting Space %q", name)
 	if err := sc.Delete(ctx, ns, name, nil); err != nil && !kerrors.IsNotFound(err) {
-		return errors.Wrapf(err, `failed to delete Space "%s/%s"`, ns, name)
+		return errors.Wrapf(err, `failed to delete Space %q`, name)
 	}
 	delete(cm.Data, keySpace)
 	cm, err := kClient.CoreV1().ConfigMaps(agentNs).Update(ctx, cm, metav1.UpdateOptions{})
