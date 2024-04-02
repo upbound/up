@@ -12,7 +12,7 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-package ctx
+package profile
 
 import (
 	"context"
@@ -24,8 +24,6 @@ import (
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/client-go/rest"
 	clientcmdapi "k8s.io/client-go/tools/clientcmd/api"
-
-	"github.com/upbound/up/internal/profile"
 )
 
 func TestFindProfileByURL(t *testing.T) {
@@ -36,10 +34,10 @@ func TestFindProfileByURL(t *testing.T) {
 	}
 	tests := map[string]struct {
 		reason         string
-		profiles       map[string]profile.Profile
+		profiles       map[string]Profile
 		conf           *clientcmdapi.Config
 		getIngressHost func(ctx context.Context, cfg *rest.Config) (string, error)
-		wantProfile    *profile.Profile
+		wantProfile    *Profile
 		wantCtp        types.NamespacedName
 		wantErr        string
 	}{
@@ -55,7 +53,7 @@ func TestFindProfileByURL(t *testing.T) {
 		},
 		"UnknownContext": {
 			reason: "context not in kubeconfig",
-			profiles: map[string]profile.Profile{
+			profiles: map[string]Profile{
 				"foo": {ID: "foo", Type: "space", KubeContext: "foo"},
 			},
 			conf: &clientcmdapi.Config{
@@ -68,7 +66,7 @@ func TestFindProfileByURL(t *testing.T) {
 		},
 		"UnknownCluster": {
 			reason: "cluster not in kubeconfig",
-			profiles: map[string]profile.Profile{
+			profiles: map[string]Profile{
 				"foo": {ID: "foo", Type: "space", KubeContext: "foo"},
 			},
 			conf: &clientcmdapi.Config{
@@ -81,7 +79,7 @@ func TestFindProfileByURL(t *testing.T) {
 		},
 		"OneMatchingProfile": {
 			reason: "an exact match on URL, defaulting to default namespace",
-			profiles: map[string]profile.Profile{
+			profiles: map[string]Profile{
 				"foo": {ID: "foo", Type: "space", KubeContext: "foo"},
 			},
 			conf: &clientcmdapi.Config{
@@ -91,12 +89,12 @@ func TestFindProfileByURL(t *testing.T) {
 				AuthInfos:      map[string]*clientcmdapi.AuthInfo{"foo": {}},
 			},
 			getIngressHost: getIngressHostFn("https://foo.com", nil),
-			wantProfile:    &profile.Profile{ID: "foo", Type: "space", KubeContext: "foo"},
+			wantProfile:    &Profile{ID: "foo", Type: "space", KubeContext: "foo"},
 			wantCtp:        types.NamespacedName{Namespace: "default"},
 		},
 		"NonMatchingProfile": {
 			reason: "profile URL does not match kubeconfig URL",
-			profiles: map[string]profile.Profile{
+			profiles: map[string]Profile{
 				"bar": {ID: "bar", Type: "space", KubeContext: "bar"},
 			},
 			conf: &clientcmdapi.Config{
@@ -116,7 +114,7 @@ func TestFindProfileByURL(t *testing.T) {
 		},
 		"OtherContextName": {
 			reason: "profile context name does not match kubeconfig context name, but URL matches",
-			profiles: map[string]profile.Profile{
+			profiles: map[string]Profile{
 				"bar": {ID: "bar", Type: "space", KubeContext: "bar"},
 			},
 			conf: &clientcmdapi.Config{
@@ -132,12 +130,12 @@ func TestFindProfileByURL(t *testing.T) {
 				AuthInfos: map[string]*clientcmdapi.AuthInfo{"foo": {}, "bar": {}},
 			},
 			getIngressHost: getIngressHostFn("https://bar.com", nil),
-			wantProfile:    &profile.Profile{ID: "bar", Type: "space", KubeContext: "bar"},
+			wantProfile:    &Profile{ID: "bar", Type: "space", KubeContext: "bar"},
 			wantCtp:        types.NamespacedName{Namespace: "default"},
 		},
 		"Group": {
 			reason: "full group URL, namespace from kubeconfig",
-			profiles: map[string]profile.Profile{
+			profiles: map[string]Profile{
 				"foo": {ID: "foo", Type: "space", KubeContext: "foo"},
 			},
 			conf: &clientcmdapi.Config{
@@ -147,12 +145,12 @@ func TestFindProfileByURL(t *testing.T) {
 				AuthInfos:      map[string]*clientcmdapi.AuthInfo{"foo": {}},
 			},
 			getIngressHost: getIngressHostFn("https://bar.com", nil),
-			wantProfile:    &profile.Profile{ID: "foo", Type: "space", KubeContext: "foo"},
+			wantProfile:    &Profile{ID: "foo", Type: "space", KubeContext: "foo"},
 			wantCtp:        types.NamespacedName{Namespace: "group"},
 		},
 		"ControlPlane": {
 			reason: "full controlplane URL",
-			profiles: map[string]profile.Profile{
+			profiles: map[string]Profile{
 				"foo": {ID: "foo", Type: "space", KubeContext: "foo"},
 			},
 			conf: &clientcmdapi.Config{
@@ -168,12 +166,12 @@ func TestFindProfileByURL(t *testing.T) {
 				AuthInfos: map[string]*clientcmdapi.AuthInfo{"foo": {}, "bar": {}},
 			},
 			getIngressHost: getIngressHostFn("https://bar.com", nil),
-			wantProfile:    &profile.Profile{ID: "foo", Type: "space", KubeContext: "foo"},
+			wantProfile:    &Profile{ID: "foo", Type: "space", KubeContext: "foo"},
 			wantCtp:        types.NamespacedName{Namespace: "group", Name: "foo"},
 		},
 		"ControlPlaneIngress": {
 			reason: "full controlplane URL with ingress host, resolved via mxp-config",
-			profiles: map[string]profile.Profile{
+			profiles: map[string]Profile{
 				"foo": {ID: "foo", Type: "space", KubeContext: "foo"},
 			},
 			conf: &clientcmdapi.Config{
@@ -189,12 +187,12 @@ func TestFindProfileByURL(t *testing.T) {
 				AuthInfos: map[string]*clientcmdapi.AuthInfo{"foo": {}, "bar": {}},
 			},
 			getIngressHost: getIngressHostFn("https://bar.com", nil),
-			wantProfile:    &profile.Profile{ID: "foo", Type: "space", KubeContext: "foo"},
+			wantProfile:    &Profile{ID: "foo", Type: "space", KubeContext: "foo"},
 			wantCtp:        types.NamespacedName{Namespace: "group", Name: "foo"},
 		},
 		"GetIngressError": {
 			reason: "getIngressHost errors, hence no match found",
-			profiles: map[string]profile.Profile{
+			profiles: map[string]Profile{
 				"foo": {ID: "foo", Type: "space", KubeContext: "foo"},
 			},
 			conf: &clientcmdapi.Config{
@@ -214,7 +212,7 @@ func TestFindProfileByURL(t *testing.T) {
 		},
 		"ControlPlaneIngressSlash": {
 			reason: "full controlplane URL with ingress host, resolved via mxp-config",
-			profiles: map[string]profile.Profile{
+			profiles: map[string]Profile{
 				"foo": {ID: "foo", Type: "space", KubeContext: "foo"},
 			},
 			conf: &clientcmdapi.Config{
@@ -230,13 +228,13 @@ func TestFindProfileByURL(t *testing.T) {
 				AuthInfos: map[string]*clientcmdapi.AuthInfo{"foo": {}, "bar": {}},
 			},
 			getIngressHost: getIngressHostFn("https://bar.com/", nil),
-			wantProfile:    &profile.Profile{ID: "foo", Type: "space", KubeContext: "foo"},
+			wantProfile:    &Profile{ID: "foo", Type: "space", KubeContext: "foo"},
 			wantCtp:        types.NamespacedName{Namespace: "group", Name: "foo"},
 		},
 	}
 	for name, tt := range tests {
 		t.Run(name, func(t *testing.T) {
-			_, p, ctp, err := findProfileByURL(context.Background(), tt.profiles, tt.conf, tt.getIngressHost)
+			_, p, ctp, err := findProfileByKubeconfig(context.Background(), tt.profiles, tt.conf, tt.getIngressHost)
 
 			if diff := cmp.Diff(tt.wantErr == "", err == nil); diff != "" {
 				t.Errorf("findProfileByURL() -want error, +got error:\n%v\n%v", diff, err)
