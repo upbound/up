@@ -126,7 +126,7 @@ func (c *detachCmd) Run(ctx context.Context, upCtx *upbound.Context, ac *account
 			detachSpinner.Fail(rErr)
 		}
 	}()
-	if err := c.detachSpace(ctx, detachSpinner.InfoPrinter, upCtx, ac, oc, kClient, mgr, rc, sc); err != nil {
+	if err := c.detachSpace(ctx, detachSpinner, upCtx, ac, oc, kClient, mgr, rc, sc); err != nil {
 		return err
 	}
 	msg = "Space has been successfully disconnected from Upbound Console"
@@ -137,22 +137,29 @@ func (c *detachCmd) Run(ctx context.Context, upCtx *upbound.Context, ac *account
 	return nil
 }
 
-func (c *detachCmd) detachSpace(ctx context.Context, p pterm.TextPrinter, upCtx *upbound.Context, ac *accounts.Client, oc *organizations.Client, kClient *kubernetes.Clientset, mgr *helm.Installer, rc *robots.Client, sc *spaces.Client) error {
+func (c *detachCmd) detachSpace(ctx context.Context, detachSpinner *pterm.SpinnerPrinter, upCtx *upbound.Context, ac *accounts.Client, oc *organizations.Client, kClient *kubernetes.Clientset, mgr *helm.Installer, rc *robots.Client, sc *spaces.Client) error {
 	if kClient == nil {
-		p.Printfln("Not connected to a Space cluster, deleting API resources only...")
+		detachSpinner.UpdateText("Continue? (Y/n)")
+		if err := warnAndConfirm(
+			"Not connected to a Space cluster, would you like to only remove the Space from the Upbound Console?\n\n" +
+				"  If the Space cluster still exists, it will continue to have the Upbound agent running and you will need to delete manually.\n",
+		); err != nil {
+			return err
+		}
+		detachSpinner.UpdateText(fmt.Sprintf("Disconnecting Space %q from Upbound Console...", c.Space))
 		a, err := getAccount(ctx, upCtx, ac)
 		if err != nil {
 			return err
 		}
-		if err := c.deleteRobot(ctx, p, oc, rc, a); err != nil {
+		if err := c.deleteRobot(ctx, detachSpinner.InfoPrinter, oc, rc, a); err != nil {
 			return err
 		}
-		if err := c.deleteSpace(ctx, p, sc, a); err != nil {
+		if err := c.deleteSpace(ctx, detachSpinner.InfoPrinter, sc, a); err != nil {
 			return err
 		}
 		return nil
 	}
-	return c.deleteResources(ctx, p, kClient, mgr, rc, sc)
+	return c.deleteResources(ctx, detachSpinner.InfoPrinter, kClient, mgr, rc, sc)
 }
 
 func (c *detachCmd) deleteSpace(ctx context.Context, p pterm.TextPrinter, sc *spaces.Client, ar *accounts.AccountResponse) error {
