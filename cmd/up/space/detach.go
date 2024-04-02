@@ -142,7 +142,7 @@ func (c *detachCmd) detachSpace(ctx context.Context, detachSpinner *pterm.Spinne
 		detachSpinner.UpdateText("Continue? (Y/n)")
 		if err := warnAndConfirm(
 			"Not connected to a Space cluster, would you like to only remove the Space from the Upbound Console?\n\n" +
-				"  If the Space cluster still exists, it will continue to have the Upbound agent running and you will need to delete manually.\n",
+					"  If the other Space cluster still exists, the Upbound agent will be left running and you will need to delete it manually.\n",
 		); err != nil {
 			return err
 		}

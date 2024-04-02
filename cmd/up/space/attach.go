@@ -330,7 +330,7 @@ func (c *attachCmd) createSpace(ctx context.Context, attachSpinner *pterm.Spinne
 			attachSpinner.UpdateText("Continue? (Y/n)")
 			if err := warnAndConfirm(
 				`Space "%s/%s" already exists. Would you like to overwrite it?`+"\n\n"+
-					"  If the other Space cluster still exists, it will continue to have the Upbound agent running and you will need to delete manually.\n",
+					"  If the other Space cluster still exists, the Upbound agent will be left running and you will need to delete it manually.\n",
 				a.Organization.Name, c.Space,
 			); err != nil {
 				return "", err
