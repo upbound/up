@@ -21,6 +21,7 @@ import (
 	"strings"
 
 	corev1 "k8s.io/api/core/v1"
+	kerrors "k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/client-go/rest"
 	"k8s.io/client-go/tools/clientcmd"
@@ -32,10 +33,10 @@ import (
 // a related profile, the current group/namespace, and the controlplane if the
 // kubeconfig points to a controlplane through mxe-router.
 func FromKubeconfig(ctx context.Context, profiles map[string]Profile, conf *clientcmdapi.Config) (string, *Profile, types.NamespacedName, error) {
-	return findProfileByKubeconfig(ctx, profiles, conf, getIngressHost)
+	return findProfileByKubeconfig(ctx, profiles, conf, GetIngressHost)
 }
 
-func findProfileByKubeconfig(ctx context.Context, profiles map[string]Profile, conf *clientcmdapi.Config, getIngressHost func(ctx context.Context, cfg *rest.Config) (string, error)) (string, *Profile, types.NamespacedName, error) { // nolint:gocyclo // TODO: shorten
+func findProfileByKubeconfig(ctx context.Context, profiles map[string]Profile, conf *clientcmdapi.Config, getIngressHost func(ctx context.Context, cfg *rest.Config) (string, []byte, error)) (string, *Profile, types.NamespacedName, error) { // nolint:gocyclo // TODO: shorten
 	// get base URL of Upbound profiles
 	profileURLs := make(map[string]string)
 	for name, p := range profiles {
@@ -105,8 +106,8 @@ func findProfileByKubeconfig(ctx context.Context, profiles map[string]Profile, c
 		if err != nil {
 			continue
 		}
-		ingressHost, err := getIngressHost(ctx, cfg)
-		if err != nil {
+		ingressHost, _, err := getIngressHost(ctx, cfg)
+		if err != nil || ingressHost == "" {
 			continue
 		}
 		if !strings.HasPrefix(ingressHost, "https://") {
@@ -124,15 +125,20 @@ func findProfileByKubeconfig(ctx context.Context, profiles map[string]Profile, c
 	return "", nil, types.NamespacedName{}, nil
 }
 
-func getIngressHost(ctx context.Context, cfg *rest.Config) (string, error) {
+// GetIngressHost returns the ingress host of the Spaces cfg points to. If the
+// ingress is not configured, it returns an empty string.
+func GetIngressHost(ctx context.Context, cfg *rest.Config) (host string, ca []byte, err error) {
 	cl, err := client.New(cfg, client.Options{})
-	if err != nil {
-		return "", err
+	if kerrors.IsNotFound(err) {
+		return "", nil, nil
+	} else if err != nil {
+		return "", nil, err
 	}
 	mxpConfig := &corev1.ConfigMap{}
 	if err := cl.Get(ctx, types.NamespacedName{Name: "ingress-public", Namespace: "upbound-system"}, mxpConfig); err != nil {
-		return "", err
+		return "", nil, err
 	}
-	ingressHost := mxpConfig.Data["ingress.host"]
-	return ingressHost, nil
+	host = mxpConfig.Data["ingress-host"]
+	ca = []byte(mxpConfig.Data["ingress-ca"])
+	return host, ca, nil
 }

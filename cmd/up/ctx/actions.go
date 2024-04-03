@@ -25,6 +25,7 @@ import (
 	"github.com/upbound/up/cmd/up/controlplane/kubeconfig"
 	"github.com/upbound/up/internal/controlplane/space"
 	"github.com/upbound/up/internal/kube"
+	"github.com/upbound/up/internal/profile"
 	upbound "github.com/upbound/up/internal/upbound"
 )
 
@@ -64,26 +65,52 @@ func (g *Group) Accept(ctx context.Context, upCtx *upbound.Context) (msg string,
 
 // Accept upserts a controlplane context to the current kubeconfig.
 func (ctp *ControlPlane) Accept(ctx context.Context, upCtx *upbound.Context) (msg string, err error) {
-	// get connection secret
-	config, err := ctp.space.kubeconfig.ClientConfig()
+	groupCfg, err := ctp.space.kubeconfig.ClientConfig()
 	if err != nil {
 		return "", err
 	}
-	cl, err := dynamic.NewForConfig(config)
+	groupKubeconfig, err := ctp.space.kubeconfig.RawConfig()
 	if err != nil {
 		return "", err
 	}
-	getter := space.New(cl)
-	ctpConfig, err := getter.GetKubeConfig(ctx, ctp.NamespacedName)
+	p, err := upCtx.Cfg.GetUpboundProfile(ctp.space.profile)
 	if err != nil {
 		return "", err
 	}
+	groupKubeconfig.CurrentContext = p.KubeContext
 
-	// merge in new context
-	ctpConfig, err = kubeconfig.ExtractControlPlaneContext(ctpConfig, kubeconfig.ExpectedConnectionSecretContext(upCtx.Account, ctp.Name), upboundContext)
+	// construct a context pointing to the controlplane, either via ingress or
+	// connection secret as fallback
+	ingress, ca, err := profile.GetIngressHost(ctx, groupCfg)
 	if err != nil {
 		return "", err
 	}
+	var ctpConfig *clientcmdapi.Config
+	if ingress == "" {
+		// via connection secret
+		cl, err := dynamic.NewForConfig(groupCfg)
+		if err != nil {
+			return "", err
+		}
+		getter := space.New(cl)
+		ctpConfig, err = getter.GetKubeConfig(ctx, ctp.NamespacedName)
+		if err != nil {
+			return "", err
+		}
+		ctpConfig, err = kubeconfig.ExtractControlPlaneContext(ctpConfig, kubeconfig.ExpectedConnectionSecretContext(upCtx.Account, ctp.Name), upboundContext)
+	} else {
+		// via ingress, with same credentials, but different URL
+		ctpConfig = groupKubeconfig.DeepCopy()
+		if err := clientcmdapi.MinifyConfig(ctpConfig); err != nil {
+			return "", err
+		}
+		ctpCtx := ctpConfig.Contexts[ctpConfig.CurrentContext]
+		ctpConfig.Clusters[ctpCtx.Cluster].Server = fmt.Sprintf("https://%s/apis/spaces.upbound.io/v1beta1/namespaces/%s/controlplanes/%s/k8s", ingress, ctp.Namespace, ctp.Name)
+		ctpConfig.Clusters[ctpCtx.Cluster].CertificateAuthorityData = ca
+	}
+	ctpConfig.Contexts[ctpConfig.CurrentContext].Namespace = "default"
+
+	// merge into kubeconfig
 	prevContext, err := mergeIntoKubeConfig(ctpConfig, upboundContext, "", kube.VerifyKubeConfig(upCtx.WrapTransport))
 	if err != nil {
 		return "", err
