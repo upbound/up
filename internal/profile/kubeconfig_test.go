@@ -64,6 +64,18 @@ func TestFindProfileByURL(t *testing.T) {
 			},
 			wantErr: "current context \"missing\" not found in kubeconfig",
 		},
+		"NoCurrentContext": {
+			reason: "no current context in kubeconfig",
+			profiles: map[string]Profile{
+				"foo": {ID: "foo", Type: "space", KubeContext: "foo"},
+			},
+			conf: &clientcmdapi.Config{
+				Contexts:  map[string]*clientcmdapi.Context{"foo": {Cluster: "foo", AuthInfo: "foo"}},
+				Clusters:  map[string]*clientcmdapi.Cluster{"foo": {Server: "https://foo.com"}},
+				AuthInfos: map[string]*clientcmdapi.AuthInfo{"foo": {}},
+			},
+			wantErr: "no current context in kubeconfig",
+		},
 		"UnknownCluster": {
 			reason: "cluster not in kubeconfig",
 			profiles: map[string]Profile{

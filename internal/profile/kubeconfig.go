@@ -54,6 +54,9 @@ func findProfileByKubeconfig(ctx context.Context, profiles map[string]Profile, c
 	}
 
 	// get user cluster URL
+	if conf.CurrentContext == "" {
+		return "", nil, types.NamespacedName{}, fmt.Errorf("no current context in kubeconfig")
+	}
 	confCtx, ok := conf.Contexts[conf.CurrentContext]
 	if !ok {
 		return "", nil, types.NamespacedName{}, fmt.Errorf("current context %q not found in kubeconfig", conf.CurrentContext)

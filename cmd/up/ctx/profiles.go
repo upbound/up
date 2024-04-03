@@ -16,6 +16,7 @@ package ctx
 
 import (
 	"context"
+	"errors"
 
 	clientcmdapi "k8s.io/client-go/tools/clientcmd/api"
 
@@ -29,9 +30,12 @@ func DeriveState(ctx context.Context, upCtx *upbound.Context, conf *clientcmdapi
 	if err != nil {
 		return nil, err
 	}
+	if len(profiles) == 0 {
+		return nil, errors.New("no Upbound profiles found")
+	}
 	name, p, ctp, err := profile.FromKubeconfig(ctx, profiles, conf)
 	if err != nil {
-		return nil, err
+		return &Profiles{}, nil
 	}
 	if p == nil {
 		return &Profiles{}, nil
