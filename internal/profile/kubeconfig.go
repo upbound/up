@@ -130,7 +130,7 @@ func getIngressHost(ctx context.Context, cfg *rest.Config) (string, error) {
 		return "", err
 	}
 	mxpConfig := &corev1.ConfigMap{}
-	if err := cl.Get(ctx, types.NamespacedName{Name: "mxp-config", Namespace: "upbound-system"}, mxpConfig); err != nil {
+	if err := cl.Get(ctx, types.NamespacedName{Name: "ingress-public", Namespace: "upbound-system"}, mxpConfig); err != nil {
 		return "", err
 	}
 	ingressHost := mxpConfig.Data["ingress.host"]
