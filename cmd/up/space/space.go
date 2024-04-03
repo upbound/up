@@ -39,6 +39,7 @@ type Cmd struct {
 	Init    initCmd    `cmd:"" help:"Initialize an Upbound Spaces deployment."`
 	Destroy destroyCmd `cmd:"" help:"Remove the Upbound Spaces deployment."`
 	Upgrade upgradeCmd `cmd:"" help:"Upgrade the Upbound Spaces deployment."`
+	List    listCmd    `cmd:"" help:"List all accessible spaces in Upbound."`
 
 	Billing billing.Cmd `cmd:""`
 }
