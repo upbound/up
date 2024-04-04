@@ -45,6 +45,7 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/yaml"
 
+	"github.com/upbound/up-sdk-go/apis/common"
 	queryv1alpha1 "github.com/upbound/up-sdk-go/apis/query/v1alpha1"
 	"github.com/upbound/up/cmd/up/query/resource"
 	"github.com/upbound/up/internal/upbound"
@@ -459,7 +460,7 @@ func createQuerySpec(obj types.NamespacedName, gk metav1.GroupKind, categories [
 				Cursor: true,
 				Objects: &queryv1alpha1.QueryObjects{
 					ControlPlane: true,
-					Object: &queryv1alpha1.JSON{
+					Object: &common.JSON{
 						Object: schema,
 					},
 				},

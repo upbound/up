@@ -917,8 +917,8 @@ github.com/tmc/grpc-websocket-proxy v0.0.0-20190109142713-0ad062ec5ee5/go.mod h1
 github.com/ugorji/go v1.1.4/go.mod h1:uQMGLiO92mf5W77hV/PUCpI3pbzQx3CRekS0kk+RGrc=
 github.com/ulikunitz/xz v0.5.11 h1:kpFauv27b6ynzBNT/Xy+1k+fK4WswhN/6PN5WhFAGw8=
 github.com/ulikunitz/xz v0.5.11/go.mod h1:nbz6k7qbPmH4IRqmfOplQw/tblSgqTqBwxkY0oWt/14=
-github.com/upbound/up-sdk-go v0.3.0 h1:G16Ku8Iv+ktYYBBnUnfCi5Db1gEtWxXuuNwmLzs47RQ=
-github.com/upbound/up-sdk-go v0.3.0/go.mod h1:5wybLHH53OqIQD+UPpTki7BrmlcIleIMAnd5zeNeoRk=
+github.com/upbound/up-sdk-go v0.3.1-0.20240404213647-1772a8c3f53a h1:7iFVtjESsnQtHb3e+qKfvwnZUaJ/+nssMH49FfUXD7M=
+github.com/upbound/up-sdk-go v0.3.1-0.20240404213647-1772a8c3f53a/go.mod h1:aiGUmU3aEkl25Dy1dMETCki99s1fKsUbV94Pmjr3ISg=
 github.com/vbatts/tar-split v0.11.5 h1:3bHCTIheBm1qFTcgh9oPu+nNBtX+XJIupG/vacinCts=
 github.com/vbatts/tar-split v0.11.5/go.mod h1:yZbwRsSeGjusneWgA781EKej9HF8vme8okylkAeNKLk=
 github.com/wk8/go-ordered-map/v2 v2.1.8 h1:5h/BUHu93oj4gIdvHHHGsScSTMijfx5PeYkE/fJgbpc=

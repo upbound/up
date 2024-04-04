@@ -20,7 +20,7 @@ import (
 
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 
-	queryv1alpha1 "github.com/upbound/up-sdk-go/apis/query/v1alpha1"
+	"github.com/upbound/up-sdk-go/apis/common"
 )
 
 type Object struct {
@@ -34,7 +34,7 @@ type Object struct {
 
 	Synced []Interval
 	Ready  []Interval
-	JSON   queryv1alpha1.JSONObject
+	JSON   common.JSONObject
 	Events []Event
 
 	Children []*Object
