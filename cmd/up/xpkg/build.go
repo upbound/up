@@ -92,10 +92,11 @@ func (c *buildCmd) AfterApply() error {
 		examples.New(),
 	)
 
-	// NOTE(hasheddan): we currently only support fetching controller image from
-	// daemon, but may opt to support additional sources in the future.
-	c.fetch = daemonFetch
-
+	if c.TarPath != "" {
+		c.fetch = xpkgFetch(c.TarPath)
+	} else {
+		c.fetch = daemonFetch
+	}
 	return nil
 }
 
@@ -113,6 +114,7 @@ type buildCmd struct {
 	ExamplesRoot string   `short:"e" help:"Path to package examples directory." default:"./examples"`
 	AuthExt      string   `short:"a" help:"Path to an authentication extension file." default:"auth.yaml"`
 	Ignore       []string `help:"Paths, specified relative to --package-root, to exclude from the package."`
+	TarPath      string   `help:"Path to tar file, an alternative to Controller."`
 }
 
 func (c *buildCmd) Help() string {
@@ -137,10 +139,19 @@ Even more details can be found in the xpkg reference document.`
 // Run executes the build command.
 func (c *buildCmd) Run(ctx context.Context, p pterm.TextPrinter) error { //nolint:gocyclo
 	var buildOpts []xpkg.BuildOpt
-	if c.Controller != "" {
-		ref, err := name.ParseReference(c.Controller)
-		if err != nil {
-			return err
+	if c.Controller != "" || c.TarPath != "" {
+		var ref name.Reference
+		var err error
+		if c.Controller != "" {
+			ref, err = name.ParseReference(c.Controller)
+			if err != nil {
+				return err
+			}
+		} else {
+			ref, err = name.ParseReference(c.TarPath)
+			if err != nil {
+				return err
+			}
 		}
 		base, err := c.fetch(ctx, ref)
 		if err != nil {
