@@ -19,10 +19,11 @@ import (
 
 	"github.com/alecthomas/kong"
 	"github.com/pterm/pterm"
+	"k8s.io/client-go/rest"
+	"sigs.k8s.io/controller-runtime/pkg/client"
 
 	"github.com/upbound/up-sdk-go/apis/upbound/v1alpha1"
 	"github.com/upbound/up-sdk-go/service/accounts"
-	"github.com/upbound/up-sdk-go/service/spaces"
 	"github.com/upbound/up/internal/upbound"
 	"github.com/upbound/up/internal/upterm"
 )
@@ -49,8 +50,13 @@ func (c *listCmd) AfterApply(kongCtx *kong.Context) error {
 		return err
 	}
 
+	ctrlCfg, err := upCtx.BuildControllerClientConfig()
+	if err != nil {
+		return err
+	}
+
 	kongCtx.Bind(upCtx)
-	kongCtx.Bind(spaces.NewClient(cfg))
+	kongCtx.Bind(ctrlCfg)
 	kongCtx.Bind(accounts.NewClient(cfg))
 
 	kongCtx.Bind(pterm.DefaultTable.WithWriter(kongCtx.Stdout).WithSeparator("   "))
@@ -59,13 +65,19 @@ func (c *listCmd) AfterApply(kongCtx *kong.Context) error {
 }
 
 // Run executes the list command.
-func (c *listCmd) Run(ctx context.Context, printer upterm.ObjectPrinter, p pterm.TextPrinter, upCtx *upbound.Context, ac *accounts.Client, sc *spaces.Client) error {
+func (c *listCmd) Run(ctx context.Context, printer upterm.ObjectPrinter, p pterm.TextPrinter, upCtx *upbound.Context, ac *accounts.Client, rest *rest.Config) error {
 	a, err := getAccount(ctx, upCtx, ac)
 	if err != nil {
 		return err
 	}
 
-	l, err := sc.List(ctx, a.Organization.Name, nil)
+	sc, err := getSpacesClient(rest)
+	if err != nil {
+		return err
+	}
+
+	var l v1alpha1.SpaceList
+	err = sc.List(ctx, &l, &client.ListOptions{Namespace: a.Organization.Name})
 	if err != nil {
 		return err
 	}

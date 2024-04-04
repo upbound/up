@@ -28,8 +28,12 @@ import (
 	corev1 "k8s.io/api/core/v1"
 	kerrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/client-go/kubernetes"
+	"k8s.io/client-go/rest"
+	"sigs.k8s.io/controller-runtime/pkg/client"
 
+	"github.com/upbound/up-sdk-go/apis/upbound/v1alpha1"
 	sdkerrs "github.com/upbound/up-sdk-go/errors"
 	"github.com/upbound/up-sdk-go/service/accounts"
 	"github.com/upbound/up-sdk-go/service/organizations"
@@ -73,7 +77,13 @@ func (c *detachCmd) AfterApply(kongCtx *kong.Context) error {
 	if err != nil {
 		return err
 	}
+	ctrlCfg, err := upCtx.BuildControllerClientConfig()
+	if err != nil {
+		return err
+	}
+
 	kongCtx.Bind(upCtx)
+	kongCtx.Bind(ctrlCfg)
 	kongCtx.Bind(robots.NewClient(cfg))
 	kongCtx.Bind(spaces.NewClient(cfg))
 	kongCtx.Bind(accounts.NewClient(cfg))
@@ -112,7 +122,7 @@ func (c *detachCmd) AfterApply(kongCtx *kong.Context) error {
 }
 
 // Run executes the detach command.
-func (c *detachCmd) Run(ctx context.Context, upCtx *upbound.Context, ac *accounts.Client, oc *organizations.Client, kClient *kubernetes.Clientset, mgr *helm.Installer, sc *spaces.Client, rc *robots.Client) (rErr error) {
+func (c *detachCmd) Run(ctx context.Context, upCtx *upbound.Context, ac *accounts.Client, oc *organizations.Client, kClient *kubernetes.Clientset, mgr *helm.Installer, rc *robots.Client, rest *rest.Config) (rErr error) {
 	msg := "Disconnecting Space from Upbound Console..."
 	if c.Space != "" {
 		msg = fmt.Sprintf("Disconnecting Space %q from Upbound Console...", c.Space)
@@ -126,6 +136,11 @@ func (c *detachCmd) Run(ctx context.Context, upCtx *upbound.Context, ac *account
 			detachSpinner.Fail(rErr)
 		}
 	}()
+	sc, err := getSpacesClient(rest)
+	if err != nil {
+		return err
+	}
+
 	if err := c.detachSpace(ctx, detachSpinner, upCtx, ac, oc, kClient, mgr, rc, sc); err != nil {
 		return err
 	}
@@ -137,7 +152,7 @@ func (c *detachCmd) Run(ctx context.Context, upCtx *upbound.Context, ac *account
 	return nil
 }
 
-func (c *detachCmd) detachSpace(ctx context.Context, detachSpinner *pterm.SpinnerPrinter, upCtx *upbound.Context, ac *accounts.Client, oc *organizations.Client, kClient *kubernetes.Clientset, mgr *helm.Installer, rc *robots.Client, sc *spaces.Client) error {
+func (c *detachCmd) detachSpace(ctx context.Context, detachSpinner *pterm.SpinnerPrinter, upCtx *upbound.Context, ac *accounts.Client, oc *organizations.Client, kClient *kubernetes.Clientset, mgr *helm.Installer, rc *robots.Client, sc client.Client) error {
 	if kClient == nil {
 		detachSpinner.UpdateText("Continue? (Y/n)")
 		if err := warnAndConfirm(
@@ -162,9 +177,16 @@ func (c *detachCmd) detachSpace(ctx context.Context, detachSpinner *pterm.Spinne
 	return c.deleteResources(ctx, detachSpinner.InfoPrinter, kClient, mgr, rc, sc)
 }
 
-func (c *detachCmd) deleteSpace(ctx context.Context, p pterm.TextPrinter, sc *spaces.Client, ar *accounts.AccountResponse) error {
+func (c *detachCmd) deleteSpace(ctx context.Context, p pterm.TextPrinter, sc client.Client, ar *accounts.AccountResponse) error {
 	p.Printf(`Deleting Space "%s/%s"`, ar.Organization.Name, c.Space)
-	if err := sc.Delete(ctx, ar.Organization.Name, c.Space, nil); err != nil && !kerrors.IsNotFound(err) {
+
+	space := &v1alpha1.Space{}
+	err := sc.Get(ctx, types.NamespacedName{Name: c.Space, Namespace: ar.Organization.Name}, space)
+	if err == nil {
+		if err := sc.Delete(ctx, space); err != nil && !kerrors.IsNotFound(err) {
+			return errors.Wrapf(err, `failed to delete Space "%s/%s"`, ar.Organization.Name, c.Space)
+		}
+	} else if !kerrors.IsNotFound(err) {
 		return errors.Wrapf(err, `failed to delete Space "%s/%s"`, ar.Organization.Name, c.Space)
 	}
 	p.Printfln(`Space "%s/%s" deleted`, ar.Organization.Name, c.Space)
@@ -194,7 +216,7 @@ func (c *detachCmd) deleteRobot(ctx context.Context, p pterm.TextPrinter, oc *or
 	return nil
 }
 
-func (c *detachCmd) deleteResources(ctx context.Context, p pterm.TextPrinter, kClient *kubernetes.Clientset, mgr *helm.Installer, rc *robots.Client, sc *spaces.Client) error {
+func (c *detachCmd) deleteResources(ctx context.Context, p pterm.TextPrinter, kClient *kubernetes.Clientset, mgr *helm.Installer, rc *robots.Client, sc client.Client) error {
 	cm, err := getConnectConfigmap(ctx, kClient, agentNs, connConfMap)
 	if kerrors.IsNotFound(err) {
 		return nil
@@ -246,7 +268,7 @@ func (c *detachCmd) deleteAgentRobot(ctx context.Context, p pterm.TextPrinter, k
 	return nil
 }
 
-func (c *detachCmd) deleteGeneratedSpace(ctx context.Context, p pterm.TextPrinter, kClient *kubernetes.Clientset, sc *spaces.Client, cmr **corev1.ConfigMap) error {
+func (c *detachCmd) deleteGeneratedSpace(ctx context.Context, p pterm.TextPrinter, kClient *kubernetes.Clientset, sc client.Client, cmr **corev1.ConfigMap) error { //nolint:gocyclo
 	cm := *cmr
 	v, ok := cm.Data[keySpace]
 	if !ok {
@@ -262,11 +284,18 @@ func (c *detachCmd) deleteGeneratedSpace(ctx context.Context, p pterm.TextPrinte
 	}
 	c.Space = name
 	p.Printfln("Deleting Space %q", name)
-	if err := sc.Delete(ctx, ns, name, nil); err != nil && !kerrors.IsNotFound(err) {
+
+	space := &v1alpha1.Space{}
+	err := sc.Get(ctx, types.NamespacedName{Name: name, Namespace: ns}, space)
+	if err == nil {
+		if err := sc.Delete(ctx, space); err != nil && !kerrors.IsNotFound(err) {
+			return errors.Wrapf(err, `failed to delete Space %q`, name)
+		}
+	} else if !kerrors.IsNotFound(err) {
 		return errors.Wrapf(err, `failed to delete Space %q`, name)
 	}
 	delete(cm.Data, keySpace)
-	cm, err := kClient.CoreV1().ConfigMaps(agentNs).Update(ctx, cm, metav1.UpdateOptions{})
+	cm, err = kClient.CoreV1().ConfigMaps(agentNs).Update(ctx, cm, metav1.UpdateOptions{})
 	if err != nil {
 		return errors.Wrapf(err, `failed to update ConfigMap "%s/%s"`, agentNs, connConfMap)
 	}

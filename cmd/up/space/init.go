@@ -36,8 +36,11 @@ import (
 	"k8s.io/apimachinery/pkg/util/runtime"
 	"k8s.io/client-go/dynamic"
 	"k8s.io/client-go/kubernetes"
+	"k8s.io/client-go/rest"
+	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/yaml"
 
+	"github.com/upbound/up-sdk-go/apis/upbound/v1alpha1"
 	"github.com/upbound/up/cmd/up/space/defaults"
 	"github.com/upbound/up/cmd/up/space/prerequisites"
 	"github.com/upbound/up/internal/config"
@@ -424,4 +427,16 @@ func outputNextSteps() {
 	pterm.Info.WithPrefix(upterm.EyesPrefix).Println("Next Steps 👇")
 	pterm.Println()
 	pterm.Println("👉 Check out Upbound Spaces docs @ https://docs.upbound.io/concepts/upbound-spaces")
+}
+
+func getSpacesClient(rest *rest.Config) (client.Client, error) {
+	sc, err := client.New(rest, client.Options{})
+	if err != nil {
+		return nil, err
+	}
+	if err := v1alpha1.AddToScheme(sc.Scheme()); err != nil {
+		return nil, err
+	}
+
+	return sc, err
 }
