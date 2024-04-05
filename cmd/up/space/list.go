@@ -22,7 +22,7 @@ import (
 	"k8s.io/client-go/rest"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 
-	"github.com/upbound/up-sdk-go/apis/upbound/v1alpha1"
+	upboundv1alpha1 "github.com/upbound/up-sdk-go/apis/upbound/v1alpha1"
 	"github.com/upbound/up-sdk-go/service/accounts"
 	"github.com/upbound/up/internal/upbound"
 	"github.com/upbound/up/internal/upterm"
@@ -35,8 +35,6 @@ var (
 // listCmd lists all of the spaces in Upbound.
 type listCmd struct {
 	Upbound upbound.Flags `embed:""`
-
-	Environment string `name:"up-environment" env:"UP_ENVIRONMENT" default:"prod" hidden:"" help:"Override the default Upbound Environment."`
 }
 
 // AfterApply sets default values in command after assignment and validation.
@@ -76,7 +74,7 @@ func (c *listCmd) Run(ctx context.Context, printer upterm.ObjectPrinter, p pterm
 		return err
 	}
 
-	var l v1alpha1.SpaceList
+	var l upboundv1alpha1.SpaceList
 	err = sc.List(ctx, &l, &client.ListOptions{Namespace: a.Organization.Name})
 	if err != nil {
 		return err
@@ -91,7 +89,7 @@ func (c *listCmd) Run(ctx context.Context, printer upterm.ObjectPrinter, p pterm
 }
 
 func extractSpaceListFields(obj any) []string {
-	space, ok := obj.(v1alpha1.Space)
+	space, ok := obj.(upboundv1alpha1.Space)
 	if !ok {
 		return []string{"unknown", "unknown", "", ""}
 	}

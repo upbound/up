@@ -32,12 +32,11 @@ import (
 	corev1 "k8s.io/api/core/v1"
 	kerrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
-	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/client-go/kubernetes"
 	"k8s.io/client-go/rest"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 
-	"github.com/upbound/up-sdk-go/apis/upbound/v1alpha1"
+	upboundv1alpha1 "github.com/upbound/up-sdk-go/apis/upbound/v1alpha1"
 	sdkerrs "github.com/upbound/up-sdk-go/errors"
 	"github.com/upbound/up-sdk-go/service/accounts"
 	"github.com/upbound/up-sdk-go/service/organizations"
@@ -291,13 +290,13 @@ func (c *attachCmd) prepareToken(ctx context.Context, p pterm.TextPrinter, kClie
 
 func (c *attachCmd) prepareSpace(ctx context.Context, attachSpinner *pterm.SpinnerPrinter, kClient *kubernetes.Clientset, a *accounts.AccountResponse, sc client.Client, u undo.Undoer, cmr **corev1.ConfigMap) error { //nolint:gocyclo
 	cm := *cmr
-	space := &v1alpha1.Space{
+	space := &upboundv1alpha1.Space{
 		ObjectMeta: metav1.ObjectMeta{
 			Namespace: a.Organization.Name,
 			Name:      c.Space,
 		},
-		Spec: v1alpha1.SpaceSpec{
-			Mode: v1alpha1.ModeConnected,
+		Spec: upboundv1alpha1.SpaceSpec{
+			Mode: upboundv1alpha1.ModeConnected,
 		},
 	}
 	// auto generate space name if none given.
@@ -335,7 +334,7 @@ func (c *attachCmd) prepareSpace(ctx context.Context, attachSpinner *pterm.Spinn
 	return nil
 }
 
-func (c *attachCmd) createSpace(ctx context.Context, attachSpinner *pterm.SpinnerPrinter, kClient *kubernetes.Clientset, a *accounts.AccountResponse, space *v1alpha1.Space, sc client.Client, u undo.Undoer, cmr **corev1.ConfigMap) (string, error) {
+func (c *attachCmd) createSpace(ctx context.Context, attachSpinner *pterm.SpinnerPrinter, kClient *kubernetes.Clientset, a *accounts.AccountResponse, space *upboundv1alpha1.Space, sc client.Client, u undo.Undoer, cmr **corev1.ConfigMap) (string, error) {
 	cm := *cmr
 	attachSpinner.InfoPrinter.Printfln("Creating a new Space in Upbound Console in organization %q...", a.Organization.Name)
 
@@ -379,13 +378,13 @@ func (c *attachCmd) createSpace(ctx context.Context, attachSpinner *pterm.Spinne
 }
 
 func (c *attachCmd) deleteSpace(ctx context.Context, p pterm.TextPrinter, a *accounts.AccountResponse, sc client.Client) error {
-	space := &v1alpha1.Space{}
-	err := sc.Get(ctx, types.NamespacedName{Name: c.Space, Namespace: a.Organization.Name}, space)
-	if err == nil {
-		if err := sc.Delete(ctx, space); err != nil && !kerrors.IsNotFound(err) {
-			return errors.Wrapf(err, `failed to delete Space "%s/%s"`, a.Organization.Name, c.Space)
-		}
-	} else if !kerrors.IsNotFound(err) {
+	space := &upboundv1alpha1.Space{
+		ObjectMeta: metav1.ObjectMeta{
+			Name:      c.Space,
+			Namespace: a.Organization.Name,
+		},
+	}
+	if err := sc.Delete(ctx, space); err != nil && !kerrors.IsNotFound(err) {
 		return errors.Wrapf(err, `failed to delete Space "%s/%s"`, a.Organization.Name, c.Space)
 	}
 

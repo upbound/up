@@ -32,15 +32,16 @@ import (
 	kerrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
+	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/runtime/schema"
-	"k8s.io/apimachinery/pkg/util/runtime"
+	kruntime "k8s.io/apimachinery/pkg/util/runtime"
 	"k8s.io/client-go/dynamic"
 	"k8s.io/client-go/kubernetes"
 	"k8s.io/client-go/rest"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/yaml"
 
-	"github.com/upbound/up-sdk-go/apis/upbound/v1alpha1"
+	upboundv1alpha1 "github.com/upbound/up-sdk-go/apis/upbound/v1alpha1"
 	"github.com/upbound/up/cmd/up/space/defaults"
 	"github.com/upbound/up/cmd/up/space/prerequisites"
 	"github.com/upbound/up/internal/config"
@@ -70,6 +71,8 @@ var (
 	}
 
 	defaultAcct = "notdemo"
+
+	spacesScheme *runtime.Scheme
 )
 
 const (
@@ -113,7 +116,10 @@ type initCmd struct {
 func init() {
 	// NOTE(tnthornton) we override the runtime.ErrorHandlers so that Helm
 	// doesn't leak Println logs.
-	runtime.ErrorHandlers = []func(error){} //nolint:reassign
+	kruntime.ErrorHandlers = []func(error){} //nolint:reassign
+
+	spacesScheme = runtime.NewScheme()
+	upboundv1alpha1.AddToScheme(spacesScheme)
 }
 
 // BeforeApply sets default values in login before assignment and validation.
@@ -430,11 +436,10 @@ func outputNextSteps() {
 }
 
 func getSpacesClient(rest *rest.Config) (client.Client, error) {
-	sc, err := client.New(rest, client.Options{})
+	sc, err := client.New(rest, client.Options{
+		Scheme: spacesScheme,
+	})
 	if err != nil {
-		return nil, err
-	}
-	if err := v1alpha1.AddToScheme(sc.Scheme()); err != nil {
 		return nil, err
 	}
 

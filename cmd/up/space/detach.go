@@ -33,7 +33,7 @@ import (
 	"k8s.io/client-go/rest"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 
-	"github.com/upbound/up-sdk-go/apis/upbound/v1alpha1"
+	upboundv1alpha1 "github.com/upbound/up-sdk-go/apis/upbound/v1alpha1"
 	sdkerrs "github.com/upbound/up-sdk-go/errors"
 	"github.com/upbound/up-sdk-go/service/accounts"
 	"github.com/upbound/up-sdk-go/service/organizations"
@@ -180,7 +180,7 @@ func (c *detachCmd) detachSpace(ctx context.Context, detachSpinner *pterm.Spinne
 func (c *detachCmd) deleteSpace(ctx context.Context, p pterm.TextPrinter, sc client.Client, ar *accounts.AccountResponse) error {
 	p.Printf(`Deleting Space "%s/%s"`, ar.Organization.Name, c.Space)
 
-	space := &v1alpha1.Space{}
+	space := &upboundv1alpha1.Space{}
 	err := sc.Get(ctx, types.NamespacedName{Name: c.Space, Namespace: ar.Organization.Name}, space)
 	if err == nil {
 		if err := sc.Delete(ctx, space); err != nil && !kerrors.IsNotFound(err) {
@@ -285,7 +285,7 @@ func (c *detachCmd) deleteGeneratedSpace(ctx context.Context, p pterm.TextPrinte
 	c.Space = name
 	p.Printfln("Deleting Space %q", name)
 
-	space := &v1alpha1.Space{}
+	space := &upboundv1alpha1.Space{}
 	err := sc.Get(ctx, types.NamespacedName{Name: name, Namespace: ns}, space)
 	if err == nil {
 		if err := sc.Delete(ctx, space); err != nil && !kerrors.IsNotFound(err) {
