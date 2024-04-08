@@ -136,7 +136,7 @@ func (c *detachCmd) Run(ctx context.Context, upCtx *upbound.Context, ac *account
 			detachSpinner.Fail(rErr)
 		}
 	}()
-	sc, err := getSpacesClient(rest)
+	sc, err := client.New(rest, client.Options{})
 	if err != nil {
 		return err
 	}

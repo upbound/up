@@ -153,7 +153,7 @@ func (c *attachCmd) Run(ctx context.Context, mgr *helm.Installer, kClient *kuber
 		}
 	}()
 	return undo.Do(func(u undo.Undoer) error {
-		sc, err := getSpacesClient(rest)
+		sc, err := client.New(rest, client.Options{})
 		if err != nil {
 			return err
 		}

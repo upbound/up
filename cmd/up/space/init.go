@@ -32,13 +32,11 @@ import (
 	kerrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
-	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	kruntime "k8s.io/apimachinery/pkg/util/runtime"
 	"k8s.io/client-go/dynamic"
 	"k8s.io/client-go/kubernetes"
-	"k8s.io/client-go/rest"
-	"sigs.k8s.io/controller-runtime/pkg/client"
+	"k8s.io/client-go/kubernetes/scheme"
 	"sigs.k8s.io/yaml"
 
 	upboundv1alpha1 "github.com/upbound/up-sdk-go/apis/upbound/v1alpha1"
@@ -71,8 +69,6 @@ var (
 	}
 
 	defaultAcct = "notdemo"
-
-	spacesScheme *runtime.Scheme
 )
 
 const (
@@ -118,8 +114,7 @@ func init() {
 	// doesn't leak Println logs.
 	kruntime.ErrorHandlers = []func(error){} //nolint:reassign
 
-	spacesScheme = runtime.NewScheme()
-	upboundv1alpha1.AddToScheme(spacesScheme)
+	kruntime.Must(upboundv1alpha1.AddToScheme(scheme.Scheme))
 }
 
 // BeforeApply sets default values in login before assignment and validation.
@@ -433,15 +428,4 @@ func outputNextSteps() {
 	pterm.Info.WithPrefix(upterm.EyesPrefix).Println("Next Steps 👇")
 	pterm.Println()
 	pterm.Println("👉 Check out Upbound Spaces docs @ https://docs.upbound.io/concepts/upbound-spaces")
-}
-
-func getSpacesClient(rest *rest.Config) (client.Client, error) {
-	sc, err := client.New(rest, client.Options{
-		Scheme: spacesScheme,
-	})
-	if err != nil {
-		return nil, err
-	}
-
-	return sc, err
 }

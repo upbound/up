@@ -69,7 +69,7 @@ func (c *listCmd) Run(ctx context.Context, printer upterm.ObjectPrinter, p pterm
 		return err
 	}
 
-	sc, err := getSpacesClient(rest)
+	sc, err := client.New(rest, client.Options{})
 	if err != nil {
 		return err
 	}
