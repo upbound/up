@@ -37,7 +37,7 @@ require (
 	github.com/sourcegraph/jsonrpc2 v0.2.0
 	github.com/spf13/afero v1.11.0
 	github.com/spf13/cobra v1.8.0
-	github.com/upbound/up-sdk-go v0.3.0
+	github.com/upbound/up-sdk-go v0.3.1-0.20240404213647-1772a8c3f53a
 	github.com/upbound/up/pkg/migration v0.0.0-00010101000000-000000000000
 	github.com/willabides/kongplete v0.3.0
 	golang.org/x/exp v0.0.0-20240213143201-ec583247a57a
@@ -54,7 +54,7 @@ require (
 	k8s.io/kube-openapi v0.0.0-20240209001042-7a0d5b415232
 	k8s.io/kubectl v0.29.1
 	k8s.io/utils v0.0.0-20240102154912-e7106e64919e
-	sigs.k8s.io/controller-runtime v0.17.1
+	sigs.k8s.io/controller-runtime v0.17.2
 	sigs.k8s.io/yaml v1.4.0
 )
 

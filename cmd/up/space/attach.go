@@ -33,13 +33,14 @@ import (
 	kerrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/client-go/kubernetes"
+	"k8s.io/client-go/rest"
+	"sigs.k8s.io/controller-runtime/pkg/client"
 
 	upboundv1alpha1 "github.com/upbound/up-sdk-go/apis/upbound/v1alpha1"
 	sdkerrs "github.com/upbound/up-sdk-go/errors"
 	"github.com/upbound/up-sdk-go/service/accounts"
 	"github.com/upbound/up-sdk-go/service/organizations"
 	"github.com/upbound/up-sdk-go/service/robots"
-	"github.com/upbound/up-sdk-go/service/spaces"
 	"github.com/upbound/up-sdk-go/service/tokens"
 	"github.com/upbound/up/internal/install/helm"
 	"github.com/upbound/up/internal/undo"
@@ -95,13 +96,17 @@ func (c *attachCmd) AfterApply(kongCtx *kong.Context) error {
 	if err != nil {
 		return err
 	}
+	ctrlCfg, err := upCtx.BuildControllerClientConfig()
+	if err != nil {
+		return err
+	}
 
 	kongCtx.Bind(upCtx)
+	kongCtx.Bind(ctrlCfg)
 	kongCtx.Bind(accounts.NewClient(cfg))
 	kongCtx.Bind(organizations.NewClient(cfg))
 	kongCtx.Bind(robots.NewClient(cfg))
 	kongCtx.Bind(tokens.NewClient(cfg))
-	kongCtx.Bind(spaces.NewClient(cfg))
 
 	if err := c.Kube.AfterApply(); err != nil {
 		return err
@@ -137,7 +142,7 @@ func (c *attachCmd) AfterApply(kongCtx *kong.Context) error {
 }
 
 // Run executes the install command.
-func (c *attachCmd) Run(ctx context.Context, mgr *helm.Installer, kClient *kubernetes.Clientset, upCtx *upbound.Context, ac *accounts.Client, oc *organizations.Client, tc *tokens.Client, rc *robots.Client, sc *spaces.Client) (rErr error) {
+func (c *attachCmd) Run(ctx context.Context, mgr *helm.Installer, kClient *kubernetes.Clientset, upCtx *upbound.Context, ac *accounts.Client, oc *organizations.Client, tc *tokens.Client, rc *robots.Client, rest *rest.Config) (rErr error) { //nolint:gocyclo
 	attachSpinner, err := upterm.CheckmarkSuccessSpinner.Start("Connecting Space to Upbound Console...")
 	if err != nil {
 		return err
@@ -148,6 +153,11 @@ func (c *attachCmd) Run(ctx context.Context, mgr *helm.Installer, kClient *kuber
 		}
 	}()
 	return undo.Do(func(u undo.Undoer) error {
+		sc, err := client.New(rest, client.Options{})
+		if err != nil {
+			return err
+		}
+
 		a, err := getAccount(ctx, upCtx, ac)
 		if err != nil {
 			return err
@@ -278,12 +288,15 @@ func (c *attachCmd) prepareToken(ctx context.Context, p pterm.TextPrinter, kClie
 	return nil
 }
 
-func (c *attachCmd) prepareSpace(ctx context.Context, attachSpinner *pterm.SpinnerPrinter, kClient *kubernetes.Clientset, a *accounts.AccountResponse, sc *spaces.Client, u undo.Undoer, cmr **corev1.ConfigMap) error { //nolint:gocyclo
+func (c *attachCmd) prepareSpace(ctx context.Context, attachSpinner *pterm.SpinnerPrinter, kClient *kubernetes.Clientset, a *accounts.AccountResponse, sc client.Client, u undo.Undoer, cmr **corev1.ConfigMap) error { //nolint:gocyclo
 	cm := *cmr
 	space := &upboundv1alpha1.Space{
 		ObjectMeta: metav1.ObjectMeta{
 			Namespace: a.Organization.Name,
 			Name:      c.Space,
+		},
+		Spec: upboundv1alpha1.SpaceSpec{
+			Mode: upboundv1alpha1.ModeConnected,
 		},
 	}
 	// auto generate space name if none given.
@@ -321,10 +334,11 @@ func (c *attachCmd) prepareSpace(ctx context.Context, attachSpinner *pterm.Spinn
 	return nil
 }
 
-func (c *attachCmd) createSpace(ctx context.Context, attachSpinner *pterm.SpinnerPrinter, kClient *kubernetes.Clientset, a *accounts.AccountResponse, space *upboundv1alpha1.Space, sc *spaces.Client, u undo.Undoer, cmr **corev1.ConfigMap) (string, error) {
+func (c *attachCmd) createSpace(ctx context.Context, attachSpinner *pterm.SpinnerPrinter, kClient *kubernetes.Clientset, a *accounts.AccountResponse, space *upboundv1alpha1.Space, sc client.Client, u undo.Undoer, cmr **corev1.ConfigMap) (string, error) {
 	cm := *cmr
 	attachSpinner.InfoPrinter.Printfln("Creating a new Space in Upbound Console in organization %q...", a.Organization.Name)
-	space, err := sc.Create(ctx, a.Organization.Name, space, nil)
+
+	err := sc.Create(ctx, space)
 	if err != nil {
 		if kerrors.IsAlreadyExists(err) && c.Space != "" {
 			attachSpinner.UpdateText("Continue? (Y/n)")
@@ -352,6 +366,7 @@ func (c *attachCmd) createSpace(ctx context.Context, attachSpinner *pterm.Spinne
 	u.Undo(func() error {
 		return c.deleteSpace(ctx, attachSpinner.InfoPrinter, a, sc)
 	})
+
 	attachSpinner.InfoPrinter.Printfln(`Space "%s/%s" created`, a.Organization.Name, space.Name)
 	cm.Data[keySpace] = path.Join(a.Organization.Name, space.Name)
 	cm, err = kClient.CoreV1().ConfigMaps(agentNs).Update(ctx, cm, metav1.UpdateOptions{})
@@ -362,10 +377,17 @@ func (c *attachCmd) createSpace(ctx context.Context, attachSpinner *pterm.Spinne
 	return space.Name, nil
 }
 
-func (c *attachCmd) deleteSpace(ctx context.Context, p pterm.TextPrinter, a *accounts.AccountResponse, sc *spaces.Client) error {
-	if err := sc.Delete(ctx, a.Organization.Name, c.Space, nil); err != nil && !kerrors.IsNotFound(err) {
+func (c *attachCmd) deleteSpace(ctx context.Context, p pterm.TextPrinter, a *accounts.AccountResponse, sc client.Client) error {
+	space := &upboundv1alpha1.Space{
+		ObjectMeta: metav1.ObjectMeta{
+			Name:      c.Space,
+			Namespace: a.Organization.Name,
+		},
+	}
+	if err := sc.Delete(ctx, space); err != nil && !kerrors.IsNotFound(err) {
 		return errors.Wrapf(err, `failed to delete Space "%s/%s"`, a.Organization.Name, c.Space)
 	}
+
 	p.Printfln(`Space "%s/%s" deleted`, a.Organization.Name, c.Space)
 	return nil
 }

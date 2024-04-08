@@ -25,6 +25,7 @@ import (
 	kerrors "k8s.io/apimachinery/pkg/util/errors"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 
+	"github.com/upbound/up-sdk-go/apis/common"
 	queryv1alpha1 "github.com/upbound/up-sdk-go/apis/query/v1alpha1"
 	"github.com/upbound/up/cmd/up/query"
 	"github.com/upbound/up/cmd/up/query/resource"
@@ -183,7 +184,7 @@ func (c *Cmd) Run(ctx context.Context, kongCtx *kong.Context, upCtx *upbound.Con
 					Objects: &queryv1alpha1.QueryObjects{
 						ID:           true,
 						ControlPlane: true,
-						Object: &queryv1alpha1.JSON{
+						Object: &common.JSON{
 							Object: true,
 						},
 					},
@@ -224,7 +225,7 @@ func createQuerySpec(obj types.NamespacedName, gk metav1.GroupKind, categories [
 				Objects: &queryv1alpha1.QueryObjects{
 					ID:           true,
 					ControlPlane: true,
-					Object: &queryv1alpha1.JSON{
+					Object: &common.JSON{
 						Object: map[string]interface{}{
 							"kind":       true,
 							"apiVersion": true,
@@ -246,7 +247,7 @@ func createQuerySpec(obj types.NamespacedName, gk metav1.GroupKind, categories [
 									Objects: &queryv1alpha1.QueryObjects{
 										ID:           true,
 										ControlPlane: true,
-										Object: &queryv1alpha1.JSON{
+										Object: &common.JSON{
 											Object: map[string]interface{}{
 												"lastTimestamp": true,
 												"message":       true,
@@ -265,7 +266,7 @@ func createQuerySpec(obj types.NamespacedName, gk metav1.GroupKind, categories [
 									Objects: &queryv1alpha1.QueryObjects{
 										ID:           true,
 										ControlPlane: true,
-										Object: &queryv1alpha1.JSON{
+										Object: &common.JSON{
 											Object: map[string]interface{}{
 												"kind":       true,
 												"apiVersion": true,
@@ -287,7 +288,7 @@ func createQuerySpec(obj types.NamespacedName, gk metav1.GroupKind, categories [
 														Objects: &queryv1alpha1.QueryObjects{
 															ID:           true,
 															ControlPlane: true,
-															Object: &queryv1alpha1.JSON{
+															Object: &common.JSON{
 																Object: map[string]interface{}{
 																	"lastTimestamp": true,
 																	"message":       true,

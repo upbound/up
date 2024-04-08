@@ -33,11 +33,13 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 	"k8s.io/apimachinery/pkg/runtime/schema"
-	"k8s.io/apimachinery/pkg/util/runtime"
+	kruntime "k8s.io/apimachinery/pkg/util/runtime"
 	"k8s.io/client-go/dynamic"
 	"k8s.io/client-go/kubernetes"
+	"k8s.io/client-go/kubernetes/scheme"
 	"sigs.k8s.io/yaml"
 
+	upboundv1alpha1 "github.com/upbound/up-sdk-go/apis/upbound/v1alpha1"
 	"github.com/upbound/up/cmd/up/space/defaults"
 	"github.com/upbound/up/cmd/up/space/prerequisites"
 	"github.com/upbound/up/internal/config"
@@ -110,7 +112,9 @@ type initCmd struct {
 func init() {
 	// NOTE(tnthornton) we override the runtime.ErrorHandlers so that Helm
 	// doesn't leak Println logs.
-	runtime.ErrorHandlers = []func(error){} //nolint:reassign
+	kruntime.ErrorHandlers = []func(error){} //nolint:reassign
+
+	kruntime.Must(upboundv1alpha1.AddToScheme(scheme.Scheme))
 }
 
 // BeforeApply sets default values in login before assignment and validation.
