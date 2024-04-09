@@ -29,6 +29,7 @@ import (
 	"github.com/spf13/afero"
 	apiextensionsv1 "k8s.io/apiextensions-apiserver/pkg/apis/apiextensions/v1"
 	apiextensionsclientset "k8s.io/apiextensions-apiserver/pkg/client/clientset/clientset"
+	kerrors "k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/api/meta"
 	v1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
@@ -178,6 +179,11 @@ func (e *ControlPlaneStateExporter) Export(ctx context.Context) error { // nolin
 		// ExportResource will fetch all resources of the given GVR and store them in the
 		// well-known directory structure.
 		count, err := exporter.ExportResources(ctx, gvr)
+		if kerrors.IsNotFound(err) {
+			// If the CRD is not found, we ignore it and continue with the next one.
+			s.UpdateText(fmt.Sprintf("(%d / %d) Exporting %s... skipped, CRD not found.", i, len(exportList), gvr.GroupResource()))
+			continue
+		}
 		if err != nil {
 			s.Fail(exportCRsMsg + stepFailed)
 			return errors.Wrapf(err, "cannot export resources for %q", crd.GetName())
@@ -210,6 +216,11 @@ func (e *ControlPlaneStateExporter) Export(ctx context.Context) error { // nolin
 			NewFileSystemPersister(fs, tmpDir, nil))
 
 		count, err := exporter.ExportResources(ctx, gvr)
+		if kerrors.IsNotFound(err) {
+			// If the resource is not found, we ignore it and continue with the next one.
+			s.UpdateText(fmt.Sprintf("Exporting native resource %s... skipped, resource not found.", r))
+			continue
+		}
 		if err != nil {
 			s.Fail(exportNativeMsg + stepFailed)
 			return errors.Wrapf(err, "cannot export resources for %q", r)
