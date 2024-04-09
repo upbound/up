@@ -27,6 +27,9 @@ import (
 	"github.com/crossplane/crossplane-runtime/pkg/errors"
 	xpmeta "github.com/crossplane/crossplane-runtime/pkg/meta"
 	"github.com/spf13/afero"
+	"github.com/upbound/up/pkg/migration"
+	"github.com/upbound/up/pkg/migration/category"
+	"github.com/upbound/up/pkg/migration/meta/v1alpha1"
 	apiextensionsv1 "k8s.io/apiextensions-apiserver/pkg/apis/apiextensions/v1"
 	apiextensionsclientset "k8s.io/apiextensions-apiserver/pkg/client/clientset/clientset"
 	kerrors "k8s.io/apimachinery/pkg/api/errors"
@@ -34,13 +37,11 @@ import (
 	v1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 	"k8s.io/apimachinery/pkg/runtime/schema"
+	"k8s.io/apimachinery/pkg/util/net"
 	"k8s.io/client-go/discovery"
 	"k8s.io/client-go/dynamic"
 	appsv1 "k8s.io/client-go/kubernetes/typed/apps/v1"
-
-	"github.com/upbound/up/pkg/migration"
-	"github.com/upbound/up/pkg/migration/category"
-	"github.com/upbound/up/pkg/migration/meta/v1alpha1"
+	"k8s.io/client-go/util/retry"
 )
 
 const (
@@ -148,89 +149,92 @@ func (e *ControlPlaneStateExporter) Export(ctx context.Context) error { // nolin
 	//////////////////////
 
 	// Export Crossplane resources.
+	exportCRsMsg := fmt.Sprintf("Exporting %d Crossplane resources...", len(exportList))
+	s, _ = migration.DefaultSpinner.Start(exportCRsMsg)
+
 	crCounts := make(map[string]int, len(exportList))
-	exportCRsMsg := "Exporting Crossplane resources... "
-	s, _ = migration.DefaultSpinner.Start(exportCRsMsg + fmt.Sprintf("0 / %d", len(exportList)))
+
 	for i, crd := range exportList {
-		gvr, err := e.customResourceGVR(crd)
-		if err != nil {
-			s.Fail(exportCRsMsg + stepFailed)
-			return errors.Wrapf(err, "cannot get GVR for %q", crd.GetName())
-		}
+		inExportCRsMsg := fmt.Sprintf("( %d / %d ) Exporting Crossplane resource %s...", i+1, len(exportList), crd.GetName())
+		s.UpdateText(inExportCRsMsg)
 
-		s.UpdateText(fmt.Sprintf("(%d / %d) Exporting %s...", i, len(exportList), gvr.GroupResource()))
+		var inCount int
+		var gvr schema.GroupVersionResource
 
-		sub := false
-		for _, vr := range crd.Spec.Versions {
-			if vr.Storage && vr.Subresources != nil && vr.Subresources.Status != nil {
-				// This CRD has a status subresource. We store this as a metadata per type and use
-				// it during import to determine if we should apply the status subresource.
-				sub = true
-				break
-			}
-		}
-		exporter := NewUnstructuredExporter(
-			NewUnstructuredFetcher(e.dynamicClient, e.options),
-			NewFileSystemPersister(fs, tmpDir, &v1alpha1.TypeMeta{
-				Categories:            crd.Spec.Names.Categories,
-				WithStatusSubresource: sub,
-			}))
+		err := retry.OnError(retry.DefaultRetry, func(err error) bool {
+			// Retry on connection refused errors, these could be transient.
+			return net.IsConnectionRefused(err)
+		}, func() (exportErr error) {
+			gvr, inCount, exportErr = e.exportCrossplaneResources(ctx, crd, fs, tmpDir)
+			return exportErr
+		})
 
-		// ExportResource will fetch all resources of the given GVR and store them in the
-		// well-known directory structure.
-		count, err := exporter.ExportResources(ctx, gvr)
-		if kerrors.IsNotFound(err) {
-			// If the CRD is not found, we ignore it and continue with the next one.
-			s.UpdateText(fmt.Sprintf("(%d / %d) Exporting %s... skipped, CRD not found.", i, len(exportList), gvr.GroupResource()))
+		if kerrors.IsNotFound(err) || meta.IsNoMatchError(err) {
+			// These errors mean something is in-flight, either being created or
+			// deleted, so we ignore it and continue with the next one.
+			s.UpdateText(inExportCRsMsg + " skipped, resource not found.")
 			continue
 		}
+
 		if err != nil {
-			s.Fail(exportCRsMsg + stepFailed)
-			return errors.Wrapf(err, "cannot export resources for %q", crd.GetName())
+			s.Fail(inExportCRsMsg + stepFailed)
+			return errors.Wrapf(err, "cannot export Crossplane resource %q", crd.GetName())
 		}
-		crCounts[gvr.GroupResource().String()] = count
+
+		crCounts[gvr.GroupResource().String()] = inCount
 	}
 
 	total := 0
 	for _, count := range crCounts {
 		total += count
 	}
+
 	s.Success(exportCRsMsg + fmt.Sprintf("%d resources exported! 📤", total))
 	//////////////////////
 
 	// Export native resources.
-	exportNativeMsg := "Exporting native resources... "
-	s, _ = migration.DefaultSpinner.Start(exportNativeMsg + fmt.Sprintf("0 / %d", len(e.options.IncludeExtraResources)))
+	exportNativeMsg := fmt.Sprintf("Exporting %d native resources...", len(e.options.IncludeExtraResources))
+	s, _ = migration.DefaultSpinner.Start(exportNativeMsg)
+
 	nativeCounts := make(map[string]int, len(e.options.IncludeExtraResources))
 
 	// In addition to the Crossplane resources, we also need to export some native resources. These are
 	// defaulted as "namespaces", "configmaps" and "secrets". However, the user can also specify additional
 	// resources to include or exclude the default ones.
 	for r := range e.extraResources() {
-		gvr, err := e.resourceMapper.ResourceFor(schema.ParseGroupResource(r).WithVersion(""))
-		if err != nil {
-			return errors.Wrapf(err, "cannot get GVR for %q", r)
-		}
-		exporter := NewUnstructuredExporter(
-			NewUnstructuredFetcher(e.dynamicClient, e.options),
-			NewFileSystemPersister(fs, tmpDir, nil))
+		inExportNativeMsg := fmt.Sprintf("( %d / %d ) Exporting native resource %s...", len(nativeCounts)+1, len(e.options.IncludeExtraResources), r)
+		s.UpdateText(inExportNativeMsg)
 
-		count, err := exporter.ExportResources(ctx, gvr)
-		if kerrors.IsNotFound(err) {
-			// If the resource is not found, we ignore it and continue with the next one.
-			s.UpdateText(fmt.Sprintf("Exporting native resource %s... skipped, resource not found.", r))
+		var inCount int
+
+		err := retry.OnError(retry.DefaultRetry, func(err error) bool {
+			// Retry on connection refused errors, these could be transient.
+			return net.IsConnectionRefused(err)
+		}, func() (exportErr error) {
+			inCount, exportErr = e.exportNativeResource(ctx, r, fs, tmpDir)
+			return exportErr
+		})
+
+		if kerrors.IsNotFound(err) || meta.IsNoMatchError(err) {
+			// These errors mean something is in-flight, either being created or
+			// deleted, so we ignore it and continue with the next one.
+			s.UpdateText(inExportNativeMsg + " skipped, resource not found.")
 			continue
 		}
+
 		if err != nil {
-			s.Fail(exportNativeMsg + stepFailed)
-			return errors.Wrapf(err, "cannot export resources for %q", r)
+			s.Fail(inExportNativeMsg + stepFailed)
+			return errors.Wrapf(err, "cannot export native resource %q", r)
 		}
-		nativeCounts[gvr.Resource] = count
+
+		nativeCounts[r] = inCount
 	}
+
 	total = 0
 	for _, count := range nativeCounts {
 		total += count
 	}
+
 	s.Success(exportNativeMsg + fmt.Sprintf("%d resources exported! 📤", total))
 	//////////////////////
 
@@ -255,6 +259,53 @@ func (e *ControlPlaneStateExporter) Export(ctx context.Context) error { // nolin
 	//////////////////////
 
 	return nil
+}
+
+func (e *ControlPlaneStateExporter) exportCrossplaneResources(ctx context.Context, crd apiextensionsv1.CustomResourceDefinition, fs afero.Afero, tmpDir string) (schema.GroupVersionResource, int, error) {
+	gvr, err := e.customResourceGVR(crd)
+	if err != nil {
+		return schema.GroupVersionResource{}, 0, errors.Wrapf(err, "cannot get GVR for %q", crd.GetName())
+	}
+
+	sub := false
+	for _, vr := range crd.Spec.Versions {
+		if vr.Storage && vr.Subresources != nil && vr.Subresources.Status != nil {
+			// This CRD has a status subresource. We store this as a metadata per type and use
+			// it during import to determine if we should apply the status subresource.
+			sub = true
+			break
+		}
+	}
+	exporter := NewUnstructuredExporter(
+		NewUnstructuredFetcher(e.dynamicClient, e.options),
+		NewFileSystemPersister(fs, tmpDir, &v1alpha1.TypeMeta{
+			Categories:            crd.Spec.Names.Categories,
+			WithStatusSubresource: sub,
+		}))
+
+	// ExportResource will fetch all resources of the given GVR and store them in the
+	// well-known directory structure.
+	count, err := exporter.ExportResources(ctx, gvr)
+	if err != nil {
+		return schema.GroupVersionResource{}, 0, errors.Wrapf(err, "cannot export resources for %q", crd.GetName())
+	}
+	return gvr, count, nil
+}
+
+func (e *ControlPlaneStateExporter) exportNativeResource(ctx context.Context, r string, fs afero.Afero, tmpDir string) (int, error) {
+	gvr, err := e.resourceMapper.ResourceFor(schema.ParseGroupResource(r).WithVersion(""))
+	if err != nil {
+		return 0, errors.Wrapf(err, "cannot get GVR for %q", r)
+	}
+	exporter := NewUnstructuredExporter(
+		NewUnstructuredFetcher(e.dynamicClient, e.options),
+		NewFileSystemPersister(fs, tmpDir, nil))
+
+	count, err := exporter.ExportResources(ctx, gvr)
+	if err != nil {
+		return 0, errors.Wrapf(err, "cannot export resources for %q", r)
+	}
+	return count, nil
 }
 
 func (e *ControlPlaneStateExporter) IncludedExtraResource(gr string) bool {
