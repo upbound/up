@@ -127,11 +127,19 @@ func (e *ControlPlaneStateExporter) Export(ctx context.Context) error { // nolin
 	// Scan the control plane for types to export.
 	scanMsg := "Scanning control plane for types to export... "
 	s, _ := migration.DefaultSpinner.Start(scanMsg)
-	crdList, err := fetchAllCRDs(ctx, e.crdClient)
-	if err != nil {
+
+	var crdList []apiextensionsv1.CustomResourceDefinition
+	if err := retry.OnError(retry.DefaultRetry, func(err error) bool {
+		// Retry on connection refused errors or transient errors.
+		return net.IsConnectionRefused(err) || kerrors.IsNotFound(err)
+	}, func() (fetchErr error) {
+		crdList, fetchErr = fetchAllCRDs(ctx, e.crdClient)
+		return fetchErr
+	}); err != nil {
 		s.Fail(scanMsg + stepFailed)
 		return errors.Wrap(err, "cannot fetch CRDs")
 	}
+
 	exportList := make([]apiextensionsv1.CustomResourceDefinition, 0, len(crdList))
 	for _, crd := range crdList {
 		// We only want to export the following types:
