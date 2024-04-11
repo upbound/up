@@ -254,7 +254,7 @@ func (c *attachCmd) deriveParams(a *accounts.AccountResponse) map[string]any {
 	}
 
 	params := map[string]any{
-		"nats": map[string]any{
+		"connect": map[string]any{
 			"url": connectURL,
 		},
 		"space":        c.Space,
