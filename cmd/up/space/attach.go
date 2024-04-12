@@ -23,7 +23,6 @@ import (
 	"strconv"
 	"strings"
 
-	"github.com/Masterminds/semver/v3"
 	"github.com/alecthomas/kong"
 	"github.com/crossplane/crossplane-runtime/pkg/errors"
 	"github.com/google/uuid"
@@ -217,20 +216,11 @@ func (c *attachCmd) installAgent(p pterm.TextPrinter, mgr *helm.Installer, a *ac
 }
 
 func (c *attachCmd) upgradeAgent(p pterm.TextPrinter, mgr *helm.Installer, a *accounts.AccountResponse, currentVersion string, u undo.Undoer) error {
-	cv, err := semver.NewVersion(currentVersion)
-	if err != nil {
-		return errors.Wrapf(err, "failed to parse current version %s", currentVersion)
+	if currentVersion != version.GetAgentVersion() {
+		p.Printfln(`Upgrading Chart "%s/%s" %s => %s`, agentNs, agentChart, currentVersion, version.GetAgentVersion())
+	} else {
+		p.Printfln(`Reinstalling Chart "%s/%s" %s`, agentNs, agentChart, version.GetAgentVersion())
 	}
-	tv, err := semver.NewVersion(version.GetAgentVersion())
-	if err != nil {
-		return errors.Wrapf(err, "failed to parse agent version %s", version.GetAgentVersion())
-	}
-	// skip upgrade if at least the specified version.
-	if !tv.GreaterThan(cv) {
-		p.Printfln(`Chart "%s/%s" already installed with version %s`, agentNs, agentChart, currentVersion)
-		return nil
-	}
-	p.Printfln(`Upgrading Chart "%s/%s" %s => %s`, agentNs, agentChart, currentVersion, version.GetAgentVersion())
 	if err := mgr.Upgrade(version.GetAgentVersion(), c.deriveParams(a)); err != nil {
 		return errors.Wrapf(err, `failed to upgrade Chart "%s/%s"`, agentNs, agentChart)
 	}
