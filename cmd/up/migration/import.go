@@ -17,9 +17,7 @@ package migration
 import (
 	"context"
 	"fmt"
-	"regexp"
 
-	"github.com/crossplane/crossplane-runtime/pkg/errors"
 	"github.com/pterm/pterm"
 	"k8s.io/client-go/discovery"
 	"k8s.io/client-go/discovery/cached/memory"
@@ -27,17 +25,13 @@ import (
 	appsv1 "k8s.io/client-go/kubernetes/typed/apps/v1"
 	"k8s.io/client-go/restmapper"
 
+	"github.com/crossplane/crossplane-runtime/pkg/errors"
+
 	"github.com/upbound/up/internal/input"
+	"github.com/upbound/up/internal/profile"
 	"github.com/upbound/up/internal/upterm"
 	"github.com/upbound/up/pkg/migration"
 	"github.com/upbound/up/pkg/migration/importer"
-)
-
-var (
-	// Matches https://00.000.000.0.nip.io/apis/spaces.upbound.io/v1beta1/namespaces/default/controlplanes/ctp1/k8s
-	newControlPlanePathRE = regexp.MustCompile(`^(?P<base>.+)/apis/spaces.upbound.io/(?P<version>v[^/]+)/namespaces/(?P<namespace>[^/]+)/controlplanes/(?P<controlplane>[^/]+)/k8s$`)
-	// Matches https://spaces-foo.upboundrocks.cloud/v1/controlplanes/acmeco/default/ctp/k8s
-	oldControlPlanePathRE = regexp.MustCompile(`^(?P<base>.+)/v1/control[pP]lanes/(?P<account>[^/]+)/(?P<namespace>[^/]+)/(?P<controlplane>[^/]+)/k8s$`)
 )
 
 type importCmd struct {
@@ -137,5 +131,6 @@ func (c *importCmd) Run(ctx context.Context, migCtx *migration.Context) error { 
 }
 
 func isMCP(host string) bool {
-	return newControlPlanePathRE.MatchString(host) || oldControlPlanePathRE.MatchString(host)
+	_, matches := profile.ParseSpacesK8sURL(host)
+	return matches
 }

@@ -20,17 +20,16 @@ package query
 
 import (
 	"fmt"
-	"regexp"
 
 	"github.com/alecthomas/kong"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
-	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/client-go/tools/clientcmd"
 
 	"github.com/crossplane/crossplane-runtime/pkg/errors"
 
 	"github.com/upbound/up/cmd/up/query/resource"
 	"github.com/upbound/up/internal/feature"
+	"github.com/upbound/up/internal/profile"
 	"github.com/upbound/up/internal/upbound"
 )
 
@@ -44,8 +43,6 @@ type GetCmd struct {
 func (c *GetCmd) BeforeReset(p *kong.Path, maturity feature.Maturity) error {
 	return feature.HideMaturity(p, maturity)
 }
-
-var controlPlanePathRE = regexp.MustCompile(`^(?P<base>.+)/apis/spaces.upbound.io/(?P<version>[^/]+)/namespaces/(?P<namespace>[^/]+)/controlplanes/(?P<controlplane>[^/]+)/k8s$`)
 
 // AfterApply constructs and binds Upbound-specific context to any subcommands
 // that have Run() methods that receive it.
@@ -66,15 +63,14 @@ func (c *GetCmd) AfterApply(kongCtx *kong.Context) error {
 
 	// extract control plane from controlplane kubeconfig context
 	// example: https://host/apis/spaces.upbound.io/v1beta1/namespaces/default/controlplanes/ctp-kine/k8s
-	m := controlPlanePathRE.FindStringSubmatch(ctpConfig.Host)
-	if m == nil {
+	controlPlane, found := profile.ParseSpacesK8sURL(ctpConfig.Host)
+	if !found {
 		return errors.New("You are not connected to a control plane.")
 	}
-	controlPlane := types.NamespacedName{Namespace: m[3], Name: m[4]}
 
 	// create Spaces API kubeconfig
 	// TODO(sttts): here we have to continue with baseURL := m[1] to talk to Spaces API. For now we use the spaces profile instead.
-	spacesKubeconfig, _, err := upCtx.Profile.GetSpaceKubeConfig()
+	spacesKubeconfig, _, err := upCtx.Profile.GetSpaceRestConfig()
 	if err != nil {
 		return err
 	}
