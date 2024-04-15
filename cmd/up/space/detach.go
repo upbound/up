@@ -241,7 +241,7 @@ func (c *detachCmd) deleteResources(ctx context.Context, kClient *kubernetes.Cli
 		}
 		detachSpinner.UpdateText("Continue? (Y/n)")
 		if err := warnAndConfirm(
-			`We're unable to confirm Space "%s/%s" is currently connected to Upbound Console. Would you like to delete it anyway?`+"\n\n"+
+			`We're unable to confirm if the Space "%s/%s" is currently connected to Upbound Console. Would you like to delete it anyway?`+"\n\n"+
 				"  If the other Space cluster still exists, the Upbound agent will be left running and you will need to delete it manually.\n",
 			upCtx.Account, c.Space,
 		); err != nil {
