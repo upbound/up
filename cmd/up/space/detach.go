@@ -155,9 +155,9 @@ func (c *detachCmd) detachSpace(ctx context.Context, detachSpinner *pterm.Spinne
 	if kClient == nil {
 		detachSpinner.UpdateText("Continue? (Y/n)")
 		if err := warnAndConfirm(
-			"Not connected to a Space cluster, would you like to only remove the Space %q from the Upbound Console?\n\n"+
+			`Not connected to a Space cluster, would you like to only remove the Space "%s/%s" from the Upbound Console?`+"\n\n"+
 				"  If the other Space cluster still exists, the Upbound agent will be left running and you will need to delete it manually.\n",
-			c.Space,
+			upCtx.Account, c.Space,
 		); err != nil {
 			return err
 		}

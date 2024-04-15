@@ -302,8 +302,8 @@ func (c *attachCmd) prepareSpace(ctx context.Context, attachSpinner *pterm.Spinn
 		if (space.Name != "" && space.Name != name) || space.Namespace != ns {
 			attachSpinner.UpdateText("Continue? (Y/n)")
 			if err := warnAndConfirm(
-				`Space "%s/%s" is currently connected to Upbound Console, would you like to disconnect it first?`+"\n\n"+
-					`  This will remove it and re-connect the Upbound agent with Space "%s/%s" instead.`+"\n",
+				`Space "%s/%s" is currently connected to Upbound Console. Would you like to continue?`+"\n\n"+
+					`  By continuing the current Space will be removed and this Space will be attached as "%s/%s" instead.`+"\n",
 				ns, name, space.Namespace, space.Name,
 			); err != nil {
 				return err
