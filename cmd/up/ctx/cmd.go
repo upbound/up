@@ -28,6 +28,7 @@ import (
 	"k8s.io/apimachinery/pkg/util/runtime"
 	"k8s.io/client-go/kubernetes/scheme"
 	"k8s.io/client-go/tools/clientcmd"
+	clientcmdapi "k8s.io/client-go/tools/clientcmd/api"
 	ctrl "sigs.k8s.io/controller-runtime"
 	"sigs.k8s.io/controller-runtime/pkg/log/zap"
 
@@ -153,80 +154,10 @@ func (c *Cmd) RunSwap(ctx context.Context, upCtx *upbound.Context) error { // no
 		return err
 	}
 
-	if last != c.KubeContext+upboundPreviousContextSuffix {
-		// switch to last context trivially via CurrentContext
-		oldCurrent := conf.CurrentContext
-		conf.CurrentContext = last
-		if err := clientcmd.ModifyConfig(po, *conf, true); err != nil {
-			return err
-		}
-		if err := writeLastContext(oldCurrent); err != nil {
-			return err
-		}
-		fmt.Printf(contextSwitchedFmt, c.KubeContext, last)
-		return nil
-	}
-
-	// swap upbound and upbound-previous context
-	prev, ok := conf.Contexts[c.KubeContext+upboundPreviousContextSuffix]
-	if !ok {
-		return fmt.Errorf("no %q context found", c.KubeContext+upboundPreviousContextSuffix)
-	}
-	current, ok := conf.Contexts[c.KubeContext]
-	if !ok {
-		return fmt.Errorf("no %q context found", c.KubeContext)
-	}
-	conf.Contexts[c.KubeContext] = prev
-	conf.Contexts[c.KubeContext+upboundPreviousContextSuffix] = current
-
-	// swap upbound and upbound-previous cluster
-	if conf.Contexts[c.KubeContext].Cluster == c.KubeContext+upboundPreviousContextSuffix {
-		prev := conf.Clusters[c.KubeContext+upboundPreviousContextSuffix]
-		if prev == nil {
-			return fmt.Errorf("no %q cluster found", c.KubeContext+upboundPreviousContextSuffix)
-		}
-		conf.Clusters[c.KubeContext] = prev
-		if current := conf.Clusters[c.KubeContext]; current == nil {
-			delete(conf.Clusters, c.KubeContext+upboundPreviousContextSuffix)
-		} else {
-			conf.Clusters[c.KubeContext+upboundPreviousContextSuffix] = current
-		}
-		if !ok {
-			delete(conf.Clusters, c.KubeContext+upboundPreviousContextSuffix)
-		}
-		for _, ctx := range conf.Contexts {
-			if ctx.Cluster == c.KubeContext+upboundPreviousContextSuffix {
-				ctx.Cluster = c.KubeContext
-			}
-			if ctx.Cluster == c.KubeContext {
-				ctx.Cluster = c.KubeContext + upboundPreviousContextSuffix
-			}
-		}
-	}
-
-	// swap upbound and upbound-previous authInfo
-	if conf.Contexts[c.KubeContext].AuthInfo == c.KubeContext+upboundPreviousContextSuffix {
-		prev := conf.AuthInfos[c.KubeContext+upboundPreviousContextSuffix]
-		if prev == nil {
-			return fmt.Errorf("no %q authInfo found", c.KubeContext+upboundPreviousContextSuffix)
-		}
-		conf.AuthInfos[c.KubeContext] = prev
-		if current := conf.AuthInfos[c.KubeContext]; current == nil {
-			delete(conf.AuthInfos, c.KubeContext+upboundPreviousContextSuffix)
-		} else {
-			conf.AuthInfos[c.KubeContext+upboundPreviousContextSuffix] = current
-		}
-		if !ok {
-			delete(conf.AuthInfos, c.KubeContext+upboundPreviousContextSuffix)
-		}
-		for _, ctx := range conf.Contexts {
-			if ctx.AuthInfo == c.KubeContext+upboundPreviousContextSuffix {
-				ctx.AuthInfo = c.KubeContext
-			}
-			if ctx.AuthInfo == c.KubeContext {
-				ctx.AuthInfo = c.KubeContext + upboundPreviousContextSuffix
-			}
-		}
+	// more complicated case: last context is upbound-previous and we have to rename
+	conf, oldContext, err := swapContext(conf, last, c.KubeContext)
+	if err != nil {
+		return err
 	}
 
 	// write kubeconfig
@@ -237,11 +168,89 @@ func (c *Cmd) RunSwap(ctx context.Context, upCtx *upbound.Context) error { // no
 	if err := clientcmd.ModifyConfig(po, *conf, true); err != nil {
 		return err
 	}
-	if err := writeLastContext(c.KubeContext + upboundPreviousContextSuffix); err != nil {
+	if err := writeLastContext(oldContext); err != nil {
 		return err
 	}
 	fmt.Printf(contextSwitchedFmt, c.KubeContext, state.Breadcrumbs())
 	return nil
+}
+
+func swapContext(conf *clientcmdapi.Config, lastKubeContext, preferredContext string) (newConf *clientcmdapi.Config, newLastContext string, err error) { // nolint:gocyclo // little long, but well tested
+	conf = conf.DeepCopy()
+
+	// switch to non-upbound last context trivially via CurrentContext e.g.
+	// - upbound <-> other
+	// - something <-> other
+	if lastKubeContext != preferredContext+upboundPreviousContextSuffix {
+		oldCurrent := conf.CurrentContext
+		conf.CurrentContext = lastKubeContext
+		return conf, oldCurrent, nil
+	}
+
+	// swap upbound and upbound-previous context
+	prev, ok := conf.Contexts[preferredContext+upboundPreviousContextSuffix]
+	if !ok {
+		return nil, "", fmt.Errorf("no %q context found", preferredContext+upboundPreviousContextSuffix)
+	}
+	current, ok := conf.Contexts[conf.CurrentContext]
+	if !ok {
+		return nil, "", fmt.Errorf("no %q context found", preferredContext)
+	}
+	if conf.CurrentContext == preferredContext {
+		conf.Contexts[preferredContext] = prev
+		conf.Contexts[preferredContext+upboundPreviousContextSuffix] = current
+		newLastContext = preferredContext + upboundPreviousContextSuffix
+	} else {
+		// For other <-> upbound-previous, keep "other" for last context
+		conf.Contexts[preferredContext] = prev
+		delete(conf.Contexts, preferredContext+upboundPreviousContextSuffix)
+		newLastContext = conf.CurrentContext
+	}
+	conf.CurrentContext = preferredContext
+
+	// swap upbound and upbound-previous cluster
+	if conf.Contexts[preferredContext].Cluster == preferredContext+upboundPreviousContextSuffix {
+		prev := conf.Clusters[preferredContext+upboundPreviousContextSuffix]
+		if prev == nil {
+			return nil, "", fmt.Errorf("no %q cluster found", preferredContext+upboundPreviousContextSuffix)
+		}
+		if current := conf.Clusters[preferredContext]; current == nil {
+			delete(conf.Clusters, preferredContext+upboundPreviousContextSuffix)
+		} else {
+			conf.Clusters[preferredContext+upboundPreviousContextSuffix] = current
+		}
+		conf.Clusters[preferredContext] = prev
+		for _, ctx := range conf.Contexts {
+			if ctx.Cluster == preferredContext+upboundPreviousContextSuffix {
+				ctx.Cluster = preferredContext
+			} else if ctx.Cluster == preferredContext {
+				ctx.Cluster = preferredContext + upboundPreviousContextSuffix
+			}
+		}
+	}
+
+	// swap upbound and upbound-previous authInfo
+	if conf.Contexts[preferredContext].AuthInfo == preferredContext+upboundPreviousContextSuffix {
+		prev := conf.AuthInfos[preferredContext+upboundPreviousContextSuffix]
+		if prev == nil {
+			return nil, "", fmt.Errorf("no %q authInfo found", preferredContext+upboundPreviousContextSuffix)
+		}
+		if current := conf.AuthInfos[preferredContext]; current == nil {
+			delete(conf.AuthInfos, preferredContext+upboundPreviousContextSuffix)
+		} else {
+			conf.AuthInfos[preferredContext+upboundPreviousContextSuffix] = current
+		}
+		conf.AuthInfos[preferredContext] = prev
+		for _, ctx := range conf.Contexts {
+			if ctx.AuthInfo == preferredContext+upboundPreviousContextSuffix {
+				ctx.AuthInfo = preferredContext
+			} else if ctx.AuthInfo == preferredContext {
+				ctx.AuthInfo = preferredContext + upboundPreviousContextSuffix
+			}
+		}
+	}
+
+	return conf, newLastContext, nil
 }
 
 func (c *Cmd) RunRelative(ctx context.Context, kongCtx *kong.Context, upCtx *upbound.Context, initialState NavigationState) error { // nolint:gocyclo // a bit long but ¯\_(ツ)_/¯
