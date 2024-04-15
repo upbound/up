@@ -117,30 +117,6 @@ func (c *Cmd) Run(ctx context.Context, kongCtx *kong.Context, upCtx *upbound.Con
 	}
 }
 
-func (c *Cmd) RunDot(ctx context.Context, kongCtx *kong.Context, upCtx *upbound.Context, initialState NavigationState) error {
-	if _, ok := initialState.(*Profiles); ok {
-		po := clientcmd.NewDefaultPathOptions()
-		conf, err := po.GetStartingConfig()
-		if err != nil {
-			return err
-		}
-		fmt.Fprintf(kongCtx.Stderr, "Non-%s kubeconfig config: %s\n", upboundRootStyle.Render("Upbound"), conf.CurrentContext)
-		return nil
-	}
-
-	if c.Short {
-		switch state := initialState.(type) {
-		case *Group:
-			fmt.Printf("%s/%s\n", state.space.profile, state.name)
-		case *ControlPlane:
-			fmt.Printf("%s/%s/%s\n", state.space.profile, state.NamespacedName.Namespace, state.NamespacedName.Name)
-		}
-	} else {
-		fmt.Printf("Current kubeconfig context %q: %s\n", c.KubeContext, initialState.Breadcrumbs())
-	}
-	return nil
-}
-
 func (c *Cmd) RunSwap(ctx context.Context, upCtx *upbound.Context) error { // nolint:gocyclo // TODO: shorten
 	last, err := readLastContext()
 	if err != nil {
@@ -155,7 +131,7 @@ func (c *Cmd) RunSwap(ctx context.Context, upCtx *upbound.Context) error { // no
 	}
 
 	// more complicated case: last context is upbound-previous and we have to rename
-	conf, oldContext, err := swapContext(conf, last, c.KubeContext)
+	conf, oldContext, err := activateContext(conf, last, c.KubeContext)
 	if err != nil {
 		return err
 	}
@@ -175,34 +151,36 @@ func (c *Cmd) RunSwap(ctx context.Context, upCtx *upbound.Context) error { // no
 	return nil
 }
 
-func swapContext(conf *clientcmdapi.Config, lastKubeContext, preferredContext string) (newConf *clientcmdapi.Config, newLastContext string, err error) { // nolint:gocyclo // little long, but well tested
-	conf = conf.DeepCopy()
-
+func activateContext(conf *clientcmdapi.Config, sourceContext, preferredContext string) (newConf *clientcmdapi.Config, newLastContext string, err error) { // nolint:gocyclo // little long, but well tested
 	// switch to non-upbound last context trivially via CurrentContext e.g.
 	// - upbound <-> other
 	// - something <-> other
-	if lastKubeContext != preferredContext+upboundPreviousContextSuffix {
+	if sourceContext != preferredContext+upboundPreviousContextSuffix {
 		oldCurrent := conf.CurrentContext
-		conf.CurrentContext = lastKubeContext
+		conf.CurrentContext = sourceContext
 		return conf, oldCurrent, nil
 	}
 
+	if sourceContext == conf.CurrentContext {
+		return nil, conf.CurrentContext, nil
+	}
+
 	// swap upbound and upbound-previous context
-	prev, ok := conf.Contexts[preferredContext+upboundPreviousContextSuffix]
+	source, ok := conf.Contexts[sourceContext]
 	if !ok {
 		return nil, "", fmt.Errorf("no %q context found", preferredContext+upboundPreviousContextSuffix)
 	}
 	current, ok := conf.Contexts[conf.CurrentContext]
 	if !ok {
-		return nil, "", fmt.Errorf("no %q context found", preferredContext)
+		return nil, "", fmt.Errorf("no %q context found", conf.CurrentContext)
 	}
 	if conf.CurrentContext == preferredContext {
-		conf.Contexts[preferredContext] = prev
+		conf.Contexts[preferredContext] = source
 		conf.Contexts[preferredContext+upboundPreviousContextSuffix] = current
 		newLastContext = preferredContext + upboundPreviousContextSuffix
 	} else {
 		// For other <-> upbound-previous, keep "other" for last context
-		conf.Contexts[preferredContext] = prev
+		conf.Contexts[preferredContext] = source
 		delete(conf.Contexts, preferredContext+upboundPreviousContextSuffix)
 		newLastContext = conf.CurrentContext
 	}

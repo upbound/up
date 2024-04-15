@@ -22,7 +22,6 @@ import (
 	"github.com/charmbracelet/lipgloss"
 	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/types"
-	"k8s.io/client-go/tools/clientcmd"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 
 	spacesv1beta1 "github.com/upbound/up-sdk-go/apis/spaces/v1beta1"
@@ -72,11 +71,7 @@ func (p *Profiles) Items(ctx context.Context, upCtx *upbound.Context) ([]list.It
 			continue
 		}
 		items = append(items, item{text: name, kind: "space", onEnter: func(ctx context.Context, upCtx *upbound.Context, m model) (model, error) {
-			spaceKubeconfig, err := p.GetSpaceKubeConfig()
-			if err != nil {
-				return m, err
-			}
-			m.state = &Space{profile: name, kubeconfig: spaceKubeconfig}
+			m.state = &Space{profile: name}
 			return m, nil
 		}})
 	}
@@ -99,12 +94,15 @@ var _ Back = &Space{}
 
 // Space provides the navigation node for a space.
 type Space struct {
-	profile    string
-	kubeconfig clientcmd.ClientConfig
+	profile string
 }
 
 func (s *Space) Items(ctx context.Context, upCtx *upbound.Context) ([]list.Item, error) {
-	config, err := s.kubeconfig.ClientConfig()
+	p, err := upCtx.Cfg.GetUpboundProfile(s.profile)
+	if err != nil {
+		return nil, err
+	}
+	config, _, err := p.GetSpaceRestConfig()
 	if err != nil {
 		return nil, err
 	}
@@ -153,7 +151,11 @@ var _ Back = &Group{}
 
 func (g *Group) Items(ctx context.Context, upCtx *upbound.Context) ([]list.Item, error) {
 	// list controlplanes in group
-	config, err := g.space.kubeconfig.ClientConfig()
+	p, err := upCtx.Cfg.GetUpboundProfile(g.space.profile)
+	if err != nil {
+		return nil, err
+	}
+	config, _, err := p.GetSpaceRestConfig()
 	if err != nil {
 		return nil, err
 	}

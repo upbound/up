@@ -21,6 +21,7 @@ import (
 
 	"k8s.io/client-go/tools/clientcmd"
 	clientcmdapi "k8s.io/client-go/tools/clientcmd/api"
+	"k8s.io/utils/ptr"
 
 	"github.com/upbound/up/internal/kube"
 	"github.com/upbound/up/internal/profile"
@@ -34,130 +35,198 @@ const (
 // Accept upserts the "upbound" kubeconfig context to the current kubeconfig,
 // pointing to the group.
 func (g *Group) Accept(ctx context.Context, upCtx *upbound.Context, kubeContext string) (msg string, err error) {
-	// new context
-	groupKubeconfig, err := g.space.kubeconfig.RawConfig()
-	if err != nil {
-		return "", err
-	}
+	// find existing space context
 	p, err := upCtx.Cfg.GetUpboundProfile(g.space.profile)
 	if err != nil {
 		return "", err
 	}
-	groupKubeconfig.CurrentContext = p.KubeContext
-	if err := clientcmdapi.MinifyConfig(&groupKubeconfig); err != nil {
+	loader, err := p.GetSpaceKubeConfig()
+	if err != nil {
 		return "", err
 	}
-	groupKubeconfig.Contexts[groupKubeconfig.CurrentContext].Namespace = g.name
-
-	prevContext, err := mergeIntoKubeConfig(&groupKubeconfig, kubeContext, kubeContext+upboundPreviousContextSuffix, "", kube.VerifyKubeConfig(upCtx.WrapTransport))
+	conf, err := loader.RawConfig()
 	if err != nil {
+		return "", err
+	}
+
+	// switch to group context
+	groupConf, prevContext, err := g.accept(&conf, p, kubeContext)
+	if err != nil {
+		return "", err
+	}
+	if contextDeepEqual(groupConf, prevContext, groupConf.CurrentContext) {
+		return fmt.Sprintf(contextSwitchedFmt, groupConf.CurrentContext, g.Breadcrumbs()), nil
+	}
+	if err := kube.VerifyKubeConfig(upCtx.WrapTransport)(groupConf); err != nil {
+		return "", err
+	}
+
+	// write back
+	if err := clientcmd.ModifyConfig(clientcmd.NewDefaultPathOptions(), *groupConf, true); err != nil {
 		return "", err
 	}
 	if err := writeLastContext(prevContext); err != nil { // nolint:staticcheck
 		// ignore error because now everything has happened already.
 	}
 
-	return fmt.Sprintf(contextSwitchedFmt, kubeContext, g.Breadcrumbs()), nil
+	return fmt.Sprintf(contextSwitchedFmt, groupConf.CurrentContext, g.Breadcrumbs()), nil
+}
+
+func (g *Group) accept(conf *clientcmdapi.Config, p profile.Profile, kubeContext string) (groupConf *clientcmdapi.Config, prevContext string, err error) {
+	conf = conf.DeepCopy()
+
+	groupContext := p.KubeContext
+	if groupContext == "" {
+		groupContext = conf.CurrentContext
+	}
+	if _, ok := conf.Contexts[groupContext]; !ok {
+		return nil, "", fmt.Errorf("context %q not found in kubeconfig", groupContext)
+	}
+
+	// create upbound-previous context because the group differs from the profile
+	if conf.Contexts[groupContext].Namespace != g.name {
+		// make room for upbound-previous context
+		if conf.CurrentContext == kubeContext+upboundPreviousContextSuffix {
+			conf.Contexts[kubeContext] = conf.Contexts[kubeContext+upboundPreviousContextSuffix]
+			conf.CurrentContext = kubeContext
+		}
+
+		conf.Contexts[kubeContext+upboundPreviousContextSuffix] = ptr.To(*conf.Contexts[groupContext])
+		conf.Contexts[kubeContext+upboundPreviousContextSuffix].Namespace = g.name
+		groupContext = kubeContext + upboundPreviousContextSuffix
+	}
+	conf, prevContext, err = activateContext(conf, groupContext, kubeContext)
+	if err != nil {
+		return nil, "", err
+	}
+
+	return conf, prevContext, nil
 }
 
 // Accept upserts a controlplane context to the current kubeconfig.
-func (ctp *ControlPlane) Accept(ctx context.Context, upCtx *upbound.Context, kubeContext string) (msg string, err error) {
-	groupCfg, err := ctp.space.kubeconfig.ClientConfig()
-	if err != nil {
-		return "", err
-	}
-	groupKubeconfig, err := ctp.space.kubeconfig.RawConfig()
-	if err != nil {
-		return "", err
-	}
+func (ctp *ControlPlane) Accept(ctx context.Context, upCtx *upbound.Context, preferredKubeContext string) (msg string, err error) { // nolint:gocyclo // little long, but well tested
+	// find existing space context
 	p, err := upCtx.Cfg.GetUpboundProfile(ctp.space.profile)
 	if err != nil {
 		return "", err
 	}
-	groupKubeconfig.CurrentContext = p.KubeContext
+	loader, err := p.GetSpaceKubeConfig()
+	if err != nil {
+		return "", err
+	}
+	groupCfg, err := loader.ClientConfig()
+	if err != nil {
+		return "", err
+	}
+	conf, err := loader.RawConfig()
+	if err != nil {
+		return "", err
+	}
 
-	// construct a context pointing to the controlplane, either via ingress or
-	// connection secret as fallback
+	// construct a context pointing to the controlplane via ingress, same
+	// credentials, but different URL
 	ingress, ca, err := profile.GetIngressHost(ctx, groupCfg)
 	if err != nil {
 		return "", err
 	}
 	if ingress == "" {
 		return "", fmt.Errorf("ingress condiguration not found")
-
 	}
-
-	// via ingress, with same credentials, but different URL
-	ctpConfig := groupKubeconfig.DeepCopy()
-	if err := clientcmdapi.MinifyConfig(ctpConfig); err != nil {
+	ctpConf, prevContext, err := ctp.accept(&conf, p, ingress, ca, preferredKubeContext)
+	if err != nil {
 		return "", err
 	}
-	ctpCtx := ctpConfig.Contexts[ctpConfig.CurrentContext]
-	ctpConfig.Clusters[ctpCtx.Cluster].Server = fmt.Sprintf("https://%s/apis/spaces.upbound.io/v1beta1/namespaces/%s/controlplanes/%s/k8s", ingress, ctp.Namespace, ctp.Name)
-	ctpConfig.Clusters[ctpCtx.Cluster].CertificateAuthorityData = ca
-	ctpConfig.Contexts[ctpConfig.CurrentContext].Namespace = "default"
+	if contextDeepEqual(ctpConf, prevContext, ctpConf.CurrentContext) {
+		return fmt.Sprintf(contextSwitchedFmt, prevContext, ctp.Breadcrumbs()), nil
+	}
+	if err := kube.VerifyKubeConfig(upCtx.WrapTransport)(ctpConf); err != nil {
+		return "", err
+	}
 
-	// merge into kubeconfig
-	prevContext, err := mergeIntoKubeConfig(ctpConfig, kubeContext, kubeContext+upboundPreviousContextSuffix, "", kube.VerifyKubeConfig(upCtx.WrapTransport))
-	if err != nil {
+	// write back
+	if err := clientcmd.ModifyConfig(clientcmd.NewDefaultPathOptions(), *ctpConf, true); err != nil {
 		return "", err
 	}
 	if err := writeLastContext(prevContext); err != nil { // nolint:staticcheck
 		// ignore error because now everything has happened already.
 	}
 
-	return fmt.Sprintf(contextSwitchedFmt, kubeContext, ctp.Breadcrumbs()), nil
+	return fmt.Sprintf(contextSwitchedFmt, ctpConf.CurrentContext, ctp.Breadcrumbs()), nil
 }
 
-// mergeIntoKubeConfig merges the current context of the passed kubeconfig into
-// default kubeconfig on disk, health checks and writes it back. The previous
-// context for "up ctx -" is returned.
-func mergeIntoKubeConfig(newConf *clientcmdapi.Config, newContext, previousContext string, existingFilePath string, preCheck ...func(cfg *clientcmdapi.Config) error) (oldContext string, err error) { // nolint:gocyclo // TODO: shorten
-	po := clientcmd.NewDefaultPathOptions()
-	po.LoadingRules.ExplicitPath = existingFilePath
-	conf, err := po.GetStartingConfig()
-	if err != nil {
-		return "", err
+func (ctp *ControlPlane) accept(conf *clientcmdapi.Config, p profile.Profile, ingress string, ca []byte, kubeContext string) (ctpConf *clientcmdapi.Config, prevContext string, err error) { // nolint:gocyclo // little long, but well tested
+	conf = conf.DeepCopy()
+
+	groupContext := p.KubeContext
+	if groupContext == "" {
+		groupContext = conf.CurrentContext
+	}
+	if _, ok := conf.Contexts[groupContext]; !ok {
+		return nil, "", fmt.Errorf("context %q not found in kubeconfig", groupContext)
+	}
+	groupCluster, ok := conf.Clusters[conf.Contexts[groupContext].Cluster]
+	if !ok {
+		return nil, "", fmt.Errorf("cluster %q not found in kubeconfig", conf.Contexts[groupContext].Cluster)
 	}
 
-	// normalize broken configs
-	if _, ok := conf.Contexts[conf.CurrentContext]; !ok {
-		conf.Contexts[conf.CurrentContext] = &clientcmdapi.Context{}
-	}
-
-	// store current upbound cluster, authInfo, context as upbound-previous if named "upbound"
-	oldContext = conf.CurrentContext
-	oldCluster := conf.Contexts[conf.CurrentContext].Cluster
-	newCluster := newConf.Contexts[newConf.CurrentContext].Cluster
-	if oldCluster == newCluster && !reflect.DeepEqual(newConf.Clusters[oldCluster], conf.Clusters[newCluster]) {
-		conf.Clusters[previousContext] = conf.Clusters[oldCluster]
-		conf.Contexts[oldContext].Cluster = previousContext
-	}
-	oldAuthInfo := conf.Contexts[conf.CurrentContext].AuthInfo
-	newAuthInfo := newConf.Contexts[newConf.CurrentContext].AuthInfo
-	if oldAuthInfo == newAuthInfo && !reflect.DeepEqual(newConf.AuthInfos[newAuthInfo], conf.AuthInfos[oldAuthInfo]) {
-		conf.AuthInfos[previousContext] = conf.AuthInfos[oldAuthInfo]
-		conf.Contexts[oldContext].AuthInfo = previousContext
-	}
-	if oldContext == newContext && !reflect.DeepEqual(newConf.Contexts[oldContext], conf.Contexts[newContext]) {
-		conf.Contexts[previousContext] = conf.Contexts[oldContext]
-		oldContext = previousContext
-	}
-
-	// merge in new context
-	conf.Clusters[newCluster] = newConf.Clusters[newCluster]
-	conf.AuthInfos[newAuthInfo] = newConf.AuthInfos[newAuthInfo]
-	conf.Contexts[newContext] = newConf.Contexts[newConf.CurrentContext]
-	conf.CurrentContext = newContext
-
-	// health check
-	for _, check := range preCheck {
-		withDefContext := *conf
-		withDefContext.CurrentContext = newConf.CurrentContext
-		if err := check(&withDefContext); err != nil {
-			return "", err
+	if _, ok := conf.Clusters[kubeContext+upboundPreviousContextSuffix]; ok {
+		// make room for upbound-previous cluster
+		freeCluster := kubeContext + upboundPreviousContextSuffix
+		for d := 1; true; d++ {
+			s := fmt.Sprintf("%s%d", freeCluster, d)
+			if _, ok := conf.Clusters[s]; !ok {
+				freeCluster = s
+				break
+			}
+		}
+		renamed := 0
+		for name, ctx := range conf.Contexts {
+			if ctx.Cluster == kubeContext+upboundPreviousContextSuffix && name != kubeContext+upboundPreviousContextSuffix {
+				ctx.Cluster = freeCluster
+				renamed++
+			}
+		}
+		if renamed > 0 {
+			conf.Clusters[freeCluster] = conf.Clusters[kubeContext+upboundPreviousContextSuffix]
 		}
 	}
+	conf.Clusters[kubeContext+upboundPreviousContextSuffix] = ptr.To(*groupCluster)
+	conf.Clusters[kubeContext+upboundPreviousContextSuffix].Server = fmt.Sprintf("https://%s/apis/spaces.upbound.io/v1beta1/namespaces/%s/controlplanes/%s/k8s", ingress, ctp.Namespace, ctp.Name)
+	conf.Clusters[kubeContext+upboundPreviousContextSuffix].CertificateAuthorityData = ca
 
-	return oldContext, clientcmd.ModifyConfig(po, *conf, true)
+	if conf.CurrentContext == kubeContext+upboundPreviousContextSuffix {
+		// make room for upbound-previous context
+		conf.Contexts[kubeContext] = conf.Contexts[kubeContext+upboundPreviousContextSuffix]
+		conf.CurrentContext = kubeContext
+	}
+	conf.Contexts[kubeContext+upboundPreviousContextSuffix] = ptr.To(*conf.Contexts[groupContext])
+	conf.Contexts[kubeContext+upboundPreviousContextSuffix].Cluster = kubeContext + upboundPreviousContextSuffix
+	conf.Contexts[kubeContext+upboundPreviousContextSuffix].Namespace = "default"
+
+	return activateContext(conf, kubeContext+upboundPreviousContextSuffix, kubeContext)
+}
+
+func contextDeepEqual(conf *clientcmdapi.Config, a, b string) bool {
+	if a == b {
+		return true
+	}
+	if a == "" || b == "" {
+		return false
+	}
+	prev := conf.Contexts[a]
+	current := conf.Contexts[b]
+	if prev == nil && current == nil {
+		return true
+	}
+	if prev == nil || current == nil {
+		return false
+	}
+	if !reflect.DeepEqual(conf.Clusters[prev.Cluster], conf.Clusters[current.Cluster]) {
+		return false
+	}
+	if !reflect.DeepEqual(conf.AuthInfos[prev.AuthInfo], conf.AuthInfos[current.AuthInfo]) {
+		return false
+	}
+
+	return false
 }

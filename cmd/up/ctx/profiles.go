@@ -42,31 +42,24 @@ func DeriveState(ctx context.Context, upCtx *upbound.Context, conf *clientcmdapi
 	}
 
 	// derive navigation state
-	spaceKubeconfig, err := p.GetSpaceKubeConfig()
-	if err != nil {
-		return nil, err
-	}
 	switch {
 	case ctp.Namespace != "" && ctp.Name != "":
 		return &ControlPlane{
 			space: Space{
-				profile:    name,
-				kubeconfig: spaceKubeconfig,
+				profile: name,
 			},
 			NamespacedName: ctp,
 		}, nil
 	case ctp.Namespace != "":
 		return &Group{
 			space: Space{
-				profile:    name,
-				kubeconfig: spaceKubeconfig,
+				profile: name,
 			},
 			name: ctp.Namespace,
 		}, nil
 	default:
 		return &Space{
-			profile:    name,
-			kubeconfig: spaceKubeconfig,
+			profile: name,
 		}, nil
 	}
 }

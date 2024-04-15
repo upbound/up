@@ -256,10 +256,40 @@ func TestSwapContext(t *testing.T) {
 			wantLast: "custom-previous",
 			wantErr:  "<nil>",
 		},
+		"UpboundAndUpbound": {
+			conf: &clientcmdapi.Config{
+				CurrentContext: "upbound",
+				Contexts: map[string]*clientcmdapi.Context{
+					"upbound":          {Namespace: "namespace1", Cluster: "upbound", AuthInfo: "upbound"},
+					"upbound-previous": {Namespace: "namespace2", Cluster: "upbound-previous", AuthInfo: "upbound-previous"},
+					"other":            {Namespace: "other", Cluster: "other", AuthInfo: "other"},
+					"mixed1":           {Namespace: "mixed1", Cluster: "upbound", AuthInfo: "upbound"},
+					"mixed2":           {Namespace: "mixed2", Cluster: "upbound-previous", AuthInfo: "upbound-previous"},
+				},
+				Clusters:  map[string]*clientcmdapi.Cluster{"upbound": {Server: "server1"}, "upbound-previous": {Server: "server2"}, "other": {Server: "other"}},
+				AuthInfos: map[string]*clientcmdapi.AuthInfo{"upbound": {Token: "token1"}, "upbound-previous": {Token: "token2"}, "other": {Token: "other"}},
+			},
+			last:      "upbound",
+			preferred: "upbound",
+			wantConf: &clientcmdapi.Config{
+				CurrentContext: "upbound",
+				Contexts: map[string]*clientcmdapi.Context{
+					"upbound":          {Namespace: "namespace1", Cluster: "upbound", AuthInfo: "upbound"},
+					"upbound-previous": {Namespace: "namespace2", Cluster: "upbound-previous", AuthInfo: "upbound-previous"},
+					"other":            {Namespace: "other", Cluster: "other", AuthInfo: "other"},
+					"mixed1":           {Namespace: "mixed1", Cluster: "upbound", AuthInfo: "upbound"},
+					"mixed2":           {Namespace: "mixed2", Cluster: "upbound-previous", AuthInfo: "upbound-previous"},
+				},
+				Clusters:  map[string]*clientcmdapi.Cluster{"upbound": {Server: "server1"}, "upbound-previous": {Server: "server2"}, "other": {Server: "other"}},
+				AuthInfos: map[string]*clientcmdapi.AuthInfo{"upbound": {Token: "token1"}, "upbound-previous": {Token: "token2"}, "other": {Token: "other"}},
+			},
+			wantLast: "upbound",
+			wantErr:  "<nil>",
+		},
 	}
 	for name, tt := range tests {
 		t.Run(name, func(t *testing.T) {
-			conf, last, err := swapContext(tt.conf, tt.last, tt.preferred)
+			conf, last, err := activateContext(tt.conf, tt.last, tt.preferred)
 			if diff := cmp.Diff(tt.wantErr, fmt.Sprintf("%v", err)); diff != "" {
 				t.Fatalf("swapContext(...): -want err, +got err:\n%s", diff)
 			}
