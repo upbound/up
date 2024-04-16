@@ -15,6 +15,7 @@
 package group
 
 import (
+	"context"
 	"strconv"
 
 	"github.com/alecthomas/kong"
@@ -25,6 +26,7 @@ import (
 
 	spacesv1beta1 "github.com/upbound/up-sdk-go/apis/spaces/v1beta1"
 	"github.com/upbound/up/internal/feature"
+	"github.com/upbound/up/internal/profile"
 	"github.com/upbound/up/internal/upbound"
 )
 
@@ -64,9 +66,6 @@ type Cmd struct {
 	List   listCmd   `cmd:"" help:"List groups in the space."`
 	Get    getCmd    `cmd:"" help:"Get a group."`
 
-	Short       bool   `short:"s" env:"UP_SHORT" name:"short" help:"Short output."`
-	KubeContext string `env:"UP_CONTEXT" default:"upbound" name:"context" help:"Kubernetes context to operate on."`
-
 	// Common Upbound API configuration
 	Flags upbound.Flags `embed:""`
 }
@@ -95,4 +94,22 @@ func extractGroupFields(obj any) []string {
 		resp.GetObjectMeta().GetName(),
 		strconv.FormatBool(protected),
 	}
+}
+
+func getCurrentProfile(ctx context.Context, upCtx *upbound.Context) (*profile.Profile, error) {
+	// get context
+	_, currentProfile, ctp, err := upCtx.Cfg.GetCurrentContext(ctx)
+	if err != nil {
+		return nil, err
+	}
+	if currentProfile == nil {
+		return nil, errors.New(profile.NoSpacesContextMsg)
+	}
+	if ctp.Namespace == "" {
+		return nil, errors.New(profile.NoGroupMsg)
+	}
+	if ctp.Name != "" {
+		return nil, errors.New("Cannot list control planes from inside a control plane, use `up ctx ..` to switch to a group level.")
+	}
+	return currentProfile, nil
 }

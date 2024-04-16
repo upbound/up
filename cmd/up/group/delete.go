@@ -27,7 +27,6 @@ import (
 	"github.com/crossplane/crossplane-runtime/pkg/errors"
 
 	spacesv1beta1 "github.com/upbound/up-sdk-go/apis/spaces/v1beta1"
-	"github.com/upbound/up/internal/profile"
 	"github.com/upbound/up/internal/upbound"
 	"github.com/upbound/up/internal/upterm"
 )
@@ -40,13 +39,10 @@ type deleteCmd struct {
 
 // Run executes the create command.
 func (c *deleteCmd) Run(ctx context.Context, printer upterm.ObjectPrinter, upCtx *upbound.Context, p pterm.TextPrinter) error { // nolint:gocyclo
-	// get context
-	_, currentProfile, _, err := upCtx.Cfg.GetCurrentContext(ctx)
+	// get profile
+	currentProfile, err := getCurrentProfile(ctx, upCtx)
 	if err != nil {
 		return err
-	}
-	if currentProfile == nil {
-		return errors.New(profile.NoSpacesContextMsg)
 	}
 
 	// create client
