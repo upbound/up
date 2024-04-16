@@ -111,7 +111,7 @@ func (s *Space) Items(ctx context.Context, upCtx *upbound.Context) ([]list.Item,
 		return nil, err
 	}
 	nss := &corev1.NamespaceList{}
-	if err := cl.List(ctx, nss, client.MatchingLabels(map[string]string{"spaces.upbound.io/group": "true"})); err != nil {
+	if err := cl.List(ctx, nss, client.MatchingLabels(map[string]string{spacesv1beta1.ControlPlaneGroupLabelKey: "true"})); err != nil {
 		return nil, err
 	}
 
