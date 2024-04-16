@@ -34,6 +34,21 @@ var (
 	selectedItemStyle = lipgloss.NewStyle().Foreground(lipgloss.Color("170"))
 )
 
+var backNavBinding = key.NewBinding(
+	key.WithKeys("left", "h"),
+	key.WithHelp("←/h", "back"),
+)
+
+var selectNavBinding = key.NewBinding(
+	key.WithKeys("right", "enter", "l"),
+	key.WithHelp("→/l/enter", "select"),
+)
+
+var exitBinding = key.NewBinding(
+	key.WithKeys("esc", "ctrl+c"),
+	key.WithHelp("esc/ctrl+c", "exit"),
+)
+
 var quitBinding = key.NewBinding(
 	key.WithKeys("q", "f10"),
 	key.WithHelp("q/f10", "switch context & quit"),
@@ -51,6 +66,15 @@ type item struct {
 }
 
 func (i item) FilterValue() string { return "" }
+
+// emptyListItem represents a terminal item in an otherwise empty list. This
+// should be used to display to the user a message when there are no actionable
+// items in the list.
+type emptyListItem struct {
+	item
+}
+
+func (i emptyListItem) FilterValue() string { return "" }
 
 type itemDelegate struct{}
 
@@ -91,6 +115,13 @@ func NewList(items []list.Item) list.Model {
 	l.SetFilteringEnabled(false)
 	l.SetShowPagination(false)
 	l.SetShowFilter(false)
+
+	l.AdditionalShortHelpKeys = func() []key.Binding {
+		return []key.Binding{
+			backNavBinding,
+			selectNavBinding,
+		}
+	}
 
 	l.KeyMap.ShowFullHelp = key.NewBinding(key.WithDisabled())
 
@@ -140,12 +171,11 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) { // nolint:gocyclo // T
 		return m, nil
 
 	case tea.KeyMsg:
-		switch keypress := msg.String(); keypress {
-		case "ctrl+c", "esc":
+		switch {
+		case key.Matches(msg, exitBinding):
 			m.termination = &Termination{}
 			return m, tea.Quit
-
-		case "q", "f10":
+		case key.Matches(msg, quitBinding):
 			if state, ok := m.state.(Accepting); ok {
 				msg, err := state.Accept(context.Background(), m.upCtx, m.kubeContext)
 				if err != nil {
@@ -155,16 +185,16 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) { // nolint:gocyclo // T
 				return m.WithTermination(msg, nil), tea.Quit
 			}
 
-		case "enter", "left", "right":
+		case key.Matches(msg, selectNavBinding):
+			fallthrough
+		case key.Matches(msg, backNavBinding):
 			var fn KeyFunc
-			switch keypress {
-			case "left":
+			switch {
+			case key.Matches(msg, backNavBinding):
 				if state, ok := m.state.(Back); ok {
 					fn = state.Back
 				}
-			case "right":
-				fallthrough
-			case "enter":
+			case key.Matches(msg, selectNavBinding):
 				if i, ok := m.list.SelectedItem().(item); ok {
 					fn = i.onEnter
 				}
