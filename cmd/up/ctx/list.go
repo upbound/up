@@ -155,13 +155,15 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) { // nolint:gocyclo // T
 				return m.WithTermination(msg, nil), tea.Quit
 			}
 
-		case "enter", "left":
+		case "enter", "left", "right":
 			var fn KeyFunc
 			switch keypress {
 			case "left":
 				if state, ok := m.state.(Back); ok {
 					fn = state.Back
 				}
+			case "right":
+				fallthrough
 			case "enter":
 				if i, ok := m.list.SelectedItem().(item); ok {
 					fn = i.onEnter
