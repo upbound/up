@@ -63,18 +63,16 @@ type item struct {
 	onEnter KeyFunc
 
 	padding []int
+
+	// emptyList denotes that the item is marking that the list is empty, and
+	// should not be considered an element in the list itself
+	emptyList bool
+
+	// back denotes that the item will return the user to the previous menu
+	back bool
 }
 
 func (i item) FilterValue() string { return "" }
-
-// emptyListItem represents a terminal item in an otherwise empty list. This
-// should be used to display to the user a message when there are no actionable
-// items in the list.
-type emptyListItem struct {
-	item
-}
-
-func (i emptyListItem) FilterValue() string { return "" }
 
 type itemDelegate struct{}
 
@@ -124,6 +122,23 @@ func NewList(items []list.Item) list.Model {
 	}
 
 	l.KeyMap.ShowFullHelp = key.NewBinding(key.WithDisabled())
+	l.KeyMap.CloseFullHelp = key.NewBinding(key.WithDisabled())
+
+	// check for initial cursor conditions
+	if len(items) > 1 {
+		nested := items[0].(item).back
+		empty := items[1].(item).emptyList
+
+		if nested && !empty {
+			// move the cursor down below the '..' button
+			l.CursorDown()
+		}
+
+		if nested && empty {
+			// disable selecting the empty list item
+			l.KeyMap.CursorDown = key.NewBinding(key.WithDisabled())
+		}
+	}
 
 	return l
 }
@@ -213,7 +228,8 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) { // nolint:gocyclo // T
 					return m, nil
 				}
 
-				m.list.SetItems(items)
+				// recreate the list to reset the cursor position
+				m.list = NewList(items)
 				m.list.SetHeight(min(m.windowHeight-2, m.ListHeight()))
 				if _, ok := m.state.(Accepting); ok {
 					m.list.KeyMap.Quit = quitBinding
