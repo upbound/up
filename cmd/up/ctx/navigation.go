@@ -25,6 +25,8 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/client"
 
 	spacesv1beta1 "github.com/upbound/up-sdk-go/apis/spaces/v1beta1"
+	upboundv1alpha1 "github.com/upbound/up-sdk-go/apis/upbound/v1alpha1"
+	"github.com/upbound/up-sdk-go/service/accounts"
 	"github.com/upbound/up/internal/upbound"
 )
 
@@ -61,22 +63,64 @@ func (f AcceptingFunc) Accept(ctx context.Context, upCtx *upbound.Context) error
 type Profiles struct{}
 
 func (p *Profiles) Items(ctx context.Context, upCtx *upbound.Context) ([]list.Item, error) {
-	profiles, err := upCtx.Cfg.GetUpboundProfiles()
+	if upCtx.Profile.IsSpace() {
+		// build list of local profile spaces
+		profiles, err := upCtx.Cfg.GetUpboundProfiles()
+		if err != nil {
+			return nil, err
+		}
+		items := make([]list.Item, 0, len(profiles))
+		for name, p := range profiles {
+			if !p.IsSpace() {
+				continue
+			}
+			items = append(items, item{text: name, kind: "space", onEnter: func(ctx context.Context, upCtx *upbound.Context, m model) (model, error) {
+				m.state = &Space{profile: name}
+				return m, nil
+			}})
+		}
+		sort.Sort(sortedItems(items))
+		return items, nil
+	}
+
+	// build list of cloud spaces
+	items := make([]list.Item, 0)
+
+	cfg, err := upCtx.BuildSDKConfig()
 	if err != nil {
 		return nil, err
 	}
-	items := make([]list.Item, 0, len(profiles))
-	for name, p := range profiles {
-		if !p.IsSpace() {
-			continue
-		}
-		items = append(items, item{text: name, kind: "space", onEnter: func(ctx context.Context, upCtx *upbound.Context, m model) (model, error) {
-			m.state = &Space{profile: name}
+
+	ac := accounts.NewClient(cfg)
+
+	a, err := upbound.GetAccount(ctx, ac, upCtx.Account)
+	if err != nil {
+		return nil, err
+	}
+
+	cloudCfg, err := upCtx.BuildControllerClientConfig()
+	if err != nil {
+		return nil, err
+	}
+
+	cloudClient, err := client.New(cloudCfg, client.Options{})
+	if err != nil {
+		return nil, err
+	}
+
+	var l upboundv1alpha1.SpaceList
+	err = cloudClient.List(ctx, &l, &client.ListOptions{Namespace: a.Organization.Name})
+	if err != nil {
+		return nil, err
+	}
+
+	for _, space := range l.Items {
+		items = append(items, item{text: space.GetObjectMeta().GetName(), kind: "space", onEnter: func(ctx context.Context, upCtx *upbound.Context, m model) (model, error) {
+			m.state = &Space{profile: space.GetObjectMeta().GetName(), cloud: true}
 			return m, nil
 		}})
 	}
 	sort.Sort(sortedItems(items))
-
 	return items, nil
 }
 
@@ -95,40 +139,76 @@ var _ Back = &Space{}
 // Space provides the navigation node for a space.
 type Space struct {
 	profile string
+	cloud   bool
 }
 
 func (s *Space) Items(ctx context.Context, upCtx *upbound.Context) ([]list.Item, error) {
-	p, err := upCtx.Cfg.GetUpboundProfile(s.profile)
-	if err != nil {
-		return nil, err
-	}
-	config, _, err := p.GetSpaceRestConfig()
-	if err != nil {
-		return nil, err
-	}
-	cl, err := client.New(config, client.Options{})
-	if err != nil {
-		return nil, err
-	}
-	nss := &corev1.NamespaceList{}
-	if err := cl.List(ctx, nss, client.MatchingLabels(map[string]string{spacesv1beta1.ControlPlaneGroupLabelKey: "true"})); err != nil {
-		return nil, err
+	if !s.cloud {
+		p, err := upCtx.Cfg.GetUpboundProfile(s.profile)
+		if err != nil {
+			return nil, err
+		}
+		config, _, err := p.GetSpaceRestConfig()
+		if err != nil {
+			return nil, err
+		}
+		cl, err := client.New(config, client.Options{})
+		if err != nil {
+			return nil, err
+		}
+		nss := &corev1.NamespaceList{}
+		if err := cl.List(ctx, nss, client.MatchingLabels(map[string]string{spacesv1beta1.ControlPlaneGroupLabelKey: "true"})); err != nil {
+			return nil, err
+		}
+
+		items := make([]list.Item, 0, len(nss.Items)+1)
+		items = append(items, item{text: "..", kind: "profiles", onEnter: s.Back, back: true})
+		for _, ns := range nss.Items {
+			items = append(items, item{text: ns.Name, kind: "group", onEnter: func(ctx context.Context, upCtx *upbound.Context, m model) (model, error) {
+				m.state = &Group{space: *s, name: ns.Name}
+				return m, nil
+			}})
+		}
+
+		if len(nss.Items) == 0 {
+			items = append(items, item{text: "No groups found", emptyList: true})
+		}
+
+		return items, nil
 	}
 
-	items := make([]list.Item, 0, len(nss.Items)+1)
-	items = append(items, item{text: "..", kind: "profiles", onEnter: s.Back, back: true})
-	for _, ns := range nss.Items {
-		items = append(items, item{text: ns.Name, kind: "group", onEnter: func(ctx context.Context, upCtx *upbound.Context, m model) (model, error) {
-			m.state = &Group{space: *s, name: ns.Name}
-			return m, nil
-		}})
-	}
+	// cfg, err := upCtx.BuildSDKConfig()
+	// if err != nil {
+	// 	return nil, err
+	// }
 
-	if len(nss.Items) == 0 {
-		items = append(items, item{text: "No groups found", emptyList: true})
-	}
+	// rest, err := upCtx.BuildCloudSpaceClientConfig(s.profile)
+	// if err != nil {
+	// 	return nil, err
+	// }
 
-	return items, nil
+	// ac := accounts.NewClient(cfg)
+
+	// a, err := upbound.GetAccount(ctx, ac, upCtx.Account)
+	// if err != nil {
+	// 	return nil, err
+	// }
+
+	// sc, err := client.New(rest, client.Options{})
+	// if err != nil {
+	// 	return nil, err
+	// }
+
+	// var l upboundv1alpha1.SpaceList
+	// err = sc.List(ctx, &l, &client.ListOptions{Namespace: a.Organization.Name})
+	// if err != nil {
+	// 	return nil, err
+	// }
+
+	// if len(l.Items) == 0 {
+	// 	p.Println("No spaces found")
+	// 	return nil, nil
+	// }
 }
 
 func (s *Space) Back(ctx context.Context, upCtx *upbound.Context, m model) (model, error) {
