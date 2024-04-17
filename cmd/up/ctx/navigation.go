@@ -116,7 +116,7 @@ func (s *Space) Items(ctx context.Context, upCtx *upbound.Context) ([]list.Item,
 	}
 
 	items := make([]list.Item, 0, len(nss.Items)+1)
-	items = append(items, item{text: "..", kind: "profiles", onEnter: s.Back})
+	items = append(items, item{text: "..", kind: "profiles", onEnter: s.Back, back: true})
 	for _, ns := range nss.Items {
 		items = append(items, item{text: ns.Name, kind: "group", onEnter: func(ctx context.Context, upCtx *upbound.Context, m model) (model, error) {
 			m.state = &Group{space: *s, name: ns.Name}
@@ -125,7 +125,7 @@ func (s *Space) Items(ctx context.Context, upCtx *upbound.Context) ([]list.Item,
 	}
 
 	if len(nss.Items) == 0 {
-		items = append(items, item{text: "No groups found"})
+		items = append(items, item{text: "No groups found", emptyList: true})
 	}
 
 	return items, nil
@@ -169,7 +169,7 @@ func (g *Group) Items(ctx context.Context, upCtx *upbound.Context) ([]list.Item,
 	}
 
 	items := make([]list.Item, 0, len(ctps.Items)+2)
-	items = append(items, item{text: "..", kind: "groups", onEnter: g.Back})
+	items = append(items, item{text: "..", kind: "groups", onEnter: g.Back, back: true})
 
 	for _, ctp := range ctps.Items {
 		items = append(items, item{text: ctp.Name, kind: "ctp", onEnter: func(ctx context.Context, upCtx *upbound.Context, m model) (model, error) {
@@ -188,7 +188,7 @@ func (g *Group) Items(ctx context.Context, upCtx *upbound.Context) ([]list.Item,
 	*/
 
 	if len(ctps.Items) == 0 {
-		items = append(items, item{text: "No ControlPlanes found"})
+		items = append(items, item{text: "No ControlPlanes found", emptyList: true})
 	}
 
 	return items, nil
@@ -214,7 +214,7 @@ var _ Back = &ControlPlane{}
 
 func (ctp *ControlPlane) Items(ctx context.Context, upCtx *upbound.Context) ([]list.Item, error) {
 	return []list.Item{
-		item{text: "..", kind: "group", onEnter: ctp.Back},
+		item{text: "..", kind: "group", onEnter: ctp.Back, back: true},
 		/*
 			item{text: fmt.Sprintf("Connect to %s", ctp.NamespacedName), onEnter: KeyFunc(func(ctx context.Context, upCtx *upbound.Context, m model) (model, error) {
 				msg, err := ctp.Accept(ctx, upCtx)

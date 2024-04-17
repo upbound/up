@@ -34,6 +34,21 @@ var (
 	selectedItemStyle = lipgloss.NewStyle().Foreground(lipgloss.Color("170"))
 )
 
+var backNavBinding = key.NewBinding(
+	key.WithKeys("left", "h"),
+	key.WithHelp("←/h", "back"),
+)
+
+var selectNavBinding = key.NewBinding(
+	key.WithKeys("right", "enter", "l"),
+	key.WithHelp("→/l/enter", "select"),
+)
+
+var exitBinding = key.NewBinding(
+	key.WithKeys("esc", "ctrl+c"),
+	key.WithHelp("esc/ctrl+c", "exit"),
+)
+
 var quitBinding = key.NewBinding(
 	key.WithKeys("q", "f10"),
 	key.WithHelp("q/f10", "switch context & quit"),
@@ -48,6 +63,13 @@ type item struct {
 	onEnter KeyFunc
 
 	padding []int
+
+	// emptyList denotes that the item is marking that the list is empty, and
+	// should not be considered an element in the list itself
+	emptyList bool
+
+	// back denotes that the item will return the user to the previous menu
+	back bool
 }
 
 func (i item) FilterValue() string { return "" }
@@ -92,7 +114,31 @@ func NewList(items []list.Item) list.Model {
 	l.SetShowPagination(false)
 	l.SetShowFilter(false)
 
+	l.AdditionalShortHelpKeys = func() []key.Binding {
+		return []key.Binding{
+			backNavBinding,
+			selectNavBinding,
+		}
+	}
+
 	l.KeyMap.ShowFullHelp = key.NewBinding(key.WithDisabled())
+	l.KeyMap.CloseFullHelp = key.NewBinding(key.WithDisabled())
+
+	// check for initial cursor conditions
+	if len(items) > 1 {
+		nested := items[0].(item).back
+		empty := items[1].(item).emptyList
+
+		if nested && !empty {
+			// move the cursor down below the '..' button
+			l.CursorDown()
+		}
+
+		if nested && empty {
+			// disable selecting the empty list item
+			l.KeyMap.CursorDown = key.NewBinding(key.WithDisabled())
+		}
+	}
 
 	return l
 }
@@ -140,12 +186,11 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) { // nolint:gocyclo // T
 		return m, nil
 
 	case tea.KeyMsg:
-		switch keypress := msg.String(); keypress {
-		case "ctrl+c", "esc":
+		switch {
+		case key.Matches(msg, exitBinding):
 			m.termination = &Termination{}
 			return m, tea.Quit
-
-		case "q", "f10":
+		case key.Matches(msg, quitBinding):
 			if state, ok := m.state.(Accepting); ok {
 				msg, err := state.Accept(context.Background(), m.upCtx, m.kubeContext)
 				if err != nil {
@@ -155,14 +200,16 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) { // nolint:gocyclo // T
 				return m.WithTermination(msg, nil), tea.Quit
 			}
 
-		case "enter", "left":
+		case key.Matches(msg, selectNavBinding):
+			fallthrough
+		case key.Matches(msg, backNavBinding):
 			var fn KeyFunc
-			switch keypress {
-			case "left":
+			switch {
+			case key.Matches(msg, backNavBinding):
 				if state, ok := m.state.(Back); ok {
 					fn = state.Back
 				}
-			case "enter":
+			case key.Matches(msg, selectNavBinding):
 				if i, ok := m.list.SelectedItem().(item); ok {
 					fn = i.onEnter
 				}
@@ -181,7 +228,8 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) { // nolint:gocyclo // T
 					return m, nil
 				}
 
-				m.list.SetItems(items)
+				// recreate the list to reset the cursor position
+				m.list = NewList(items)
 				m.list.SetHeight(min(m.windowHeight-2, m.ListHeight()))
 				if _, ok := m.state.(Accepting); ok {
 					m.list.KeyMap.Quit = quitBinding
