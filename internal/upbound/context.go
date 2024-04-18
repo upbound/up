@@ -287,10 +287,7 @@ func (c *Context) BuildControllerClientConfig() (*rest.Config, error) {
 // cloud-hosted space. Uses the space name as the current context
 func (c *Context) BuildCloudSpaceClientConfig(spaceName, profileName string) (clientcmd.ClientConfig, error) {
 	// uniquely identify the space and the profile used to authenticate it
-	spaceProfile := fmt.Sprintf("%s-%s", spaceName, profileName)
-	// uniquely identify the profile auth info, prefixed to protect against
-	// overriding existing auth info in the customer's kubeconfig
-	profileAuthName := fmt.Sprintf("upbound-%s", profileName)
+	contextName := fmt.Sprintf("%s-%s", spaceName, profileName)
 
 	clusters := make(map[string]*clientcmdapi.Cluster)
 	clusters[spaceName] = &clientcmdapi.Cluster{
@@ -301,16 +298,19 @@ func (c *Context) BuildCloudSpaceClientConfig(spaceName, profileName string) (cl
 	}
 
 	contexts := make(map[string]*clientcmdapi.Context)
-	contexts[spaceProfile] = &clientcmdapi.Context{
+	contexts[contextName] = &clientcmdapi.Context{
 		Cluster: spaceName,
 	}
 
 	authInfos := make(map[string]*clientcmdapi.AuthInfo)
 	if c.Profile.Session != "" {
-		authInfos[profileAuthName] = &clientcmdapi.AuthInfo{
+		// uniquely identify the profile auth info, prefixed to protect against
+		// overriding existing auth info in the customer's kubeconfig
+		authInfoName := fmt.Sprintf("upbound-profile-%s", profileName)
+		authInfos[authInfoName] = &clientcmdapi.AuthInfo{
 			Token: c.Profile.Session,
 		}
-		contexts[spaceProfile].AuthInfo = profileAuthName
+		contexts[contextName].AuthInfo = authInfoName
 	}
 
 	return clientcmd.NewDefaultClientConfig(clientcmdapi.Config{
@@ -318,7 +318,7 @@ func (c *Context) BuildCloudSpaceClientConfig(spaceName, profileName string) (cl
 		APIVersion:     "v1",
 		Clusters:       clusters,
 		Contexts:       contexts,
-		CurrentContext: spaceProfile,
+		CurrentContext: contextName,
 		AuthInfos:      authInfos,
 	}, &clientcmd.ConfigOverrides{}), nil
 }
