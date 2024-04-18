@@ -28,6 +28,7 @@ import (
 	"github.com/upbound/up/cmd/up/configuration/template"
 	"github.com/upbound/up/cmd/up/controlplane"
 	"github.com/upbound/up/cmd/up/ctx"
+	"github.com/upbound/up/cmd/up/group"
 	"github.com/upbound/up/cmd/up/login"
 	"github.com/upbound/up/cmd/up/migration"
 	"github.com/upbound/up/cmd/up/organization"
@@ -101,6 +102,7 @@ type cli struct {
 	Configuration      configuration.Cmd            `cmd:"" name:"configuration" aliases:"cfg" help:"Interact with configurations."`
 	ControlPlane       controlplane.Cmd             `cmd:"" name:"controlplane" aliases:"ctp" help:"Interact with control planes of the current profile, both in Upbound and local Spaces."`
 	Space              space.Cmd                    `cmd:"" help:"Interact with local Spaces."`
+	Group              group.Cmd                    `cmd:"" help:"Interact with groups inside Spaces."`
 	Organization       organization.Cmd             `cmd:"" name:"organization" aliases:"org" help:"Interact with Upbound organizations."`
 	Profile            profile.Cmd                  `cmd:"" help:"Interact with Upbound profiles or local Spaces."`
 	Ctx                ctx.Cmd                      `cmd:"" maturity:"alpha" hidden:"" help:"Select an Upbound kubeconfig context."`

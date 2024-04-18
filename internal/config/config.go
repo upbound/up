@@ -16,10 +16,14 @@ package config
 
 import (
 	"bytes"
+	"context"
 	"encoding/json"
 	"io"
 	"os"
 	"path/filepath"
+
+	"k8s.io/apimachinery/pkg/types"
+	"k8s.io/client-go/tools/clientcmd"
 
 	"github.com/crossplane/crossplane-runtime/pkg/errors"
 
@@ -120,6 +124,27 @@ func (c *Config) GetUpboundProfile(name string) (profile.Profile, error) {
 		return profile.Profile{}, errors.Errorf(errProfileNotFoundFmt, name)
 	}
 	return p, nil
+}
+
+// GetCurrentContext returns the current context from the kubeconfig, profile and config
+func (c *Config) GetCurrentContext(ctx context.Context) (profileName string, currentProfile *profile.Profile, ctp types.NamespacedName, err error) {
+	po := clientcmd.NewDefaultPathOptions()
+	conf, err := po.GetStartingConfig()
+	if err != nil {
+		return "", nil, types.NamespacedName{}, err
+	}
+
+	profiles, err := c.GetUpboundProfiles()
+	if err != nil {
+		return "", nil, types.NamespacedName{}, err
+	}
+
+	profileName, currentProfile, ctp, err = profile.FromKubeconfig(ctx, profiles, conf)
+	if err != nil {
+		return "", nil, types.NamespacedName{}, err
+	}
+
+	return profileName, currentProfile, ctp, nil
 }
 
 // GetUpboundProfiles returns the list of existing profiles. If no profiles

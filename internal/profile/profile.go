@@ -23,6 +23,11 @@ import (
 	"k8s.io/client-go/tools/clientcmd"
 )
 
+const (
+	NoSpacesContextMsg = "This cluster does not have spaces installed, use `up space init` to install spaces."
+	NoGroupMsg         = "The current kubeconfig context does not point to a group, use `up ctx` to select a group."
+)
+
 // Type is a type of Upbound profile.
 type Type string
 
