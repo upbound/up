@@ -18,6 +18,7 @@ import (
 	"bytes"
 	"crypto/tls"
 	"encoding/json"
+	"fmt"
 	"net/http"
 	"net/http/cookiejar"
 	"net/url"
@@ -269,6 +270,30 @@ func (c *Context) BuildControllerClientConfig() (*rest.Config, error) {
 
 	cfg := &rest.Config{
 		Host:      c.APIEndpoint.String(),
+		APIPath:   controllerClientPath,
+		Transport: tr,
+		UserAgent: UserAgent,
+	}
+
+	if c.Profile.Session != "" {
+		cfg.BearerToken = c.Profile.Session
+	}
+	return cfg, nil
+}
+
+// BuildCloudSpaceClientConfig builds a REST config pointed at an Upbound
+// cloud-hosted space suitable for usage with any K8s controller-runtime client.
+func (c *Context) BuildCloudSpaceClientConfig(spaceName string) (*rest.Config, error) {
+	var tr http.RoundTripper = &http.Transport{
+		TLSClientConfig: &tls.Config{
+			// todo(redbackthomson): replace once a public CA is configured
+			InsecureSkipVerify: true, //nolint:gosec
+		},
+	}
+
+	cfg := &rest.Config{
+		// TODO(redbackthomson): replace with a URL returned in the space status
+		Host:      fmt.Sprintf("https://%s.space.mxe.upbound.services", spaceName),
 		APIPath:   controllerClientPath,
 		Transport: tr,
 		UserAgent: UserAgent,

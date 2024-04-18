@@ -106,7 +106,7 @@ func (g *Group) accept(conf *clientcmdapi.Config, p profile.Profile, kubeContext
 // Accept upserts a controlplane context to the current kubeconfig.
 func (ctp *ControlPlane) Accept(ctx context.Context, upCtx *upbound.Context, preferredKubeContext string) (msg string, err error) { // nolint:gocyclo // little long, but well tested
 	// find existing space context
-	p, err := upCtx.Cfg.GetUpboundProfile(ctp.space.profile)
+	p, err := upCtx.Cfg.GetUpboundProfile(ctp.group.space.profile)
 	if err != nil {
 		return "", err
 	}
@@ -191,7 +191,7 @@ func (ctp *ControlPlane) accept(conf *clientcmdapi.Config, p profile.Profile, in
 		}
 	}
 	conf.Clusters[kubeContext+upboundPreviousContextSuffix] = ptr.To(*groupCluster)
-	conf.Clusters[kubeContext+upboundPreviousContextSuffix].Server = fmt.Sprintf("https://%s/apis/spaces.upbound.io/v1beta1/namespaces/%s/controlplanes/%s/k8s", ingress, ctp.Namespace, ctp.Name)
+	conf.Clusters[kubeContext+upboundPreviousContextSuffix].Server = fmt.Sprintf("https://%s/apis/spaces.upbound.io/v1beta1/namespaces/%s/controlplanes/%s/k8s", ingress, ctp.NamespacedName().Namespace, ctp.NamespacedName().Name)
 	conf.Clusters[kubeContext+upboundPreviousContextSuffix].CertificateAuthorityData = ca
 
 	if conf.CurrentContext == kubeContext+upboundPreviousContextSuffix {

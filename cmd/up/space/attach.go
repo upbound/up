@@ -157,7 +157,7 @@ func (c *attachCmd) Run(ctx context.Context, mgr *helm.Installer, kClient *kuber
 			return err
 		}
 
-		a, err := getAccount(ctx, ac, upCtx.Account)
+		a, err := upbound.GetAccount(ctx, ac, upCtx.Account)
 		if err != nil {
 			return err
 		}
@@ -375,20 +375,6 @@ func (c *attachCmd) createSpace(ctx context.Context, attachSpinner *pterm.Spinne
 	}
 	*cmr = cm
 	return space.Name, nil
-}
-
-func getAccount(ctx context.Context, ac *accounts.Client, account string) (*accounts.AccountResponse, error) {
-	a, err := ac.Get(ctx, account)
-	if err != nil {
-		return nil, errors.Wrapf(err, "failed to get Account %q", account)
-	}
-	if a.Account.Type != accounts.AccountOrganization {
-		return nil, fmt.Errorf("account %q is not an organization", account)
-	}
-	if a.Organization == nil {
-		return nil, fmt.Errorf("account %q does not have an organization", account)
-	}
-	return a, nil
 }
 
 func (c *attachCmd) createNamespace(ctx context.Context, p pterm.TextPrinter, kClient *kubernetes.Clientset, ns string, u undo.Undoer) error {

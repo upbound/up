@@ -356,7 +356,7 @@ func TestControlPlaneAccept(t *testing.T) {
 	}
 	for name, tt := range tests {
 		t.Run(name, func(t *testing.T) {
-			ctp := &ControlPlane{NamespacedName: tt.ctp}
+			ctp := &ControlPlane{group: Group{name: tt.ctp.Namespace}, name: tt.ctp.Name}
 			conf, last, err := ctp.accept(tt.conf, profile.Profile{KubeContext: "profile"}, "https://ingress", []byte{1, 2, 3}, tt.preferred)
 			if diff := cmp.Diff(tt.wantErr, fmt.Sprintf("%v", err)); diff != "" {
 				t.Fatalf("g.accept(...): -want err, +got err:\n%s", diff)

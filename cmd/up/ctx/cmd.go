@@ -16,7 +16,6 @@ package ctx
 
 import (
 	"context"
-	"errors"
 	"fmt"
 	"io"
 	"strings"
@@ -60,10 +59,6 @@ func (c *Cmd) AfterApply(kongCtx *kong.Context) error {
 	}
 	kongCtx.Bind(upCtx)
 
-	if !upCtx.Profile.IsSpace() {
-		// TODO: add legacy support
-		return errors.New("Only Spaces contexts supported for now.")
-	}
 	return nil
 }
 
@@ -295,7 +290,7 @@ func (c *Cmd) RunRelative(ctx context.Context, kongCtx *kong.Context, upCtx *upb
 		case *Group:
 			fmt.Printf("%s/%s\n", state.space.profile, state.name)
 		case *ControlPlane:
-			fmt.Printf("%s/%s/%s\n", state.space.profile, state.NamespacedName.Namespace, state.NamespacedName.Name)
+			fmt.Printf("%s/%s/%s\n", state.group.space.profile, state.NamespacedName().Namespace, state.NamespacedName().Name)
 		}
 	} else {
 		fmt.Print(msg)
