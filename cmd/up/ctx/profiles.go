@@ -47,6 +47,7 @@ func DeriveState(ctx context.Context, upCtx *upbound.Context, conf *clientcmdapi
 		return &ControlPlane{
 			group: Group{
 				space: Space{
+					name:    name,
 					profile: name,
 					cloud:   !p.IsSpace(),
 				},
@@ -57,6 +58,7 @@ func DeriveState(ctx context.Context, upCtx *upbound.Context, conf *clientcmdapi
 	case ctp.Namespace != "":
 		return &Group{
 			space: Space{
+				name:    name,
 				profile: name,
 				cloud:   !p.IsSpace(),
 			},
@@ -64,6 +66,7 @@ func DeriveState(ctx context.Context, upCtx *upbound.Context, conf *clientcmdapi
 		}, nil
 	default:
 		return &Space{
+			name:    name,
 			profile: name,
 			cloud:   !p.IsSpace(),
 		}, nil

@@ -75,7 +75,7 @@ func (p *Profiles) Items(ctx context.Context, upCtx *upbound.Context) ([]list.It
 				continue
 			}
 			items = append(items, item{text: name, kind: "space", onEnter: func(ctx context.Context, upCtx *upbound.Context, m model) (model, error) {
-				m.state = &Space{profile: name}
+				m.state = &Space{name: name, profile: name}
 				return m, nil
 			}})
 		}
@@ -113,8 +113,17 @@ func (p *Profiles) Items(ctx context.Context, upCtx *upbound.Context) ([]list.It
 
 	items := make([]list.Item, 0)
 	for _, space := range l.Items {
+		if space.Spec.Mode == upboundv1alpha1.ModeLegacy {
+			continue
+		}
+
+		// todo(redbackthomson): Add support for connected spaces
+		if space.Spec.Mode == upboundv1alpha1.ModeConnected {
+			continue
+		}
+
 		items = append(items, item{text: space.GetObjectMeta().GetName(), kind: "space", onEnter: func(ctx context.Context, upCtx *upbound.Context, m model) (model, error) {
-			m.state = &Space{profile: space.GetObjectMeta().GetName(), cloud: true}
+			m.state = &Space{name: space.GetObjectMeta().GetName(), profile: upCtx.ProfileName, cloud: true}
 			return m, nil
 		}})
 	}
@@ -137,6 +146,7 @@ var _ Back = &Space{}
 // Space provides the navigation node for a space.
 type Space struct {
 	profile string
+	name    string
 	cloud   bool
 }
 
@@ -157,9 +167,7 @@ func (s *Space) Items(ctx context.Context, upCtx *upbound.Context) ([]list.Item,
 			return nil, err
 		}
 	} else {
-		// todo(redbackthomson): enable namespace discoverability in cloud once
-		// it's available
-		rest, err := upCtx.BuildCloudSpaceClientConfig(s.profile)
+		rest, err := upCtx.BuildCloudSpaceRestConfig(s.name, s.profile)
 		if err != nil {
 			return nil, err
 		}
@@ -168,11 +176,6 @@ func (s *Space) Items(ctx context.Context, upCtx *upbound.Context) ([]list.Item,
 		if err != nil {
 			return nil, err
 		}
-
-		// return []list.Item{item{text: "default", kind: "group", onEnter: func(ctx context.Context, upCtx *upbound.Context, m model) (model, error) {
-		// 	m.state = &Group{space: *s, name: "default", cloud: s.cloud}
-		// 	return m, nil
-		// }}}, nil
 	}
 
 	nss := &corev1.NamespaceList{}
@@ -184,7 +187,7 @@ func (s *Space) Items(ctx context.Context, upCtx *upbound.Context) ([]list.Item,
 	items = append(items, item{text: "..", kind: "profiles", onEnter: s.Back, back: true})
 	for _, ns := range nss.Items {
 		items = append(items, item{text: ns.Name, kind: "group", onEnter: func(ctx context.Context, upCtx *upbound.Context, m model) (model, error) {
-			m.state = &Group{space: *s, name: ns.Name, cloud: s.cloud}
+			m.state = &Group{space: *s, name: ns.Name}
 			return m, nil
 		}})
 	}
@@ -202,6 +205,9 @@ func (s *Space) Back(ctx context.Context, upCtx *upbound.Context, m model) (mode
 }
 
 func (s *Space) Breadcrumbs() string {
+	if s.cloud {
+		return upboundRootStyle.Render("Upbound") + pathSegmentStyle.Render(" space ") + pathSegmentStyle.Render(s.name)
+	}
 	return upboundRootStyle.Render("Upbound") + pathSegmentStyle.Render(" profile ") + pathSegmentStyle.Render(s.profile)
 }
 
@@ -209,7 +215,6 @@ func (s *Space) Breadcrumbs() string {
 type Group struct {
 	space Space
 	name  string
-	cloud bool
 }
 
 var _ Accepting = &Group{}
@@ -217,7 +222,7 @@ var _ Back = &Group{}
 
 func (g *Group) Items(ctx context.Context, upCtx *upbound.Context) ([]list.Item, error) {
 	var cl client.Client
-	if !g.cloud {
+	if !g.space.cloud {
 		p, err := upCtx.Cfg.GetUpboundProfile(g.space.profile)
 		if err != nil {
 			return nil, err
@@ -231,12 +236,7 @@ func (g *Group) Items(ctx context.Context, upCtx *upbound.Context) ([]list.Item,
 			return nil, err
 		}
 	} else {
-		// cfg, err := upCtx.BuildSDKConfig()
-		// if err != nil {
-		// 	return nil, err
-		// }
-
-		rest, err := upCtx.BuildCloudSpaceClientConfig(g.space.profile)
+		rest, err := upCtx.BuildCloudSpaceRestConfig(g.space.name, g.space.profile)
 		if err != nil {
 			return nil, err
 		}
@@ -257,7 +257,7 @@ func (g *Group) Items(ctx context.Context, upCtx *upbound.Context) ([]list.Item,
 
 	for _, ctp := range ctps.Items {
 		items = append(items, item{text: ctp.Name, kind: "ctp", onEnter: func(ctx context.Context, upCtx *upbound.Context, m model) (model, error) {
-			m.state = &ControlPlane{group: *g, name: ctp.Name, cloud: g.cloud}
+			m.state = &ControlPlane{group: *g, name: ctp.Name}
 			return m, nil
 		}})
 	}
@@ -291,7 +291,6 @@ func (g *Group) Back(ctx context.Context, upCtx *upbound.Context, m model) (mode
 type ControlPlane struct {
 	group Group
 	name  string
-	cloud bool
 }
 
 var _ Accepting = &ControlPlane{}

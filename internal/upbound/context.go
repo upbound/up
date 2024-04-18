@@ -28,6 +28,8 @@ import (
 	"github.com/spf13/afero"
 	utilnet "k8s.io/apimachinery/pkg/util/net"
 	"k8s.io/client-go/rest"
+	"k8s.io/client-go/tools/clientcmd"
+	clientcmdapi "k8s.io/client-go/tools/clientcmd/api"
 	"k8s.io/client-go/transport"
 
 	"github.com/upbound/up-sdk-go"
@@ -281,28 +283,62 @@ func (c *Context) BuildControllerClientConfig() (*rest.Config, error) {
 	return cfg, nil
 }
 
-// BuildCloudSpaceClientConfig builds a REST config pointed at an Upbound
-// cloud-hosted space suitable for usage with any K8s controller-runtime client.
-func (c *Context) BuildCloudSpaceClientConfig(spaceName string) (*rest.Config, error) {
-	var tr http.RoundTripper = &http.Transport{
-		TLSClientConfig: &tls.Config{
-			// todo(redbackthomson): replace once a public CA is configured
-			InsecureSkipVerify: true, //nolint:gosec
-		},
-	}
+// BuildCloudSpaceClientConfig builds a Kubeconfig pointed at an Upbound
+// cloud-hosted space. Uses the space name as the current context
+func (c *Context) BuildCloudSpaceClientConfig(spaceName, profileName string) (clientcmd.ClientConfig, error) {
+	// uniquely identify the space and the profile used to authenticate it
+	spaceProfile := fmt.Sprintf("%s-%s", spaceName, profileName)
+	// uniquely identify the profile auth info, prefixed to protect against
+	// overriding existing auth info in the customer's kubeconfig
+	profileAuthName := fmt.Sprintf("upbound-%s", profileName)
 
-	cfg := &rest.Config{
+	clusters := make(map[string]*clientcmdapi.Cluster)
+	clusters[spaceName] = &clientcmdapi.Cluster{
 		// TODO(redbackthomson): replace with a URL returned in the space status
-		Host:      fmt.Sprintf("https://%s.space.mxe.upbound.services", spaceName),
-		APIPath:   controllerClientPath,
-		Transport: tr,
-		UserAgent: UserAgent,
+		Server: fmt.Sprintf("https://%s.space.mxe.upbound.services", spaceName),
+		// todo(redbackthomson): replace once a public CA is configured
+		InsecureSkipTLSVerify: true, //nolint:gosec
 	}
 
-	if c.Profile.Session != "" {
-		cfg.BearerToken = c.Profile.Session
+	contexts := make(map[string]*clientcmdapi.Context)
+	contexts[spaceProfile] = &clientcmdapi.Context{
+		Cluster: spaceName,
 	}
-	return cfg, nil
+
+	authInfos := make(map[string]*clientcmdapi.AuthInfo)
+	if c.Profile.Session != "" {
+		authInfos[profileAuthName] = &clientcmdapi.AuthInfo{
+			Token: c.Profile.Session,
+		}
+		contexts[spaceProfile].AuthInfo = profileAuthName
+	}
+
+	return clientcmd.NewDefaultClientConfig(clientcmdapi.Config{
+		Kind:           "Config",
+		APIVersion:     "v1",
+		Clusters:       clusters,
+		Contexts:       contexts,
+		CurrentContext: spaceProfile,
+		AuthInfos:      authInfos,
+	}, &clientcmd.ConfigOverrides{}), nil
+}
+
+// BuildCloudSpaceRestConfig builds a REST config pointed at an Upbound
+// cloud-hosted space suitable for usage with any K8s controller-runtime client.
+func (c *Context) BuildCloudSpaceRestConfig(spaceName, profileName string) (*rest.Config, error) {
+	clientCfg, err := c.BuildCloudSpaceClientConfig(spaceName, profileName)
+	if err != nil {
+		return nil, err
+	}
+
+	restCfg, err := clientCfg.ClientConfig()
+	if err != nil {
+		return nil, err
+	}
+
+	restCfg.UserAgent = UserAgent
+
+	return restCfg, nil
 }
 
 // applyOverrides applies applicable overrides to the given Flags based on the
