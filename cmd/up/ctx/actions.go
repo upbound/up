@@ -127,7 +127,6 @@ func (g *Group) accept(conf *clientcmdapi.Config, groupContext, kubeContext stri
 // Accept upserts a controlplane context to the current kubeconfig.
 func (ctp *ControlPlane) Accept(ctx context.Context, upCtx *upbound.Context, preferredKubeContext string) (msg string, err error) { // nolint:gocyclo // little long, but well tested
 	var ca []byte
-	var insecure bool
 	var groupContext, ingress string
 	var loader clientcmd.ClientConfig
 	if ctp.group.space.cloud {
@@ -142,9 +141,6 @@ func (ctp *ControlPlane) Accept(ctx context.Context, upCtx *upbound.Context, pre
 		}
 
 		ingress = strings.TrimPrefix(groupCfg.Host, "https://")
-
-		// todo(redbackthomson): disable insecure flag once we have a public CA
-		insecure = groupCfg.TLSClientConfig.Insecure
 	} else {
 		// find existing space context
 		p, err := upCtx.Cfg.GetUpboundProfile(ctp.group.space.profile)
@@ -183,7 +179,7 @@ func (ctp *ControlPlane) Accept(ctx context.Context, upCtx *upbound.Context, pre
 		groupContext = conf.CurrentContext
 	}
 
-	ctpConf, prevContext, err := ctp.accept(&conf, groupContext, ingress, ca, insecure, preferredKubeContext)
+	ctpConf, prevContext, err := ctp.accept(&conf, groupContext, ingress, ca, preferredKubeContext)
 	if err != nil {
 		return "", err
 	}
@@ -205,7 +201,7 @@ func (ctp *ControlPlane) Accept(ctx context.Context, upCtx *upbound.Context, pre
 	return fmt.Sprintf(contextSwitchedFmt, ctpConf.CurrentContext, ctp.Breadcrumbs()), nil
 }
 
-func (ctp *ControlPlane) accept(conf *clientcmdapi.Config, groupContext, ingress string, ca []byte, insecureSkipTlsVerify bool, kubeContext string) (ctpConf *clientcmdapi.Config, prevContext string, err error) { // nolint:gocyclo // little long, but well tested
+func (ctp *ControlPlane) accept(conf *clientcmdapi.Config, groupContext, ingress string, ca []byte, kubeContext string) (ctpConf *clientcmdapi.Config, prevContext string, err error) { // nolint:gocyclo // little long, but well tested
 	conf = conf.DeepCopy()
 
 	if _, ok := conf.Contexts[groupContext]; !ok {
