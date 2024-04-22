@@ -21,8 +21,6 @@ import (
 	"github.com/google/go-cmp/cmp"
 	"k8s.io/apimachinery/pkg/types"
 	clientcmdapi "k8s.io/client-go/tools/clientcmd/api"
-
-	"github.com/upbound/up/internal/profile"
 )
 
 func TestGroupAccept(t *testing.T) {
@@ -194,7 +192,7 @@ func TestGroupAccept(t *testing.T) {
 	for name, tt := range tests {
 		t.Run(name, func(t *testing.T) {
 			g := &Group{name: tt.group}
-			conf, last, err := g.accept(tt.conf, profile.Profile{KubeContext: "profile"}, tt.preferred)
+			conf, last, err := g.accept(tt.conf, "profile", tt.preferred)
 			if diff := cmp.Diff(tt.wantErr, fmt.Sprintf("%v", err)); diff != "" {
 				t.Fatalf("g.accept(...): -want err, +got err:\n%s", diff)
 			}
@@ -357,7 +355,7 @@ func TestControlPlaneAccept(t *testing.T) {
 	for name, tt := range tests {
 		t.Run(name, func(t *testing.T) {
 			ctp := &ControlPlane{group: Group{name: tt.ctp.Namespace}, name: tt.ctp.Name}
-			conf, last, err := ctp.accept(tt.conf, profile.Profile{KubeContext: "profile"}, "https://ingress", []byte{1, 2, 3}, tt.preferred)
+			conf, last, err := ctp.accept(tt.conf, "profile", "https://ingress", []byte{1, 2, 3}, tt.preferred)
 			if diff := cmp.Diff(tt.wantErr, fmt.Sprintf("%v", err)); diff != "" {
 				t.Fatalf("g.accept(...): -want err, +got err:\n%s", diff)
 			}
