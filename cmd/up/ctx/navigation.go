@@ -165,7 +165,7 @@ func (s *Space) Items(ctx context.Context, upCtx *upbound.Context) ([]list.Item,
 			return nil, err
 		}
 	} else {
-		rest, err := upCtx.BuildCloudSpaceRestConfig(s.name, s.profile)
+		rest, err := upCtx.BuildCloudSpaceRestConfig(ctx, s.name, s.profile)
 		if err != nil {
 			return nil, err
 		}
@@ -234,7 +234,7 @@ func (g *Group) Items(ctx context.Context, upCtx *upbound.Context) ([]list.Item,
 			return nil, err
 		}
 	} else {
-		rest, err := upCtx.BuildCloudSpaceRestConfig(g.space.name, g.space.profile)
+		rest, err := upCtx.BuildCloudSpaceRestConfig(ctx, g.space.name, g.space.profile)
 		if err != nil {
 			return nil, err
 		}

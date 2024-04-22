@@ -16,6 +16,7 @@ package upbound
 
 import (
 	"bytes"
+	"context"
 	"crypto/tls"
 	"encoding/json"
 	"fmt"
@@ -26,14 +27,17 @@ import (
 	"github.com/alecthomas/kong"
 	"github.com/crossplane/crossplane-runtime/pkg/errors"
 	"github.com/spf13/afero"
+	"k8s.io/apimachinery/pkg/types"
 	utilnet "k8s.io/apimachinery/pkg/util/net"
 	"k8s.io/client-go/rest"
 	"k8s.io/client-go/tools/clientcmd"
 	clientcmdapi "k8s.io/client-go/tools/clientcmd/api"
 	"k8s.io/client-go/transport"
+	"sigs.k8s.io/controller-runtime/pkg/client"
 
 	"github.com/upbound/up-sdk-go"
 
+	upboundv1alpha1 "github.com/upbound/up-sdk-go/apis/upbound/v1alpha1"
 	"github.com/upbound/up/internal/config"
 	"github.com/upbound/up/internal/profile"
 )
@@ -285,14 +289,31 @@ func (c *Context) BuildControllerClientConfig() (*rest.Config, error) {
 
 // BuildCloudSpaceClientConfig builds a Kubeconfig pointed at an Upbound
 // cloud-hosted space. Uses the space name as the current context
-func (c *Context) BuildCloudSpaceClientConfig(spaceName, profileName string) (clientcmd.ClientConfig, error) {
+func (c *Context) BuildCloudSpaceClientConfig(ctx context.Context, spaceName, profileName string) (clientcmd.ClientConfig, error) {
+	// describe the space to get its fqdn
+	cloudLoader, err := c.BuildControllerClientConfig()
+	if err != nil {
+		return nil, err
+	}
+
+	cloudClient, err := client.New(cloudLoader, client.Options{})
+	if err != nil {
+		return nil, err
+	}
+
+	var space upboundv1alpha1.Space
+	err = cloudClient.Get(ctx, types.NamespacedName{Name: spaceName, Namespace: c.Account}, &space)
+	if err != nil {
+		return nil, err
+	}
+
 	// uniquely identify the space and the profile used to authenticate it
 	contextName := fmt.Sprintf("%s-%s", spaceName, profileName)
 
 	clusters := make(map[string]*clientcmdapi.Cluster)
 	clusters[spaceName] = &clientcmdapi.Cluster{
 		// TODO(redbackthomson): replace with a URL returned in the space status
-		Server: fmt.Sprintf("https://%s.space.mxe.upbound.services", spaceName),
+		Server: fmt.Sprintf("https://%s.%s", c.Account, space.Status.FQDN),
 		// todo(redbackthomson): replace once a public CA is configured
 		InsecureSkipTLSVerify: true, //nolint:gosec
 	}
@@ -325,8 +346,8 @@ func (c *Context) BuildCloudSpaceClientConfig(spaceName, profileName string) (cl
 
 // BuildCloudSpaceRestConfig builds a REST config pointed at an Upbound
 // cloud-hosted space suitable for usage with any K8s controller-runtime client.
-func (c *Context) BuildCloudSpaceRestConfig(spaceName, profileName string) (*rest.Config, error) {
-	clientCfg, err := c.BuildCloudSpaceClientConfig(spaceName, profileName)
+func (c *Context) BuildCloudSpaceRestConfig(ctx context.Context, spaceName, profileName string) (*rest.Config, error) {
+	clientCfg, err := c.BuildCloudSpaceClientConfig(ctx, spaceName, profileName)
 	if err != nil {
 		return nil, err
 	}

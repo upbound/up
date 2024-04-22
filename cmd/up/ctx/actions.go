@@ -53,7 +53,7 @@ func (g *Group) Accept(ctx context.Context, upCtx *upbound.Context, kubeContext 
 
 	var groupContext string
 	if g.space.cloud {
-		cloudLoader, err := upCtx.BuildCloudSpaceClientConfig(g.space.name, g.space.profile)
+		cloudLoader, err := upCtx.BuildCloudSpaceClientConfig(ctx, g.space.name, g.space.profile)
 		if err != nil {
 			return "", err
 		}
@@ -130,7 +130,7 @@ func (ctp *ControlPlane) Accept(ctx context.Context, upCtx *upbound.Context, pre
 	var groupContext, ingress string
 	var loader clientcmd.ClientConfig
 	if ctp.group.space.cloud {
-		loader, err = upCtx.BuildCloudSpaceClientConfig(ctp.group.space.name, ctp.group.space.profile)
+		loader, err = upCtx.BuildCloudSpaceClientConfig(ctx, ctp.group.space.name, ctp.group.space.profile)
 		if err != nil {
 			return "", err
 		}
