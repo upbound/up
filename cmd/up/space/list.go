@@ -103,9 +103,11 @@ func extractSpaceListFields(obj any) []string {
 		region = string(*space.Spec.Region)
 	}
 
+	mode := space.ObjectMeta.Labels[upboundv1alpha1.SpaceModeLabelKey]
+
 	return []string{
 		space.GetObjectMeta().GetName(),
-		string(space.Spec.Mode),
+		mode,
 		provider,
 		region,
 	}

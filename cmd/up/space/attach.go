@@ -285,9 +285,7 @@ func (c *attachCmd) prepareSpace(ctx context.Context, attachSpinner *pterm.Spinn
 			Namespace: a.Organization.Name,
 			Name:      c.Space,
 		},
-		Spec: upboundv1alpha1.SpaceSpec{
-			Mode: upboundv1alpha1.ModeConnected,
-		},
+		Spec: upboundv1alpha1.SpaceSpec{},
 	}
 	// auto generate space name if none given.
 	if space.Name == "" {

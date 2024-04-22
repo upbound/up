@@ -113,13 +113,11 @@ func (p *Profiles) Items(ctx context.Context, upCtx *upbound.Context) ([]list.It
 
 	items := make([]list.Item, 0)
 	for _, space := range l.Items {
-		if space.Spec.Mode == upboundv1alpha1.ModeLegacy {
-			continue
-		}
-
-		// todo(redbackthomson): Add support for connected spaces
-		if space.Spec.Mode == upboundv1alpha1.ModeConnected {
-			continue
+		if mode, ok := space.ObjectMeta.Labels[upboundv1alpha1.SpaceModeLabelKey]; ok {
+			// todo(redbackthomson): Add support for connected spaces
+			if mode == string(upboundv1alpha1.ModeLegacy) || mode == string(upboundv1alpha1.ModeConnected) {
+				continue
+			}
 		}
 
 		items = append(items, item{text: space.GetObjectMeta().GetName(), kind: "space", onEnter: func(ctx context.Context, upCtx *upbound.Context, m model) (model, error) {
