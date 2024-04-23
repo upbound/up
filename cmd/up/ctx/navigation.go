@@ -62,7 +62,7 @@ func (f AcceptingFunc) Accept(ctx context.Context, upCtx *upbound.Context) error
 
 type Profiles struct{}
 
-func (p *Profiles) Items(ctx context.Context, upCtx *upbound.Context) ([]list.Item, error) {
+func (p *Profiles) Items(ctx context.Context, upCtx *upbound.Context) ([]list.Item, error) { //nolint:gocyclo
 	if upCtx.Profile.IsSpace() {
 		// build list of local profile spaces
 		profiles, err := upCtx.Cfg.GetUpboundProfiles()

@@ -35,7 +35,7 @@ const (
 
 // Accept upserts the "upbound" kubeconfig context to the current kubeconfig,
 // pointing to the group.
-func (g *Group) Accept(ctx context.Context, upCtx *upbound.Context, kubeContext string) (msg string, err error) {
+func (g *Group) Accept(ctx context.Context, upCtx *upbound.Context, kubeContext string) (msg string, err error) { //nolint:gocyclo
 	// find existing space context
 	p, err := upCtx.Cfg.GetUpboundProfile(g.space.profile)
 	if err != nil {

@@ -921,8 +921,6 @@ github.com/tmc/grpc-websocket-proxy v0.0.0-20190109142713-0ad062ec5ee5/go.mod h1
 github.com/ugorji/go v1.1.4/go.mod h1:uQMGLiO92mf5W77hV/PUCpI3pbzQx3CRekS0kk+RGrc=
 github.com/ulikunitz/xz v0.5.11 h1:kpFauv27b6ynzBNT/Xy+1k+fK4WswhN/6PN5WhFAGw8=
 github.com/ulikunitz/xz v0.5.11/go.mod h1:nbz6k7qbPmH4IRqmfOplQw/tblSgqTqBwxkY0oWt/14=
-github.com/upbound/up-sdk-go v0.3.1-0.20240416065539-7e5f37220770 h1:CD6I+9qqDIDnDmvXDr7iaaLAM5jZNDM7Nsk1SrOWTts=
-github.com/upbound/up-sdk-go v0.3.1-0.20240416065539-7e5f37220770/go.mod h1:aiGUmU3aEkl25Dy1dMETCki99s1fKsUbV94Pmjr3ISg=
 github.com/upbound/up-sdk-go v0.3.1-0.20240422225903-9b574e4afe29 h1:xZ8IOcVEGtjYsBvr0Tv5z/Dw/8UE/Bn5rLFdBL1qXLw=
 github.com/upbound/up-sdk-go v0.3.1-0.20240422225903-9b574e4afe29/go.mod h1:aiGUmU3aEkl25Dy1dMETCki99s1fKsUbV94Pmjr3ISg=
 github.com/vbatts/tar-split v0.11.5 h1:3bHCTIheBm1qFTcgh9oPu+nNBtX+XJIupG/vacinCts=

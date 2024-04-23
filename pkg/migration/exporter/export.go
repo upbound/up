@@ -27,9 +27,6 @@ import (
 	"github.com/crossplane/crossplane-runtime/pkg/errors"
 	xpmeta "github.com/crossplane/crossplane-runtime/pkg/meta"
 	"github.com/spf13/afero"
-	"github.com/upbound/up/pkg/migration"
-	"github.com/upbound/up/pkg/migration/category"
-	"github.com/upbound/up/pkg/migration/meta/v1alpha1"
 	apiextensionsv1 "k8s.io/apiextensions-apiserver/pkg/apis/apiextensions/v1"
 	apiextensionsclientset "k8s.io/apiextensions-apiserver/pkg/client/clientset/clientset"
 	kerrors "k8s.io/apimachinery/pkg/api/errors"
@@ -42,6 +39,10 @@ import (
 	"k8s.io/client-go/dynamic"
 	appsv1 "k8s.io/client-go/kubernetes/typed/apps/v1"
 	"k8s.io/client-go/util/retry"
+
+	"github.com/upbound/up/pkg/migration"
+	"github.com/upbound/up/pkg/migration/category"
+	"github.com/upbound/up/pkg/migration/meta/v1alpha1"
 )
 
 const (

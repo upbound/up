@@ -312,7 +312,6 @@ func (c *Context) BuildCloudSpaceClientConfig(ctx context.Context, spaceName, pr
 
 	clusters := make(map[string]*clientcmdapi.Cluster)
 	clusters[spaceName] = &clientcmdapi.Cluster{
-		// TODO(redbackthomson): replace with a URL returned in the space status
 		Server: fmt.Sprintf("https://%s.%s", c.Account, space.Status.FQDN),
 		// todo(redbackthomson): replace once a public CA is configured
 		InsecureSkipTLSVerify: true, //nolint:gosec
