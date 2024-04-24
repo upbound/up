@@ -16,23 +16,22 @@ package controlplane
 
 import (
 	"context"
+	"fmt"
 
 	"github.com/alecthomas/kong"
+	"github.com/crossplane/crossplane-runtime/pkg/errors"
 	"github.com/pterm/pterm"
-	"k8s.io/apimachinery/pkg/types"
-	"k8s.io/client-go/dynamic"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	ctrlclient "sigs.k8s.io/controller-runtime/pkg/client"
 
-	"github.com/upbound/up-sdk-go/service/configurations"
-	cp "github.com/upbound/up-sdk-go/service/controlplanes"
-	"github.com/upbound/up/internal/controlplane"
-	"github.com/upbound/up/internal/controlplane/cloud"
-	"github.com/upbound/up/internal/controlplane/space"
+	spacesv1beta1 "github.com/upbound/up-sdk-go/apis/spaces/v1beta1"
+	"github.com/upbound/up/internal/profile"
 	"github.com/upbound/up/internal/upbound"
 )
 
-type ctpCreator interface {
-	Create(ctx context.Context, ctp types.NamespacedName, opts controlplane.Options) (*controlplane.Response, error)
-}
+const (
+	kubeconfigFmt = "kubeconfig-%s"
+)
 
 // createCmd creates a control plane on Upbound.
 type createCmd struct {
@@ -43,54 +42,66 @@ type createCmd struct {
 
 	SecretName string `help:"The name of the control plane's secret. Defaults to 'kubeconfig-{control plane name}'. Only applicable for Space control planes."`
 	Group      string `short:"g" help:"The control plane group that the control plane is contained in. This defaults to the group specified in the current profile."`
-
-	client ctpCreator
 }
 
 // AfterApply sets default values in command after assignment and validation.
 func (c *createCmd) AfterApply(kongCtx *kong.Context, upCtx *upbound.Context) error {
-	if upCtx.Profile.IsSpace() {
-		kubeconfig, ns, err := upCtx.Profile.GetSpaceRestConfig()
-		if err != nil {
-			return err
-		}
-		if c.Group == "" {
-			c.Group = ns
-		}
-
-		client, err := dynamic.NewForConfig(kubeconfig)
-		if err != nil {
-			return err
-		}
-		c.client = space.New(client)
-	} else {
-		cfg, err := upCtx.BuildSDKConfig()
-		if err != nil {
-			return err
-		}
-		ctpclient := cp.NewClient(cfg)
-		cfgclient := configurations.NewClient(cfg)
-
-		c.client = cloud.New(ctpclient, cfgclient, upCtx.Account)
-	}
-
 	kongCtx.Bind(pterm.DefaultTable.WithWriter(kongCtx.Stdout).WithSeparator("   "))
 	return nil
 }
 
 // Run executes the create command.
 func (c *createCmd) Run(ctx context.Context, p pterm.TextPrinter, upCtx *upbound.Context) error {
-	_, err := c.client.Create(
-		ctx,
-		types.NamespacedName{Name: c.Name, Namespace: c.Group},
-		controlplane.Options{
-			SecretName:        c.SecretName,
-			SecretNamespace:   c.Group,
-			ConfigurationName: c.ConfigurationName,
-		},
-	)
+	_, currentProfile, ctp, err := upCtx.Cfg.GetCurrentContext(ctx)
 	if err != nil {
 		return err
+	}
+	if currentProfile == nil {
+		return errors.New(profile.NoSpacesContextMsg)
+	}
+	if ctp.Namespace == "" {
+		return errors.New(profile.NoGroupMsg)
+	}
+	if ctp.Name != "" {
+		return errors.New("Cannot create control planes from inside a control plane, use `up ctx ..` to switch to a group level.")
+	}
+
+	// create client
+	restConfig, _, err := currentProfile.GetSpaceRestConfig()
+	if err != nil {
+		return err
+	}
+	cl, err := ctrlclient.New(restConfig, ctrlclient.Options{})
+	if err != nil {
+		return err
+	}
+
+	ns := ctp.Namespace
+	if c.Group != "" {
+		ns = c.Group
+	}
+
+	if c.SecretName == "" {
+		c.SecretName = fmt.Sprintf(kubeconfigFmt, c.Name)
+	}
+
+	// TODO(erhan): check if we need to handle c.Description and c.ConfigurationName parameters
+	ctpToCreate := &spacesv1beta1.ControlPlane{
+		ObjectMeta: metav1.ObjectMeta{
+			Name:      c.Name,
+			Namespace: ns,
+		},
+		Spec: spacesv1beta1.ControlPlaneSpec{
+			WriteConnectionSecretToReference: &spacesv1beta1.SecretReference{
+				Name:      c.SecretName,
+				Namespace: ns,
+			},
+			// TODO(erhan): check if we need to specify PublishConnectionDetailsTo
+		},
+	}
+
+	if errCreate := cl.Create(ctx, ctpToCreate); errCreate != nil {
+		return errCreate
 	}
 
 	p.Printfln("%s created", c.Name)

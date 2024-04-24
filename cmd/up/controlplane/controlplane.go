@@ -31,14 +31,11 @@ import (
 	"github.com/upbound/up/cmd/up/controlplane/kubeconfig"
 	"github.com/upbound/up/cmd/up/controlplane/pkg"
 	"github.com/upbound/up/cmd/up/controlplane/pullsecret"
-	"github.com/upbound/up/internal/controlplane"
 	"github.com/upbound/up/internal/feature"
 	"github.com/upbound/up/internal/upbound"
-	"github.com/upbound/up/internal/upterm"
 )
 
 var (
-	cloudfieldNames = []string{"NAME", "CONFIGURATION", "UPDATED", "SYNCED", "READY", "MESSAGE", "AGE"}
 	spacefieldNames = []string{"GROUP", "NAME", "CROSSPLANE", "SYNCED", "READY", "MESSAGE", "AGE"}
 )
 
@@ -121,40 +118,6 @@ local Spaces are supported. Use the "profile" management command to switch
 between different Upbound profiles or to connect to a local Space.`
 }
 
-func extractCloudFields(obj any) []string {
-	resp, ok := obj.(*controlplane.Response)
-	if !ok {
-		return []string{"unknown", "unknown", "", "", "", "", ""}
-	}
-
-	return []string{
-		resp.Name,
-		resp.Cfg,
-		resp.Updated,
-		resp.Synced,
-		resp.Ready,
-		resp.Message,
-		formatAge(resp.Age),
-	}
-}
-
-func extractSpaceFieldsLegacy(obj any) []string {
-	resp, ok := obj.(*controlplane.Response)
-	if !ok {
-		return []string{"unknown", "unknown", "", "", "", "", ""}
-	}
-
-	return []string{
-		resp.Group,
-		resp.Name,
-		resp.CrossplaneVersion,
-		resp.Synced,
-		resp.Ready,
-		resp.Message,
-		formatAge(resp.Age),
-	}
-}
-
 func extractSpaceFields(obj any) []string {
 	ctp, ok := obj.(spacesv1beta1.ControlPlane)
 	if !ok {
@@ -183,14 +146,4 @@ func formatAge(age *time.Duration) string {
 	}
 
 	return duration.HumanDuration(*age)
-}
-
-func tabularPrint(obj any, printer upterm.ObjectPrinter, upCtx *upbound.Context) error {
-	if obj, ok := obj.([]spacesv1beta1.ControlPlane); ok {
-		return printer.Print(obj, spacefieldNames, extractSpaceFields)
-	}
-	if upCtx.Profile.IsSpace() {
-		return printer.Print(obj, spacefieldNames, extractSpaceFieldsLegacy)
-	}
-	return printer.Print(obj, cloudfieldNames, extractCloudFields)
 }
