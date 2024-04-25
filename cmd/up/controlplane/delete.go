@@ -18,67 +18,40 @@ import (
 	"context"
 
 	"github.com/alecthomas/kong"
+	"github.com/pkg/errors"
 	"github.com/pterm/pterm"
-	"k8s.io/apimachinery/pkg/types"
-	"k8s.io/client-go/dynamic"
+	kerrors "k8s.io/apimachinery/pkg/api/errors"
+	v1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"sigs.k8s.io/controller-runtime/pkg/client"
 
-	"github.com/upbound/up-sdk-go/service/configurations"
-	cp "github.com/upbound/up-sdk-go/service/controlplanes"
-	"github.com/upbound/up/internal/controlplane"
-	"github.com/upbound/up/internal/controlplane/cloud"
-	"github.com/upbound/up/internal/controlplane/space"
+	spacesv1beta1 "github.com/upbound/up-sdk-go/apis/spaces/v1beta1"
 	"github.com/upbound/up/internal/upbound"
 )
 
-type ctpDeleter interface {
-	Delete(ctx context.Context, ctp types.NamespacedName) error
-}
-
 // deleteCmd deletes a control plane on Upbound.
 type deleteCmd struct {
-	Name  string `arg:"" help:"Name of control plane." predictor:"ctps"`
-	Group string `short:"g" help:"The control plane group that the control plane is contained in. This defaults to the group specified in the current profile."`
-
-	client ctpDeleter
+	Name string `arg:"" help:"Name of control plane." predictor:"ctps"`
 }
 
 // AfterApply sets default values in command after assignment and validation.
 func (c *deleteCmd) AfterApply(kongCtx *kong.Context, upCtx *upbound.Context) error {
-	if upCtx.Profile.IsSpace() {
-		kubeconfig, ns, err := upCtx.Profile.GetSpaceRestConfig()
-		if err != nil {
-			return err
-		}
-		if c.Group == "" {
-			c.Group = ns
-		}
-
-		client, err := dynamic.NewForConfig(kubeconfig)
-		if err != nil {
-			return err
-		}
-		c.client = space.New(client)
-	} else {
-		cfg, err := upCtx.BuildSDKConfig()
-		if err != nil {
-			return err
-		}
-		ctpclient := cp.NewClient(cfg)
-		cfgclient := configurations.NewClient(cfg)
-
-		c.client = cloud.New(ctpclient, cfgclient, upCtx.Account)
-	}
 	return nil
 }
 
 // Run executes the delete command.
-func (c *deleteCmd) Run(ctx context.Context, p pterm.TextPrinter, upCtx *upbound.Context) error {
-	if err := c.client.Delete(ctx, types.NamespacedName{Name: c.Name, Namespace: c.Group}); err != nil {
-		if controlplane.IsNotFound(err) {
+func (c *deleteCmd) Run(ctx context.Context, p pterm.TextPrinter, upCtx *upbound.Context, client client.Client) error {
+	ctp := &spacesv1beta1.ControlPlane{
+		ObjectMeta: v1.ObjectMeta{
+			Name: c.Name,
+		},
+	}
+
+	if err := client.Delete(ctx, ctp); err != nil {
+		if kerrors.IsNotFound(err) {
 			p.Printfln("Control plane %s not found", c.Name)
 			return nil
 		}
-		return err
+		return errors.Wrap(err, "error deleting control plane")
 	}
 	p.Printfln("%s deleted", c.Name)
 	return nil

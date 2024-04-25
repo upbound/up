@@ -16,10 +16,6 @@ package profile
 
 import (
 	"encoding/json"
-	"errors"
-
-	"k8s.io/client-go/rest"
-	"k8s.io/client-go/tools/clientcmd"
 )
 
 const (
@@ -43,25 +39,11 @@ const (
 
 // A Profile is a set of credentials
 type Profile struct {
-	// ID is either a username, email, or token.
+	// ID is the referencable name of the profile.
 	ID string `json:"id,omitempty"`
-
-	// Type is the type of the profile.
-	Type Type `json:"type"`
 
 	// Session is a session token used to authenticate to Upbound.
 	Session string `json:"session,omitempty"`
-
-	// Account is the default account to use when this profile is selected.
-	Account string `json:"account,omitempty"`
-
-	// Kubeconfig is the kubeconfig file path that GetSpaceRestConfig() will
-	// read. If empty, it refers to client-go's default kubeconfig location.
-	Kubeconfig string `json:"kubeconfig,omitempty"`
-
-	// KubeContext is the context within Kubeconfig that GetSpaceRestConfig()
-	// will read. If empty, it refers to the default context.
-	KubeContext string `json:"kube_context,omitempty"`
 
 	// BaseConfig represent persisted settings for this profile.
 	// For example:
@@ -72,47 +54,7 @@ type Profile struct {
 
 // Validate returns an error if the profile is invalid.
 func (p Profile) Validate() error {
-	if (!p.IsSpace() && p.ID == "") || p.Type == "" {
-		return errors.New(errInvalidProfile)
-	}
 	return nil
-}
-
-func (p Profile) IsSpace() bool {
-	return p.Type == Space
-}
-
-// GetSpaceKubeConfig returns the kubeconfig and namespace for the Space
-// profile.
-func (p Profile) GetSpaceKubeConfig() (clientcmd.ClientConfig, error) {
-	rules := clientcmd.NewDefaultClientConfigLoadingRules()
-	rules.ExplicitPath = p.Kubeconfig
-	loader := clientcmd.NewNonInteractiveDeferredLoadingClientConfig(
-		rules,
-		&clientcmd.ConfigOverrides{CurrentContext: p.KubeContext},
-	)
-	return loader, nil
-}
-
-// GetSpaceRestConfig returns the kube RESTconfig and namespace for the Space
-// profile.
-func (p Profile) GetSpaceRestConfig() (*rest.Config, string, error) {
-	loader, err := p.GetSpaceKubeConfig()
-	if err != nil {
-		return nil, "", err
-	}
-
-	cfg, err := loader.ClientConfig()
-	if err != nil {
-		return nil, "", err
-	}
-
-	ns, _, err := loader.Namespace()
-	if err != nil {
-		return nil, "", err
-	}
-
-	return cfg, ns, nil
 }
 
 // Redacted embeds a Upbound Profile for the sole purpose of redacting
@@ -128,13 +70,10 @@ type Redacted struct {
 func (p Redacted) MarshalJSON() ([]byte, error) {
 	type profile Redacted
 	pc := profile(p)
-	// Space profiles don't have session tokens.
-	if !p.IsSpace() {
-		s := "NONE"
-		if pc.Session != "" {
-			s = "REDACTED"
-		}
-		pc.Session = s
+	s := "NONE"
+	if pc.Session != "" {
+		s = "REDACTED"
 	}
+	pc.Session = s
 	return json.Marshal(&pc)
 }

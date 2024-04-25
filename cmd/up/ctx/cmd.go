@@ -288,9 +288,9 @@ func (c *Cmd) RunRelative(ctx context.Context, kongCtx *kong.Context, upCtx *upb
 	if c.Short {
 		switch state := m.state.(type) {
 		case *Group:
-			fmt.Printf("%s/%s\n", state.space.profile, state.name)
+			fmt.Printf("%s/%s\n", state.space.name, state.name)
 		case *ControlPlane:
-			fmt.Printf("%s/%s/%s\n", state.group.space.profile, state.NamespacedName().Namespace, state.NamespacedName().Name)
+			fmt.Printf("%s/%s/%s\n", state.group.space.name, state.NamespacedName().Namespace, state.NamespacedName().Name)
 		}
 	} else {
 		fmt.Print(msg)

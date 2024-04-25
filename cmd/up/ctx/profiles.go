@@ -16,7 +16,7 @@ package ctx
 
 import (
 	"context"
-	"errors"
+	"strings"
 
 	clientcmdapi "k8s.io/client-go/tools/clientcmd/api"
 
@@ -24,22 +24,34 @@ import (
 	"github.com/upbound/up/internal/upbound"
 )
 
+func getCurrentContext(config clientcmdapi.Config) (context *clientcmdapi.Context, cluster *clientcmdapi.Cluster, exists bool) {
+	current := config.CurrentContext
+	if current == "" {
+		return nil, nil, false
+	}
+
+	context, exists = config.Contexts[current]
+	if !exists {
+		return nil, nil, false
+	}
+
+	cluster, exists = config.Clusters[context.Cluster]
+	return context, cluster, exists
+}
+
 func DeriveState(ctx context.Context, upCtx *upbound.Context, conf *clientcmdapi.Config) (NavigationState, error) {
-	// find profile and derive controlplane from kubeconfig
-	profiles, err := upCtx.Cfg.GetUpboundProfiles()
+	kubeconfig, err := upCtx.Kubecfg.RawConfig()
 	if err != nil {
 		return nil, err
 	}
-	if len(profiles) == 0 {
-		return nil, errors.New("no Upbound profiles found")
+	_, cluster, exists := getCurrentContext(kubeconfig)
+
+	// not pointed at any context
+	if !exists {
+		return &Organizations{}, nil
 	}
-	name, p, ctp, err := profile.FromKubeconfig(ctx, profiles, conf)
-	if err != nil {
-		return &Profiles{}, nil // nolint:nilerr // intentionally ignore error
-	}
-	if p == nil {
-		return &Profiles{}, nil
-	}
+
+	ctp, exists := profile.ParseSpacesK8sURL(strings.TrimSuffix(cluster.Server, "/"))
 
 	// derive navigation state
 	switch {
@@ -47,9 +59,7 @@ func DeriveState(ctx context.Context, upCtx *upbound.Context, conf *clientcmdapi
 		return &ControlPlane{
 			group: Group{
 				space: Space{
-					name:    name,
-					profile: name,
-					cloud:   !p.IsSpace(),
+					name: kubeconfig.CurrentContext,
 				},
 				name: ctp.Namespace,
 			},
@@ -58,17 +68,13 @@ func DeriveState(ctx context.Context, upCtx *upbound.Context, conf *clientcmdapi
 	case ctp.Namespace != "":
 		return &Group{
 			space: Space{
-				name:    name,
-				profile: name,
-				cloud:   !p.IsSpace(),
+				name: kubeconfig.CurrentContext,
 			},
 			name: ctp.Namespace,
 		}, nil
 	default:
 		return &Space{
-			name:    name,
-			profile: name,
-			cloud:   !p.IsSpace(),
+			name: kubeconfig.CurrentContext,
 		}, nil
 	}
 }

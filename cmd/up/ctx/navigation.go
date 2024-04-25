@@ -20,13 +20,14 @@ import (
 
 	"github.com/charmbracelet/bubbles/list"
 	"github.com/charmbracelet/lipgloss"
+	"github.com/pkg/errors"
 	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/types"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 
 	spacesv1beta1 "github.com/upbound/up-sdk-go/apis/spaces/v1beta1"
 	upboundv1alpha1 "github.com/upbound/up-sdk-go/apis/upbound/v1alpha1"
-	"github.com/upbound/up-sdk-go/service/accounts"
+	"github.com/upbound/up-sdk-go/service/organizations"
 	"github.com/upbound/up/internal/upbound"
 )
 
@@ -60,39 +61,62 @@ func (f AcceptingFunc) Accept(ctx context.Context, upCtx *upbound.Context) error
 	return f(ctx, upCtx)
 }
 
-type Profiles struct{}
+type Organizations struct{}
 
-func (p *Profiles) Items(ctx context.Context, upCtx *upbound.Context) ([]list.Item, error) { //nolint:gocyclo
-	if upCtx.Profile.IsSpace() {
-		// build list of local profile spaces
-		profiles, err := upCtx.Cfg.GetUpboundProfiles()
-		if err != nil {
-			return nil, err
-		}
-		items := make([]list.Item, 0, len(profiles))
-		for name, p := range profiles {
-			if !p.IsSpace() {
-				continue
-			}
-			items = append(items, item{text: name, kind: "space", onEnter: func(ctx context.Context, upCtx *upbound.Context, m model) (model, error) {
-				m.state = &Space{name: name, profile: name}
-				return m, nil
-			}})
-		}
-		sort.Sort(sortedItems(items))
-		return items, nil
-	}
-
+func (p *Organizations) Items(ctx context.Context, upCtx *upbound.Context) ([]list.Item, error) { //nolint:gocyclo
 	cfg, err := upCtx.BuildSDKConfig()
 	if err != nil {
 		return nil, err
 	}
 
-	ac := accounts.NewClient(cfg)
+	client := organizations.NewClient(cfg)
 
-	a, err := upbound.GetAccount(ctx, ac, upCtx.Account)
+	orgs, err := client.List(ctx)
+	if err != nil {
+		return nil, errors.Wrap(err, "error listing organizations")
+	}
+
+	items := make([]list.Item, 0)
+	for _, org := range orgs {
+		items = append(items, item{text: org.DisplayName, kind: "org", onEnter: func(ctx context.Context, upCtx *upbound.Context, m model) (model, error) {
+			m.state = &Profiles{org: org.Name}
+			return m, nil
+		}})
+	}
+	sort.Sort(sortedItems(items))
+	return items, nil
+}
+
+func (p *Organizations) Breadcrumbs() string {
+	return upboundRootStyle.Render("Upbound") + " organizations"
+}
+
+var _ Back = &Profiles{}
+
+type Profiles struct {
+	org string
+}
+
+func (p *Profiles) Items(ctx context.Context, upCtx *upbound.Context) ([]list.Item, error) { //nolint:gocyclo
+	selfHosted, err := upCtx.IsSelfHostedSpaceContext(ctx)
 	if err != nil {
 		return nil, err
+	}
+
+	if selfHosted {
+		kubeCfg, err := upCtx.Kubecfg.RawConfig()
+		if err != nil {
+			return nil, err
+		}
+
+		items := []list.Item{
+			item{text: kubeCfg.CurrentContext, kind: "space", onEnter: func(ctx context.Context, upCtx *upbound.Context, m model) (model, error) {
+				m.state = &Space{name: kubeCfg.CurrentContext}
+				return m, nil
+			}},
+		}
+		sort.Sort(sortedItems(items))
+		return items, nil
 	}
 
 	cloudCfg, err := upCtx.BuildControllerClientConfig()
@@ -106,7 +130,7 @@ func (p *Profiles) Items(ctx context.Context, upCtx *upbound.Context) ([]list.It
 	}
 
 	var l upboundv1alpha1.SpaceList
-	err = cloudClient.List(ctx, &l, &client.ListOptions{Namespace: a.Organization.Name})
+	err = cloudClient.List(ctx, &l, &client.ListOptions{Namespace: p.org})
 	if err != nil {
 		return nil, err
 	}
@@ -121,7 +145,7 @@ func (p *Profiles) Items(ctx context.Context, upCtx *upbound.Context) ([]list.It
 		}
 
 		items = append(items, item{text: space.GetObjectMeta().GetName(), kind: "space", onEnter: func(ctx context.Context, upCtx *upbound.Context, m model) (model, error) {
-			m.state = &Space{name: space.GetObjectMeta().GetName(), profile: upCtx.ProfileName, cloud: true}
+			m.state = &Space{name: space.GetObjectMeta().GetName()}
 			return m, nil
 		}})
 	}
@@ -129,8 +153,17 @@ func (p *Profiles) Items(ctx context.Context, upCtx *upbound.Context) ([]list.It
 	return items, nil
 }
 
+func (p *Profiles) Back(ctx context.Context, upCtx *upbound.Context, m model) (model, error) {
+	m.state = &Organizations{}
+	return m, nil
+}
+
 func (p *Profiles) Breadcrumbs() string {
 	return upboundRootStyle.Render("Upbound") + " profiles"
+}
+
+func (p *Profiles) IsCloudProfile() bool {
+	return p.org != ""
 }
 
 type sortedItems []list.Item
@@ -143,37 +176,14 @@ var _ Back = &Space{}
 
 // Space provides the navigation node for a space.
 type Space struct {
-	profile string
+	profile Profiles
 	name    string
-	cloud   bool
 }
 
 func (s *Space) Items(ctx context.Context, upCtx *upbound.Context) ([]list.Item, error) {
-	var cl client.Client
-
-	if !s.cloud {
-		p, err := upCtx.Cfg.GetUpboundProfile(s.profile)
-		if err != nil {
-			return nil, err
-		}
-		config, _, err := p.GetSpaceRestConfig()
-		if err != nil {
-			return nil, err
-		}
-		cl, err = client.New(config, client.Options{})
-		if err != nil {
-			return nil, err
-		}
-	} else {
-		rest, err := upCtx.BuildCloudSpaceRestConfig(ctx, s.name, s.profile)
-		if err != nil {
-			return nil, err
-		}
-
-		cl, err = client.New(rest, client.Options{})
-		if err != nil {
-			return nil, err
-		}
+	cl, err := upCtx.BuildCurrentContextClient()
+	if err != nil {
+		return nil, err
 	}
 
 	nss := &corev1.NamespaceList{}
@@ -203,10 +213,7 @@ func (s *Space) Back(ctx context.Context, upCtx *upbound.Context, m model) (mode
 }
 
 func (s *Space) Breadcrumbs() string {
-	if s.cloud {
-		return upboundRootStyle.Render("Upbound") + pathSegmentStyle.Render(" space ") + pathSegmentStyle.Render(s.name)
-	}
-	return upboundRootStyle.Render("Upbound") + pathSegmentStyle.Render(" profile ") + pathSegmentStyle.Render(s.profile)
+	return upboundRootStyle.Render("Upbound") + pathSegmentStyle.Render(" space ") + pathSegmentStyle.Render(s.name)
 }
 
 // Group provides the navigation node for a concrete group aka namespace.
@@ -219,30 +226,9 @@ var _ Accepting = &Group{}
 var _ Back = &Group{}
 
 func (g *Group) Items(ctx context.Context, upCtx *upbound.Context) ([]list.Item, error) {
-	var cl client.Client
-	if !g.space.cloud {
-		p, err := upCtx.Cfg.GetUpboundProfile(g.space.profile)
-		if err != nil {
-			return nil, err
-		}
-		config, _, err := p.GetSpaceRestConfig()
-		if err != nil {
-			return nil, err
-		}
-		cl, err = client.New(config, client.Options{})
-		if err != nil {
-			return nil, err
-		}
-	} else {
-		rest, err := upCtx.BuildCloudSpaceRestConfig(ctx, g.space.name, g.space.profile)
-		if err != nil {
-			return nil, err
-		}
-
-		cl, err = client.New(rest, client.Options{})
-		if err != nil {
-			return nil, err
-		}
+	cl, err := upCtx.BuildCurrentContextClient()
+	if err != nil {
+		return nil, err
 	}
 
 	ctps := &spacesv1beta1.ControlPlaneList{}

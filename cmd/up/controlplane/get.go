@@ -18,71 +18,39 @@ import (
 	"context"
 
 	"github.com/alecthomas/kong"
+	"github.com/pkg/errors"
 	"github.com/pterm/pterm"
+	kerrors "k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/types"
-	"k8s.io/client-go/dynamic"
+	"sigs.k8s.io/controller-runtime/pkg/client"
 
-	"github.com/upbound/up-sdk-go/service/configurations"
+	spacesv1beta1 "github.com/upbound/up-sdk-go/apis/spaces/v1beta1"
 	cp "github.com/upbound/up-sdk-go/service/controlplanes"
-	"github.com/upbound/up/internal/controlplane"
-	"github.com/upbound/up/internal/controlplane/cloud"
-	"github.com/upbound/up/internal/controlplane/space"
 	"github.com/upbound/up/internal/upbound"
 	"github.com/upbound/up/internal/upterm"
 )
 
-type ctpGetter interface {
-	Get(ctx context.Context, name types.NamespacedName) (*controlplane.Response, error)
-}
-
 // AfterApply sets default values in command after assignment and validation.
 func (c *getCmd) AfterApply(kongCtx *kong.Context, upCtx *upbound.Context) error {
-	if upCtx.Profile.IsSpace() {
-		kubeconfig, ns, err := upCtx.Profile.GetSpaceRestConfig()
-		if err != nil {
-			return err
-		}
-		if c.Group == "" {
-			c.Group = ns
-		}
-
-		client, err := dynamic.NewForConfig(kubeconfig)
-		if err != nil {
-			return err
-		}
-		c.client = space.New(client)
-	} else {
-		cfg, err := upCtx.BuildSDKConfig()
-		if err != nil {
-			return err
-		}
-		ctpclient := cp.NewClient(cfg)
-		cfgclient := configurations.NewClient(cfg)
-
-		c.client = cloud.New(ctpclient, cfgclient, upCtx.Account)
-	}
-
 	kongCtx.Bind(pterm.DefaultTable.WithWriter(kongCtx.Stdout).WithSeparator("   "))
 	return nil
 }
 
 // getCmd gets a single control plane in an account on Upbound.
 type getCmd struct {
-	Name  string `arg:"" required:"" help:"Name of control plane." predictor:"ctps"`
-	Group string `short:"g" help:"The control plane group that the control plane is contained in. This defaults to the group specified in the current profile."`
-
-	client ctpGetter
+	Name string `arg:"" required:"" help:"Name of control plane." predictor:"ctps"`
 }
 
 // Run executes the get command.
-func (c *getCmd) Run(ctx context.Context, printer upterm.ObjectPrinter, p pterm.TextPrinter, upCtx *upbound.Context) error {
-	ctp, err := c.client.Get(ctx, types.NamespacedName{Name: c.Name, Namespace: c.Group})
-	if controlplane.IsNotFound(err) {
-		p.Printfln("Control plane %s not found", c.Name)
-		return nil
-	}
-	if err != nil {
-		return err
+func (c *getCmd) Run(ctx context.Context, printer upterm.ObjectPrinter, p pterm.TextPrinter, upCtx *upbound.Context, client client.Client) error {
+	var ctp spacesv1beta1.ControlPlane
+	if err := client.Get(ctx, types.NamespacedName{Name: c.Name}, &ctp); err != nil {
+		if kerrors.IsNotFound(err) {
+			p.Printfln("Control plane %s not found", c.Name)
+			return nil
+		}
+
+		return errors.Wrap(err, "error getting control plane")
 	}
 
 	return tabularPrint(ctp, printer, upCtx)

@@ -69,23 +69,28 @@ const (
 
 // Context includes common data that Upbound consumers may utilize.
 type Context struct {
+	// Profile fields
 	ProfileName string
 	Profile     profile.Profile
 	Token       string
-	Account     string
-	Domain      *url.URL
+	Cfg         *config.Config
+	CfgSrc      config.Source
 
+	// Kubeconfig fields
+	Kubecfg clientcmd.ClientConfig
+
+	// Upbound API connection URLs
+	Domain                *url.URL
+	APIEndpoint           *url.URL
+	ProxyEndpoint         *url.URL
+	RegistryEndpoint      *url.URL
 	InsecureSkipTLSVerify bool
 
-	APIEndpoint      *url.URL
-	ProxyEndpoint    *url.URL
-	RegistryEndpoint *url.URL
-	Cfg              *config.Config
-	CfgSrc           config.Source
-
+	// Debugging
 	DebugLevel    int
 	WrapTransport func(rt http.RoundTripper) http.RoundTripper
 
+	// Miscellaneous
 	allowMissingProfile bool
 	cfgPath             string
 	fs                  afero.Fs
@@ -177,13 +182,7 @@ func NewFromFlags(f Flags, opts ...Option) (*Context, error) { //nolint:gocyclo
 		c.RegistryEndpoint = &u
 	}
 
-	c.Account = of.Account
 	c.Domain = of.Domain
-
-	// If account has not already been set, use the profile default.
-	if c.Account == "" {
-		c.Account = c.Profile.Account
-	}
 
 	c.InsecureSkipTLSVerify = of.InsecureSkipTLSVerify
 
@@ -204,7 +203,39 @@ func NewFromFlags(f Flags, opts ...Option) (*Context, error) { //nolint:gocyclo
 	default:
 	}
 
+	c.Kubecfg = clientcmd.NewNonInteractiveDeferredLoadingClientConfig(
+		clientcmd.NewDefaultClientConfigLoadingRules(),
+		&clientcmd.ConfigOverrides{},
+	)
+
 	return c, nil
+}
+
+// BuildCurrentContextClient creates a K8s client using the current Kubeconfig
+// defaulting to the current Kubecontext
+func (c *Context) BuildCurrentContextClient() (client.Client, error) {
+	rest, err := c.Kubecfg.ClientConfig()
+	if err != nil {
+		return nil, errors.Wrap(err, "unable to get kube config")
+	}
+
+	sc, err := client.New(rest, client.Options{})
+	if err != nil {
+		return nil, errors.Wrap(err, "error creating kube client")
+	}
+	return sc, nil
+}
+
+// IsSelfHostedSpaceContext returns true if the current context is pointed at a
+// self-hosted space cluster
+func (c *Context) IsSelfHostedSpaceContext(ctx context.Context) (bool, error) {
+	client, err := c.BuildCurrentContextClient()
+	if err != nil {
+		return false, err
+	}
+
+	host, _, err := profile.GetIngressHost(ctx, client)
+	return host != "", err
 }
 
 // BuildSDKConfig builds an Upbound SDK config suitable for usage with any
@@ -289,7 +320,7 @@ func (c *Context) BuildControllerClientConfig() (*rest.Config, error) {
 
 // BuildCloudSpaceClientConfig builds a Kubeconfig pointed at an Upbound
 // cloud-hosted space. Uses the space name as the current context
-func (c *Context) BuildCloudSpaceClientConfig(ctx context.Context, spaceName, profileName string) (clientcmd.ClientConfig, error) {
+func (c *Context) BuildCloudSpaceClientConfig(ctx context.Context, spaceName, organization string) (clientcmd.ClientConfig, error) {
 	// describe the space to get its fqdn
 	cloudLoader, err := c.BuildControllerClientConfig()
 	if err != nil {
@@ -302,17 +333,17 @@ func (c *Context) BuildCloudSpaceClientConfig(ctx context.Context, spaceName, pr
 	}
 
 	var space upboundv1alpha1.Space
-	err = cloudClient.Get(ctx, types.NamespacedName{Name: spaceName, Namespace: c.Account}, &space)
+	err = cloudClient.Get(ctx, types.NamespacedName{Name: spaceName, Namespace: organization}, &space)
 	if err != nil {
 		return nil, err
 	}
 
-	// uniquely identify the space and the profile used to authenticate it
-	contextName := fmt.Sprintf("%s-%s", spaceName, profileName)
+	// uniquely identify the space
+	contextName := fmt.Sprintf("upbound/%s", spaceName)
 
 	clusters := make(map[string]*clientcmdapi.Cluster)
 	clusters[spaceName] = &clientcmdapi.Cluster{
-		Server: fmt.Sprintf("https://%s.%s", c.Account, space.Status.FQDN),
+		Server: fmt.Sprintf("https://%s.%s", organization, space.Status.FQDN),
 		// todo(redbackthomson): replace once a public CA is configured
 		InsecureSkipTLSVerify: true, //nolint:gosec
 	}
@@ -326,7 +357,7 @@ func (c *Context) BuildCloudSpaceClientConfig(ctx context.Context, spaceName, pr
 	if c.Profile.Session != "" {
 		// uniquely identify the profile auth info, prefixed to protect against
 		// overriding existing auth info in the customer's kubeconfig
-		authInfoName := fmt.Sprintf("upbound-profile-%s", profileName)
+		authInfoName := fmt.Sprintf("upbound/%s", organization)
 		authInfos[authInfoName] = &clientcmdapi.AuthInfo{
 			Token: c.Profile.Session,
 		}
