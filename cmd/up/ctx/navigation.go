@@ -254,7 +254,7 @@ func (g *Group) Items(ctx context.Context, upCtx *upbound.Context) ([]list.Item,
 	items = append(items, item{text: "..", kind: "groups", onEnter: g.Back, back: true})
 
 	for _, ctp := range ctps.Items {
-		items = append(items, item{text: ctp.Name, kind: "ctp", onEnter: func(ctx context.Context, upCtx *upbound.Context, m model) (model, error) {
+		items = append(items, item{text: ctp.Name, kind: "controlplane", onEnter: func(ctx context.Context, upCtx *upbound.Context, m model) (model, error) {
 			m.state = &ControlPlane{group: *g, name: ctp.Name}
 			return m, nil
 		}})
@@ -296,7 +296,7 @@ var _ Back = &ControlPlane{}
 
 func (ctp *ControlPlane) Items(ctx context.Context, upCtx *upbound.Context) ([]list.Item, error) {
 	return []list.Item{
-		item{text: "..", kind: "ctps", onEnter: ctp.Back, back: true},
+		item{text: "..", kind: "controlplanes", onEnter: ctp.Back, back: true},
 		/*
 			item{text: fmt.Sprintf("Connect to %s", ctp.NamespacedName), onEnter: KeyFunc(func(ctx context.Context, upCtx *upbound.Context, m model) (model, error) {
 				msg, err := ctp.Accept(ctx, upCtx)
