@@ -45,21 +45,30 @@ func DeriveState(ctx context.Context, upCtx *upbound.Context, conf *clientcmdapi
 	switch {
 	case ctp.Namespace != "" && ctp.Name != "":
 		return &ControlPlane{
-			space: Space{
-				profile: name,
+			group: Group{
+				space: Space{
+					name:    name,
+					profile: name,
+					cloud:   !p.IsSpace(),
+				},
+				name: ctp.Namespace,
 			},
-			NamespacedName: ctp,
+			name: ctp.Name,
 		}, nil
 	case ctp.Namespace != "":
 		return &Group{
 			space: Space{
+				name:    name,
 				profile: name,
+				cloud:   !p.IsSpace(),
 			},
 			name: ctp.Namespace,
 		}, nil
 	default:
 		return &Space{
+			name:    name,
 			profile: name,
+			cloud:   !p.IsSpace(),
 		}, nil
 	}
 }

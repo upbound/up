@@ -64,7 +64,7 @@ func (c *listCmd) AfterApply(kongCtx *kong.Context) error {
 
 // Run executes the list command.
 func (c *listCmd) Run(ctx context.Context, printer upterm.ObjectPrinter, p pterm.TextPrinter, upCtx *upbound.Context, ac *accounts.Client, rest *rest.Config) error {
-	a, err := getAccount(ctx, ac, upCtx.Account)
+	a, err := upbound.GetAccount(ctx, ac, upCtx.Account)
 	if err != nil {
 		return err
 	}
@@ -103,9 +103,11 @@ func extractSpaceListFields(obj any) []string {
 		region = string(*space.Spec.Region)
 	}
 
+	mode := space.ObjectMeta.Labels[upboundv1alpha1.SpaceModeLabelKey]
+
 	return []string{
 		space.GetObjectMeta().GetName(),
-		string(space.Spec.Mode),
+		mode,
 		provider,
 		region,
 	}

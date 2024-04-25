@@ -17,7 +17,6 @@ package profile
 import (
 	"encoding/json"
 	"errors"
-	"fmt"
 
 	"k8s.io/client-go/rest"
 	"k8s.io/client-go/tools/clientcmd"
@@ -86,9 +85,6 @@ func (p Profile) IsSpace() bool {
 // GetSpaceKubeConfig returns the kubeconfig and namespace for the Space
 // profile.
 func (p Profile) GetSpaceKubeConfig() (clientcmd.ClientConfig, error) {
-	if !p.IsSpace() {
-		return nil, fmt.Errorf("kube client not supported for profile type %q", p.Type)
-	}
 	rules := clientcmd.NewDefaultClientConfigLoadingRules()
 	rules.ExplicitPath = p.Kubeconfig
 	loader := clientcmd.NewNonInteractiveDeferredLoadingClientConfig(

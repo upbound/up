@@ -180,7 +180,7 @@ func (c *detachCmd) detachSpace(ctx context.Context, detachSpinner *pterm.Spinne
 
 func disconnectSpace(ctx context.Context, progressSpinner *pterm.SpinnerPrinter, ac *accounts.Client, oc *organizations.Client, rc *robots.Client, sc client.Client, namespace, name string) error {
 	progressSpinner.UpdateText(fmt.Sprintf(`Disconnecting Space "%s/%s" from Upbound Console...`, namespace, name))
-	a, err := getAccount(ctx, ac, namespace)
+	a, err := upbound.GetAccount(ctx, ac, namespace)
 	if err != nil {
 		return err
 	}
