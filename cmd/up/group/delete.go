@@ -22,7 +22,7 @@ import (
 	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/types"
-	ctrlclient "sigs.k8s.io/controller-runtime/pkg/client"
+	"sigs.k8s.io/controller-runtime/pkg/client"
 
 	"github.com/crossplane/crossplane-runtime/pkg/errors"
 
@@ -38,23 +38,7 @@ type deleteCmd struct {
 }
 
 // Run executes the create command.
-func (c *deleteCmd) Run(ctx context.Context, printer upterm.ObjectPrinter, upCtx *upbound.Context, p pterm.TextPrinter) error { // nolint:gocyclo
-	// get profile
-	currentProfile, err := getCurrentProfile(ctx, upCtx)
-	if err != nil {
-		return err
-	}
-
-	// create client
-	restConfig, _, err := currentProfile.GetSpaceRestConfig()
-	if err != nil {
-		return err
-	}
-	cl, err := ctrlclient.New(restConfig, ctrlclient.Options{})
-	if err != nil {
-		return err
-	}
-
+func (c *deleteCmd) Run(ctx context.Context, printer upterm.ObjectPrinter, upCtx *upbound.Context, client client.Client, p pterm.TextPrinter) error { // nolint:gocyclo
 	// delete group
 	group := corev1.Namespace{
 		ObjectMeta: metav1.ObjectMeta{
@@ -64,7 +48,7 @@ func (c *deleteCmd) Run(ctx context.Context, printer upterm.ObjectPrinter, upCtx
 
 	// ensure deletion protection is disabled, if not forcing
 	if !c.Force {
-		if err := cl.Get(ctx, types.NamespacedName{Name: c.Name}, &group); err != nil {
+		if err := client.Get(ctx, types.NamespacedName{Name: c.Name}, &group); err != nil {
 			return err
 		}
 
@@ -75,7 +59,7 @@ func (c *deleteCmd) Run(ctx context.Context, printer upterm.ObjectPrinter, upCtx
 		}
 	}
 
-	if err := cl.Delete(ctx, &group); err != nil {
+	if err := client.Delete(ctx, &group); err != nil {
 		return err
 	}
 
