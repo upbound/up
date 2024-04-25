@@ -77,10 +77,11 @@ func (c *Cmd) AfterApply(kongCtx *kong.Context) error {
 
 func (c *Cmd) Run(ctx context.Context, kongCtx *kong.Context, upCtx *upbound.Context) error { // nolint:gocyclo // TODO: split up
 	// create client
-	kubeconfig, ns, err := upCtx.Profile.GetSpaceRestConfig()
+	kubeconfig, err := upCtx.Kubecfg.ClientConfig()
 	if err != nil {
 		return err
 	}
+
 	if c.Group == "" {
 		if !c.AllGroups {
 			c.Group = ns

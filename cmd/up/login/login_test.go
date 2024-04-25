@@ -83,7 +83,7 @@ func TestConstructAuth(t *testing.T) {
 		password string
 	}
 	type want struct {
-		pType profile.Type
+		pType profile.TokenType
 		auth  *auth
 	}
 	cases := map[string]struct {
@@ -164,7 +164,7 @@ func TestParseID(t *testing.T) {
 	}
 	type want struct {
 		id    string
-		pType profile.Type
+		pType profile.TokenType
 	}
 	cases := map[string]struct {
 		reason string

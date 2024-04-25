@@ -27,7 +27,7 @@ var (
 	oldControlPlanePathRE = regexp.MustCompile(`^(?P<base>.+)/v1/control[pP]lanes/(?P<account>[^/]+)/(?P<namespace>[^/]+)/(?P<controlplane>[^/]+)/k8s$`)
 )
 
-// ParseSpacesK8sURL parses a URL and returns the base, version, namespace, and controlplane.
+// ParseSpacesK8sURL parses a URL and returns the namespace and controlplane name.
 func ParseSpacesK8sURL(url string) (types.NamespacedName, bool) {
 	m := newControlPlanePathRE.FindStringSubmatch(url)
 	if m == nil {

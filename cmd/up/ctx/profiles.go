@@ -16,42 +16,24 @@ package ctx
 
 import (
 	"context"
-	"strings"
 
 	clientcmdapi "k8s.io/client-go/tools/clientcmd/api"
 
-	"github.com/upbound/up/internal/profile"
 	"github.com/upbound/up/internal/upbound"
 )
-
-func getCurrentContext(config clientcmdapi.Config) (context *clientcmdapi.Context, cluster *clientcmdapi.Cluster, exists bool) {
-	current := config.CurrentContext
-	if current == "" {
-		return nil, nil, false
-	}
-
-	context, exists = config.Contexts[current]
-	if !exists {
-		return nil, nil, false
-	}
-
-	cluster, exists = config.Clusters[context.Cluster]
-	return context, cluster, exists
-}
 
 func DeriveState(ctx context.Context, upCtx *upbound.Context, conf *clientcmdapi.Config) (NavigationState, error) {
 	kubeconfig, err := upCtx.Kubecfg.RawConfig()
 	if err != nil {
 		return nil, err
 	}
-	_, cluster, exists := getCurrentContext(kubeconfig)
+
+	ctp, exists := upCtx.ParseCurrentSpaceContextURL()
 
 	// not pointed at any context
 	if !exists {
 		return &Organizations{}, nil
 	}
-
-	ctp, exists := profile.ParseSpacesK8sURL(strings.TrimSuffix(cluster.Server, "/"))
 
 	// derive navigation state
 	switch {

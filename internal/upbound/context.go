@@ -218,33 +218,6 @@ func NewFromFlags(f Flags, opts ...Option) (*Context, error) { //nolint:gocyclo
 	return c, nil
 }
 
-// BuildCurrentContextClient creates a K8s client using the current Kubeconfig
-// defaulting to the current Kubecontext
-func (c *Context) BuildCurrentContextClient() (client.Client, error) {
-	rest, err := c.Kubecfg.ClientConfig()
-	if err != nil {
-		return nil, errors.Wrap(err, "unable to get kube config")
-	}
-
-	sc, err := client.New(rest, client.Options{})
-	if err != nil {
-		return nil, errors.Wrap(err, "error creating kube client")
-	}
-	return sc, nil
-}
-
-// IsSelfHostedSpaceContext returns true if the current context is pointed at a
-// self-hosted space cluster
-func (c *Context) IsSelfHostedSpaceContext(ctx context.Context) (bool, error) {
-	client, err := c.BuildCurrentContextClient()
-	if err != nil {
-		return false, err
-	}
-
-	host, _, err := profile.GetIngressHost(ctx, client)
-	return host != "", err
-}
-
 // BuildSDKConfig builds an Upbound SDK config suitable for usage with any
 // service client.
 func (c *Context) BuildSDKConfig() (*up.Config, error) {

@@ -24,7 +24,6 @@ import (
 	"github.com/pterm/pterm"
 	"helm.sh/helm/v3/pkg/chart"
 	"k8s.io/client-go/kubernetes"
-	"k8s.io/client-go/rest"
 	"sigs.k8s.io/yaml"
 
 	"github.com/crossplane/crossplane-runtime/pkg/errors"
@@ -92,7 +91,7 @@ func (c *upgradeCmd) AfterApply(quiet config.QuietFlag) error { //nolint:gocyclo
 		return err
 	}
 
-	kubeconfig, err := c.getKubeconfig(upCtx)
+	kubeconfig, err := upCtx.Kubecfg.ClientConfig()
 	if err != nil {
 		return err
 	}
@@ -156,19 +155,6 @@ func (c *upgradeCmd) AfterApply(quiet config.QuietFlag) error { //nolint:gocyclo
 	}
 
 	return nil
-}
-
-// getKubeconfig returns the kubeconfig from flags if provided, otherwise the
-// kubeconfig from the active profile.
-func (c *upgradeCmd) getKubeconfig(upCtx *upbound.Context) (*rest.Config, error) {
-	if c.Kube.Kubeconfig != "" || c.Kube.Context != "" {
-		return c.Kube.GetConfig(), nil
-	}
-	if !upCtx.Profile.IsSpace() {
-		return nil, fmt.Errorf("upgrade is not supported for non-space profile %q", upCtx.ProfileName)
-	}
-	cfg, _, err := upCtx.Profile.GetSpaceRestConfig()
-	return cfg, err
 }
 
 // Run executes the upgrade command.

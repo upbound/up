@@ -23,7 +23,6 @@ import (
 	"github.com/pterm/pterm"
 	v1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/client-go/kubernetes"
-	"k8s.io/client-go/rest"
 
 	"github.com/upbound/up/internal/input"
 	"github.com/upbound/up/internal/install/helm"
@@ -57,7 +56,7 @@ func (c *destroyCmd) AfterApply(kongCtx *kong.Context) error {
 		return err
 	}
 
-	kubeconfig, err := c.getKubeconfig(upCtx)
+	kubeconfig, err := upCtx.Kubecfg.ClientConfig()
 	if err != nil {
 		return err
 	}
@@ -128,19 +127,6 @@ func (c *destroyCmd) confirm() {
 		pterm.Error.Println("Destruction was not confirmed")
 		os.Exit(10)
 	}
-}
-
-// getKubeconfig returns the kubeconfig from flags if provided, otherwise the
-// kubeconfig from the active profile.
-func (c *destroyCmd) getKubeconfig(upCtx *upbound.Context) (*rest.Config, error) {
-	if c.Kube.Kubeconfig != "" || c.Kube.Context != "" {
-		return c.Kube.GetConfig(), nil
-	}
-	if !upCtx.Profile.IsSpace() {
-		return nil, fmt.Errorf("destroy is not supported for non-space profile %q", upCtx.ProfileName)
-	}
-	cfg, _, err := upCtx.Profile.GetSpaceRestConfig()
-	return cfg, err
 }
 
 // Run executes the uninstall command.
