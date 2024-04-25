@@ -82,9 +82,11 @@ func (c *Cmd) Run(ctx context.Context, kongCtx *kong.Context, upCtx *upbound.Con
 		return err
 	}
 
-	if c.Group == "" {
-		if !c.AllGroups {
-			c.Group = ns
+	ctp, exists := upCtx.ParseCurrentSpaceContextURL()
+
+	if c.Group == "" && !c.AllGroups {
+		if exists && ctp.Namespace != "" {
+			c.Group = ctp.Namespace
 		}
 	}
 	kc, err := client.New(kubeconfig, client.Options{Scheme: queryScheme})

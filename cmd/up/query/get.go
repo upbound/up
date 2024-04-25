@@ -70,7 +70,7 @@ func (c *GetCmd) AfterApply(kongCtx *kong.Context) error {
 
 	// create Spaces API kubeconfig
 	// TODO(sttts): here we have to continue with baseURL := m[1] to talk to Spaces API. For now we use the spaces profile instead.
-	spacesKubeconfig, _, err := upCtx.Profile.GetSpaceRestConfig()
+	spacesKubeconfig, err := upCtx.Kubecfg.RawConfig()
 	if err != nil {
 		return err
 	}
