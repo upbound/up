@@ -75,6 +75,7 @@ type Context struct {
 	Token       string
 	Cfg         *config.Config
 	CfgSrc      config.Source
+	Account     string
 
 	// Kubeconfig fields
 	Kubecfg clientcmd.ClientConfig
@@ -182,7 +183,13 @@ func NewFromFlags(f Flags, opts ...Option) (*Context, error) { //nolint:gocyclo
 		c.RegistryEndpoint = &u
 	}
 
+	c.Account = of.Account
 	c.Domain = of.Domain
+
+	// If account has not already been set, use the profile default.
+	if c.Account == "" {
+		c.Account = c.Profile.Account
+	}
 
 	c.InsecureSkipTLSVerify = of.InsecureSkipTLSVerify
 

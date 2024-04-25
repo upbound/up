@@ -23,14 +23,13 @@ const (
 	NoGroupMsg         = "The current kubeconfig context does not point to a group, use `up ctx` to select a group."
 )
 
-// Type is a type of Upbound profile.
-type Type string
+// TokenType is a type of Upbound session token format.
+type TokenType string
 
 const (
 	// Types of profiles.
-	User  Type = "user"
-	Token Type = "token"
-	Space Type = "space"
+	User  TokenType = "user"
+	Token TokenType = "token"
 
 	DefaultName = "default"
 
@@ -42,8 +41,14 @@ type Profile struct {
 	// ID is the referencable name of the profile.
 	ID string `json:"id,omitempty"`
 
+	// TokenType is the type of the profile.
+	TokenType TokenType `json:"type"`
+
 	// Session is a session token used to authenticate to Upbound.
 	Session string `json:"session,omitempty"`
+
+	// Account is the default account to use when this profile is selected.
+	Account string `json:"account,omitempty"`
 
 	// BaseConfig represent persisted settings for this profile.
 	// For example:
