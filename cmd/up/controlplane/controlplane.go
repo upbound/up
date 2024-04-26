@@ -25,7 +25,6 @@ import (
 
 	spacesv1beta1 "github.com/upbound/up-sdk-go/apis/spaces/v1beta1"
 	"github.com/upbound/up/cmd/up/controlplane/connector"
-	"github.com/upbound/up/cmd/up/controlplane/kubeconfig"
 	"github.com/upbound/up/cmd/up/controlplane/pkg"
 	"github.com/upbound/up/cmd/up/controlplane/pullsecret"
 	"github.com/upbound/up/internal/controlplane"
@@ -92,11 +91,10 @@ func PredictControlPlanes() complete.Predictor {
 
 // Cmd contains commands for interacting with control planes.
 type Cmd struct {
-	Connect connectCmd `cmd:"" help:"Connect kubectl to control plane."`
-	Create  createCmd  `cmd:"" help:"Create a managed control plane."`
-	Delete  deleteCmd  `cmd:"" help:"Delete a control plane."`
-	List    listCmd    `cmd:"" help:"List control planes for the account."`
-	Get     getCmd     `cmd:"" help:"Get a single control plane."`
+	Create createCmd `cmd:"" help:"Create a managed control plane."`
+	Delete deleteCmd `cmd:"" help:"Delete a control plane."`
+	List   listCmd   `cmd:"" help:"List control planes for the account."`
+	Get    getCmd    `cmd:"" help:"Get a single control plane."`
 
 	Connector connector.Cmd `cmd:"" help:"Connect an App Cluster to a managed control plane."`
 
@@ -104,8 +102,6 @@ type Cmd struct {
 	Provider      pkg.Cmd `cmd:"" set:"package_type=Provider" help:"Manage Providers."`
 
 	PullSecret pullsecret.Cmd `cmd:"" help:"Manage package pull secrets."`
-
-	Kubeconfig kubeconfig.Cmd `cmd:"" name:"kubeconfig" help:"Manage control plane kubeconfig data."`
 
 	// Common Upbound API configuration
 	Flags upbound.Flags `embed:""`
