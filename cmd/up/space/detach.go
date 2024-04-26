@@ -153,7 +153,7 @@ func (c *detachCmd) Run(ctx context.Context, upCtx *upbound.Context, ac *account
 
 func (c *detachCmd) detachSpace(ctx context.Context, detachSpinner *pterm.SpinnerPrinter, upCtx *upbound.Context, ac *accounts.Client, oc *organizations.Client, kClient *kubernetes.Clientset, mgr *helm.Installer, rc *robots.Client, sc client.Client) error {
 	if kClient == nil {
-		detachSpinner.UpdateText("Continue? (Y/n)")
+		detachSpinner.UpdateText("Continue? (y/N)")
 		if err := warnAndConfirm(
 			`Not connected to a Space cluster, would you like to only remove the Space "%s/%s" from the Upbound Console?`+"\n\n"+
 				"  If the other Space cluster still exists, the Upbound agent will be left running and you will need to delete it manually.\n",
