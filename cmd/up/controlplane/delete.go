@@ -40,9 +40,15 @@ func (c *deleteCmd) AfterApply(kongCtx *kong.Context, upCtx *upbound.Context) er
 
 // Run executes the delete command.
 func (c *deleteCmd) Run(ctx context.Context, p pterm.TextPrinter, upCtx *upbound.Context, client client.Client) error {
+	ns, _, err := upCtx.Kubecfg.Namespace()
+	if err != nil {
+		return errors.Wrap(err, "error getting namespace")
+	}
+
 	ctp := &spacesv1beta1.ControlPlane{
 		ObjectMeta: v1.ObjectMeta{
-			Name: c.Name,
+			Name:      c.Name,
+			Namespace: ns,
 		},
 	}
 

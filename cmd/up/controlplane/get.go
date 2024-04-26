@@ -44,7 +44,12 @@ type getCmd struct {
 // Run executes the get command.
 func (c *getCmd) Run(ctx context.Context, printer upterm.ObjectPrinter, p pterm.TextPrinter, upCtx *upbound.Context, client client.Client) error {
 	var ctp spacesv1beta1.ControlPlane
-	if err := client.Get(ctx, types.NamespacedName{Name: c.Name}, &ctp); err != nil {
+	ns, _, err := upCtx.Kubecfg.Namespace()
+	if err != nil {
+		return errors.Wrap(err, "error getting namespace")
+	}
+
+	if err := client.Get(ctx, types.NamespacedName{Name: c.Name, Namespace: ns}, &ctp); err != nil {
 		if kerrors.IsNotFound(err) {
 			p.Printfln("Control plane %s not found", c.Name)
 			return nil

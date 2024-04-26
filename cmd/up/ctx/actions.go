@@ -143,6 +143,8 @@ func (ctp *ControlPlane) Accept(ctx context.Context, upCtx *upbound.Context, pre
 			return "", err
 		}
 
+		loader = upCtx.Kubecfg
+
 		// construct a context pointing to the controlplane via ingress, same
 		// credentials, but different URL
 		ingress, ca, err = profile.GetIngressHost(ctx, cl)

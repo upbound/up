@@ -39,11 +39,21 @@ func (c *listCmd) AfterApply(kongCtx *kong.Context, upCtx *upbound.Context) erro
 }
 
 // Run executes the list command.
-func (c *listCmd) Run(ctx context.Context, printer upterm.ObjectPrinter, p pterm.TextPrinter, upCtx *upbound.Context, client client.Client) error {
+func (c *listCmd) Run(ctx context.Context, printer upterm.ObjectPrinter, p pterm.TextPrinter, upCtx *upbound.Context, cl client.Client) error {
 	// todo(redbackthomson): Add support for `-A`
 
 	var l spacesv1beta1.ControlPlaneList
-	if err := client.List(ctx, &l); err != nil {
+
+	ns, _, err := upCtx.Kubecfg.Namespace()
+	if err != nil {
+		return errors.Wrap(err, "error getting namespace")
+	}
+
+	if c.AllGroups {
+		ns = ""
+	}
+
+	if err := cl.List(ctx, &l, &client.ListOptions{Namespace: ns}); err != nil {
 		return errors.Wrap(err, "error getting control planes")
 	}
 
@@ -52,5 +62,5 @@ func (c *listCmd) Run(ctx context.Context, printer upterm.ObjectPrinter, p pterm
 		return nil
 	}
 
-	return tabularPrint(l, printer, upCtx)
+	return tabularPrint(l.Items, printer, upCtx)
 }

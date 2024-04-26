@@ -22,6 +22,7 @@ import (
 	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/util/runtime"
 	"k8s.io/client-go/kubernetes/scheme"
+	"sigs.k8s.io/controller-runtime/pkg/client"
 
 	spacesv1beta1 "github.com/upbound/up-sdk-go/apis/spaces/v1beta1"
 	"github.com/upbound/up/internal/feature"
@@ -50,14 +51,14 @@ func (c *Cmd) AfterApply(kongCtx *kong.Context) error {
 	}
 	kongCtx.Bind(upCtx)
 
-	client, err := upCtx.BuildCurrentContextClient()
+	cl, err := upCtx.BuildCurrentContextClient()
 	if err != nil {
 		return errors.Wrap(err, "unable to get kube client")
 	}
 
 	// todo(redbackthomson): Assert we are at the space level
 
-	kongCtx.Bind(client)
+	kongCtx.BindTo(cl, (*client.Client)(nil))
 
 	return nil
 }

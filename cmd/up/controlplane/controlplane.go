@@ -22,12 +22,16 @@ import (
 	"github.com/pkg/errors"
 	"github.com/posener/complete"
 	"k8s.io/apimachinery/pkg/util/duration"
+	"k8s.io/utils/ptr"
+	"sigs.k8s.io/controller-runtime/pkg/client"
+
+	xpcommonv1 "github.com/crossplane/crossplane-runtime/apis/common/v1"
 
 	spacesv1beta1 "github.com/upbound/up-sdk-go/apis/spaces/v1beta1"
+
 	"github.com/upbound/up/cmd/up/controlplane/connector"
 	"github.com/upbound/up/cmd/up/controlplane/pkg"
 	"github.com/upbound/up/cmd/up/controlplane/pullsecret"
-	"github.com/upbound/up/internal/controlplane"
 	"github.com/upbound/up/internal/feature"
 	"github.com/upbound/up/internal/upbound"
 	"github.com/upbound/up/internal/upterm"
@@ -51,11 +55,11 @@ func (c *Cmd) AfterApply(kongCtx *kong.Context) error {
 	}
 	kongCtx.Bind(upCtx)
 
-	client, err := upCtx.BuildCurrentContextClient()
+	cl, err := upCtx.BuildCurrentContextClient()
 	if err != nil {
 		return errors.Wrap(err, "unable to get kube client")
 	}
-	kongCtx.Bind(client)
+	kongCtx.BindTo(cl, (*client.Client)(nil))
 
 	return nil
 }
@@ -115,19 +119,24 @@ between different Upbound profiles or to connect to a local Space.`
 }
 
 func extractSpaceFields(obj any) []string {
-	resp, ok := obj.(*controlplane.Response)
+	ctp, ok := obj.(spacesv1beta1.ControlPlane)
 	if !ok {
 		return []string{"unknown", "unknown", "", "", "", "", ""}
 	}
 
+	v := ""
+	if pv := ctp.Spec.Crossplane.Version; pv != nil {
+		v = *pv
+	}
+
 	return []string{
-		resp.Group,
-		resp.Name,
-		resp.CrossplaneVersion,
-		resp.Synced,
-		resp.Ready,
-		resp.Message,
-		formatAge(resp.Age),
+		ctp.GetNamespace(),
+		ctp.GetName(),
+		v,
+		string(ctp.GetCondition(xpcommonv1.TypeSynced).Status),
+		string(ctp.GetCondition(xpcommonv1.TypeReady).Status),
+		ctp.Annotations["internal.spaces.upbound.io/message"],
+		formatAge(ptr.To(time.Since(ctp.CreationTimestamp.Time))),
 	}
 }
 
