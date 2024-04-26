@@ -16,7 +16,6 @@ package pullsecret
 
 import (
 	"context"
-	"fmt"
 
 	"github.com/alecthomas/kong"
 	"github.com/crossplane/crossplane-runtime/pkg/errors"
@@ -37,10 +36,6 @@ const (
 // AfterApply constructs and binds Upbound-specific context to any subcommands
 // that have Run() methods that receive it.
 func (c *createCmd) AfterApply(kongCtx *kong.Context, upCtx *upbound.Context) error {
-	if upCtx.Profile.IsSpace() {
-		return fmt.Errorf("create is not supported for space profile %q", upCtx.ProfileName)
-	}
-
 	kubeconfig, err := kube.GetKubeConfig(c.Kubeconfig)
 	if err != nil {
 		return err
