@@ -75,7 +75,7 @@ type createCmd struct {
 
 	// NOTE(hasheddan): kong automatically cleans paths tagged with existingfile.
 	File       string `type:"existingfile" short:"f" help:"Path to credentials file. Credentials from profile are used if not specified."`
-	Kubeconfig string `type:"existingfile" help:"Override default kubeconfig path."`
+	Kubeconfig string `hidden:"" type:"existingfile" help:"No longer used. Please use the KUBECONFIG environment variable instead."`
 	Namespace  string `short:"n" env:"UPBOUND_NAMESPACE" default:"upbound-system" help:"Kubernetes namespace for pull secret."`
 }
 
