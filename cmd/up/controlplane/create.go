@@ -16,6 +16,7 @@ package controlplane
 
 import (
 	"context"
+
 	"github.com/alecthomas/kong"
 	"github.com/pkg/errors"
 	"github.com/pterm/pterm"
@@ -28,8 +29,8 @@ import (
 
 // createCmd creates a control plane on Upbound.
 type createCmd struct {
-	Name string `arg:"" required:"" help:"Name of control plane."`
-
+	Name  string `arg:"" required:"" help:"Name of control plane."`
+	Group string `short:"g" default:"" help:"The control plane group that the control plane is contained in. This defaults to the group specified in the current context"`
 	// todo(redbackthomson): Support all overrides for control planes
 	// ConfigurationName *string `help:"The optional name of the Configuration."`
 
@@ -39,20 +40,22 @@ type createCmd struct {
 // AfterApply sets default values in command after assignment and validation.
 func (c *createCmd) AfterApply(kongCtx *kong.Context, upCtx *upbound.Context) error {
 	kongCtx.Bind(pterm.DefaultTable.WithWriter(kongCtx.Stdout).WithSeparator("   "))
+	if c.Group == "" {
+		ns, _, err := upCtx.Kubecfg.Namespace()
+		if err != nil {
+			return err
+		}
+		c.Group = ns
+	}
 	return nil
 }
 
 // Run executes the create command.
 func (c *createCmd) Run(ctx context.Context, p pterm.TextPrinter, upCtx *upbound.Context, client client.Client) error {
-	ns, _, err := upCtx.Kubecfg.Namespace()
-	if err != nil {
-		return errors.Wrap(err, "error getting namespace")
-	}
-
 	ctp := &spacesv1beta1.ControlPlane{
 		ObjectMeta: v1.ObjectMeta{
 			Name:      c.Name,
-			Namespace: ns,
+			Namespace: c.Group,
 		},
 	}
 

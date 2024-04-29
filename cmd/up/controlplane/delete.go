@@ -30,25 +30,28 @@ import (
 
 // deleteCmd deletes a control plane on Upbound.
 type deleteCmd struct {
-	Name string `arg:"" help:"Name of control plane." predictor:"ctps"`
+	Name  string `arg:"" help:"Name of control plane." predictor:"ctps"`
+	Group string `short:"g" default:"" help:"The control plane group that the control plane is contained in. This defaults to the group specified in the current context"`
 }
 
 // AfterApply sets default values in command after assignment and validation.
 func (c *deleteCmd) AfterApply(kongCtx *kong.Context, upCtx *upbound.Context) error {
+	if c.Group == "" {
+		ns, _, err := upCtx.Kubecfg.Namespace()
+		if err != nil {
+			return err
+		}
+		c.Group = ns
+	}
 	return nil
 }
 
 // Run executes the delete command.
 func (c *deleteCmd) Run(ctx context.Context, p pterm.TextPrinter, upCtx *upbound.Context, client client.Client) error {
-	ns, _, err := upCtx.Kubecfg.Namespace()
-	if err != nil {
-		return errors.Wrap(err, "error getting namespace")
-	}
-
 	ctp := &spacesv1beta1.ControlPlane{
 		ObjectMeta: v1.ObjectMeta{
 			Name:      c.Name,
-			Namespace: ns,
+			Namespace: c.Group,
 		},
 	}
 

@@ -29,31 +29,31 @@ import (
 
 // listCmd list control planes in an account on Upbound.
 type listCmd struct {
-	AllGroups bool `short:"A" default:"false" help:"List control planes across all groups."`
+	AllGroups bool   `short:"A" default:"false" help:"List control planes across all groups."`
+	Group     string `short:"g" default:"" help:"The control plane group that the control plane is contained in. This defaults to the group specified in the current context"`
 }
 
 // AfterApply sets default values in command after assignment and validation.
 func (c *listCmd) AfterApply(kongCtx *kong.Context, upCtx *upbound.Context) error {
 	kongCtx.Bind(pterm.DefaultTable.WithWriter(kongCtx.Stdout).WithSeparator("   "))
+	// `-A` prevails over `-g`
+	if c.AllGroups {
+		c.Group = ""
+	} else if c.Group == "" {
+		ns, _, err := upCtx.Kubecfg.Namespace()
+		if err != nil {
+			return err
+		}
+		c.Group = ns
+	}
 	return nil
 }
 
 // Run executes the list command.
 func (c *listCmd) Run(ctx context.Context, printer upterm.ObjectPrinter, p pterm.TextPrinter, upCtx *upbound.Context, cl client.Client) error {
-	// todo(redbackthomson): Add support for `-A`
 
 	var l spacesv1beta1.ControlPlaneList
-
-	ns, _, err := upCtx.Kubecfg.Namespace()
-	if err != nil {
-		return errors.Wrap(err, "error getting namespace")
-	}
-
-	if c.AllGroups {
-		ns = ""
-	}
-
-	if err := cl.List(ctx, &l, &client.ListOptions{Namespace: ns}); err != nil {
+	if err := cl.List(ctx, &l, client.InNamespace(c.Group)); err != nil {
 		return errors.Wrap(err, "error getting control planes")
 	}
 

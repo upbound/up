@@ -33,23 +33,27 @@ import (
 // AfterApply sets default values in command after assignment and validation.
 func (c *getCmd) AfterApply(kongCtx *kong.Context, upCtx *upbound.Context) error {
 	kongCtx.Bind(pterm.DefaultTable.WithWriter(kongCtx.Stdout).WithSeparator("   "))
+	// default to group pointed by current context
+	if c.Group == "" {
+		ns, _, err := upCtx.Kubecfg.Namespace()
+		if err != nil {
+			return err
+		}
+		c.Group = ns
+	}
 	return nil
 }
 
 // getCmd gets a single control plane in an account on Upbound.
 type getCmd struct {
-	Name string `arg:"" required:"" help:"Name of control plane." predictor:"ctps"`
+	Name  string `arg:"" required:"" help:"Name of control plane." predictor:"ctps"`
+	Group string `short:"g" default:"" help:"The control plane group that the control plane is contained in. This defaults to the group specified in the current context"`
 }
 
 // Run executes the get command.
 func (c *getCmd) Run(ctx context.Context, printer upterm.ObjectPrinter, p pterm.TextPrinter, upCtx *upbound.Context, client client.Client) error {
 	var ctp spacesv1beta1.ControlPlane
-	ns, _, err := upCtx.Kubecfg.Namespace()
-	if err != nil {
-		return errors.Wrap(err, "error getting namespace")
-	}
-
-	if err := client.Get(ctx, types.NamespacedName{Name: c.Name, Namespace: ns}, &ctp); err != nil {
+	if err := client.Get(ctx, types.NamespacedName{Namespace: c.Group, Name: c.Name}, &ctp); err != nil {
 		if kerrors.IsNotFound(err) {
 			p.Printfln("Control plane %s not found", c.Name)
 			return nil
