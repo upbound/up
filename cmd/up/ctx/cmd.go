@@ -360,12 +360,12 @@ func DeriveState(ctx context.Context, upCtx *upbound.Context, conf *clientcmdapi
 
 	rest, err := clientcmd.NewDefaultClientConfig(*spaceKubeconfig, &clientcmd.ConfigOverrides{}).ClientConfig()
 	if err != nil {
-		return nil, err
+		return &Root{}, nil
 	}
 
 	spaceClient, err := client.New(rest, client.Options{})
 	if err != nil {
-		return nil, err
+		return &Root{}, nil
 	}
 
 	// determine if self-hosted by looking for ingress
@@ -446,7 +446,7 @@ func DeriveCloudState(ctx context.Context, upCtx *upbound.Context, conf *clientc
 		org:  *org,
 		name: spaceName,
 
-		ingress:  ingress,
+		ingress:  strings.TrimPrefix(ingress, "https://"),
 		ca:       make([]byte, 0),
 		authInfo: auth,
 	}

@@ -6,9 +6,23 @@ import (
 	"github.com/crossplane/crossplane-runtime/pkg/errors"
 	"github.com/upbound/up/internal/profile"
 	"k8s.io/apimachinery/pkg/types"
+	"k8s.io/client-go/tools/clientcmd"
 	clientcmdapi "k8s.io/client-go/tools/clientcmd/api"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 )
+
+// HasValidContext returns true if the kube configuration attached to the
+// context is valid and usable.
+func (c *Context) HasValidContext() bool {
+	// todo(redbackthomson): Add support for overriding current context as part
+	// of CLI args
+	config, err := c.Kubecfg.RawConfig()
+	if err != nil {
+		return false
+	}
+
+	return clientcmd.ConfirmUsable(config, "") == nil
+}
 
 // BuildCurrentContextClient creates a K8s client using the current Kubeconfig
 // defaulting to the current Kubecontext
