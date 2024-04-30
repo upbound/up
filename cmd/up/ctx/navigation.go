@@ -27,11 +27,10 @@ import (
 	clientcmdapi "k8s.io/client-go/tools/clientcmd/api"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 
-	authv1alpha1 "github.com/upbound/up-sdk-go/apis/auth/v1alpha1"
 	spacesv1beta1 "github.com/upbound/up-sdk-go/apis/spaces/v1beta1"
 	upboundv1alpha1 "github.com/upbound/up-sdk-go/apis/upbound/v1alpha1"
+	"github.com/upbound/up-sdk-go/service/auth"
 	"github.com/upbound/up-sdk-go/service/organizations"
-	"github.com/upbound/up-sdk-go/service/tokenexchange"
 	"github.com/upbound/up/internal/profile"
 	"github.com/upbound/up/internal/upbound"
 )
@@ -170,14 +169,14 @@ func (o *Organization) IsCloudProfile() bool {
 	return o.name != ""
 }
 
-func (o *Organization) generateOrgScopedToken(ctx context.Context, upCtx *upbound.Context) (*authv1alpha1.TokenExchangeResponse, error) {
+func (o *Organization) generateOrgScopedToken(ctx context.Context, upCtx *upbound.Context) (*auth.TokenExchangeResponse, error) {
 	cfg, err := upCtx.BuildSDKAuthConfig()
 	if err != nil {
 		return nil, err
 	}
 
-	client := tokenexchange.NewClient(cfg)
-	return client.Get(ctx, o.name, upCtx.Profile.Session)
+	client := auth.NewClient(cfg)
+	return client.GetOrgScopedToken(ctx, o.name, upCtx.Profile.Session)
 }
 
 type sortedItems []list.Item
