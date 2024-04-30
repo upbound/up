@@ -1,7 +1,6 @@
 package upbound
 
 import (
-	"context"
 	"strings"
 
 	"github.com/crossplane/crossplane-runtime/pkg/errors"
@@ -26,44 +25,38 @@ func (c *Context) BuildCurrentContextClient() (client.Client, error) {
 	return sc, nil
 }
 
-// IsSelfHostedSpaceContext returns true if the current context is pointed at a
-// self-hosted space cluster
-func (c *Context) IsSelfHostedSpaceContext(ctx context.Context) (bool, error) {
-	client, err := c.BuildCurrentContextClient()
-	if err != nil {
-		return false, err
-	}
-
-	host, _, err := profile.GetIngressHost(ctx, client)
-	return host != "", err
-}
-
-func (c *Context) getCurrentContext() (context *clientcmdapi.Context, cluster *clientcmdapi.Cluster, exists bool) {
+func (c *Context) GetCurrentContext() (context *clientcmdapi.Context, cluster *clientcmdapi.Cluster, auth *clientcmdapi.AuthInfo, exists bool) {
 	// todo: Add support for overriding current context as part of CLI args
 
 	config, err := c.Kubecfg.RawConfig()
 	if err != nil {
-		return nil, nil, false
+		return nil, nil, nil, false
 	}
 
 	current := config.CurrentContext
 	if current == "" {
-		return nil, nil, false
+		return nil, nil, nil, false
 	}
 
 	context, exists = config.Contexts[current]
 	if !exists {
-		return nil, nil, false
+		return nil, nil, nil, false
 	}
 
 	cluster, exists = config.Clusters[context.Cluster]
-	return context, cluster, exists
+
+	if context.AuthInfo == "" {
+		return context, cluster, nil, exists
+	}
+
+	auth, exists = config.AuthInfos[context.AuthInfo]
+	return context, cluster, auth, exists
 }
 
-func (c *Context) ParseCurrentSpaceContextURL() (types.NamespacedName, bool) {
-	_, cluster, exists := c.getCurrentContext()
+func (c *Context) ParseCurrentSpaceContextURL() (string, types.NamespacedName, bool) {
+	_, cluster, _, exists := c.GetCurrentContext()
 	if !exists {
-		return types.NamespacedName{}, false
+		return "", types.NamespacedName{}, false
 	}
 
 	return profile.ParseSpacesK8sURL(strings.TrimSuffix(cluster.Server, "/"))

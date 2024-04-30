@@ -25,7 +25,6 @@ import (
 // GetIngressHost returns the ingress host of the Spaces cfg points to. If the
 // ingress is not configured, it returns an empty string.
 func GetIngressHost(ctx context.Context, cl client.Client) (host string, ca []byte, err error) {
-	// todo(redbackthomson): Get the spaces host for cloud spaces
 	mxpConfig := &corev1.ConfigMap{}
 	if err := cl.Get(ctx, types.NamespacedName{Name: "ingress-public", Namespace: "upbound-system"}, mxpConfig); err != nil {
 		return "", nil, err

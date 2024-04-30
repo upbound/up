@@ -131,6 +131,6 @@ func (c *importCmd) Run(ctx context.Context, migCtx *migration.Context) error { 
 }
 
 func isMCP(host string) bool {
-	_, matches := profile.ParseSpacesK8sURL(host)
+	_, _, matches := profile.ParseSpacesK8sURL(host)
 	return matches
 }

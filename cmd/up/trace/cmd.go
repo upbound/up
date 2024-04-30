@@ -82,7 +82,7 @@ func (c *Cmd) Run(ctx context.Context, kongCtx *kong.Context, upCtx *upbound.Con
 		return err
 	}
 
-	ctp, exists := upCtx.ParseCurrentSpaceContextURL()
+	_, ctp, exists := upCtx.ParseCurrentSpaceContextURL()
 
 	if c.Group == "" && !c.AllGroups {
 		if exists && ctp.Namespace != "" {

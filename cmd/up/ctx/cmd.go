@@ -16,6 +16,7 @@ package ctx
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"io"
 	"strings"
@@ -24,14 +25,18 @@ import (
 	"github.com/charmbracelet/bubbles/key"
 	"github.com/charmbracelet/bubbles/list"
 	tea "github.com/charmbracelet/bubbletea"
+	"k8s.io/apimachinery/pkg/api/meta"
+	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/apimachinery/pkg/util/runtime"
 	"k8s.io/client-go/kubernetes/scheme"
 	"k8s.io/client-go/tools/clientcmd"
 	clientcmdapi "k8s.io/client-go/tools/clientcmd/api"
 	ctrl "sigs.k8s.io/controller-runtime"
+	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/log/zap"
 
 	spacesv1beta1 "github.com/upbound/up-sdk-go/apis/spaces/v1beta1"
+	"github.com/upbound/up/internal/profile"
 	"github.com/upbound/up/internal/upbound"
 )
 
@@ -119,11 +124,11 @@ func (c *Cmd) RunSwap(ctx context.Context, upCtx *upbound.Context) error { // no
 	}
 
 	// load kubeconfig
-	po := clientcmd.NewDefaultPathOptions()
-	conf, err := po.GetStartingConfig()
+	confRaw, err := upCtx.Kubecfg.RawConfig()
 	if err != nil {
 		return err
 	}
+	conf := &confRaw
 
 	// more complicated case: last context is upbound-previous and we have to rename
 	conf, oldContext, err := activateContext(conf, last, c.KubeContext)
@@ -136,7 +141,7 @@ func (c *Cmd) RunSwap(ctx context.Context, upCtx *upbound.Context) error { // no
 	if err != nil {
 		return err
 	}
-	if err := clientcmd.ModifyConfig(po, *conf, true); err != nil {
+	if err := clientcmd.ModifyConfig(upCtx.Kubecfg.ConfigAccess(), *conf, true); err != nil {
 		return err
 	}
 	if err := writeLastContext(oldContext); err != nil {
@@ -329,4 +334,86 @@ func (c *Cmd) RunInteractive(ctx context.Context, kongCtx *kong.Context, upCtx *
 		return m.termination.Err
 	}
 	return nil
+}
+
+func DeriveState(ctx context.Context, upCtx *upbound.Context, conf *clientcmdapi.Config) (NavigationState, error) {
+	ingress, ctp, exists := upCtx.ParseCurrentSpaceContextURL()
+
+	var spaceKubeconfig *clientcmdapi.Config
+	var err error
+
+	// if we're already pointing at the space level
+	if !exists {
+		spaceKubeconfig = conf
+	} else {
+		// reference the space server
+		config, err := upCtx.Kubecfg.RawConfig()
+		if err != nil {
+			return nil, err
+		}
+
+		config = *config.DeepCopy()
+		config.Clusters[config.Contexts[config.CurrentContext].Cluster].Server = ingress
+		spaceKubeconfig = &config
+	}
+
+	rest, err := clientcmd.NewDefaultClientConfig(*spaceKubeconfig, &clientcmd.ConfigOverrides{}).ClientConfig()
+	if err != nil {
+		return nil, err
+	}
+
+	spaceClient, err := client.New(rest, client.Options{})
+	if err != nil {
+		return nil, err
+	}
+
+	// determine if self-hosted by looking for ingress
+	host, ca, err := profile.GetIngressHost(ctx, spaceClient)
+	if meta.IsNoMatchError(err) {
+		return DeriveCloudState(ctx, upCtx, conf)
+	} else if err != nil {
+		return nil, err
+	}
+
+	return DeriveSelfHostedState(ctx, upCtx, conf, host, ca, ctp)
+}
+
+func DeriveSelfHostedState(ctx context.Context, upCtx *upbound.Context, conf *clientcmdapi.Config, ingress string, ca []byte, ctp types.NamespacedName) (NavigationState, error) {
+	auth := conf.AuthInfos[conf.Contexts[conf.CurrentContext].AuthInfo]
+
+	space := Space{
+		name:     conf.CurrentContext,
+		ingress:  ingress,
+		ca:       ca,
+		authInfo: auth,
+	}
+
+	// derive navigation state
+	switch {
+	case ctp.Namespace != "" && ctp.Name != "":
+		return &ControlPlane{
+			group: Group{
+				space: space,
+				name:  ctp.Namespace,
+			},
+			name: ctp.Name,
+		}, nil
+	case ctp.Namespace != "":
+		return &Group{
+			space: space,
+			name:  ctp.Namespace,
+		}, nil
+	default:
+		return &space, nil
+	}
+}
+
+func DeriveCloudState(ctx context.Context, upCtx *upbound.Context, conf *clientcmdapi.Config) (NavigationState, error) {
+	// // get the space ingress
+	// cUrl, err := url.Parse(cluster.Server)
+	// if err != nil {
+	// 	return &Organizations{}, errors.New("unable to parse current context server to url")
+	// }
+
+	return nil, errors.ErrUnsupported
 }

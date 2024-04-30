@@ -54,7 +54,7 @@ func (c *QueryCmd) AfterApply(kongCtx *kong.Context) error { // nolint:gocyclo /
 	}
 	kongCtx.Bind(upCtx)
 
-	ctp, exists := upCtx.ParseCurrentSpaceContextURL()
+	_, ctp, exists := upCtx.ParseCurrentSpaceContextURL()
 
 	if c.Group == "" && !c.AllGroups {
 		if exists && ctp.Namespace != "" {

@@ -23,11 +23,14 @@ import (
 	"github.com/pkg/errors"
 	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/types"
+	"k8s.io/client-go/tools/clientcmd"
+	clientcmdapi "k8s.io/client-go/tools/clientcmd/api"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 
 	spacesv1beta1 "github.com/upbound/up-sdk-go/apis/spaces/v1beta1"
 	upboundv1alpha1 "github.com/upbound/up-sdk-go/apis/upbound/v1alpha1"
 	"github.com/upbound/up-sdk-go/service/organizations"
+	"github.com/upbound/up/internal/profile"
 	"github.com/upbound/up/internal/upbound"
 )
 
@@ -53,6 +56,7 @@ type Accepting interface {
 type Back interface {
 	NavigationState
 	Back(ctx context.Context, upCtx *upbound.Context, m model) (model, error)
+	CanBack() bool
 }
 
 type AcceptingFunc func(ctx context.Context, upCtx *upbound.Context) error
@@ -76,7 +80,7 @@ func (p *Organizations) Items(ctx context.Context, upCtx *upbound.Context) ([]li
 		return nil, errors.Wrap(err, "error listing organizations")
 	}
 
-	items := make([]list.Item, 0)
+	items := make([]list.Item, 0, len(orgs))
 	for _, org := range orgs {
 		items = append(items, item{text: org.DisplayName, kind: "org", onEnter: func(ctx context.Context, upCtx *upbound.Context, m model) (model, error) {
 			m.state = &Profiles{org: org.Name}
@@ -98,27 +102,6 @@ type Profiles struct {
 }
 
 func (p *Profiles) Items(ctx context.Context, upCtx *upbound.Context) ([]list.Item, error) { //nolint:gocyclo
-	selfHosted, err := upCtx.IsSelfHostedSpaceContext(ctx)
-	if err != nil {
-		return nil, err
-	}
-
-	if selfHosted {
-		kubeCfg, err := upCtx.Kubecfg.RawConfig()
-		if err != nil {
-			return nil, err
-		}
-
-		items := []list.Item{
-			item{text: kubeCfg.CurrentContext, kind: "space", onEnter: func(ctx context.Context, upCtx *upbound.Context, m model) (model, error) {
-				m.state = &Space{name: kubeCfg.CurrentContext}
-				return m, nil
-			}},
-		}
-		sort.Sort(sortedItems(items))
-		return items, nil
-	}
-
 	cloudCfg, err := upCtx.BuildControllerClientConfig()
 	if err != nil {
 		return nil, err
@@ -158,6 +141,10 @@ func (p *Profiles) Back(ctx context.Context, upCtx *upbound.Context, m model) (m
 	return m, nil
 }
 
+func (p *Profiles) CanBack() bool {
+	return true
+}
+
 func (p *Profiles) Breadcrumbs() string {
 	return upboundRootStyle.Render("Upbound") + " profiles"
 }
@@ -178,10 +165,14 @@ var _ Back = &Space{}
 type Space struct {
 	profile Profiles
 	name    string
+
+	ingress  string
+	ca       []byte
+	authInfo *clientcmdapi.AuthInfo
 }
 
 func (s *Space) Items(ctx context.Context, upCtx *upbound.Context) ([]list.Item, error) {
-	cl, err := upCtx.BuildCurrentContextClient()
+	cl, err := s.GetClient()
 	if err != nil {
 		return nil, err
 	}
@@ -192,7 +183,9 @@ func (s *Space) Items(ctx context.Context, upCtx *upbound.Context) ([]list.Item,
 	}
 
 	items := make([]list.Item, 0, len(nss.Items)+1)
-	items = append(items, item{text: "..", kind: "profiles", onEnter: s.Back, back: true})
+	if s.CanBack() {
+		items = append(items, item{text: "..", kind: "profiles", onEnter: s.Back, back: true})
+	}
 	for _, ns := range nss.Items {
 		items = append(items, item{text: ns.Name, kind: "group", onEnter: func(ctx context.Context, upCtx *upbound.Context, m model) (model, error) {
 			m.state = &Group{space: *s, name: ns.Name}
@@ -212,8 +205,23 @@ func (s *Space) Back(ctx context.Context, upCtx *upbound.Context, m model) (mode
 	return m, nil
 }
 
+func (s *Space) CanBack() bool {
+	return s.profile.IsCloudProfile()
+}
+
 func (s *Space) Breadcrumbs() string {
 	return upboundRootStyle.Render("Upbound") + pathSegmentStyle.Render(" space ") + pathSegmentStyle.Render(s.name)
+}
+
+// GetClient returns a kube client pointed at the current space and narrowed
+// down to the scope of the provided resource.
+func (s *Space) GetClient() (client.Client, error) {
+	rest, err := buildSpacesClient(s.ingress, s.ca, s.authInfo, types.NamespacedName{}).ClientConfig()
+	if err != nil {
+		return nil, err
+	}
+
+	return client.New(rest, client.Options{})
 }
 
 // Group provides the navigation node for a concrete group aka namespace.
@@ -226,7 +234,7 @@ var _ Accepting = &Group{}
 var _ Back = &Group{}
 
 func (g *Group) Items(ctx context.Context, upCtx *upbound.Context) ([]list.Item, error) {
-	cl, err := upCtx.BuildCurrentContextClient()
+	cl, err := g.space.GetClient()
 	if err != nil {
 		return nil, err
 	}
@@ -271,6 +279,10 @@ func (g *Group) Back(ctx context.Context, upCtx *upbound.Context, m model) (mode
 	return m, nil
 }
 
+func (g *Group) CanBack() bool {
+	return true
+}
+
 // ControlPlane provides the navigation node for a concrete controlplane.
 type ControlPlane struct {
 	group Group
@@ -304,6 +316,49 @@ func (ctp *ControlPlane) Back(ctx context.Context, upCtx *upbound.Context, m mod
 	return m, nil
 }
 
+func (ctp *ControlPlane) CanBack() bool {
+	return true
+}
+
 func (ctp *ControlPlane) NamespacedName() types.NamespacedName {
 	return types.NamespacedName{Name: ctp.name, Namespace: ctp.group.name}
+}
+
+// buildSpacesClient creates a new kubeconfig hardcoded to match the provided
+// spaces access configuration and pointed directly at the resource.
+func buildSpacesClient(ingress string, ca []byte, authInfo *clientcmdapi.AuthInfo, resource types.NamespacedName) clientcmd.ClientConfig {
+	ref := "upbound"
+
+	clusters := make(map[string]*clientcmdapi.Cluster)
+	clusters[ref] = &clientcmdapi.Cluster{
+		// when accessing any resource on the space, reference the server from
+		// the space level
+		Server: profile.ToSpacesK8sURL(ingress, resource),
+	}
+	if len(ca) == 0 {
+		clusters[ref].InsecureSkipTLSVerify = true
+	} else {
+		clusters[ref].CertificateAuthorityData = ca
+	}
+
+	contexts := make(map[string]*clientcmdapi.Context)
+	contexts[ref] = &clientcmdapi.Context{
+		Cluster:   ref,
+		Namespace: resource.Namespace,
+	}
+
+	authInfos := make(map[string]*clientcmdapi.AuthInfo)
+	if authInfo != nil {
+		authInfos[ref] = authInfo
+		contexts[ref].AuthInfo = ref
+	}
+
+	return clientcmd.NewDefaultClientConfig(clientcmdapi.Config{
+		Kind:           "Config",
+		APIVersion:     "v1",
+		Clusters:       clusters,
+		Contexts:       contexts,
+		CurrentContext: ref,
+		AuthInfos:      authInfos,
+	}, &clientcmd.ConfigOverrides{})
 }
