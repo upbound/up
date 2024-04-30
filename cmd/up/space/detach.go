@@ -153,8 +153,7 @@ func (c *detachCmd) Run(ctx context.Context, upCtx *upbound.Context, ac *account
 
 func (c *detachCmd) detachSpace(ctx context.Context, detachSpinner *pterm.SpinnerPrinter, upCtx *upbound.Context, ac *accounts.Client, oc *organizations.Client, kClient *kubernetes.Clientset, mgr *helm.Installer, rc *robots.Client, sc client.Client) error {
 	if kClient == nil {
-		detachSpinner.UpdateText("Continue? (y/N)")
-		if err := warnAndConfirm(
+		if err := warnAndConfirmWithSpinner(detachSpinner,
 			`Not connected to a Space cluster, would you like to only remove the Space "%s/%s" from the Upbound Console?`+"\n\n"+
 				"  If the other Space cluster still exists, the Upbound agent will be left running and you will need to delete it manually.\n",
 			upCtx.Account, c.Space,
@@ -239,8 +238,7 @@ func (c *detachCmd) deleteResources(ctx context.Context, kClient *kubernetes.Cli
 		if c.Space == "" {
 			return errors.New("failed to find Space to detach from Upbound Console")
 		}
-		detachSpinner.UpdateText("Continue? (Y/n)")
-		if err := warnAndConfirm(
+		if err := warnAndConfirmWithSpinner(detachSpinner,
 			`We're unable to confirm if the Space "%s/%s" is currently connected to Upbound Console. Would you like to delete it anyway?`+"\n\n"+
 				"  If the other Space cluster still exists, the Upbound agent will be left running and you will need to delete it manually.\n",
 			upCtx.Account, c.Space,
