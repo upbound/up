@@ -16,6 +16,7 @@ package controlplane
 
 import (
 	"context"
+	"fmt"
 
 	"github.com/alecthomas/kong"
 	"github.com/pkg/errors"
@@ -55,8 +56,7 @@ func (c *getCmd) Run(ctx context.Context, printer upterm.ObjectPrinter, p pterm.
 	var ctp spacesv1beta1.ControlPlane
 	if err := client.Get(ctx, types.NamespacedName{Namespace: c.Group, Name: c.Name}, &ctp); err != nil {
 		if kerrors.IsNotFound(err) {
-			p.Printfln("Control plane %s not found", c.Name)
-			return nil
+			return fmt.Errorf("control plane %q not found", c.Name)
 		}
 
 		return errors.Wrap(err, "error getting control plane")

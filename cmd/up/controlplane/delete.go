@@ -16,6 +16,7 @@ package controlplane
 
 import (
 	"context"
+	"fmt"
 
 	"github.com/alecthomas/kong"
 	"github.com/pkg/errors"
@@ -57,8 +58,7 @@ func (c *deleteCmd) Run(ctx context.Context, p pterm.TextPrinter, upCtx *upbound
 
 	if err := client.Delete(ctx, ctp); err != nil {
 		if kerrors.IsNotFound(err) {
-			p.Printfln("Control plane %s not found", c.Name)
-			return nil
+			return fmt.Errorf("control plane %q not found", c.Name)
 		}
 		return errors.Wrap(err, "error deleting control plane")
 	}
