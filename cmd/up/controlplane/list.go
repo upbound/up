@@ -19,82 +19,68 @@ import (
 
 	"github.com/alecthomas/kong"
 	"github.com/pterm/pterm"
-	"k8s.io/client-go/dynamic"
+	ctrlclient "sigs.k8s.io/controller-runtime/pkg/client"
 
-	"github.com/upbound/up-sdk-go/service/configurations"
-	cp "github.com/upbound/up-sdk-go/service/controlplanes"
-	"github.com/upbound/up/internal/controlplane"
-	"github.com/upbound/up/internal/controlplane/cloud"
-	"github.com/upbound/up/internal/controlplane/space"
+	"github.com/crossplane/crossplane-runtime/pkg/errors"
+
+	spacesv1beta1 "github.com/upbound/up-sdk-go/apis/spaces/v1beta1"
+	"github.com/upbound/up/internal/profile"
 	"github.com/upbound/up/internal/upbound"
 	"github.com/upbound/up/internal/upterm"
 )
-
-type ctpLister interface {
-	List(ctx context.Context, namespace string) ([]*controlplane.Response, error)
-}
 
 // listCmd list control planes in an account on Upbound.
 type listCmd struct {
 	Group     string `short:"g" help:"The control plane group that the control plane is contained in. This defaults to the group specified in the current profile."`
 	AllGroups bool   `short:"A" default:"false" help:"List control planes across all groups."`
-
-	client ctpLister
 }
 
 // AfterApply sets default values in command after assignment and validation.
-func (c *listCmd) AfterApply(kongCtx *kong.Context, upCtx *upbound.Context) error {
-	if upCtx.Profile.IsSpace() {
-		kubeconfig, ns, err := upCtx.Profile.GetSpaceRestConfig()
-		if err != nil {
-			return err
-		}
-		if c.Group == "" {
-			c.Group = ns
-		}
-
-		client, err := dynamic.NewForConfig(kubeconfig)
-		if err != nil {
-			return err
-		}
-		c.client = space.New(client)
-	} else {
-		cfg, err := upCtx.BuildSDKConfig()
-		if err != nil {
-			return err
-		}
-		ctpclient := cp.NewClient(cfg)
-		cfgclient := configurations.NewClient(cfg)
-
-		c.client = cloud.New(ctpclient, cfgclient, upCtx.Account)
-	}
-
+func (c *listCmd) AfterApply(kongCtx *kong.Context) error {
 	kongCtx.Bind(pterm.DefaultTable.WithWriter(kongCtx.Stdout).WithSeparator("   "))
+
 	return nil
 }
 
 // Run executes the list command.
-func (c *listCmd) Run(ctx context.Context, printer upterm.ObjectPrinter, p pterm.TextPrinter, upCtx *upbound.Context) error {
-	l, err := c.client.List(ctx, c.deriveGroup())
-	if controlplane.IsNotFound(err) {
-		p.Printfln("No Control planes found in %s group", c.deriveGroup())
-		return nil
+func (c *listCmd) Run(ctx context.Context, printer upterm.ObjectPrinter, upCtx *upbound.Context, p pterm.TextPrinter) error { // nolint:gocyclo
+	// get context
+	_, currentProfile, ctp, err := upCtx.Cfg.GetCurrentContext(ctx)
+	if err != nil {
+		return err
 	}
+	if currentProfile == nil {
+		return errors.New(profile.NoSpacesContextMsg)
+	}
+	if ctp.Namespace == "" {
+		return errors.New(profile.NoGroupMsg)
+	}
+	if ctp.Name != "" {
+		return errors.New("Cannot list control planes from inside a control plane, use `up ctx ..` to switch to a group level.")
+	}
+
+	// create client
+	restConfig, _, err := currentProfile.GetSpaceRestConfig()
+	if err != nil {
+		return err
+	}
+	cl, err := ctrlclient.New(restConfig, ctrlclient.Options{})
 	if err != nil {
 		return err
 	}
 
-	if len(l) == 0 {
-		p.Println("No control planes found")
-		return nil
+	// list control planes
+	ns := ctp.Namespace
+	if c.Group != "" {
+		ns = c.Group
 	}
-
-	return tabularPrint(l, printer, upCtx)
-}
-
-func (c *listCmd) deriveGroup() string {
 	if c.AllGroups {
-		return ""
+		ns = ""
 	}
-	return c.Group
+	var ctps spacesv1beta1.ControlPlaneList
+	if err := cl.List(ctx, &ctps, ctrlclient.InNamespace(ns)); err != nil {
+		return err
+	}
+
+	return printer.Print(ctps.Items, spacefieldNames, extractSpaceFields)
 }
