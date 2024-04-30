@@ -76,7 +76,7 @@ type attachCmd struct {
 	Kube    upbound.KubeFlags `embed:""`
 
 	Space string `arg:"" optional:"" help:"Name of the Upbound Space. If name is not a supplied, one is generated."`
-	Token string `name:"robot-token" optional:"" help:"The Upbound robot token contents used to authenticate the connection."`
+	Token string `name:"robot-token" optional:"" hidden:"" help:"The Upbound robot token contents used to authenticate the connection."`
 
 	Environment string `name:"up-environment" env:"UP_ENVIRONMENT" default:"prod" hidden:"" help:"Override the default Upbound Environment."`
 }
