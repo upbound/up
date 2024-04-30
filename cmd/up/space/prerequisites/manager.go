@@ -18,6 +18,8 @@ import (
 	"github.com/crossplane/crossplane-runtime/pkg/errors"
 	"k8s.io/client-go/rest"
 
+	"github.com/upbound/up/cmd/up/space/prerequisites/opentelemetrycollector"
+
 	"github.com/upbound/up/cmd/up/space/defaults"
 	"github.com/upbound/up/cmd/up/space/prerequisites/certmanager"
 	"github.com/upbound/up/cmd/up/space/prerequisites/ingressnginx"
@@ -88,6 +90,12 @@ func New(config *rest.Config, defs *defaults.CloudConfig) (*Manager, error) {
 		return nil, errors.Wrap(err, errCreatePrerequisite)
 	}
 	prereqs = append(prereqs, phelm)
+
+	otelopr, err := opentelemetrycollector.New(config)
+	if err != nil {
+		return nil, errors.Wrap(err, errCreatePrerequisite)
+	}
+	prereqs = append(prereqs, otelopr)
 
 	return &Manager{
 		prereqs: prereqs,
