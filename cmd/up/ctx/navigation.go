@@ -27,9 +27,11 @@ import (
 	clientcmdapi "k8s.io/client-go/tools/clientcmd/api"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 
+	authv1alpha1 "github.com/upbound/up-sdk-go/apis/auth/v1alpha1"
 	spacesv1beta1 "github.com/upbound/up-sdk-go/apis/spaces/v1beta1"
 	upboundv1alpha1 "github.com/upbound/up-sdk-go/apis/upbound/v1alpha1"
 	"github.com/upbound/up-sdk-go/service/organizations"
+	"github.com/upbound/up-sdk-go/service/tokenexchange"
 	"github.com/upbound/up/internal/profile"
 	"github.com/upbound/up/internal/upbound"
 )
@@ -65,9 +67,9 @@ func (f AcceptingFunc) Accept(ctx context.Context, upCtx *upbound.Context) error
 	return f(ctx, upCtx)
 }
 
-type Organizations struct{}
+type Root struct{}
 
-func (p *Organizations) Items(ctx context.Context, upCtx *upbound.Context) ([]list.Item, error) { //nolint:gocyclo
+func (r *Root) Items(ctx context.Context, upCtx *upbound.Context) ([]list.Item, error) { //nolint:gocyclo
 	cfg, err := upCtx.BuildSDKConfig()
 	if err != nil {
 		return nil, err
@@ -83,7 +85,7 @@ func (p *Organizations) Items(ctx context.Context, upCtx *upbound.Context) ([]li
 	items := make([]list.Item, 0, len(orgs))
 	for _, org := range orgs {
 		items = append(items, item{text: org.DisplayName, kind: "org", onEnter: func(ctx context.Context, upCtx *upbound.Context, m model) (model, error) {
-			m.state = &Profiles{org: org.Name}
+			m.state = &Organization{name: org.Name}
 			return m, nil
 		}})
 	}
@@ -91,17 +93,17 @@ func (p *Organizations) Items(ctx context.Context, upCtx *upbound.Context) ([]li
 	return items, nil
 }
 
-func (p *Organizations) Breadcrumbs() string {
+func (r *Root) Breadcrumbs() string {
 	return upboundRootStyle.Render("Upbound") + " organizations"
 }
 
-var _ Back = &Profiles{}
+var _ Back = &Organization{}
 
-type Profiles struct {
-	org string
+type Organization struct {
+	name string
 }
 
-func (p *Profiles) Items(ctx context.Context, upCtx *upbound.Context) ([]list.Item, error) { //nolint:gocyclo
+func (o *Organization) Items(ctx context.Context, upCtx *upbound.Context) ([]list.Item, error) { //nolint:gocyclo
 	cloudCfg, err := upCtx.BuildControllerClientConfig()
 	if err != nil {
 		return nil, err
@@ -113,12 +115,18 @@ func (p *Profiles) Items(ctx context.Context, upCtx *upbound.Context) ([]list.It
 	}
 
 	var l upboundv1alpha1.SpaceList
-	err = cloudClient.List(ctx, &l, &client.ListOptions{Namespace: p.org})
+	err = cloudClient.List(ctx, &l, &client.ListOptions{Namespace: o.name})
+	if err != nil {
+		return nil, err
+	}
+
+	token, err := o.generateOrgScopedToken(ctx, upCtx)
 	if err != nil {
 		return nil, err
 	}
 
 	items := make([]list.Item, 0)
+	items = append(items, item{text: "..", kind: "organizations", onEnter: o.Back, back: true})
 	for _, space := range l.Items {
 		if mode, ok := space.ObjectMeta.Labels[upboundv1alpha1.SpaceModeLabelKey]; ok {
 			// todo(redbackthomson): Add support for connected spaces
@@ -128,7 +136,16 @@ func (p *Profiles) Items(ctx context.Context, upCtx *upbound.Context) ([]list.It
 		}
 
 		items = append(items, item{text: space.GetObjectMeta().GetName(), kind: "space", onEnter: func(ctx context.Context, upCtx *upbound.Context, m model) (model, error) {
-			m.state = &Space{name: space.GetObjectMeta().GetName()}
+			m.state = &Space{
+				org:     *o,
+				name:    space.GetObjectMeta().GetName(),
+				ingress: space.Status.FQDN,
+				// todo(redbackthomson): Replace with public CA data once available
+				ca: make([]byte, 0),
+				authInfo: &clientcmdapi.AuthInfo{
+					Token: token.AccessToken,
+				},
+			}
 			return m, nil
 		}})
 	}
@@ -136,21 +153,31 @@ func (p *Profiles) Items(ctx context.Context, upCtx *upbound.Context) ([]list.It
 	return items, nil
 }
 
-func (p *Profiles) Back(ctx context.Context, upCtx *upbound.Context, m model) (model, error) {
-	m.state = &Organizations{}
+func (o *Organization) Back(ctx context.Context, upCtx *upbound.Context, m model) (model, error) {
+	m.state = &Root{}
 	return m, nil
 }
 
-func (p *Profiles) CanBack() bool {
+func (o *Organization) CanBack() bool {
 	return true
 }
 
-func (p *Profiles) Breadcrumbs() string {
-	return upboundRootStyle.Render("Upbound") + " profiles"
+func (o *Organization) Breadcrumbs() string {
+	return upboundRootStyle.Render("Upbound") + " spaces"
 }
 
-func (p *Profiles) IsCloudProfile() bool {
-	return p.org != ""
+func (o *Organization) IsCloudProfile() bool {
+	return o.name != ""
+}
+
+func (o *Organization) generateOrgScopedToken(ctx context.Context, upCtx *upbound.Context) (*authv1alpha1.TokenExchangeResponse, error) {
+	cfg, err := upCtx.BuildSDKAuthConfig()
+	if err != nil {
+		return nil, err
+	}
+
+	client := tokenexchange.NewClient(cfg)
+	return client.Get(ctx, o.name, upCtx.Profile.Session)
 }
 
 type sortedItems []list.Item
@@ -163,8 +190,8 @@ var _ Back = &Space{}
 
 // Space provides the navigation node for a space.
 type Space struct {
-	profile Profiles
-	name    string
+	org  Organization
+	name string
 
 	ingress  string
 	ca       []byte
@@ -201,12 +228,12 @@ func (s *Space) Items(ctx context.Context, upCtx *upbound.Context) ([]list.Item,
 }
 
 func (s *Space) Back(ctx context.Context, upCtx *upbound.Context, m model) (model, error) {
-	m.state = &Profiles{}
+	m.state = &Organization{}
 	return m, nil
 }
 
 func (s *Space) CanBack() bool {
-	return s.profile.IsCloudProfile()
+	return s.org.IsCloudProfile()
 }
 
 func (s *Space) Breadcrumbs() string {

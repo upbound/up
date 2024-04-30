@@ -34,6 +34,7 @@ type Flags struct {
 
 	// Hidden
 	APIEndpoint      *url.URL `env:"OVERRIDE_API_ENDPOINT" hidden:"" name:"override-api-endpoint" help:"Overrides the default API endpoint." json:"apiEndpoint,omitempty"`
+	AuthEndpoint     *url.URL `env:"OVERRIDE_AUTH_ENDPOINT" hidden:"" name:"override-auth-endpoint" help:"Overrides the default auth endpoint." json:"authEndpoint,omitempty"`
 	ProxyEndpoint    *url.URL `env:"OVERRIDE_PROXY_ENDPOINT" hidden:"" name:"override-proxy-endpoint" help:"Overrides the default proxy endpoint." json:"proxyEndpoint,omitempty"`
 	RegistryEndpoint *url.URL `env:"OVERRIDE_REGISTRY_ENDPOINT" hidden:"" name:"override-registry-endpoint" help:"Overrides the default registry endpoint." json:"registryEndpoint,omitempty"`
 }

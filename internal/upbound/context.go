@@ -51,6 +51,8 @@ const (
 
 	// Default API subdomain.
 	apiSubdomain = "api."
+	// Default auth subdomain.
+	authSubdomain = "auth."
 	// Default proxy subdomain.
 	proxySubdomain = "proxy."
 
@@ -83,6 +85,7 @@ type Context struct {
 	// Upbound API connection URLs
 	Domain                *url.URL
 	APIEndpoint           *url.URL
+	AuthEndpoint          *url.URL
 	ProxyEndpoint         *url.URL
 	RegistryEndpoint      *url.URL
 	InsecureSkipTLSVerify bool
@@ -168,6 +171,13 @@ func NewFromFlags(f Flags, opts ...Option) (*Context, error) { //nolint:gocyclo
 		c.APIEndpoint = &u
 	}
 
+	c.AuthEndpoint = of.AuthEndpoint
+	if c.AuthEndpoint == nil {
+		u := *of.Domain
+		u.Host = authSubdomain + u.Host
+		c.AuthEndpoint = &u
+	}
+
 	c.ProxyEndpoint = of.ProxyEndpoint
 	if c.ProxyEndpoint == nil {
 		u := *of.Domain
@@ -221,6 +231,16 @@ func NewFromFlags(f Flags, opts ...Option) (*Context, error) { //nolint:gocyclo
 // BuildSDKConfig builds an Upbound SDK config suitable for usage with any
 // service client.
 func (c *Context) BuildSDKConfig() (*up.Config, error) {
+	return c.buildSDKConfig(c.APIEndpoint)
+}
+
+// BuildSDKAuthConfig builds an Upbound SDK config pointed at the Upbound auth
+// endpoint.
+func (c *Context) BuildSDKAuthConfig() (*up.Config, error) {
+	return c.buildSDKConfig(c.AuthEndpoint)
+}
+
+func (c *Context) buildSDKConfig(endpoint *url.URL) (*up.Config, error) {
 	cj, err := cookiejar.New(nil)
 	if err != nil {
 		return nil, err
@@ -241,7 +261,7 @@ func (c *Context) BuildSDKConfig() (*up.Config, error) {
 		tr = c.WrapTransport(tr)
 	}
 	client := up.NewClient(func(u *up.HTTPClient) {
-		u.BaseURL = c.APIEndpoint
+		u.BaseURL = endpoint
 		u.HTTP = &http.Client{
 			Jar:       cj,
 			Transport: tr,

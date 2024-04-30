@@ -16,7 +16,6 @@ package ctx
 
 import (
 	"context"
-	"errors"
 	"fmt"
 	"io"
 	"strings"
@@ -25,6 +24,8 @@ import (
 	"github.com/charmbracelet/bubbles/key"
 	"github.com/charmbracelet/bubbles/list"
 	tea "github.com/charmbracelet/bubbletea"
+	"github.com/golang-jwt/jwt"
+	kerrors "k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/api/meta"
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/apimachinery/pkg/util/runtime"
@@ -369,7 +370,7 @@ func DeriveState(ctx context.Context, upCtx *upbound.Context, conf *clientcmdapi
 
 	// determine if self-hosted by looking for ingress
 	host, ca, err := profile.GetIngressHost(ctx, spaceClient)
-	if meta.IsNoMatchError(err) {
+	if meta.IsNoMatchError(err) || kerrors.IsUnauthorized(err) {
 		return DeriveCloudState(ctx, upCtx, conf)
 	} else if err != nil {
 		return nil, err
@@ -409,11 +410,68 @@ func DeriveSelfHostedState(ctx context.Context, upCtx *upbound.Context, conf *cl
 }
 
 func DeriveCloudState(ctx context.Context, upCtx *upbound.Context, conf *clientcmdapi.Config) (NavigationState, error) {
-	// // get the space ingress
-	// cUrl, err := url.Parse(cluster.Server)
-	// if err != nil {
-	// 	return &Organizations{}, errors.New("unable to parse current context server to url")
-	// }
+	auth := conf.AuthInfos[conf.Contexts[conf.CurrentContext].AuthInfo]
 
-	return nil, errors.ErrUnsupported
+	// not authenticated with an Upbound JWT, start from empty
+	if auth == nil {
+		return &Root{}, nil
+	}
+
+	token, err := ParseJWT(auth.Token)
+	if err != nil {
+		return nil, err
+	}
+
+	claims, ok := token.Claims.(jwt.MapClaims)
+	if !ok {
+		return nil, err
+	}
+
+	orgClaim, ok := claims["organization"]
+	if !ok {
+		return &Root{}, nil
+	}
+
+	org := &Organization{
+		name: orgClaim.(string),
+	}
+
+	ingress, ctp, exists := upCtx.ParseCurrentSpaceContextURL()
+	if !exists {
+		return org, nil
+	}
+
+	spaceName := strings.TrimPrefix(strings.Split(ingress, ".")[0], "https://")
+	space := Space{
+		org:  *org,
+		name: spaceName,
+
+		ingress:  ingress,
+		ca:       make([]byte, 0),
+		authInfo: auth,
+	}
+
+	// derive navigation state
+	switch {
+	case ctp.Namespace != "" && ctp.Name != "":
+		return &ControlPlane{
+			group: Group{
+				space: space,
+				name:  ctp.Namespace,
+			},
+			name: ctp.Name,
+		}, nil
+	case ctp.Namespace != "":
+		return &Group{
+			space: space,
+			name:  ctp.Namespace,
+		}, nil
+	default:
+		return &space, nil
+	}
+}
+
+func ParseJWT(encoded string) (*jwt.Token, error) {
+	token, _, error := new(jwt.Parser).ParseUnverified(encoded, jwt.MapClaims{})
+	return token, error
 }
