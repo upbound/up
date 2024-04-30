@@ -32,10 +32,7 @@ import (
 // FromKubeconfig finds the profile by a given user kubeconfig. It returns
 // a related profile, the current group/namespace, and the controlplane if the
 // kubeconfig points to a controlplane through mxe-router.
-//
-// If the current kubeconfig context does not point to a Space or a controlplane,
-// it returns NO ERROR, but all other values are zero values.
-func FromKubeconfig(ctx context.Context, profiles map[string]Profile, conf *clientcmdapi.Config) (profileName string, profile *Profile, namespace types.NamespacedName, err error) {
+func FromKubeconfig(ctx context.Context, profiles map[string]Profile, conf *clientcmdapi.Config) (string, *Profile, types.NamespacedName, error) {
 	return findProfileByKubeconfig(ctx, profiles, conf, GetIngressHost)
 }
 

@@ -21,11 +21,7 @@ import (
 	"github.com/alecthomas/kong"
 	"github.com/posener/complete"
 	"k8s.io/apimachinery/pkg/util/duration"
-	"k8s.io/utils/ptr"
 
-	xpcommonv1 "github.com/crossplane/crossplane-runtime/apis/common/v1"
-
-	spacesv1beta1 "github.com/upbound/up-sdk-go/apis/spaces/v1beta1"
 	cp "github.com/upbound/up-sdk-go/service/controlplanes"
 	"github.com/upbound/up/cmd/up/controlplane/connector"
 	"github.com/upbound/up/cmd/up/controlplane/kubeconfig"
@@ -138,7 +134,7 @@ func extractCloudFields(obj any) []string {
 	}
 }
 
-func extractSpaceFieldsLegacy(obj any) []string {
+func extractSpaceFields(obj any) []string {
 	resp, ok := obj.(*controlplane.Response)
 	if !ok {
 		return []string{"unknown", "unknown", "", "", "", "", ""}
@@ -155,28 +151,6 @@ func extractSpaceFieldsLegacy(obj any) []string {
 	}
 }
 
-func extractSpaceFields(obj any) []string {
-	ctp, ok := obj.(spacesv1beta1.ControlPlane)
-	if !ok {
-		return []string{"unknown", "unknown", "", "", "", "", ""}
-	}
-
-	v := ""
-	if pv := ctp.Spec.Crossplane.Version; pv != nil {
-		v = *pv
-	}
-
-	return []string{
-		ctp.GetNamespace(),
-		ctp.GetName(),
-		v,
-		string(ctp.GetCondition(xpcommonv1.TypeSynced).Status),
-		string(ctp.GetCondition(xpcommonv1.TypeReady).Status),
-		ctp.Annotations["internal.spaces.upbound.io/message"],
-		formatAge(ptr.To(time.Since(ctp.CreationTimestamp.Time))),
-	}
-}
-
 func formatAge(age *time.Duration) string {
 	if age == nil {
 		return ""
@@ -186,11 +160,8 @@ func formatAge(age *time.Duration) string {
 }
 
 func tabularPrint(obj any, printer upterm.ObjectPrinter, upCtx *upbound.Context) error {
-	if obj, ok := obj.([]spacesv1beta1.ControlPlane); ok {
-		return printer.Print(obj, spacefieldNames, extractSpaceFields)
-	}
 	if upCtx.Profile.IsSpace() {
-		return printer.Print(obj, spacefieldNames, extractSpaceFieldsLegacy)
+		return printer.Print(obj, spacefieldNames, extractSpaceFields)
 	}
 	return printer.Print(obj, cloudfieldNames, extractCloudFields)
 }
