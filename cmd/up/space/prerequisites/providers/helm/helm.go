@@ -107,7 +107,11 @@ func (h *Helm) GetName() string {
 
 // Install performs a kubectl apply of the package.
 func (h *Helm) Install() error { //nolint:gocyclo
-	if h.IsInstalled() {
+	installed, err := h.IsInstalled()
+	if err != nil {
+		return err
+	}
+	if installed {
 		// nothing to do
 		return nil
 	}
@@ -140,7 +144,7 @@ func (h *Helm) Install() error { //nolint:gocyclo
 		Name: ccName,
 	})
 
-	_, err := h.dClient.
+	_, err = h.dClient.
 		Resource(pkgGVR).
 		Create(
 			context.Background(),
@@ -181,7 +185,7 @@ func (h *Helm) Install() error { //nolint:gocyclo
 }
 
 // IsInstalled checks if provider-helm has been installed in the target cluster.
-func (h *Helm) IsInstalled() bool {
+func (h *Helm) IsInstalled() (bool, error) {
 	_, err := h.crdclient.
 		CustomResourceDefinitions().
 		Get(
@@ -189,7 +193,14 @@ func (h *Helm) IsInstalled() bool {
 			objectsCRD,
 			metav1.GetOptions{},
 		)
-	return !kerrors.IsNotFound(err)
+
+	if err == nil {
+		return true, nil
+	}
+	if kerrors.IsNotFound(err) {
+		return false, nil
+	}
+	return false, err
 }
 
 // isUXPInstalled checks if UXP exists in the target cluster.

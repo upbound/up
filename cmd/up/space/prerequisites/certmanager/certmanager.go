@@ -90,13 +90,17 @@ func (c *CertManager) GetName() string {
 
 // Install performs a Helm install of the chart.
 func (c *CertManager) Install() error {
-	if c.IsInstalled() {
+	installed, err := c.IsInstalled()
+	if err != nil {
+		return err
+	}
+	if installed {
 		// nothing to do
 		return nil
 	}
 
 	// create namespace before creating chart.
-	_, err := c.kclient.CoreV1().
+	_, err = c.kclient.CoreV1().
 		Namespaces().
 		Create(context.Background(),
 			&corev1.Namespace{
@@ -112,7 +116,7 @@ func (c *CertManager) Install() error {
 }
 
 // IsInstalled checks if cert-manager has been installed in the target cluster.
-func (c *CertManager) IsInstalled() bool {
+func (c *CertManager) IsInstalled() (bool, error) {
 	_, err := c.crdclient.
 		CustomResourceDefinitions().
 		Get(
@@ -120,5 +124,11 @@ func (c *CertManager) IsInstalled() bool {
 			certificatesCRD,
 			metav1.GetOptions{},
 		)
-	return !kerrors.IsNotFound(err)
+	if err == nil {
+		return true, nil
+	}
+	if kerrors.IsNotFound(err) {
+		return false, nil
+	}
+	return false, err
 }

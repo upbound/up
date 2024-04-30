@@ -93,13 +93,17 @@ func (c *IngressNginx) GetName() string {
 
 // Install performs a Helm install of the chart.
 func (c *IngressNginx) Install() error { //nolint:gocyclo
-	if c.IsInstalled() {
+	installed, err := c.IsInstalled()
+	if err != nil {
+		return err
+	}
+	if installed {
 		// nothing to do
 		return nil
 	}
 
 	// create namespace before creating chart.
-	_, err := c.kclient.CoreV1().
+	_, err = c.kclient.CoreV1().
 		Namespaces().
 		Create(context.Background(),
 			&corev1.Namespace{
@@ -137,7 +141,7 @@ func (c *IngressNginx) Install() error { //nolint:gocyclo
 }
 
 // IsInstalled checks if cert-manager has been installed in the target cluster.
-func (c *IngressNginx) IsInstalled() bool {
+func (c *IngressNginx) IsInstalled() (bool, error) {
 	il, err := c.kclient.
 		NetworkingV1().
 		IngressClasses().
@@ -148,10 +152,16 @@ func (c *IngressNginx) IsInstalled() bool {
 
 	// Separate check in the event il comes back nil.
 	if il != nil && len(il.Items) == 0 {
-		return false
+		return false, nil
 	}
 
-	return !kerrors.IsNotFound(err)
+	if err == nil {
+		return true, nil
+	}
+	if kerrors.IsNotFound(err) {
+		return false, nil
+	}
+	return false, err
 }
 
 // getValues returns the IngressNginx parameters that are passed to

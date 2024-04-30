@@ -16,11 +16,14 @@ package prerequisites
 
 import (
 	"github.com/crossplane/crossplane-runtime/pkg/errors"
+	"github.com/crossplane/crossplane-runtime/pkg/feature"
 	"k8s.io/client-go/rest"
 
 	"github.com/upbound/up/cmd/up/space/defaults"
+	spacefeature "github.com/upbound/up/cmd/up/space/features"
 	"github.com/upbound/up/cmd/up/space/prerequisites/certmanager"
 	"github.com/upbound/up/cmd/up/space/prerequisites/ingressnginx"
+	"github.com/upbound/up/cmd/up/space/prerequisites/opentelemetrycollector"
 	"github.com/upbound/up/cmd/up/space/prerequisites/providers/helm"
 	"github.com/upbound/up/cmd/up/space/prerequisites/providers/kubernetes"
 	"github.com/upbound/up/cmd/up/space/prerequisites/uxp"
@@ -36,7 +39,7 @@ type Prerequisite interface {
 	GetName() string
 
 	Install() error
-	IsInstalled() bool
+	IsInstalled() (bool, error)
 }
 
 // Manager provides APIs for interacting with Prerequisites within the target
@@ -52,7 +55,7 @@ type Status struct {
 }
 
 // New constructs a new Manager for working with installation Prerequisites.
-func New(config *rest.Config, defs *defaults.CloudConfig) (*Manager, error) {
+func New(config *rest.Config, defs *defaults.CloudConfig, features *feature.Flags) (*Manager, error) {
 	prereqs := []Prerequisite{}
 	certmanager, err := certmanager.New(config)
 	if err != nil {
@@ -89,6 +92,14 @@ func New(config *rest.Config, defs *defaults.CloudConfig) (*Manager, error) {
 	}
 	prereqs = append(prereqs, phelm)
 
+	if features.Enabled(spacefeature.EnableAlphaSharedTelemetry) {
+		otelopr, err := opentelemetrycollector.New(config)
+		if err != nil {
+			return nil, errors.Wrap(err, errCreatePrerequisite)
+		}
+		prereqs = append(prereqs, otelopr)
+	}
+
 	return &Manager{
 		prereqs: prereqs,
 	}, nil
@@ -96,15 +107,19 @@ func New(config *rest.Config, defs *defaults.CloudConfig) (*Manager, error) {
 
 // Check performs IsInstalled checks for each of the Prerequisites against the
 // target cluster.
-func (m *Manager) Check() *Status {
+func (m *Manager) Check() (*Status, error) {
 	notInstalled := []Prerequisite{}
 	for _, p := range m.prereqs {
-		if !p.IsInstalled() {
+		installed, err := p.IsInstalled()
+		if err != nil {
+			return nil, err
+		}
+		if !installed {
 			notInstalled = append(notInstalled, p)
 		}
 	}
 
 	return &Status{
 		NotInstalled: notInstalled,
-	}
+	}, nil
 }
