@@ -24,6 +24,7 @@ import (
 	"github.com/alecthomas/kong"
 	xpv1 "github.com/crossplane/crossplane-runtime/apis/common/v1"
 	"github.com/crossplane/crossplane-runtime/pkg/errors"
+	"github.com/crossplane/crossplane-runtime/pkg/feature"
 	"github.com/crossplane/crossplane-runtime/pkg/resource"
 	"github.com/pterm/pterm"
 	"golang.org/x/exp/maps"
@@ -41,6 +42,7 @@ import (
 
 	upboundv1alpha1 "github.com/upbound/up-sdk-go/apis/upbound/v1alpha1"
 	"github.com/upbound/up/cmd/up/space/defaults"
+	spacefeature "github.com/upbound/up/cmd/up/space/features"
 	"github.com/upbound/up/cmd/up/space/prerequisites"
 	"github.com/upbound/up/internal/config"
 	"github.com/upbound/up/internal/install"
@@ -102,11 +104,12 @@ type initCmd struct {
 
 	helmMgr    install.Manager
 	prereqs    *prerequisites.Manager
-	parser     install.ParameterParser
+	helmParams map[string]any
 	kClient    kubernetes.Interface
 	dClient    dynamic.Interface
 	pullSecret *kube.ImagePullApplicator
 	quiet      config.QuietFlag
+	features   *feature.Flags
 }
 
 func init() {
@@ -165,12 +168,6 @@ func (c *initCmd) AfterApply(kongCtx *kong.Context, quiet config.QuietFlag) erro
 		pterm.Info.Println("Public ingress will be exposed")
 	}
 
-	prereqs, err := prerequisites.New(kubeconfig, defs)
-	if err != nil {
-		return err
-	}
-	c.prereqs = prereqs
-
 	secret := kube.NewSecretApplicator(kClient)
 	c.pullSecret = kube.NewImagePullApplicator(secret)
 	dClient, err := dynamic.NewForConfig(kubeconfig)
@@ -206,20 +203,28 @@ func (c *initCmd) AfterApply(kongCtx *kong.Context, quiet config.QuietFlag) erro
 			return errors.Wrap(err, errReadParametersFile)
 		}
 	}
-	c.parser = helm.NewParser(base, c.Set)
-	c.quiet = quiet
+	parser := helm.NewParser(base, c.Set)
+	c.helmParams, err = parser.Parse()
+	if err != nil {
+		return errors.Wrap(err, errParseInstallParameters)
+	}
+	c.features = &feature.Flags{}
+	spacefeature.EnableFeatures(c.features, c.helmParams)
 
+	prereqs, err := prerequisites.New(kubeconfig, defs, c.features)
+	if err != nil {
+		return err
+	}
+	c.prereqs = prereqs
+
+	c.quiet = quiet
 	return nil
 }
 
 // Run executes the install command.
 func (c *initCmd) Run(ctx context.Context, upCtx *upbound.Context) error {
-	params, err := c.parser.Parse()
-	if err != nil {
-		return errors.Wrap(err, errParseInstallParameters)
-	}
-	overrideRegistry(c.Registry.Repository.String(), params)
-	ensureAccount(params)
+	overrideRegistry(c.Registry.Repository.String(), c.helmParams)
+	ensureAccount(c.helmParams)
 
 	// check if required prerequisites are installed
 	status := c.prereqs.Check()
@@ -256,7 +261,7 @@ func (c *initCmd) Run(ctx context.Context, upCtx *upbound.Context) error {
 		return err
 	}
 
-	if err := c.deploySpace(ctx, params); err != nil {
+	if err := c.deploySpace(ctx, c.helmParams); err != nil {
 		return err
 	}
 
@@ -264,7 +269,7 @@ func (c *initCmd) Run(ctx context.Context, upCtx *upbound.Context) error {
 
 	outputNextSteps()
 
-	return c.createOrUpdateProfile(getAcct(params), upCtx)
+	return c.createOrUpdateProfile(getAcct(c.helmParams), upCtx)
 }
 
 // createOrUpdateProfile updates the active profile to access the new space,
