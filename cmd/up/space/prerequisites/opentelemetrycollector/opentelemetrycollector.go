@@ -47,7 +47,7 @@ var (
 		},
 	}
 
-	otelCollectorCRD = "opentelemetrycollector.opentelemetry.io"
+	otelCollectorCRD = "opentelemetrycollectors.opentelemetry.io"
 
 	errFmtCreateHelmManager = "failed to create helm manager for %s"
 	errFmtCreateK8sClient   = "failed to create kubernetes client for helm chart %s"
