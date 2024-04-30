@@ -437,6 +437,7 @@ func (f Flags) MarshalJSON() ([]byte, error) {
 		InsecureSkipTLSVerify bool   `json:"insecure_skip_tls_verify,omitempty"`
 		Debug                 int    `json:"debug,omitempty"`
 		APIEndpoint           string `json:"override_api_endpoint,omitempty"`
+		AuthEndpoint          string `json:"override_auth_endpoint,omitempty"`
 		ProxyEndpoint         string `json:"override_proxy_endpoint,omitempty"`
 		RegistryEndpoint      string `json:"override_registry_endpoint,omitempty"`
 	}{
@@ -446,6 +447,7 @@ func (f Flags) MarshalJSON() ([]byte, error) {
 		InsecureSkipTLSVerify: f.InsecureSkipTLSVerify,
 		Debug:                 f.Debug,
 		APIEndpoint:           nullableURL(f.APIEndpoint),
+		AuthEndpoint:          nullableURL(f.AuthEndpoint),
 		ProxyEndpoint:         nullableURL(f.ProxyEndpoint),
 		RegistryEndpoint:      nullableURL(f.RegistryEndpoint),
 	}
