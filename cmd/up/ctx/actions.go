@@ -33,7 +33,18 @@ const (
 	upboundPreviousContextSuffix = "-previous"
 )
 
-// Accept upserts the "upbound" kubeconfig context and cluster. to the current
+// Accept upserts the "upbound" kubeconfig context and cluster to the current
+// kubeconfig, pointing to the space.
+func (s *Space) Accept(ctx context.Context, upCtx *upbound.Context, kubeContext string) (msg string, err error) {
+	spaceContext, err := writeContext(ctx, upCtx, *s, types.NamespacedName{}, kubeContext)
+	if err != nil {
+		return "", err
+	}
+
+	return fmt.Sprintf(contextSwitchedFmt, spaceContext, s.Breadcrumbs()), nil
+}
+
+// Accept upserts the "upbound" kubeconfig context and cluster to the current
 // kubeconfig, pointing to the group.
 func (g *Group) Accept(ctx context.Context, upCtx *upbound.Context, kubeContext string) (msg string, err error) {
 	groupContext, err := writeContext(ctx, upCtx, g.space, types.NamespacedName{Namespace: g.name}, kubeContext)
