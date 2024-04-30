@@ -51,12 +51,15 @@ func (c *Cmd) AfterApply(kongCtx *kong.Context) error {
 	}
 	kongCtx.Bind(upCtx)
 
+	// we can't use groups from inside a control plane
+	if _, _, ok := upCtx.ParseCurrentSpaceContextURL(); ok {
+		return errors.New("cannot view groups from inside a control plane context. Use 'up ctx ..' to go up to the group context")
+	}
+
 	cl, err := upCtx.BuildCurrentContextClient()
 	if err != nil {
 		return errors.Wrap(err, "unable to get kube client")
 	}
-
-	// todo(redbackthomson): Assert we are at the space level
 
 	kongCtx.BindTo(cl, (*client.Client)(nil))
 
