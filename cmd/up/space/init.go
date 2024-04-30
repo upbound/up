@@ -227,7 +227,11 @@ func (c *initCmd) Run(ctx context.Context, upCtx *upbound.Context) error {
 	ensureAccount(c.helmParams)
 
 	// check if required prerequisites are installed
-	status := c.prereqs.Check()
+	status, err := c.prereqs.Check()
+	if err != nil {
+		pterm.Error.Println("error checking prerequisites status")
+		return err
+	}
 
 	// At least 1 prerequisite is not installed, check if we should install the
 	// missing ones for the client.
@@ -249,7 +253,7 @@ func (c *initCmd) Run(ctx context.Context, upCtx *upbound.Context) error {
 				return nil
 			}
 		}
-		if err := c.installPrereqs(); err != nil {
+		if err := c.installPrereqs(status); err != nil {
 			return err
 		}
 	}
@@ -305,8 +309,7 @@ func (c *initCmd) createOrUpdateProfile(acct string, upCtx *upbound.Context) err
 	return nil
 }
 
-func (c *initCmd) installPrereqs() error {
-	status := c.prereqs.Check()
+func (c *initCmd) installPrereqs(status *prerequisites.Status) error {
 	for i, p := range status.NotInstalled {
 		if err := upterm.WrapWithSuccessSpinner(
 			upterm.StepCounter(

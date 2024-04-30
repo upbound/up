@@ -89,12 +89,16 @@ func (u *UXP) GetName() string {
 
 // Install performs a Helm install of the chart.
 func (u *UXP) Install() error {
-	if u.IsInstalled() {
+	installed, err := u.IsInstalled()
+	if err != nil {
+		return err
+	}
+	if installed {
 		// nothing to do
 		return nil
 	}
 	// create namespace before creating chart.
-	_, err := u.kclient.CoreV1().
+	_, err = u.kclient.CoreV1().
 		Namespaces().
 		Create(context.Background(),
 			&corev1.Namespace{
@@ -124,7 +128,7 @@ func (u *UXP) Install() error {
 }
 
 // IsInstalled checks if UXP has been installed in the target cluster.
-func (u *UXP) IsInstalled() bool {
+func (u *UXP) IsInstalled() (bool, error) {
 	_, err := u.crdclient.
 		CustomResourceDefinitions().
 		Get(
@@ -132,5 +136,11 @@ func (u *UXP) IsInstalled() bool {
 			xrdCRD,
 			metav1.GetOptions{},
 		)
-	return !kerrors.IsNotFound(err)
+	if err == nil {
+		return true, nil
+	}
+	if kerrors.IsNotFound(err) {
+		return false, nil
+	}
+	return false, err
 }

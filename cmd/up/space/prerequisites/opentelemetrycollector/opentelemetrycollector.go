@@ -89,19 +89,23 @@ func New(config *rest.Config) (*OpenTelemetryCollectorOperator, error) {
 }
 
 // GetName returns the name of the opentelemetry-operator chart.
-func (c *OpenTelemetryCollectorOperator) GetName() string {
+func (o *OpenTelemetryCollectorOperator) GetName() string {
 	return chartName
 }
 
 // Install performs a Helm install of the chart.
-func (c *OpenTelemetryCollectorOperator) Install() error {
-	if c.IsInstalled() {
+func (o *OpenTelemetryCollectorOperator) Install() error {
+	installed, err := o.IsInstalled()
+	if err != nil {
+		return err
+	}
+	if installed {
 		// nothing to do
 		return nil
 	}
 
 	// create namespace before creating chart.
-	_, err := c.kclient.CoreV1().
+	_, err = o.kclient.CoreV1().
 		Namespaces().
 		Create(context.Background(),
 			&corev1.Namespace{
@@ -113,17 +117,23 @@ func (c *OpenTelemetryCollectorOperator) Install() error {
 		return errors.Wrap(err, fmt.Sprintf(errFmtCreateNamespace, chartName))
 	}
 
-	return c.mgr.Install(version, values)
+	return o.mgr.Install(version, values)
 }
 
 // IsInstalled checks if opentelemetry operator has been installed in the target cluster.
-func (c *OpenTelemetryCollectorOperator) IsInstalled() bool {
-	_, err := c.crdclient.
+func (o *OpenTelemetryCollectorOperator) IsInstalled() (bool, error) {
+	_, err := o.crdclient.
 		CustomResourceDefinitions().
 		Get(
 			context.Background(),
 			otelCollectorCRD,
 			metav1.GetOptions{},
 		)
-	return !kerrors.IsNotFound(err)
+	if err == nil {
+		return true, nil
+	}
+	if kerrors.IsNotFound(err) {
+		return false, nil
+	}
+	return false, err
 }

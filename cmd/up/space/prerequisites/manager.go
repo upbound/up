@@ -39,7 +39,7 @@ type Prerequisite interface {
 	GetName() string
 
 	Install() error
-	IsInstalled() bool
+	IsInstalled() (bool, error)
 }
 
 // Manager provides APIs for interacting with Prerequisites within the target
@@ -107,15 +107,19 @@ func New(config *rest.Config, defs *defaults.CloudConfig, features *feature.Flag
 
 // Check performs IsInstalled checks for each of the Prerequisites against the
 // target cluster.
-func (m *Manager) Check() *Status {
+func (m *Manager) Check() (*Status, error) {
 	notInstalled := []Prerequisite{}
 	for _, p := range m.prereqs {
-		if !p.IsInstalled() {
+		installed, err := p.IsInstalled()
+		if err != nil {
+			return nil, err
+		}
+		if !installed {
 			notInstalled = append(notInstalled, p)
 		}
 	}
 
 	return &Status{
 		NotInstalled: notInstalled,
-	}
+	}, nil
 }

@@ -106,7 +106,11 @@ func (k *Kubernetes) GetName() string {
 
 // Install performs a Helm install of the chart.
 func (k *Kubernetes) Install() error { //nolint:gocyclo
-	if k.IsInstalled() {
+	installed, err := k.IsInstalled()
+	if err != nil {
+		return err
+	}
+	if installed {
 		// nothing to do
 		return nil
 	}
@@ -139,7 +143,7 @@ func (k *Kubernetes) Install() error { //nolint:gocyclo
 		Name: ccName,
 	})
 
-	_, err := k.dClient.
+	_, err = k.dClient.
 		Resource(pkgGVR).
 		Create(
 			context.Background(),
@@ -181,7 +185,7 @@ func (k *Kubernetes) Install() error { //nolint:gocyclo
 }
 
 // IsInstalled checks if cert-manager has been installed in the target cluster.
-func (k *Kubernetes) IsInstalled() bool {
+func (k *Kubernetes) IsInstalled() (bool, error) {
 	_, err := k.crdclient.
 		CustomResourceDefinitions().
 		Get(
@@ -189,7 +193,13 @@ func (k *Kubernetes) IsInstalled() bool {
 			objectsCRD,
 			metav1.GetOptions{},
 		)
-	return !kerrors.IsNotFound(err)
+	if err == nil {
+		return true, nil
+	}
+	if kerrors.IsNotFound(err) {
+		return false, nil
+	}
+	return false, err
 }
 
 func (k *Kubernetes) isUXPInstalled() bool {
