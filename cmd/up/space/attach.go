@@ -298,8 +298,7 @@ func (c *attachCmd) prepareSpace(ctx context.Context, attachSpinner *pterm.Spinn
 		}
 		ns, name := parts[0], parts[1]
 		if (space.Name != "" && space.Name != name) || space.Namespace != ns {
-			attachSpinner.UpdateText("Continue? (Y/n)")
-			if err := warnAndConfirm(
+			if err := warnAndConfirmWithSpinner(attachSpinner,
 				`Space "%s/%s" is currently connected to Upbound Console. Would you like to continue?`+"\n\n"+
 					`  By continuing the current Space will be removed and this Space will be attached as "%s/%s" instead.`+"\n",
 				ns, name, space.Namespace, space.Name,
@@ -354,8 +353,7 @@ func (c *attachCmd) createSpace(ctx context.Context, attachSpinner *pterm.Spinne
 		return "", errors.Wrapf(err, errCreateSpace)
 	}
 	attachSpinner.InfoPrinter.Printfln(`Space "%s/%s" exists`, space.Namespace, space.Name)
-	attachSpinner.UpdateText("Continue? (Y/n)")
-	if err := warnAndConfirm(
+	if err := warnAndConfirmWithSpinner(attachSpinner,
 		`Space "%s/%s" already exists. Would you like to overwrite it?`+"\n\n"+
 			"  If the other Space cluster still exists, the Upbound agent will be left running and you will need to delete it manually.\n",
 		space.Namespace, space.Name,
@@ -631,4 +629,15 @@ func (c *attachCmd) createToken(ctx context.Context, attachSpinner *pterm.Spinne
 	}
 	*cmr = cm
 	return tr, nil
+}
+
+// warnAndConfirmWithSpinner prints a warning and confirmation prompt while a
+// spinner is running, preventing the spinner from drawing over the
+// prompt.
+func warnAndConfirmWithSpinner(spinner *pterm.SpinnerPrinter, warning string, args ...any) error {
+	spinner.IsActive = false
+	defer func() {
+		spinner.IsActive = true
+	}()
+	return warnAndConfirm(warning, args...)
 }
