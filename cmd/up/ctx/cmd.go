@@ -378,7 +378,7 @@ func DeriveState(ctx context.Context, upCtx *upbound.Context, conf *clientcmdapi
 
 	// determine if self-hosted by looking for ingress
 	host, ca, err := profile.GetIngressHost(ctx, spaceClient)
-	if meta.IsNoMatchError(err) || kerrors.IsUnauthorized(err) {
+	if kerrors.IsNotFound(err) || meta.IsNoMatchError(err) || kerrors.IsUnauthorized(err) {
 		return DeriveCloudState(ctx, upCtx, conf)
 	} else if err != nil {
 		return nil, err
