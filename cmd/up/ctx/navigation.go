@@ -29,7 +29,6 @@ import (
 
 	spacesv1beta1 "github.com/upbound/up-sdk-go/apis/spaces/v1beta1"
 	upboundv1alpha1 "github.com/upbound/up-sdk-go/apis/upbound/v1alpha1"
-	"github.com/upbound/up-sdk-go/service/auth"
 	"github.com/upbound/up-sdk-go/service/organizations"
 	"github.com/upbound/up/internal/profile"
 	"github.com/upbound/up/internal/upbound"
@@ -119,11 +118,6 @@ func (o *Organization) Items(ctx context.Context, upCtx *upbound.Context) ([]lis
 		return nil, err
 	}
 
-	token, err := o.generateOrgScopedToken(ctx, upCtx)
-	if err != nil {
-		return nil, err
-	}
-
 	items := make([]list.Item, 0)
 	items = append(items, item{text: "..", kind: "organizations", onEnter: o.Back, back: true})
 	for _, space := range l.Items {
@@ -140,10 +134,8 @@ func (o *Organization) Items(ctx context.Context, upCtx *upbound.Context) ([]lis
 				name:    space.GetObjectMeta().GetName(),
 				ingress: space.Status.FQDN,
 				// todo(redbackthomson): Replace with public CA data once available
-				ca: make([]byte, 0),
-				authInfo: &clientcmdapi.AuthInfo{
-					Token: token.AccessToken,
-				},
+				ca:       make([]byte, 0),
+				authInfo: o.getOrgScopedAuthInfo(upCtx),
 			}
 			return m, nil
 		}})
@@ -169,14 +161,25 @@ func (o *Organization) IsCloudProfile() bool {
 	return o.name != ""
 }
 
-func (o *Organization) generateOrgScopedToken(ctx context.Context, upCtx *upbound.Context) (*auth.TokenExchangeResponse, error) {
-	cfg, err := upCtx.BuildSDKAuthConfig()
-	if err != nil {
-		return nil, err
+func (o *Organization) getOrgScopedAuthInfo(upCtx *upbound.Context) *clientcmdapi.AuthInfo {
+	return &clientcmdapi.AuthInfo{
+		Exec: &clientcmdapi.ExecConfig{
+			APIVersion: "client.authentication.k8s.io/v1",
+			Command:    "up",
+			Args:       []string{"space", "token"},
+			Env: []clientcmdapi.ExecEnvVar{
+				clientcmdapi.ExecEnvVar{
+					Name:  "UPBOUND_ORGANIZATION",
+					Value: o.name,
+				},
+				clientcmdapi.ExecEnvVar{
+					Name:  "UP_PROFILE",
+					Value: upCtx.ProfileName,
+				},
+			},
+			InteractiveMode: clientcmdapi.IfAvailableExecInteractiveMode,
+		},
 	}
-
-	client := auth.NewClient(cfg)
-	return client.GetOrgScopedToken(ctx, o.name, upCtx.Profile.Session)
 }
 
 type sortedItems []list.Item

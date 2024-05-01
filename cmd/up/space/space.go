@@ -40,6 +40,7 @@ type Cmd struct {
 	Destroy destroyCmd `cmd:"" help:"Remove the Upbound Spaces deployment."`
 	Upgrade upgradeCmd `cmd:"" help:"Upgrade the Upbound Spaces deployment."`
 	List    listCmd    `cmd:"" help:"List all accessible spaces in Upbound."`
+	Token   tokenCmd   `cmd:"" help:"Generates an organization-scoped token to authenticate with a Cloud space."`
 
 	Billing billing.Cmd `cmd:""`
 }
