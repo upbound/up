@@ -84,6 +84,8 @@ type Cmd struct {
 
 	User user.Cmd `cmd:"" help:"Manage organization users."`
 
+	Token tokenCmd `cmd:"" help:"Generates an organization-scoped token to authenticate with a Cloud space."`
+
 	// Common Upbound API configuration
 	Flags upbound.Flags `embed:""`
 }

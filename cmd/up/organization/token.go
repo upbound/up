@@ -12,7 +12,7 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-package space
+package organization
 
 import (
 	"context"
@@ -34,7 +34,7 @@ import (
 type tokenCmd struct {
 	Upbound upbound.Flags `embed:""`
 
-	Organization string `name:"organization" short:"o" required:"" env:"UPBOUND_ORGANIZATION" help:"Organization against which to generate the token." json:"organization,omitempty"`
+	Name string `arg:"" env:"UPBOUND_ORGANIZATION" required:"" help:"Name of organization." predictor:"orgs"`
 }
 
 // AfterApply sets default values in command after assignment and validation.
@@ -56,7 +56,7 @@ func (c *tokenCmd) Run(ctx context.Context, printer upterm.ObjectPrinter, p pter
 	}
 
 	client := auth.NewClient(cfg)
-	token, err := client.GetOrgScopedToken(ctx, c.Organization, upCtx.Profile.Session)
+	token, err := client.GetOrgScopedToken(ctx, c.Name, upCtx.Profile.Session)
 	if err != nil {
 		return err
 	}

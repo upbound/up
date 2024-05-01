@@ -166,7 +166,7 @@ func (o *Organization) getOrgScopedAuthInfo(upCtx *upbound.Context) *clientcmdap
 		Exec: &clientcmdapi.ExecConfig{
 			APIVersion: "client.authentication.k8s.io/v1",
 			Command:    "up",
-			Args:       []string{"space", "token"},
+			Args:       []string{"organization", "token"},
 			Env: []clientcmdapi.ExecEnvVar{
 				clientcmdapi.ExecEnvVar{
 					Name:  "UPBOUND_ORGANIZATION",
