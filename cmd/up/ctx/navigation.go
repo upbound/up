@@ -83,7 +83,7 @@ func (r *Root) Items(ctx context.Context, upCtx *upbound.Context) ([]list.Item, 
 
 	items := make([]list.Item, 0, len(orgs))
 	for _, org := range orgs {
-		items = append(items, item{text: org.DisplayName, kind: "organization", onEnter: func(ctx context.Context, upCtx *upbound.Context, m model) (model, error) {
+		items = append(items, item{text: org.DisplayName, kind: "organization", matchingTerms: []string{org.Name}, onEnter: func(ctx context.Context, upCtx *upbound.Context, m model) (model, error) {
 			m.state = &Organization{name: org.Name}
 			return m, nil
 		}})
@@ -239,8 +239,7 @@ func (s *Space) Breadcrumbs() string {
 	return upboundRootStyle.Render("Upbound") + pathSegmentStyle.Render(" space ") + pathSegmentStyle.Render(s.name)
 }
 
-// GetClient returns a kube client pointed at the current space and narrowed
-// down to the scope of the provided resource.
+// GetClient returns a kube client pointed at the current space
 func (s *Space) GetClient() (client.Client, error) {
 	rest, err := buildSpacesClient(s.ingress, s.ca, s.authInfo, types.NamespacedName{}).ClientConfig()
 	if err != nil {

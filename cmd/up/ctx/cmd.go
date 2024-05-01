@@ -235,8 +235,14 @@ func activateContext(conf *clientcmdapi.Config, sourceContext, preferredContext 
 }
 
 func (c *Cmd) RunRelative(ctx context.Context, kongCtx *kong.Context, upCtx *upbound.Context, initialState NavigationState) error { // nolint:gocyclo // a bit long but ¯\_(ツ)_/¯
+	// begin from root unless we're starting from a relative . or ..
+	state := initialState
+	if !strings.HasPrefix(c.Argument, ".") {
+		state = &Root{}
+	}
+
 	m := model{
-		state:       initialState,
+		state:       state,
 		upCtx:       upCtx,
 		kubeContext: c.KubeContext,
 	}
@@ -261,7 +267,7 @@ func (c *Cmd) RunRelative(ctx context.Context, kongCtx *kong.Context, upCtx *upb
 			}
 			found := false
 			for _, i := range items {
-				if i, ok := i.(item); ok && i.text == s {
+				if i, ok := i.(item); ok && i.Matches(s) {
 					if i.onEnter == nil {
 						return fmt.Errorf("cannot enter %q in: %s", s, m.state.Breadcrumbs())
 					}

@@ -24,6 +24,7 @@ import (
 	"github.com/charmbracelet/bubbles/list"
 	tea "github.com/charmbracelet/bubbletea"
 	"github.com/charmbracelet/lipgloss"
+	"k8s.io/apimachinery/pkg/util/sets"
 
 	"github.com/upbound/up/internal/upbound"
 )
@@ -64,6 +65,8 @@ type item struct {
 
 	padding []int
 
+	matchingTerms []string
+
 	// emptyList denotes that the item is marking that the list is empty, and
 	// should not be considered an element in the list itself
 	emptyList bool
@@ -73,6 +76,13 @@ type item struct {
 }
 
 func (i item) FilterValue() string { return "" }
+func (i item) Matches(s string) bool {
+	if strings.EqualFold(s, i.text) {
+		return true
+	}
+
+	return sets.New(i.matchingTerms...).Has(s)
+}
 
 type itemDelegate struct{}
 
