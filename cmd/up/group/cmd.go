@@ -52,7 +52,7 @@ func (c *Cmd) AfterApply(kongCtx *kong.Context) error {
 	kongCtx.Bind(upCtx)
 
 	// we can't use groups from inside a control plane
-	if _, _, ok := upCtx.ParseCurrentSpaceContextURL(); ok {
+	if _, _, ok := upCtx.GetCurrentSpaceContextScope(); ok {
 		return errors.New("cannot view groups from inside a control plane context. Use 'up ctx ..' to go up to the group context")
 	}
 

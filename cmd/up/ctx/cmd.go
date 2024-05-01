@@ -172,6 +172,7 @@ func activateContext(conf *clientcmdapi.Config, sourceContext, preferredContext 
 	if !ok {
 		return nil, "", fmt.Errorf("no %q context found", preferredContext+upboundPreviousContextSuffix)
 	}
+	// todo(redbackthomson): Handle the case of no current context
 	current, ok := conf.Contexts[conf.CurrentContext]
 	if !ok {
 		return nil, "", fmt.Errorf("no %q context found", conf.CurrentContext)
@@ -339,7 +340,7 @@ func (c *Cmd) RunInteractive(ctx context.Context, kongCtx *kong.Context, upCtx *
 }
 
 func DeriveState(ctx context.Context, upCtx *upbound.Context, conf *clientcmdapi.Config) (NavigationState, error) {
-	ingress, ctp, exists := upCtx.ParseCurrentSpaceContextURL()
+	ingress, ctp, exists := upCtx.GetCurrentSpaceContextScope()
 
 	var spaceKubeconfig *clientcmdapi.Config
 	var err error
@@ -431,7 +432,7 @@ func DeriveCloudState(ctx context.Context, upCtx *upbound.Context, conf *clientc
 		name: orgName,
 	}
 
-	ingress, ctp, exists := upCtx.ParseCurrentSpaceContextURL()
+	ingress, ctp, exists := upCtx.GetCurrentSpaceContextScope()
 	if !exists {
 		return org, nil
 	}

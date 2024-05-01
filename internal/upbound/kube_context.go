@@ -71,11 +71,22 @@ func (c *Context) GetCurrentContext() (context *clientcmdapi.Context, cluster *c
 	return context, cluster, auth, exists
 }
 
-func (c *Context) ParseCurrentSpaceContextURL() (string, types.NamespacedName, bool) {
-	_, cluster, _, exists := c.GetCurrentContext()
+func (c *Context) GetCurrentSpaceContextScope() (string, types.NamespacedName, bool) {
+	context, cluster, _, exists := c.GetCurrentContext()
 	if !exists {
 		return "", types.NamespacedName{}, false
 	}
 
-	return profile.ParseSpacesK8sURL(strings.TrimSuffix(cluster.Server, "/"))
+	base, nsn, exists := profile.ParseSpacesK8sURL(strings.TrimSuffix(cluster.Server, "/"))
+	// we are inside a ctp scope
+	if exists {
+		return base, nsn, exists
+	}
+
+	// we aren't inside a group scope
+	if context.Namespace == "" {
+		return "", types.NamespacedName{}, false
+	}
+
+	return cluster.Server, types.NamespacedName{Namespace: context.Namespace}, true
 }
