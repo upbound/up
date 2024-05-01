@@ -32,6 +32,10 @@ func (c *Context) BuildCurrentContextClient() (client.Client, error) {
 		return nil, errors.Wrap(err, "unable to get kube config")
 	}
 
+	// todo(redbackthomson): Delete once spaces-api is able to accept protobuf
+	// requests
+	rest.ContentConfig.ContentType = "application/json"
+
 	sc, err := client.New(rest, client.Options{})
 	if err != nil {
 		return nil, errors.Wrap(err, "error creating kube client")

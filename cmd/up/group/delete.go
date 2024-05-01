@@ -31,6 +31,10 @@ import (
 	"github.com/upbound/up/internal/upterm"
 )
 
+var (
+	errDeletionProtectionEnabled = errors.New("Deletion protection is enabled on the specified group. Use '--force' to delete anyway.")
+)
+
 // deleteCmd creates a group in a space.
 type deleteCmd struct {
 	Name  string `arg:"" required:"" help:"Name of group."`
@@ -52,11 +56,15 @@ func (c *deleteCmd) Run(ctx context.Context, printer upterm.ObjectPrinter, upCtx
 			return err
 		}
 
-		if protEn, err := strconv.ParseBool(group.Labels[spacesv1beta1.ControlPlaneGroupProtectionKey]); err != nil {
-			return err
-		} else if protEn {
-			return errors.New("Deletion protection is enabled on the specified group. Use '--force' to delete anyway.")
+		key, ok := group.Labels[spacesv1beta1.ControlPlaneGroupProtectionKey]
+		if ok {
+			if protected, err := strconv.ParseBool(key); err != nil {
+				return err
+			} else if protected {
+				return errDeletionProtectionEnabled
+			}
 		}
+
 	}
 
 	if err := client.Delete(ctx, &group); err != nil {
