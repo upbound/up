@@ -98,7 +98,7 @@ func (d itemDelegate) Render(w io.Writer, m list.Model, index int, listItem list
 		kind = fmt.Sprintf("[%s]", str.kind)
 	}
 
-	fmt.Fprintf(w, lipgloss.JoinHorizontal(lipgloss.Top, // nolint:staticcheck
+	fmt.Fprint(w, lipgloss.JoinHorizontal(lipgloss.Top, // nolint:staticcheck
 		kindStyle.Render(fmt.Sprintf("%15s ", kind)),
 		mainStyle.Render(str.text),
 	))
