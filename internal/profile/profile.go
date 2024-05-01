@@ -28,12 +28,10 @@ type TokenType string
 
 const (
 	// Types of profiles.
-	User  TokenType = "user"
-	Token TokenType = "token"
+	TokenTypeUser  TokenType = "user"
+	TokenTypeToken TokenType = "token"
 
 	DefaultName = "default"
-
-	errInvalidProfile = "profile is not valid"
 )
 
 // A Profile is a set of credentials

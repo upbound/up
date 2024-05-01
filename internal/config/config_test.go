@@ -28,14 +28,14 @@ import (
 func TestAddOrUpdateUpboundProfile(t *testing.T) {
 	name := "cool-profile"
 	profOne := profile.Profile{
-		ID:      "cool-user",
-		Type:    profile.User,
-		Account: "cool-org",
+		ID:        "cool-user",
+		TokenType: profile.TokenTypeUser,
+		Account:   "cool-org",
 	}
 	profTwo := profile.Profile{
-		ID:      "cool-user",
-		Type:    profile.User,
-		Account: "other-org",
+		ID:        "cool-user",
+		TokenType: profile.TokenTypeUser,
+		Account:   "other-org",
 	}
 
 	cases := map[string]struct {
@@ -80,58 +80,6 @@ func TestAddOrUpdateUpboundProfile(t *testing.T) {
 			want:   &Config{},
 			err:    errors.New("profile is not valid"),
 		},
-		"AddNewSpaceProfile": {
-			reason: "Adding a new space profile to an empty Config should not cause an error.",
-			name:   "cool-profile",
-			cfg:    &Config{},
-			add: profile.Profile{
-				Type:        profile.Space,
-				Kubeconfig:  "cool-config",
-				KubeContext: "cool-context",
-			},
-			want: &Config{
-				Upbound: Upbound{
-					Profiles: map[string]profile.Profile{
-						"cool-profile": {
-							Type:        profile.Space,
-							Kubeconfig:  "cool-config",
-							KubeContext: "cool-context",
-						},
-					},
-				},
-			},
-		},
-		"UpdateExistingSpaceProfile": {
-			reason: "Updating an existing space profile in the Config should not cause an error.",
-			name:   "cool-profile",
-			cfg: &Config{
-				Upbound: Upbound{
-					Profiles: map[string]profile.Profile{
-						"cool-profile": {
-							Type:        profile.Space,
-							Kubeconfig:  "cool-config",
-							KubeContext: "cool-context",
-						},
-					},
-				},
-			},
-			add: profile.Profile{
-				Type:        profile.Space,
-				Kubeconfig:  "other-config",
-				KubeContext: "other-context",
-			},
-			want: &Config{
-				Upbound: Upbound{
-					Profiles: map[string]profile.Profile{
-						"cool-profile": {
-							Type:        profile.Space,
-							Kubeconfig:  "other-config",
-							KubeContext: "other-context",
-						},
-					},
-				},
-			},
-		},
 	}
 	for name, tc := range cases {
 		t.Run(name, func(t *testing.T) {
@@ -149,9 +97,9 @@ func TestAddOrUpdateUpboundProfile(t *testing.T) {
 func TestGetDefaultUpboundProfile(t *testing.T) {
 	name := "cool-profile"
 	profOne := profile.Profile{
-		ID:      "cool-user",
-		Type:    profile.User,
-		Account: "cool-org",
+		ID:        "cool-user",
+		TokenType: profile.TokenTypeUser,
+		Account:   "cool-org",
 	}
 
 	cases := map[string]struct {
@@ -208,9 +156,9 @@ func TestGetDefaultUpboundProfile(t *testing.T) {
 func TestGetUpboundProfile(t *testing.T) {
 	name := "cool-profile"
 	profOne := profile.Profile{
-		ID:      "cool-user",
-		Type:    profile.User,
-		Account: "cool-org",
+		ID:        "cool-user",
+		TokenType: profile.TokenTypeUser,
+		Account:   "cool-org",
 	}
 
 	cases := map[string]struct {
@@ -254,8 +202,8 @@ func TestGetUpboundProfile(t *testing.T) {
 func TestSetDefaultUpboundProfile(t *testing.T) {
 	name := "cool-user"
 	profOne := profile.Profile{
-		Type:    profile.User,
-		Account: "cool-org",
+		TokenType: profile.TokenTypeUser,
+		Account:   "cool-org",
 	}
 
 	cases := map[string]struct {
@@ -293,13 +241,13 @@ func TestSetDefaultUpboundProfile(t *testing.T) {
 func TestGetUpboundProfiles(t *testing.T) {
 	nameOne := "cool-user"
 	profOne := profile.Profile{
-		Type:    profile.User,
-		Account: "cool-org",
+		TokenType: profile.TokenTypeUser,
+		Account:   "cool-org",
 	}
 	nameTwo := "cool-user2"
 	profTwo := profile.Profile{
-		Type:    profile.User,
-		Account: "cool-org2",
+		TokenType: profile.TokenTypeUser,
+		Account:   "cool-org2",
 	}
 
 	type args struct {
@@ -361,16 +309,16 @@ func TestGetUpboundProfiles(t *testing.T) {
 func TestGetBaseConfig(t *testing.T) {
 	nameOne := "cool-user"
 	profOne := profile.Profile{
-		Type:    profile.User,
-		Account: "cool-org",
+		TokenType: profile.TokenTypeUser,
+		Account:   "cool-org",
 		BaseConfig: map[string]string{
 			"key": "value",
 		},
 	}
 	nameTwo := "cool-user2"
 	profTwo := profile.Profile{
-		Type:    profile.User,
-		Account: "cool-org2",
+		TokenType: profile.TokenTypeUser,
+		Account:   "cool-org2",
 	}
 
 	type args struct {
@@ -432,13 +380,13 @@ func TestGetBaseConfig(t *testing.T) {
 func TestAddToBaseConfig(t *testing.T) {
 	nameOne := "cool-user"
 	profOne := profile.Profile{
-		Type:    profile.User,
-		Account: "cool-org",
+		TokenType: profile.TokenTypeUser,
+		Account:   "cool-org",
 	}
 	nameTwo := "cool-user2"
 	profTwo := profile.Profile{
-		Type:    profile.User,
-		Account: "cool-org2",
+		TokenType: profile.TokenTypeUser,
+		Account:   "cool-org2",
 	}
 
 	type args struct {
@@ -540,8 +488,8 @@ func TestBaseToJSON(t *testing.T) {
 					Upbound: Upbound{
 						Profiles: map[string]profile.Profile{
 							exists: {
-								Type:    profile.User,
-								Account: "account",
+								TokenType: profile.TokenTypeUser,
+								Account:   "account",
 								BaseConfig: map[string]string{
 									"k": "v",
 								},

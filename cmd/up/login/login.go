@@ -220,7 +220,7 @@ func constructAuth(username, token, password string) (*auth, profile.TokenType, 
 	if err != nil {
 		return nil, "", err
 	}
-	if profType == profile.Token {
+	if profType == profile.TokenTypeToken {
 		password = token
 	}
 	return &auth{
@@ -242,9 +242,9 @@ func parseID(user, token string) (string, profile.TokenType, error) {
 		if claims.Id == "" {
 			return "", "", errors.New(errNoIDInToken)
 		}
-		return claims.Id, profile.Token, nil
+		return claims.Id, profile.TokenTypeToken, nil
 	}
-	return user, profile.User, nil
+	return user, profile.TokenTypeUser, nil
 }
 
 // extractSession extracts the specified cookie from an HTTP response. The
