@@ -227,7 +227,7 @@ func (s *Space) Items(ctx context.Context, upCtx *upbound.Context) ([]list.Item,
 }
 
 func (s *Space) Back(ctx context.Context, upCtx *upbound.Context, m model) (model, error) {
-	m.state = &Organization{}
+	m.state = &s.org
 	return m, nil
 }
 

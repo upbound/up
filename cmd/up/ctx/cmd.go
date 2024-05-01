@@ -16,6 +16,7 @@ package ctx
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"io"
 	"strings"
@@ -410,6 +411,9 @@ func DeriveSelfHostedState(ctx context.Context, upCtx *upbound.Context, conf *cl
 }
 
 func DeriveCloudState(ctx context.Context, upCtx *upbound.Context, conf *clientcmdapi.Config) (NavigationState, error) {
+	// todo(redbackthomson): Validate we have an active session to cloud in the
+	// current profile
+
 	auth := conf.AuthInfos[conf.Contexts[conf.CurrentContext].AuthInfo]
 
 	// not authenticated with an Upbound JWT, start from empty
@@ -417,23 +421,14 @@ func DeriveCloudState(ctx context.Context, upCtx *upbound.Context, conf *clientc
 		return &Root{}, nil
 	}
 
-	token, err := ParseJWT(auth.Token)
+	// see if we're using an org scoped JWT
+	orgName, err := getOrgFromAuth(auth.Token)
 	if err != nil {
-		return nil, err
-	}
-
-	claims, ok := token.Claims.(jwt.MapClaims)
-	if !ok {
-		return nil, err
-	}
-
-	orgClaim, ok := claims["organization"]
-	if !ok {
 		return &Root{}, nil
 	}
 
 	org := &Organization{
-		name: orgClaim.(string),
+		name: orgName,
 	}
 
 	ingress, ctp, exists := upCtx.ParseCurrentSpaceContextURL()
@@ -471,7 +466,25 @@ func DeriveCloudState(ctx context.Context, upCtx *upbound.Context, conf *clientc
 	}
 }
 
-func ParseJWT(encoded string) (*jwt.Token, error) {
-	token, _, error := new(jwt.Parser).ParseUnverified(encoded, jwt.MapClaims{})
-	return token, error
+// getOrgFromAuth loads the organization name by reading the JWT and pulling out
+// the claim. Returns an error if the JWT doesn't have the claim, or there was
+// an error parsing the JWT. This method DOES NOT verify the JWT against any
+// keys.
+func getOrgFromAuth(authToken string) (string, error) {
+	token, _, err := new(jwt.Parser).ParseUnverified(authToken, jwt.MapClaims{})
+	if err != nil {
+		return "", err
+	}
+
+	claims, ok := token.Claims.(jwt.MapClaims)
+	if !ok {
+		return "", err
+	}
+
+	orgClaim, ok := claims["organization"]
+	if !ok {
+		return "", errors.New("no organization claim")
+	}
+
+	return orgClaim.(string), nil
 }
