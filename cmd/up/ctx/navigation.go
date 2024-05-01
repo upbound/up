@@ -83,7 +83,7 @@ func (r *Root) Items(ctx context.Context, upCtx *upbound.Context) ([]list.Item, 
 
 	items := make([]list.Item, 0, len(orgs))
 	for _, org := range orgs {
-		items = append(items, item{text: org.DisplayName, kind: "org", onEnter: func(ctx context.Context, upCtx *upbound.Context, m model) (model, error) {
+		items = append(items, item{text: org.DisplayName, kind: "organization", onEnter: func(ctx context.Context, upCtx *upbound.Context, m model) (model, error) {
 			m.state = &Organization{name: org.Name}
 			return m, nil
 		}})
