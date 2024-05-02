@@ -184,7 +184,7 @@ func (o *Organization) getOrgScopedAuthInfo(upCtx *upbound.Context) (*clientcmda
 			Args:       []string{"organization", "token"},
 			Env: []clientcmdapi.ExecEnvVar{
 				clientcmdapi.ExecEnvVar{
-					Name:  "UPBOUND_ORGANIZATION",
+					Name:  "ORGANIZATION",
 					Value: o.name,
 				},
 				clientcmdapi.ExecEnvVar{

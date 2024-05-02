@@ -34,7 +34,7 @@ import (
 type tokenCmd struct {
 	Upbound upbound.Flags `embed:""`
 
-	Name string `arg:"" env:"UPBOUND_ORGANIZATION" required:"" help:"Name of organization." predictor:"orgs"`
+	Name string `arg:"" env:"ORGANIZATION" required:"" help:"Name of organization." predictor:"orgs"`
 }
 
 // AfterApply sets default values in command after assignment and validation.

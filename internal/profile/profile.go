@@ -39,7 +39,7 @@ type Profile struct {
 	// ID is the referencable name of the profile.
 	ID string `json:"id,omitempty"`
 
-	// TokenType is the type of the profile.
+	// TokenType is the type of token in the profile.
 	TokenType TokenType `json:"type"`
 
 	// Session is a session token used to authenticate to Upbound.
