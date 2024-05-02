@@ -25,6 +25,7 @@ import (
 	"k8s.io/utils/ptr"
 
 	"github.com/pkg/errors"
+
 	"github.com/upbound/up/internal/kube"
 	upbound "github.com/upbound/up/internal/upbound"
 )

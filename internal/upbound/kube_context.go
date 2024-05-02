@@ -4,11 +4,12 @@ import (
 	"strings"
 
 	"github.com/crossplane/crossplane-runtime/pkg/errors"
-	"github.com/upbound/up/internal/profile"
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/client-go/tools/clientcmd"
 	clientcmdapi "k8s.io/client-go/tools/clientcmd/api"
 	"sigs.k8s.io/controller-runtime/pkg/client"
+
+	"github.com/upbound/up/internal/profile"
 )
 
 // HasValidContext returns true if the kube configuration attached to the

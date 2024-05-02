@@ -164,10 +164,6 @@ func (o *Organization) Breadcrumbs() string {
 	return upboundRootStyle.Render("Upbound") + " spaces"
 }
 
-func (o *Organization) IsCloudProfile() bool {
-	return o.name != ""
-}
-
 func (o *Organization) getOrgScopedAuthInfo(upCtx *upbound.Context) (*clientcmdapi.AuthInfo, error) {
 	var cmd string
 	switch version.GetReleaseTarget() {
@@ -253,8 +249,12 @@ func (s *Space) Back(ctx context.Context, upCtx *upbound.Context, m model) (mode
 	return m, nil
 }
 
+func (s *Space) IsCloud() bool {
+	return s.org.name != ""
+}
+
 func (s *Space) CanBack() bool {
-	return s.org.IsCloudProfile()
+	return s.IsCloud()
 }
 
 func (s *Space) Breadcrumbs() string {
