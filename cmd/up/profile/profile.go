@@ -30,6 +30,9 @@ type Cmd struct {
 	View    viewCmd    `cmd:"" help:"View the Upbound Profile settings across profiles."`
 	Config  config.Cmd `cmd:"" help:"Interact with the current Upbound Profile's config."`
 
+	// Deprecated
+	Set setCmd `cmd:"" help:"Deprecated: Set an Upbound Profile for use with a Space."`
+
 	Flags upbound.Flags `embed:""`
 }
 

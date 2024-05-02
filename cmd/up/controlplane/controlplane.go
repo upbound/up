@@ -112,6 +112,10 @@ type Cmd struct {
 
 	PullSecret pullsecret.Cmd `cmd:"" help:"Manage package pull secrets."`
 
+	// Deprecated commands
+	Connect    connectCmd    `cmd:"" help:"Deprecated: Connect kubectl to control plane."`
+	Disconnect disconnectCmd `cmd:"" help:"Deprecated: Disconnect kubectl from control plane."`
+
 	// Common Upbound API configuration
 	Flags upbound.Flags `embed:""`
 }
