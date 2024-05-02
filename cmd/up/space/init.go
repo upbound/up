@@ -272,14 +272,6 @@ func (c *initCmd) Run(ctx context.Context, upCtx *upbound.Context) error {
 
 	outputNextSteps()
 
-	return c.createOrUpdateProfile(getAcct(c.helmParams), upCtx)
-}
-
-// createOrUpdateProfile updates the active profile to access the new space,
-// or if there is no active profile, creates a new profile. The profile is set
-// as the default.
-func (c *initCmd) createOrUpdateProfile(acct string, upCtx *upbound.Context) error {
-	// todo(redbackthomson): Update with `up ctx` equivalent code
 	return nil
 }
 
@@ -353,15 +345,6 @@ func upVersionBounds(ch *chart.Chart) error {
 	}
 
 	return checkVersion(fmt.Sprintf("unsupported up version %q", version.GetVersion()), constraints, version.GetVersion())
-}
-
-func getAcct(params map[string]any) string {
-	v, ok := params["account"]
-	if !ok {
-		return "account_unset"
-	}
-
-	return v.(string)
 }
 
 func (c *initCmd) deploySpace(ctx context.Context, params map[string]any) error {
