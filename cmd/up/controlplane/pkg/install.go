@@ -72,7 +72,11 @@ func (c *installCmd) AfterApply(kongCtx *kong.Context, upCtx *upbound.Context) e
 		return errors.New(errUnknownPkgType)
 	}
 
-	kubeconfig, err := kube.GetKubeConfig(c.Kubeconfig)
+	if c.Kubeconfig != "" {
+		return errors.New("--kubeconfig has been deprecated in favour of setting the KUBECONFIG environment variable")
+	}
+
+	kubeconfig, err := upCtx.Kubecfg.ClientConfig()
 	if err != nil {
 		return err
 	}
@@ -98,7 +102,7 @@ type installCmd struct {
 	Package string `arg:"" help:"Reference to the ${package_type}."`
 
 	// NOTE(hasheddan): kong automatically cleans paths tagged with existingfile.
-	Kubeconfig         string        `hidden:"" type:"existingfile" help:"No longer used. Please use the KUBECONFIG environment variable instead."`
+	Kubeconfig         string        `hidden:"" type:"existingfile" help:"Deprecated: Override default kubeconfig path."`
 	Name               string        `help:"Name of ${package_type}."`
 	PackagePullSecrets []string      `help:"List of secrets used to pull ${package_type}."`
 	Wait               time.Duration `short:"w" help:"Wait duration for successful ${package_type} installation."`
