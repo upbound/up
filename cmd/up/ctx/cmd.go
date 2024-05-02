@@ -57,6 +57,7 @@ type Cmd struct {
 	Argument    string `arg:"" optional:"" help:".. to move to the parent, '-' for the previous context, '.' for the current context, or any relative path."`
 	Short       bool   `short:"s" env:"UP_SHORT" name:"short" help:"Short output."`
 	KubeContext string `env:"UP_CONTEXT" default:"upbound" name:"context" help:"Kubernetes context to operate on."`
+	File        string `short:"f" name:"kubeconfig" help:"Kubeconfig to modify when saving a new context"`
 }
 
 func (c *Cmd) AfterApply(kongCtx *kong.Context) error {
@@ -85,8 +86,8 @@ type model struct {
 
 	termination *Termination
 
-	upCtx       *upbound.Context
-	kubeContext string
+	upCtx         *upbound.Context
+	contextWriter kubeContextWriter
 }
 
 func (m model) WithTermination(msg string, err error) model {
@@ -242,9 +243,9 @@ func (c *Cmd) RunRelative(ctx context.Context, kongCtx *kong.Context, upCtx *upb
 	}
 
 	m := model{
-		state:       state,
-		upCtx:       upCtx,
-		kubeContext: c.KubeContext,
+		state:         state,
+		upCtx:         upCtx,
+		contextWriter: c.kubeContextWriter(),
 	}
 	for _, s := range strings.Split(c.Argument, "/") {
 		switch s {
@@ -293,21 +294,24 @@ func (c *Cmd) RunRelative(ctx context.Context, kongCtx *kong.Context, upCtx *upb
 			return fmt.Errorf("cannot move context to: %s", m.state.Breadcrumbs())
 		}
 		var err error
-		msg, err = accepting.Accept(ctx, upCtx, c.KubeContext)
+		msg, err = accepting.Accept(ctx, upCtx, m.contextWriter)
 		if err != nil {
 			return err
 		}
 	}
 
-	if c.Short {
-		switch state := m.state.(type) {
-		case *Group:
-			fmt.Printf("%s/%s\n", state.space.name, state.name)
-		case *ControlPlane:
-			fmt.Printf("%s/%s/%s\n", state.group.space.name, state.NamespacedName().Namespace, state.NamespacedName().Name)
+	// don't print anything else or we are going to pollute stdout
+	if c.File != "-" {
+		if c.Short {
+			switch state := m.state.(type) {
+			case *Group:
+				fmt.Printf("%s/%s\n", state.space.name, state.name)
+			case *ControlPlane:
+				fmt.Printf("%s/%s/%s\n", state.group.space.name, state.NamespacedName().Namespace, state.NamespacedName().Name)
+			}
+		} else {
+			fmt.Print(msg)
 		}
-	} else {
-		fmt.Print(msg)
 	}
 
 	return nil
@@ -316,9 +320,9 @@ func (c *Cmd) RunRelative(ctx context.Context, kongCtx *kong.Context, upCtx *upb
 func (c *Cmd) RunInteractive(ctx context.Context, kongCtx *kong.Context, upCtx *upbound.Context, initialState NavigationState) error {
 	// start interactive mode
 	m := model{
-		state:       initialState,
-		upCtx:       upCtx,
-		kubeContext: c.KubeContext,
+		state:         initialState,
+		upCtx:         upCtx,
+		contextWriter: c.kubeContextWriter(),
 	}
 	items, err := m.state.Items(ctx, upCtx)
 	if err != nil {
@@ -343,6 +347,17 @@ func (c *Cmd) RunInteractive(ctx context.Context, kongCtx *kong.Context, upCtx *
 		return m.termination.Err
 	}
 	return nil
+}
+
+func (c *Cmd) kubeContextWriter() kubeContextWriter {
+	if c.File == "-" {
+		return &printWriter{}
+	}
+
+	return &fileWriter{
+		fileOverride: c.File,
+		kubeContext:  c.KubeContext,
+	}
 }
 
 func DeriveState(ctx context.Context, upCtx *upbound.Context, conf *clientcmdapi.Config) (NavigationState, error) {

@@ -51,7 +51,7 @@ type NavigationState interface {
 // Accepting is a model state that provides a method to accept a navigation node.
 type Accepting interface {
 	NavigationState
-	Accept(ctx context.Context, upCtx *upbound.Context, kubeContext string) (string, error)
+	Accept(ctx context.Context, upCtx *upbound.Context, writer kubeContextWriter) (string, error)
 }
 
 // Back is a model state that provides a method to go back to the parent navigation node.
