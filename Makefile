@@ -13,6 +13,9 @@ PLATFORMS ?= linux_amd64 linux_arm64 linux_arm darwin_amd64 darwin_arm64 windows
 # Connect agent version
 UP_CONNECT_AGENT_VERSION = 0.0.0-309.gd29fc13
 
+# Release target version
+RELEASE_TARGET ?= debug
+
 # ====================================================================================
 # Setup Output
 
@@ -34,6 +37,7 @@ GO_TEST_PARALLEL := $(shell echo $$(( $(NPROCS) / 2 )))
 GO_STATIC_PACKAGES = $(GO_PROJECT)/cmd/up $(GO_PROJECT)/cmd/docker-credential-up
 GO_LDFLAGS += -X $(GO_PROJECT)/internal/version.version=$(VERSION)
 GO_LDFLAGS += -X $(GO_PROJECT)/internal/version.agentVersion=$(UP_CONNECT_AGENT_VERSION)
+GO_LDFLAGS += -X $(GO_PROJECT)/internal/version.target=$(RELEASE_TARGET)
 GO_SUBDIRS += cmd internal
 GO111MODULE = on
 GO_REQUIRED_VERSION = 1.22

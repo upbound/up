@@ -91,7 +91,7 @@ func writeContext(ctx context.Context, upCtx *upbound.Context, space Space, ctp 
 	}
 
 	// write back
-	if err := clientcmd.ModifyConfig(clientcmd.NewDefaultPathOptions(), *ctpConf, true); err != nil {
+	if err := clientcmd.ModifyConfig(clientcmd.NewDefaultPathOptions(), *ctpConf, false); err != nil {
 		return "", err
 	}
 	if err := writeLastContext(prevContext); err != nil { // nolint:staticcheck

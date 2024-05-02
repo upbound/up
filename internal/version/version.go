@@ -37,9 +37,17 @@ const (
 	errNotSemVerFmt           = "%s; couldn't covert version to semver"
 )
 
+type ReleaseTarget string
+
+const (
+	ReleaseTargetRelease ReleaseTarget = "release"
+	ReleaseTargetDebug   ReleaseTarget = "debug"
+)
+
 var (
 	version      string
 	agentVersion string
+	target       string = string(ReleaseTargetDebug)
 )
 
 // GetVersion returns the current build version.
@@ -50,6 +58,18 @@ func GetVersion() string {
 // GetAgentVersion returns the connect agent version.
 func GetAgentVersion() string {
 	return agentVersion
+}
+
+// GetReleaseTarget returns the target type that the binary was built with.
+func GetReleaseTarget() ReleaseTarget {
+	switch target {
+	case string(ReleaseTargetRelease):
+		return ReleaseTargetRelease
+	case string(ReleaseTargetDebug):
+		fallthrough
+	default:
+		return ReleaseTargetDebug
+	}
 }
 
 type client interface {

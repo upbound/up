@@ -16,6 +16,7 @@ package ctx
 
 import (
 	"context"
+	"os"
 	"sort"
 
 	"github.com/charmbracelet/bubbles/list"
@@ -32,6 +33,7 @@ import (
 	"github.com/upbound/up-sdk-go/service/organizations"
 	"github.com/upbound/up/internal/profile"
 	"github.com/upbound/up/internal/upbound"
+	"github.com/upbound/up/internal/version"
 )
 
 var (
@@ -118,6 +120,11 @@ func (o *Organization) Items(ctx context.Context, upCtx *upbound.Context) ([]lis
 		return nil, err
 	}
 
+	authInfo, err := o.getOrgScopedAuthInfo(upCtx)
+	if err != nil {
+		return nil, err
+	}
+
 	items := make([]list.Item, 0)
 	items = append(items, item{text: "..", kind: "organizations", onEnter: o.Back, back: true})
 	for _, space := range l.Items {
@@ -135,7 +142,7 @@ func (o *Organization) Items(ctx context.Context, upCtx *upbound.Context) ([]lis
 				ingress: space.Status.FQDN,
 				// todo(redbackthomson): Replace with public CA data once available
 				ca:       make([]byte, 0),
-				authInfo: o.getOrgScopedAuthInfo(upCtx),
+				authInfo: authInfo,
 			}
 			return m, nil
 		}})
@@ -161,11 +168,23 @@ func (o *Organization) IsCloudProfile() bool {
 	return o.name != ""
 }
 
-func (o *Organization) getOrgScopedAuthInfo(upCtx *upbound.Context) *clientcmdapi.AuthInfo {
+func (o *Organization) getOrgScopedAuthInfo(upCtx *upbound.Context) (*clientcmdapi.AuthInfo, error) {
+	var cmd string
+	switch version.GetReleaseTarget() {
+	case version.ReleaseTargetRelease:
+		cmd = "up"
+	case version.ReleaseTargetDebug:
+		var err error
+		cmd, err = os.Executable()
+		if err != nil {
+			return nil, err
+		}
+	}
+
 	return &clientcmdapi.AuthInfo{
 		Exec: &clientcmdapi.ExecConfig{
 			APIVersion: "client.authentication.k8s.io/v1",
-			Command:    "up",
+			Command:    cmd,
 			Args:       []string{"organization", "token"},
 			Env: []clientcmdapi.ExecEnvVar{
 				clientcmdapi.ExecEnvVar{
@@ -179,7 +198,7 @@ func (o *Organization) getOrgScopedAuthInfo(upCtx *upbound.Context) *clientcmdap
 			},
 			InteractiveMode: clientcmdapi.IfAvailableExecInteractiveMode,
 		},
-	}
+	}, nil
 }
 
 type sortedItems []list.Item
