@@ -183,11 +183,11 @@ func (o *Organization) getOrgScopedAuthInfo(upCtx *upbound.Context) (*clientcmda
 			Command:    cmd,
 			Args:       []string{"organization", "token"},
 			Env: []clientcmdapi.ExecEnvVar{
-				clientcmdapi.ExecEnvVar{
+				{
 					Name:  "ORGANIZATION",
 					Value: o.Name,
 				},
-				clientcmdapi.ExecEnvVar{
+				{
 					Name:  "UP_PROFILE",
 					Value: upCtx.ProfileName,
 				},

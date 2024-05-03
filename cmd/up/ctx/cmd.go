@@ -392,12 +392,12 @@ func deriveState(ctx context.Context, upCtx *upbound.Context, conf *clientcmdapi
 
 	rest, err := clientcmd.NewDefaultClientConfig(*spaceKubeconfig, &clientcmd.ConfigOverrides{}).ClientConfig()
 	if err != nil {
-		return &Root{}, nil
+		return &Root{}, nil // nolint:nilerr
 	}
 
 	spaceClient, err := client.New(rest, client.Options{})
 	if err != nil {
-		return &Root{}, nil
+		return &Root{}, nil // nolint:nilerr
 	}
 
 	// determine if self-hosted by looking for ingress
@@ -455,7 +455,7 @@ func DeriveCloudState(upCtx *upbound.Context, conf *clientcmdapi.Config) (Naviga
 	// see if we're using an org scoped JWT
 	orgName, err := getOrgFromAuth(auth.Token)
 	if err != nil {
-		return &Root{}, nil
+		return &Root{}, nil // nolint:nilerr
 	}
 
 	org := &Organization{
