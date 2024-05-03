@@ -16,7 +16,7 @@ package controlplane
 
 import (
 	"context"
-	"errors"
+	"fmt"
 
 	"github.com/upbound/up/cmd/up/controlplane/kubeconfig"
 )
@@ -27,5 +27,5 @@ type connectCmd struct {
 
 // Run executes the get command.
 func (c *connectCmd) Run(ctx context.Context) error {
-	return errors.New("this command has been removed in favor of 'up ctx'")
+	return fmt.Errorf("this command has been removed in favor of 'up ctx <space name>/%s/%s'", c.Group, c.Name)
 }

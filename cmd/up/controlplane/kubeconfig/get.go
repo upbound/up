@@ -16,8 +16,7 @@ package kubeconfig
 
 import (
 	"context"
-
-	"github.com/crossplane/crossplane-runtime/pkg/errors"
+	"fmt"
 )
 
 // getCmd gets kubeconfig data for an Upbound control plane.
@@ -30,5 +29,5 @@ type getCmd struct {
 
 // Run executes the get command.
 func (c *getCmd) Run(ctx context.Context) error {
-	return errors.New("this command has been removed in favor of 'up ctx'")
+	return fmt.Errorf("this command has been removed in favor of 'up ctx <space name>/%s/%s'", c.Group, c.Name)
 }
