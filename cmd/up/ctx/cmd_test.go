@@ -399,8 +399,8 @@ xPWjLExASVeAdNehjgFcrfoc7ZWtJYeE42his0athGjS/fNK7PnjijpZn6h76hRB
 			want: &Group{
 				Space: Space{
 					Name:    "hub",
-					Ingress: "https://hub", // TODO: there is nothing to store the hub (vs. the ingress)
-					CA:      []byte(hubCA),
+					Ingress: "https://ingress", // TODO: there is nothing to store the hub (vs. the ingress)
+					CA:      []byte(ingressCA),
 					AuthInfo: &clientcmdapi.AuthInfo{
 						Token: "token",
 					},
@@ -424,6 +424,7 @@ xPWjLExASVeAdNehjgFcrfoc7ZWtJYeE42his0athGjS/fNK7PnjijpZn6h76hRB
 			},
 			want: &Group{
 				Space: Space{
+					Name:    "ingress",
 					Ingress: "https://ingress", // TODO: there is nothing to store the hub (vs. the ingress)
 					CA:      []byte(ingressCA),
 					AuthInfo: &clientcmdapi.AuthInfo{
@@ -447,15 +448,13 @@ xPWjLExASVeAdNehjgFcrfoc7ZWtJYeE42his0athGjS/fNK7PnjijpZn6h76hRB
 			getIngressHost: func(ctx context.Context, cl client.Client) (host string, ca []byte, err error) {
 				return "https://ingress", []byte(ingressCA), nil
 			},
-			want: &Group{
-				Space: Space{
-					Ingress: "https://ingress", // TODO: there is nothing to store the hub (vs. the ingress)
-					CA:      []byte(ingressCA),
-					AuthInfo: &clientcmdapi.AuthInfo{
-						Token: "token",
-					},
+			want: &Space{
+				Ingress: "https://ingress", // TODO: there is nothing to store the hub (vs. the ingress)
+				CA:      []byte(ingressCA),
+				AuthInfo: &clientcmdapi.AuthInfo{
+					Token: "token",
 				},
-				Name: "default",
+				Name: "ingress",
 			},
 			wantErr: "<nil>",
 		},
@@ -482,38 +481,11 @@ xPWjLExASVeAdNehjgFcrfoc7ZWtJYeE42his0athGjS/fNK7PnjijpZn6h76hRB
 						AuthInfo: &clientcmdapi.AuthInfo{
 							Token: "token",
 						},
+						Name: "ctp1",
 					},
 					Name: "default",
 				},
 				Name: "ctp1",
-			},
-			wantErr: "<nil>",
-		},
-		"UpboundAPI": {
-			conf: clientcmdapi.Config{
-				CurrentContext: "upbound",
-				Contexts:       map[string]*clientcmdapi.Context{"upbound": {Namespace: "default", Cluster: "upbound", AuthInfo: "upbound"}},
-				Clusters: map[string]*clientcmdapi.Cluster{
-					"upbound": {Server: "https://api.upbound.io", CertificateAuthorityData: []byte(hubCA)},
-				},
-				AuthInfos: map[string]*clientcmdapi.AuthInfo{"upbound": {Token: "token"}},
-			},
-			getIngressHost: ingressUnknownKind,
-			want:           &Root{},
-			wantErr:        "<nil>",
-		},
-		"Organization": {
-			conf: clientcmdapi.Config{
-				CurrentContext: "upbound",
-				Contexts:       map[string]*clientcmdapi.Context{"upbound": {Namespace: "default", Cluster: "upbound", AuthInfo: "upbound"}},
-				Clusters: map[string]*clientcmdapi.Cluster{
-					"upbound": {Server: "https://api.upbound.io", CertificateAuthorityData: []byte(hubCA)},
-				},
-				AuthInfos: map[string]*clientcmdapi.AuthInfo{"upbound": {Token: orgToken}},
-			},
-			getIngressHost: ingressUnknownKind,
-			want: &Organization{
-				Name: "org",
 			},
 			wantErr: "<nil>",
 		},
@@ -522,20 +494,18 @@ xPWjLExASVeAdNehjgFcrfoc7ZWtJYeE42his0athGjS/fNK7PnjijpZn6h76hRB
 				CurrentContext: "upbound",
 				Contexts:       map[string]*clientcmdapi.Context{"upbound": {Namespace: "default", Cluster: "upbound", AuthInfo: "upbound"}},
 				Clusters: map[string]*clientcmdapi.Cluster{
-					"upbound": {Server: "https://eu-west-1.ibm-cloud.com", CertificateAuthorityData: []byte(hubCA)},
+					"upbound": {Server: "https://eu-west-1.ibm-cloud.com", CertificateAuthorityData: []byte(ingressCA)},
 				},
 				AuthInfos: map[string]*clientcmdapi.AuthInfo{"upbound": {Token: orgToken}},
 			},
-			getIngressHost: func(ctx context.Context, cl client.Client) (host string, ca []byte, err error) {
-				return "https://eu-west-1.ibm-cloud.com", []byte(ingressCA), nil
-			},
+			getIngressHost: ingressPublicNotFound,
 			want: &Group{
 				Space: Space{
 					Org: Organization{
 						Name: "org",
 					},
-					Name:     "space", // TODO: where does this come from?
-					Ingress:  "https://eu-west-1.ibm-cloud.com",
+					Name:     "eu-west-1", // TODO: where does this come from?
+					Ingress:  "eu-west-1.ibm-cloud.com",
 					CA:       []byte(ingressCA),
 					AuthInfo: &clientcmdapi.AuthInfo{Token: orgToken},
 				},
@@ -548,7 +518,7 @@ xPWjLExASVeAdNehjgFcrfoc7ZWtJYeE42his0athGjS/fNK7PnjijpZn6h76hRB
 				CurrentContext: "upbound",
 				Contexts:       map[string]*clientcmdapi.Context{"upbound": {Namespace: "default", Cluster: "upbound", AuthInfo: "upbound"}},
 				Clusters: map[string]*clientcmdapi.Cluster{
-					"upbound": {Server: "https://eu-west-1.ibm-cloud.com/apis/spaces.upbound.io/v1beta1/namespaces/default/controlplanes/ctp1/k8s", CertificateAuthorityData: []byte(hubCA)},
+					"upbound": {Server: "https://eu-west-1.ibm-cloud.com/apis/spaces.upbound.io/v1beta1/namespaces/default/controlplanes/ctp1/k8s", CertificateAuthorityData: []byte(ingressCA)},
 				},
 				AuthInfos: map[string]*clientcmdapi.AuthInfo{"upbound": {Token: orgToken}},
 			},
@@ -559,8 +529,8 @@ xPWjLExASVeAdNehjgFcrfoc7ZWtJYeE42his0athGjS/fNK7PnjijpZn6h76hRB
 						Org: Organization{
 							Name: "org",
 						},
-						Name:     "space", // TODO: where does this come from?
-						Ingress:  "https://eu-west-1.ibm-cloud.com",
+						Name:     "eu-west-1",
+						Ingress:  "eu-west-1.ibm-cloud.com",
 						CA:       []byte(ingressCA),
 						AuthInfo: &clientcmdapi.AuthInfo{Token: orgToken},
 					},
@@ -582,8 +552,8 @@ xPWjLExASVeAdNehjgFcrfoc7ZWtJYeE42his0athGjS/fNK7PnjijpZn6h76hRB
 			getIngressHost: func(ctx context.Context, cl client.Client) (host string, ca []byte, err error) {
 				return "https://ingress", []byte(ingressCA), nil
 			},
-			want:    &Root{}, // or do we want an error?
-			wantErr: "<nil>",
+			want:    nil,
+			wantErr: `invalid configuration: cluster "invalid" was not found for context "hub"`,
 		},
 		"UnknownAuthInfo": {
 			conf: clientcmdapi.Config{
@@ -597,8 +567,8 @@ xPWjLExASVeAdNehjgFcrfoc7ZWtJYeE42his0athGjS/fNK7PnjijpZn6h76hRB
 			getIngressHost: func(ctx context.Context, cl client.Client) (host string, ca []byte, err error) {
 				return "https://ingress", []byte(ingressCA), nil
 			},
-			want:    &Root{}, // or do we want an error?
-			wantErr: "<nil>",
+			want:    nil,
+			wantErr: `invalid configuration: user "invalid" was not found for context "hub"`,
 		},
 		"UnknownContext": {
 			conf: clientcmdapi.Config{
@@ -612,8 +582,8 @@ xPWjLExASVeAdNehjgFcrfoc7ZWtJYeE42his0athGjS/fNK7PnjijpZn6h76hRB
 			getIngressHost: func(ctx context.Context, cl client.Client) (host string, ca []byte, err error) {
 				return "https://ingress", []byte(ingressCA), nil
 			},
-			want:    &Root{}, // or do we want an error?
-			wantErr: "<nil>",
+			want:    nil, // or do we want an error?
+			wantErr: `invalid configuration: context was not found for specified context: invalid`,
 		},
 	}
 	for name, tt := range tests {

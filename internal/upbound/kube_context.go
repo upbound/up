@@ -92,6 +92,10 @@ func (c *Context) GetCurrentSpaceContextScope() (string, types.NamespacedName, b
 		return "", types.NamespacedName{}, false
 	}
 
+	if cluster == nil || cluster.Server == "" {
+		return "", types.NamespacedName{}, false
+	}
+
 	base, nsn, exists := profile.ParseSpacesK8sURL(strings.TrimSuffix(cluster.Server, "/"))
 	// we are inside a ctp scope
 	if exists {

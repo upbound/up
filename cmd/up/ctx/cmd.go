@@ -390,6 +390,10 @@ func deriveState(ctx context.Context, upCtx *upbound.Context, conf *clientcmdapi
 		spaceKubeconfig = &config
 	}
 
+	if err := clientcmd.Validate(*spaceKubeconfig); err != nil {
+		return nil, err
+	}
+
 	rest, err := clientcmd.NewDefaultClientConfig(*spaceKubeconfig, &clientcmd.ConfigOverrides{}).ClientConfig()
 	if err != nil {
 		return &Root{}, nil // nolint:nilerr
@@ -446,6 +450,7 @@ func DeriveCloudState(upCtx *upbound.Context, conf *clientcmdapi.Config) (Naviga
 	// current profile
 
 	auth := conf.AuthInfos[conf.Contexts[conf.CurrentContext].AuthInfo]
+	ca := conf.Clusters[conf.Contexts[conf.CurrentContext].Cluster].CertificateAuthorityData
 
 	// not authenticated with an Upbound JWT, start from empty
 	if auth == nil {
@@ -473,7 +478,7 @@ func DeriveCloudState(upCtx *upbound.Context, conf *clientcmdapi.Config) (Naviga
 		Name: spaceName,
 
 		Ingress:  strings.TrimPrefix(ingress, "https://"),
-		CA:       make([]byte, 0),
+		CA:       ca,
 		AuthInfo: auth,
 	}
 
