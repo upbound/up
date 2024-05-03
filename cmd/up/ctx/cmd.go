@@ -16,7 +16,6 @@ package ctx
 
 import (
 	"context"
-	"errors"
 	"fmt"
 	"io"
 	"strings"
@@ -25,7 +24,6 @@ import (
 	"github.com/charmbracelet/bubbles/key"
 	"github.com/charmbracelet/bubbles/list"
 	tea "github.com/charmbracelet/bubbletea"
-	"github.com/golang-jwt/jwt"
 	kerrors "k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/api/meta"
 	"k8s.io/apimachinery/pkg/types"
@@ -458,13 +456,19 @@ func DeriveCloudState(upCtx *upbound.Context, conf *clientcmdapi.Config) (Naviga
 	ca := conf.Clusters[conf.Contexts[conf.CurrentContext].Cluster].CertificateAuthorityData
 
 	// not authenticated with an Upbound JWT, start from empty
-	if auth == nil {
+	if auth == nil || auth.Exec == nil {
 		return &Root{}, nil
 	}
 
-	// see if we're using an org scoped JWT
-	orgName, err := getOrgFromAuth(auth.Token)
-	if err != nil {
+	orgName := ""
+	for _, e := range auth.Exec.Env {
+		if e.Name == "ORGANIZATION" {
+			orgName = e.Value
+		}
+	}
+
+	// the exec was modified or wasn't produced by up
+	if orgName == "" {
 		return &Root{}, nil // nolint:nilerr
 	}
 
@@ -505,27 +509,4 @@ func DeriveCloudState(upCtx *upbound.Context, conf *clientcmdapi.Config) (Naviga
 	default:
 		return &space, nil
 	}
-}
-
-// getOrgFromAuth loads the organization name by reading the JWT and pulling out
-// the claim. Returns an error if the JWT doesn't have the claim, or there was
-// an error parsing the JWT. This method DOES NOT verify the JWT against any
-// keys.
-func getOrgFromAuth(authToken string) (string, error) {
-	token, _, err := new(jwt.Parser).ParseUnverified(authToken, jwt.MapClaims{})
-	if err != nil {
-		return "", err
-	}
-
-	claims, ok := token.Claims.(jwt.MapClaims)
-	if !ok {
-		return "", err
-	}
-
-	orgClaim, ok := claims["organization"]
-	if !ok {
-		return "", errors.New("no organization claim")
-	}
-
-	return orgClaim.(string), nil
 }

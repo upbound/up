@@ -19,7 +19,6 @@ import (
 	"fmt"
 	"testing"
 
-	"github.com/golang-jwt/jwt"
 	"github.com/google/go-cmp/cmp"
 	"k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/api/meta"
@@ -363,10 +362,7 @@ xPWjLExASVeAdNehjgFcrfoc7ZWtJYeE42his0athGjS/fNK7PnjijpZn6h76hRB
 	ingressUnknownKind := func(ctx context.Context, cl client.Client) (host string, ca []byte, err error) {
 		return "", nil, &meta.NoKindMatchError{GroupKind: schema.GroupKind{Group: "ConfigMap"}}
 	}
-	orgToken, err := jwt.NewWithClaims(jwt.SigningMethodHS256, &jwt.MapClaims{"organization": "org"}).SignedString([]byte("key"))
-	if err != nil {
-		t.Fatalf("jwt.NewWithClaims(...): %v", err)
-	}
+	authOrgExec, _ := getOrgScopedAuthInfo(&upbound.Context{ProfileName: "profile"}, "org")
 
 	tests := map[string]struct {
 		conf           clientcmdapi.Config
@@ -468,7 +464,7 @@ xPWjLExASVeAdNehjgFcrfoc7ZWtJYeE42his0athGjS/fNK7PnjijpZn6h76hRB
 					"ctp1":    {Server: "https://ingress/apis/spaces.upbound.io/v1beta1/namespaces/default/controlplanes/ctp1/k8s", CertificateAuthorityData: []byte(ingressCA)},
 					"ctp2":    {Server: "https://ingress/apis/spaces.upbound.io/v1beta1/namespaces/default/controlplanes/ctp2/k8s", CertificateAuthorityData: []byte(ingressCA)},
 				},
-				AuthInfos: map[string]*clientcmdapi.AuthInfo{"hub": {Token: "token"}},
+				AuthInfos: map[string]*clientcmdapi.AuthInfo{"hub": authOrgExec},
 			},
 			getIngressHost: func(ctx context.Context, cl client.Client) (host string, ca []byte, err error) {
 				return "https://ingress", []byte(ingressCA), nil
@@ -476,12 +472,10 @@ xPWjLExASVeAdNehjgFcrfoc7ZWtJYeE42his0athGjS/fNK7PnjijpZn6h76hRB
 			want: &ControlPlane{
 				Group: Group{
 					Space: Space{
-						Ingress: "https://ingress",
-						CA:      []byte(ingressCA),
-						AuthInfo: &clientcmdapi.AuthInfo{
-							Token: "token",
-						},
-						Name: "ctp1",
+						Ingress:  "https://ingress",
+						CA:       []byte(ingressCA),
+						AuthInfo: authOrgExec,
+						Name:     "ctp1",
 					},
 					Name: "default",
 				},
@@ -496,7 +490,7 @@ xPWjLExASVeAdNehjgFcrfoc7ZWtJYeE42his0athGjS/fNK7PnjijpZn6h76hRB
 				Clusters: map[string]*clientcmdapi.Cluster{
 					"upbound": {Server: "https://eu-west-1.ibm-cloud.com", CertificateAuthorityData: []byte(ingressCA)},
 				},
-				AuthInfos: map[string]*clientcmdapi.AuthInfo{"upbound": {Token: orgToken}},
+				AuthInfos: map[string]*clientcmdapi.AuthInfo{"upbound": authOrgExec},
 			},
 			getIngressHost: ingressPublicNotFound,
 			want: &Group{
@@ -507,7 +501,7 @@ xPWjLExASVeAdNehjgFcrfoc7ZWtJYeE42his0athGjS/fNK7PnjijpZn6h76hRB
 					Name:     "eu-west-1", // TODO: where does this come from?
 					Ingress:  "eu-west-1.ibm-cloud.com",
 					CA:       []byte(ingressCA),
-					AuthInfo: &clientcmdapi.AuthInfo{Token: orgToken},
+					AuthInfo: authOrgExec,
 				},
 				Name: "default",
 			},
@@ -520,7 +514,7 @@ xPWjLExASVeAdNehjgFcrfoc7ZWtJYeE42his0athGjS/fNK7PnjijpZn6h76hRB
 				Clusters: map[string]*clientcmdapi.Cluster{
 					"upbound": {Server: "https://eu-west-1.ibm-cloud.com/apis/spaces.upbound.io/v1beta1/namespaces/default/controlplanes/ctp1/k8s", CertificateAuthorityData: []byte(ingressCA)},
 				},
-				AuthInfos: map[string]*clientcmdapi.AuthInfo{"upbound": {Token: orgToken}},
+				AuthInfos: map[string]*clientcmdapi.AuthInfo{"upbound": authOrgExec},
 			},
 			getIngressHost: ingressUnknownKind,
 			want: &ControlPlane{
@@ -532,7 +526,7 @@ xPWjLExASVeAdNehjgFcrfoc7ZWtJYeE42his0athGjS/fNK7PnjijpZn6h76hRB
 						Name:     "eu-west-1",
 						Ingress:  "eu-west-1.ibm-cloud.com",
 						CA:       []byte(ingressCA),
-						AuthInfo: &clientcmdapi.AuthInfo{Token: orgToken},
+						AuthInfo: authOrgExec,
 					},
 					Name: "default",
 				},
