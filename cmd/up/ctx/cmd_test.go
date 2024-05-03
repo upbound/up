@@ -399,7 +399,7 @@ xPWjLExASVeAdNehjgFcrfoc7ZWtJYeE42his0athGjS/fNK7PnjijpZn6h76hRB
 			want: &Group{
 				Space: Space{
 					Name:    "hub",
-					Ingress: "https://ingress", // TODO: there is nothing to store the hub (vs. the ingress)
+					Ingress: "https://ingress",
 					CA:      []byte(ingressCA),
 					AuthInfo: &clientcmdapi.AuthInfo{
 						Token: "token",
@@ -425,7 +425,7 @@ xPWjLExASVeAdNehjgFcrfoc7ZWtJYeE42his0athGjS/fNK7PnjijpZn6h76hRB
 			want: &Group{
 				Space: Space{
 					Name:    "ingress",
-					Ingress: "https://ingress", // TODO: there is nothing to store the hub (vs. the ingress)
+					Ingress: "https://ingress",
 					CA:      []byte(ingressCA),
 					AuthInfo: &clientcmdapi.AuthInfo{
 						Token: "token",
@@ -449,7 +449,7 @@ xPWjLExASVeAdNehjgFcrfoc7ZWtJYeE42his0athGjS/fNK7PnjijpZn6h76hRB
 				return "https://ingress", []byte(ingressCA), nil
 			},
 			want: &Space{
-				Ingress: "https://ingress", // TODO: there is nothing to store the hub (vs. the ingress)
+				Ingress: "https://ingress",
 				CA:      []byte(ingressCA),
 				AuthInfo: &clientcmdapi.AuthInfo{
 					Token: "token",
@@ -476,7 +476,7 @@ xPWjLExASVeAdNehjgFcrfoc7ZWtJYeE42his0athGjS/fNK7PnjijpZn6h76hRB
 			want: &ControlPlane{
 				Group: Group{
 					Space: Space{
-						Ingress: "https://ingress", // TODO: there is nothing to store the hub (vs. the ingress)
+						Ingress: "https://ingress",
 						CA:      []byte(ingressCA),
 						AuthInfo: &clientcmdapi.AuthInfo{
 							Token: "token",

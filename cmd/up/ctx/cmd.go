@@ -418,6 +418,11 @@ func deriveState(ctx context.Context, upCtx *upbound.Context, conf *clientcmdapi
 func DeriveSelfHostedState(conf *clientcmdapi.Config, ingress string, ca []byte, ctp types.NamespacedName) (NavigationState, error) {
 	auth := conf.AuthInfos[conf.Contexts[conf.CurrentContext].AuthInfo]
 
+	// TODO(redbackthomson): Here we are only storing the ingress of the space,
+	// and not necessarily the hub URL. It would be good to store the hub URL
+	// because when exporting the Kubeconfig, we would export the hub as the
+	// server.
+
 	space := Space{
 		Name:     conf.CurrentContext,
 		Ingress:  ingress,
