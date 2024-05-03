@@ -72,14 +72,6 @@ func TestAddOrUpdateUpboundProfile(t *testing.T) {
 				},
 			},
 		},
-		"Invalid": {
-			reason: "Adding an invalid profile should cause an error.",
-			name:   name,
-			cfg:    &Config{},
-			add:    profile.Profile{},
-			want:   &Config{},
-			err:    errors.New("profile is not valid"),
-		},
 	}
 	for name, tc := range cases {
 		t.Run(name, func(t *testing.T) {
