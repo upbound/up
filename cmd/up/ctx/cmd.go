@@ -38,6 +38,7 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/log/zap"
 
 	spacesv1beta1 "github.com/upbound/up-sdk-go/apis/spaces/v1beta1"
+	"github.com/upbound/up/internal/kube"
 	"github.com/upbound/up/internal/profile"
 	"github.com/upbound/up/internal/upbound"
 )
@@ -116,7 +117,7 @@ func (c *Cmd) Run(ctx context.Context, kongCtx *kong.Context, upCtx *upbound.Con
 	case "":
 		return c.RunInteractive(ctx, kongCtx, upCtx, initialState)
 	default:
-		return c.RunRelative(ctx, kongCtx, upCtx, initialState)
+		return c.RunRelative(ctx, upCtx, initialState)
 	}
 }
 
@@ -235,7 +236,7 @@ func activateContext(conf *clientcmdapi.Config, sourceContext, preferredContext 
 	return conf, newLastContext, nil
 }
 
-func (c *Cmd) RunRelative(ctx context.Context, kongCtx *kong.Context, upCtx *upbound.Context, initialState NavigationState) error { // nolint:gocyclo // a bit long but ¯\_(ツ)_/¯
+func (c *Cmd) RunRelative(ctx context.Context, upCtx *upbound.Context, initialState NavigationState) error { // nolint:gocyclo // a bit long but ¯\_(ツ)_/¯
 	// begin from root unless we're starting from a relative . or ..
 	state := initialState
 	if !strings.HasPrefix(c.Argument, ".") {
@@ -245,7 +246,7 @@ func (c *Cmd) RunRelative(ctx context.Context, kongCtx *kong.Context, upCtx *upb
 	m := model{
 		state:         state,
 		upCtx:         upCtx,
-		contextWriter: c.kubeContextWriter(),
+		contextWriter: c.kubeContextWriter(upCtx),
 	}
 	for _, s := range strings.Split(c.Argument, "/") {
 		switch s {
@@ -256,7 +257,7 @@ func (c *Cmd) RunRelative(ctx context.Context, kongCtx *kong.Context, upCtx *upb
 				return fmt.Errorf("cannot move to parent context from: %s", m.state.Breadcrumbs())
 			}
 			var err error
-			m, err = back.Back(ctx, upCtx, m)
+			m, err = back.Back(m)
 			if err != nil {
 				return err
 			}
@@ -272,7 +273,7 @@ func (c *Cmd) RunRelative(ctx context.Context, kongCtx *kong.Context, upCtx *upb
 					if i.onEnter == nil {
 						return fmt.Errorf("cannot enter %q in: %s", s, m.state.Breadcrumbs())
 					}
-					m, err = i.onEnter(ctx, m.upCtx, m)
+					m, err = i.onEnter(m)
 					if err != nil {
 						return err
 					}
@@ -286,7 +287,7 @@ func (c *Cmd) RunRelative(ctx context.Context, kongCtx *kong.Context, upCtx *upb
 		}
 	}
 
-	// final step if we moved: access the state
+	// final step if we moved: accept the state
 	msg := fmt.Sprintf("Kubeconfig context %q: %s\n", c.KubeContext, m.state.Breadcrumbs())
 	if m.state.Breadcrumbs() != initialState.Breadcrumbs() {
 		accepting, ok := m.state.(Accepting)
@@ -294,7 +295,7 @@ func (c *Cmd) RunRelative(ctx context.Context, kongCtx *kong.Context, upCtx *upb
 			return fmt.Errorf("cannot move context to: %s", m.state.Breadcrumbs())
 		}
 		var err error
-		msg, err = accepting.Accept(ctx, upCtx, m.contextWriter)
+		msg, err = accepting.Accept(m.contextWriter)
 		if err != nil {
 			return err
 		}
@@ -305,9 +306,9 @@ func (c *Cmd) RunRelative(ctx context.Context, kongCtx *kong.Context, upCtx *upb
 		if c.Short {
 			switch state := m.state.(type) {
 			case *Group:
-				fmt.Printf("%s/%s\n", state.space.name, state.name)
+				fmt.Printf("%s/%s\n", state.Space.Name, state.Name)
 			case *ControlPlane:
-				fmt.Printf("%s/%s/%s\n", state.group.space.name, state.NamespacedName().Namespace, state.NamespacedName().Name)
+				fmt.Printf("%s/%s/%s\n", state.Group.Space.Name, state.NamespacedName().Namespace, state.NamespacedName().Name)
 			}
 		} else {
 			fmt.Print(msg)
@@ -322,7 +323,7 @@ func (c *Cmd) RunInteractive(ctx context.Context, kongCtx *kong.Context, upCtx *
 	m := model{
 		state:         initialState,
 		upCtx:         upCtx,
-		contextWriter: c.kubeContextWriter(),
+		contextWriter: c.kubeContextWriter(upCtx),
 	}
 	items, err := m.state.Items(ctx, upCtx)
 	if err != nil {
@@ -349,18 +350,26 @@ func (c *Cmd) RunInteractive(ctx context.Context, kongCtx *kong.Context, upCtx *
 	return nil
 }
 
-func (c *Cmd) kubeContextWriter() kubeContextWriter {
+func (c *Cmd) kubeContextWriter(upCtx *upbound.Context) kubeContextWriter {
 	if c.File == "-" {
 		return &printWriter{}
 	}
 
 	return &fileWriter{
-		fileOverride: c.File,
-		kubeContext:  c.KubeContext,
+		upCtx:            upCtx,
+		fileOverride:     c.File,
+		kubeContext:      c.KubeContext,
+		verify:           kube.VerifyKubeConfig(upCtx.WrapTransport),
+		writeLastContext: writeLastContext,
+		modifyConfig:     clientcmd.ModifyConfig,
 	}
 }
 
 func DeriveState(ctx context.Context, upCtx *upbound.Context, conf *clientcmdapi.Config) (NavigationState, error) {
+	return deriveState(ctx, upCtx, conf, profile.GetIngressHost)
+}
+
+func deriveState(ctx context.Context, upCtx *upbound.Context, conf *clientcmdapi.Config, getIngressHost func(ctx context.Context, cl client.Client) (host string, ca []byte, err error)) (NavigationState, error) {
 	ingress, ctp, exists := upCtx.GetCurrentSpaceContextScope()
 
 	var spaceKubeconfig *clientcmdapi.Config
@@ -392,47 +401,47 @@ func DeriveState(ctx context.Context, upCtx *upbound.Context, conf *clientcmdapi
 	}
 
 	// determine if self-hosted by looking for ingress
-	host, ca, err := profile.GetIngressHost(ctx, spaceClient)
+	host, ca, err := getIngressHost(ctx, spaceClient)
 	if kerrors.IsNotFound(err) || meta.IsNoMatchError(err) || kerrors.IsUnauthorized(err) {
-		return DeriveCloudState(ctx, upCtx, conf)
+		return DeriveCloudState(upCtx, conf)
 	} else if err != nil {
 		return nil, err
 	}
 
-	return DeriveSelfHostedState(ctx, upCtx, conf, host, ca, ctp)
+	return DeriveSelfHostedState(conf, host, ca, ctp)
 }
 
-func DeriveSelfHostedState(ctx context.Context, upCtx *upbound.Context, conf *clientcmdapi.Config, ingress string, ca []byte, ctp types.NamespacedName) (NavigationState, error) {
+func DeriveSelfHostedState(conf *clientcmdapi.Config, ingress string, ca []byte, ctp types.NamespacedName) (NavigationState, error) {
 	auth := conf.AuthInfos[conf.Contexts[conf.CurrentContext].AuthInfo]
 
 	space := Space{
-		name:     conf.CurrentContext,
-		ingress:  ingress,
-		ca:       ca,
-		authInfo: auth,
+		Name:     conf.CurrentContext,
+		Ingress:  ingress,
+		CA:       ca,
+		AuthInfo: auth,
 	}
 
 	// derive navigation state
 	switch {
 	case ctp.Namespace != "" && ctp.Name != "":
 		return &ControlPlane{
-			group: Group{
-				space: space,
-				name:  ctp.Namespace,
+			Group: Group{
+				Space: space,
+				Name:  ctp.Namespace,
 			},
-			name: ctp.Name,
+			Name: ctp.Name,
 		}, nil
 	case ctp.Namespace != "":
 		return &Group{
-			space: space,
-			name:  ctp.Namespace,
+			Space: space,
+			Name:  ctp.Namespace,
 		}, nil
 	default:
 		return &space, nil
 	}
 }
 
-func DeriveCloudState(ctx context.Context, upCtx *upbound.Context, conf *clientcmdapi.Config) (NavigationState, error) {
+func DeriveCloudState(upCtx *upbound.Context, conf *clientcmdapi.Config) (NavigationState, error) {
 	// todo(redbackthomson): Validate we have an active session to cloud in the
 	// current profile
 
@@ -450,7 +459,7 @@ func DeriveCloudState(ctx context.Context, upCtx *upbound.Context, conf *clientc
 	}
 
 	org := &Organization{
-		name: orgName,
+		Name: orgName,
 	}
 
 	ingress, ctp, exists := upCtx.GetCurrentSpaceContextScope()
@@ -460,28 +469,28 @@ func DeriveCloudState(ctx context.Context, upCtx *upbound.Context, conf *clientc
 
 	spaceName := strings.TrimPrefix(strings.Split(ingress, ".")[0], "https://")
 	space := Space{
-		org:  *org,
-		name: spaceName,
+		Org:  *org,
+		Name: spaceName,
 
-		ingress:  strings.TrimPrefix(ingress, "https://"),
-		ca:       make([]byte, 0),
-		authInfo: auth,
+		Ingress:  strings.TrimPrefix(ingress, "https://"),
+		CA:       make([]byte, 0),
+		AuthInfo: auth,
 	}
 
 	// derive navigation state
 	switch {
 	case ctp.Namespace != "" && ctp.Name != "":
 		return &ControlPlane{
-			group: Group{
-				space: space,
-				name:  ctp.Namespace,
+			Group: Group{
+				Space: space,
+				Name:  ctp.Namespace,
 			},
-			name: ctp.Name,
+			Name: ctp.Name,
 		}, nil
 	case ctp.Namespace != "":
 		return &Group{
-			space: space,
-			name:  ctp.Namespace,
+			Space: space,
+			Name:  ctp.Namespace,
 		}, nil
 	default:
 		return &space, nil

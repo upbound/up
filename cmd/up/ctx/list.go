@@ -25,8 +25,6 @@ import (
 	tea "github.com/charmbracelet/bubbletea"
 	"github.com/charmbracelet/lipgloss"
 	"k8s.io/apimachinery/pkg/util/sets"
-
-	"github.com/upbound/up/internal/upbound"
 )
 
 var (
@@ -55,7 +53,7 @@ var quitBinding = key.NewBinding(
 	key.WithHelp("q/f10", "switch context & quit"),
 )
 
-type KeyFunc func(ctx context.Context, upCtx *upbound.Context, m model) (model, error)
+type KeyFunc func(m model) (model, error)
 
 type item struct {
 	text string
@@ -202,7 +200,7 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) { // nolint:gocyclo // T
 			return m, tea.Quit
 		case key.Matches(msg, quitBinding):
 			if state, ok := m.state.(Accepting); ok {
-				msg, err := state.Accept(context.Background(), m.upCtx, m.contextWriter)
+				msg, err := state.Accept(m.contextWriter)
 				if err != nil {
 					m.err = err
 					return m, nil
@@ -227,7 +225,7 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) { // nolint:gocyclo // T
 				}
 			}
 			if fn != nil {
-				newState, err := fn(context.Background(), m.upCtx, m)
+				newState, err := fn(m)
 				if err != nil {
 					m.err = err
 					return m, nil
