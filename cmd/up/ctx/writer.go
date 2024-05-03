@@ -22,7 +22,7 @@ type printWriter struct {
 
 var _ kubeContextWriter = &printWriter{}
 
-// Write implements kubeconfigWriter.
+// Write implements kubeContextWriter.Write.
 func (p *printWriter) Write(config *clientcmdapi.Config) error {
 	b, err := clientcmd.Write(*config)
 	if err != nil {
@@ -34,9 +34,10 @@ func (p *printWriter) Write(config *clientcmdapi.Config) error {
 }
 
 type fileWriter struct {
-	upCtx            *upbound.Context
-	fileOverride     string
-	kubeContext      string
+	upCtx        *upbound.Context
+	fileOverride string
+	kubeContext  string
+
 	writeLastContext func(string) error
 	verify           func(cfg *clientcmdapi.Config) error
 	modifyConfig     func(configAccess clientcmd.ConfigAccess, newConfig clientcmdapi.Config, relativizePaths bool) error
@@ -44,14 +45,14 @@ type fileWriter struct {
 
 var _ kubeContextWriter = &fileWriter{}
 
-// Write implements kubeconfigWriter.
+// Write implements kubeContextWriter.Write.
 func (f *fileWriter) Write(config *clientcmdapi.Config) error {
 	outConfig, err := f.loadOutputKubeconfig()
 	if err != nil {
 		return err
 	}
 
-	ctpConf, prevContext, err := f.replaceContext(config, outConfig)
+	ctpConf, prevContext, err := f.upsertContext(config, outConfig)
 	if err != nil {
 		return err
 	}
@@ -94,9 +95,9 @@ func (f *fileWriter) loadOutputKubeconfig() (config *clientcmdapi.Config, err er
 	return &raw, nil
 }
 
-// replaceContext upserts the current kubeconfig with the upserted upbound context
-// and cluster to point to the given space and resource
-func (f *fileWriter) replaceContext(inConfig *clientcmdapi.Config, outConfig *clientcmdapi.Config) (ctpConf *clientcmdapi.Config, prevContext string, err error) {
+// upsertContext upserts the input kubeconfig based on its current context into
+// the output kubeconfig at the destination context name set in the writer
+func (f *fileWriter) upsertContext(inConfig *clientcmdapi.Config, outConfig *clientcmdapi.Config) (ctpConf *clientcmdapi.Config, prevContext string, err error) {
 	// assumes the current context
 	ctpConf, prevContext, err = mergeUpboundContext(outConfig, inConfig, inConfig.CurrentContext, f.kubeContext)
 	if err != nil {
@@ -114,7 +115,7 @@ func (f *fileWriter) replaceContext(inConfig *clientcmdapi.Config, outConfig *cl
 
 // mergeUpboundContext copies the provided group context into the config under
 // the provided context name, updates the current context to the new context and
-// renaming the previous current context.
+// renames the previous current context.
 // Note: We add all of the information to the `*-previous` context in this
 // method because when we call `activateContext`, it gets swapped with the
 // correct context name.
@@ -141,6 +142,7 @@ func mergeUpboundContext(dest, src *clientcmdapi.Config, srcContext, destContext
 			}
 		}
 		renamed := 0
+		// update all clusters using the existing previous to point at the new
 		for name, ctx := range dest.Contexts {
 			if ctx.Cluster == destContext+upboundPreviousContextSuffix && name != destContext+upboundPreviousContextSuffix {
 				ctx.Cluster = freeCluster
@@ -156,7 +158,7 @@ func mergeUpboundContext(dest, src *clientcmdapi.Config, srcContext, destContext
 
 	if dest.CurrentContext == destContext+upboundPreviousContextSuffix {
 		// make room for upbound-previous context
-		dest.Contexts[destContext] = dest.Contexts[destContext+upboundPreviousContextSuffix]
+		dest.Contexts[destContext] = ptr.To(*dest.Contexts[destContext+upboundPreviousContextSuffix])
 		dest.CurrentContext = destContext
 	}
 	dest.Contexts[destContext+upboundPreviousContextSuffix] = ptr.To(*src.Contexts[srcContext])

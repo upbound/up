@@ -388,10 +388,18 @@ func buildSpacesClient(ingress string, ca []byte, authInfo *clientcmdapi.AuthInf
 		clusters[ref].CertificateAuthorityData = ca
 	}
 
-	contexts := make(map[string]*clientcmdapi.Context)
-	contexts[ref] = &clientcmdapi.Context{
-		Cluster:   ref,
-		Namespace: resource.Namespace,
+	contexts := map[string]*clientcmdapi.Context{
+		ref: {
+			Cluster: ref,
+		},
+	}
+
+	// since we are pointing at an individual control plane, we'll point at the
+	// "default" namespace inside
+	if resource.Name != "" {
+		contexts[ref].Namespace = "default"
+	} else {
+		contexts[ref].Namespace = resource.Namespace
 	}
 
 	authInfos := make(map[string]*clientcmdapi.AuthInfo)
