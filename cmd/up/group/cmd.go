@@ -15,7 +15,6 @@
 package group
 
 import (
-	"context"
 	"strconv"
 
 	"github.com/alecthomas/kong"
@@ -23,10 +22,10 @@ import (
 	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/util/runtime"
 	"k8s.io/client-go/kubernetes/scheme"
+	"sigs.k8s.io/controller-runtime/pkg/client"
 
 	spacesv1beta1 "github.com/upbound/up-sdk-go/apis/spaces/v1beta1"
 	"github.com/upbound/up/internal/feature"
-	"github.com/upbound/up/internal/profile"
 	"github.com/upbound/up/internal/upbound"
 )
 
@@ -52,10 +51,18 @@ func (c *Cmd) AfterApply(kongCtx *kong.Context) error {
 	}
 	kongCtx.Bind(upCtx)
 
-	if !upCtx.Profile.IsSpace() {
-		// TODO: add legacy support
-		return errors.New("Only Spaces contexts supported for now.")
+	// we can't use groups from inside a control plane
+	if _, ctp, exists := upCtx.GetCurrentSpaceContextScope(); exists && ctp.Name != "" {
+		return errors.New("cannot view groups from inside a control plane context. Use 'up ctx ..' to go up to the group context")
 	}
+
+	cl, err := upCtx.BuildCurrentContextClient()
+	if err != nil {
+		return errors.Wrap(err, "unable to get kube client")
+	}
+
+	kongCtx.BindTo(cl, (*client.Client)(nil))
+
 	return nil
 }
 
@@ -94,22 +101,4 @@ func extractGroupFields(obj any) []string {
 		resp.GetObjectMeta().GetName(),
 		strconv.FormatBool(protected),
 	}
-}
-
-func getCurrentProfile(ctx context.Context, upCtx *upbound.Context) (*profile.Profile, error) {
-	// get context
-	_, currentProfile, ctp, err := upCtx.Cfg.GetCurrentContext(ctx)
-	if err != nil {
-		return nil, err
-	}
-	if currentProfile == nil {
-		return nil, errors.New(profile.NoSpacesContextMsg)
-	}
-	if ctp.Namespace == "" {
-		return nil, errors.New(profile.NoGroupMsg)
-	}
-	if ctp.Name != "" {
-		return nil, errors.New("Cannot list control planes from inside a control plane, use `up ctx ..` to switch to a group level.")
-	}
-	return currentProfile, nil
 }

@@ -21,7 +21,7 @@ import (
 	"github.com/pterm/pterm"
 	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
-	ctrlclient "sigs.k8s.io/controller-runtime/pkg/client"
+	"sigs.k8s.io/controller-runtime/pkg/client"
 
 	spacesv1beta1 "github.com/upbound/up-sdk-go/apis/spaces/v1beta1"
 	"github.com/upbound/up/internal/upbound"
@@ -35,35 +35,18 @@ type createCmd struct {
 }
 
 // Run executes the create command.
-func (c *createCmd) Run(ctx context.Context, printer upterm.ObjectPrinter, upCtx *upbound.Context, p pterm.TextPrinter) error { // nolint:gocyclo
-	// get profile
-	currentProfile, err := getCurrentProfile(ctx, upCtx)
-	if err != nil {
-		return err
-	}
-
-	// create client
-	restConfig, _, err := currentProfile.GetSpaceRestConfig()
-	if err != nil {
-		return err
-	}
-	cl, err := ctrlclient.New(restConfig, ctrlclient.Options{})
-	if err != nil {
-		return err
-	}
-
+func (c *createCmd) Run(ctx context.Context, printer upterm.ObjectPrinter, upCtx *upbound.Context, client client.Client, p pterm.TextPrinter) error { // nolint:gocyclo
 	// create group
 	group := corev1.Namespace{
 		ObjectMeta: metav1.ObjectMeta{
 			Name: c.Name,
 			Labels: map[string]string{
-				spacesv1beta1.ControlPlaneGroupLabelKey:      "true",
 				spacesv1beta1.ControlPlaneGroupProtectionKey: strconv.FormatBool(c.DeletionProtection),
 			},
 		},
 	}
 
-	if err := cl.Create(ctx, &group); err != nil {
+	if err := client.Create(ctx, &group); err != nil {
 		return err
 	}
 

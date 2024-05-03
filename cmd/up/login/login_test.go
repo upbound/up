@@ -83,7 +83,7 @@ func TestConstructAuth(t *testing.T) {
 		password string
 	}
 	type want struct {
-		pType profile.Type
+		pType profile.TokenType
 		auth  *auth
 	}
 	cases := map[string]struct {
@@ -103,7 +103,7 @@ func TestConstructAuth(t *testing.T) {
 				password: "cool-password",
 			},
 			want: want{
-				pType: profile.User,
+				pType: profile.TokenTypeUser,
 				auth: &auth{
 					ID:       "cool-user",
 					Password: "cool-password",
@@ -117,7 +117,7 @@ func TestConstructAuth(t *testing.T) {
 				token: "eyJ0eXAiOiJKV1QiLCJhbGciOiJIUzI1NiJ9.eyJpc3MiOiJPbmxpbmUgSldUIEJ1aWxkZXIiLCJpYXQiOjE2MTg1MTc5NDMsImV4cCI6MTY1MDA1Mzk0MywiYXVkIjoiaHR0cHM6Ly9kYW5pZWxtYW5ndW0uY29tIiwic3ViIjoiZ2VvcmdlZGFuaWVsbWFuZ3VtQGdtYWlsLmNvbSIsIkpUSSI6Imhhc2hlZGRhbiJ9.zI42wXvwDHiATx9ycECz7JyATTn9P07wN-TRXvtCGcM",
 			},
 			want: want{
-				pType: profile.Token,
+				pType: profile.TokenTypeToken,
 				auth: &auth{
 					ID:       "hasheddan",
 					Password: "eyJ0eXAiOiJKV1QiLCJhbGciOiJIUzI1NiJ9.eyJpc3MiOiJPbmxpbmUgSldUIEJ1aWxkZXIiLCJpYXQiOjE2MTg1MTc5NDMsImV4cCI6MTY1MDA1Mzk0MywiYXVkIjoiaHR0cHM6Ly9kYW5pZWxtYW5ndW0uY29tIiwic3ViIjoiZ2VvcmdlZGFuaWVsbWFuZ3VtQGdtYWlsLmNvbSIsIkpUSSI6Imhhc2hlZGRhbiJ9.zI42wXvwDHiATx9ycECz7JyATTn9P07wN-TRXvtCGcM",
@@ -132,7 +132,7 @@ func TestConstructAuth(t *testing.T) {
 				password: "forget-about-me",
 			},
 			want: want{
-				pType: profile.Token,
+				pType: profile.TokenTypeToken,
 				auth: &auth{
 					ID:       "hasheddan",
 					Password: "eyJ0eXAiOiJKV1QiLCJhbGciOiJIUzI1NiJ9.eyJpc3MiOiJPbmxpbmUgSldUIEJ1aWxkZXIiLCJpYXQiOjE2MTg1MTc5NDMsImV4cCI6MTY1MDA1Mzk0MywiYXVkIjoiaHR0cHM6Ly9kYW5pZWxtYW5ndW0uY29tIiwic3ViIjoiZ2VvcmdlZGFuaWVsbWFuZ3VtQGdtYWlsLmNvbSIsIkpUSSI6Imhhc2hlZGRhbiJ9.zI42wXvwDHiATx9ycECz7JyATTn9P07wN-TRXvtCGcM",
@@ -164,7 +164,7 @@ func TestParseID(t *testing.T) {
 	}
 	type want struct {
 		id    string
-		pType profile.Type
+		pType profile.TokenType
 	}
 	cases := map[string]struct {
 		reason string
@@ -193,7 +193,7 @@ func TestParseID(t *testing.T) {
 			},
 			want: want{
 				id:    "hasheddan",
-				pType: profile.Token,
+				pType: profile.TokenTypeToken,
 			},
 		},
 		"Successful": {
@@ -203,7 +203,7 @@ func TestParseID(t *testing.T) {
 			},
 			want: want{
 				id:    "cool-user",
-				pType: profile.User,
+				pType: profile.TokenTypeUser,
 			},
 		},
 	}

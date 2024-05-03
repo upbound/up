@@ -205,7 +205,7 @@ func (c *LoginWebCmd) exchangeTokenForSession(ctx context.Context, p pterm.TextP
 	if !ok {
 		return errors.New("failed to get user details, code may have expired")
 	}
-	return setSession(ctx, p, upCtx, res, profile.User, username)
+	return setSession(ctx, p, upCtx, res, profile.TokenTypeUser, username)
 }
 
 type callbackServer struct {

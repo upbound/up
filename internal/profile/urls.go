@@ -15,6 +15,7 @@
 package profile
 
 import (
+	"fmt"
 	"regexp"
 
 	"k8s.io/apimachinery/pkg/types"
@@ -22,20 +23,44 @@ import (
 
 var (
 	// Matches https://00.000.000.0.nip.io/apis/spaces.upbound.io/v1beta1/namespaces/default/controlplanes/ctp1/k8s
-	newControlPlanePathRE = regexp.MustCompile(`^(?P<base>.+)/apis/spaces.upbound.io/(?P<version>v[^/]+)/namespaces/(?P<namespace>[^/]+)/controlplanes/(?P<controlplane>[^/]+)/k8s$`)
+	controlPlaneRE = regexp.MustCompile(`^(?P<base>.+)/apis/spaces.upbound.io/(?P<version>v[^/]+)/namespaces/(?P<namespace>[^/]+)/controlplanes/(?P<controlplane>[^/]+)/k8s$`)
 	// Matches https://spaces-foo.upboundrocks.cloud/v1/controlplanes/acmeco/default/ctp/k8s
-	oldControlPlanePathRE = regexp.MustCompile(`^(?P<base>.+)/v1/control[pP]lanes/(?P<account>[^/]+)/(?P<namespace>[^/]+)/(?P<controlplane>[^/]+)/k8s$`)
+	legacyControlPlanePathRE = regexp.MustCompile(`^(?P<base>.+)/v1/control[pP]lanes/(?P<account>[^/]+)/(?P<namespace>[^/]+)/(?P<controlplane>[^/]+)/k8s$`)
 )
 
-// ParseSpacesK8sURL parses a URL and returns the base, version, namespace, and controlplane.
-func ParseSpacesK8sURL(url string) (types.NamespacedName, bool) {
-	m := newControlPlanePathRE.FindStringSubmatch(url)
+// ParseSpacesK8sURL parses a URL and returns the namespace and optionally the
+// controlplane name (if specified).
+func ParseSpacesK8sURL(url string) (base string, resource types.NamespacedName, matches bool) {
+	m := controlPlaneRE.FindStringSubmatch(url)
 	if m == nil {
-		m = oldControlPlanePathRE.FindStringSubmatch(url)
-		if m == nil {
-			return types.NamespacedName{}, false
-		}
-		return types.NamespacedName{Namespace: m[3], Name: m[4]}, true
+		return "", types.NamespacedName{}, false
 	}
-	return types.NamespacedName{Namespace: m[3], Name: m[4]}, true
+
+	baseInd := controlPlaneRE.SubexpIndex("base")
+	nsInd := controlPlaneRE.SubexpIndex("namespace")
+	nameInd := controlPlaneRE.SubexpIndex("controlplane")
+	return m[baseInd], types.NamespacedName{Namespace: m[nsInd], Name: m[nameInd]}, true
+}
+
+// ParseMCPK8sURL attempts to parse a legacy MCP URL and returns the name of the
+// matching control plane if it matches
+func ParseMCPK8sURL(url string) (resource types.NamespacedName, matches bool) {
+	m := legacyControlPlanePathRE.FindStringSubmatch(url)
+	if m == nil {
+		return types.NamespacedName{}, false
+	}
+
+	nsInd := legacyControlPlanePathRE.SubexpIndex("namespace")
+	nameInd := legacyControlPlanePathRE.SubexpIndex("controlplane")
+	return types.NamespacedName{Namespace: m[nsInd], Name: m[nameInd]}, true
+}
+
+func ToSpacesK8sURL(ingress string, ctp types.NamespacedName) string {
+	// pointed directly at the space
+	if ctp.Name == "" {
+		return fmt.Sprintf("https://%s", ingress)
+	}
+
+	// pointed at a control plane
+	return fmt.Sprintf("https://%s/apis/spaces.upbound.io/v1beta1/namespaces/%s/controlplanes/%s/k8s", ingress, ctp.Namespace, ctp.Name)
 }

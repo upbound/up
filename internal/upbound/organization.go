@@ -23,7 +23,7 @@ import (
 	"github.com/upbound/up-sdk-go/service/accounts"
 )
 
-func GetAccount(ctx context.Context, ac *accounts.Client, account string) (*accounts.AccountResponse, error) {
+func GetOrganization(ctx context.Context, ac *accounts.Client, account string) (*accounts.AccountResponse, error) {
 	a, err := ac.Get(ctx, account)
 	if err != nil {
 		return nil, errors.Wrapf(err, "failed to get Account %q", account)

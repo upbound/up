@@ -54,15 +54,16 @@ func (c *QueryCmd) AfterApply(kongCtx *kong.Context) error { // nolint:gocyclo /
 	}
 	kongCtx.Bind(upCtx)
 
-	// create Spaces API kubeconfig
-	kubeconfig, ns, err := upCtx.Profile.GetSpaceRestConfig()
+	_, ctp, exists := upCtx.GetCurrentSpaceContextScope()
+
+	if c.Group == "" && !c.AllGroups {
+		if exists && ctp.Namespace != "" {
+			c.Group = ctp.Namespace
+		}
+	}
+	kubeconfig, err := upCtx.Kubecfg.RawConfig()
 	if err != nil {
 		return err
-	}
-	if c.Group == "" {
-		if !c.AllGroups {
-			c.Group = ns
-		}
 	}
 	kongCtx.Bind(kubeconfig)
 

@@ -157,7 +157,7 @@ func (c *attachCmd) Run(ctx context.Context, mgr *helm.Installer, kClient *kuber
 			return err
 		}
 
-		a, err := upbound.GetAccount(ctx, ac, upCtx.Account)
+		a, err := upbound.GetOrganization(ctx, ac, upCtx.Account)
 		if err != nil {
 			return err
 		}

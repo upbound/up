@@ -39,26 +39,10 @@ func (c *listCmd) AfterApply(kongCtx *kong.Context) error {
 }
 
 // Run executes the list command.
-func (c *listCmd) Run(ctx context.Context, printer upterm.ObjectPrinter, upCtx *upbound.Context, p pterm.TextPrinter) error { // nolint:gocyclo
-	// get profile
-	currentProfile, err := getCurrentProfile(ctx, upCtx)
-	if err != nil {
-		return err
-	}
-
-	// create client
-	restConfig, _, err := currentProfile.GetSpaceRestConfig()
-	if err != nil {
-		return err
-	}
-	cl, err := ctrlclient.New(restConfig, ctrlclient.Options{})
-	if err != nil {
-		return err
-	}
-
+func (c *listCmd) Run(ctx context.Context, printer upterm.ObjectPrinter, upCtx *upbound.Context, client ctrlclient.Client, p pterm.TextPrinter) error { // nolint:gocyclo
 	// list groups
 	var nss corev1.NamespaceList
-	if err := cl.List(ctx, &nss, ctrlclient.MatchingLabels(map[string]string{spacesv1beta1.ControlPlaneGroupLabelKey: "true"})); err != nil {
+	if err := client.List(ctx, &nss, ctrlclient.MatchingLabels(map[string]string{spacesv1beta1.ControlPlaneGroupLabelKey: "true"})); err != nil {
 		return err
 	}
 

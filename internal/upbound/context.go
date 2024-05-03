@@ -51,6 +51,8 @@ const (
 
 	// Default API subdomain.
 	apiSubdomain = "api."
+	// Default auth subdomain.
+	authSubdomain = "auth."
 	// Default proxy subdomain.
 	proxySubdomain = "proxy."
 
@@ -69,23 +71,30 @@ const (
 
 // Context includes common data that Upbound consumers may utilize.
 type Context struct {
+	// Profile fields
 	ProfileName string
 	Profile     profile.Profile
 	Token       string
+	Cfg         *config.Config
+	CfgSrc      config.Source
 	Account     string
-	Domain      *url.URL
 
+	// Kubeconfig fields
+	Kubecfg clientcmd.ClientConfig
+
+	// Upbound API connection URLs
+	Domain                *url.URL
+	APIEndpoint           *url.URL
+	AuthEndpoint          *url.URL
+	ProxyEndpoint         *url.URL
+	RegistryEndpoint      *url.URL
 	InsecureSkipTLSVerify bool
 
-	APIEndpoint      *url.URL
-	ProxyEndpoint    *url.URL
-	RegistryEndpoint *url.URL
-	Cfg              *config.Config
-	CfgSrc           config.Source
-
+	// Debugging
 	DebugLevel    int
 	WrapTransport func(rt http.RoundTripper) http.RoundTripper
 
+	// Miscellaneous
 	allowMissingProfile bool
 	cfgPath             string
 	fs                  afero.Fs
@@ -162,6 +171,13 @@ func NewFromFlags(f Flags, opts ...Option) (*Context, error) { //nolint:gocyclo
 		c.APIEndpoint = &u
 	}
 
+	c.AuthEndpoint = of.AuthEndpoint
+	if c.AuthEndpoint == nil {
+		u := *of.Domain
+		u.Host = authSubdomain + u.Host
+		c.AuthEndpoint = &u
+	}
+
 	c.ProxyEndpoint = of.ProxyEndpoint
 	if c.ProxyEndpoint == nil {
 		u := *of.Domain
@@ -204,12 +220,27 @@ func NewFromFlags(f Flags, opts ...Option) (*Context, error) { //nolint:gocyclo
 	default:
 	}
 
+	c.Kubecfg = clientcmd.NewNonInteractiveDeferredLoadingClientConfig(
+		clientcmd.NewDefaultClientConfigLoadingRules(),
+		&clientcmd.ConfigOverrides{},
+	)
+
 	return c, nil
 }
 
 // BuildSDKConfig builds an Upbound SDK config suitable for usage with any
 // service client.
 func (c *Context) BuildSDKConfig() (*up.Config, error) {
+	return c.buildSDKConfig(c.APIEndpoint)
+}
+
+// BuildSDKAuthConfig builds an Upbound SDK config pointed at the Upbound auth
+// endpoint.
+func (c *Context) BuildSDKAuthConfig() (*up.Config, error) {
+	return c.buildSDKConfig(c.AuthEndpoint)
+}
+
+func (c *Context) buildSDKConfig(endpoint *url.URL) (*up.Config, error) {
 	cj, err := cookiejar.New(nil)
 	if err != nil {
 		return nil, err
@@ -230,7 +261,7 @@ func (c *Context) BuildSDKConfig() (*up.Config, error) {
 		tr = c.WrapTransport(tr)
 	}
 	client := up.NewClient(func(u *up.HTTPClient) {
-		u.BaseURL = c.APIEndpoint
+		u.BaseURL = endpoint
 		u.HTTP = &http.Client{
 			Jar:       cj,
 			Transport: tr,
@@ -289,7 +320,7 @@ func (c *Context) BuildControllerClientConfig() (*rest.Config, error) {
 
 // BuildCloudSpaceClientConfig builds a Kubeconfig pointed at an Upbound
 // cloud-hosted space. Uses the space name as the current context
-func (c *Context) BuildCloudSpaceClientConfig(ctx context.Context, spaceName, profileName string) (clientcmd.ClientConfig, error) {
+func (c *Context) BuildCloudSpaceClientConfig(ctx context.Context, spaceName, organization string) (clientcmd.ClientConfig, error) {
 	// describe the space to get its fqdn
 	cloudLoader, err := c.BuildControllerClientConfig()
 	if err != nil {
@@ -302,17 +333,17 @@ func (c *Context) BuildCloudSpaceClientConfig(ctx context.Context, spaceName, pr
 	}
 
 	var space upboundv1alpha1.Space
-	err = cloudClient.Get(ctx, types.NamespacedName{Name: spaceName, Namespace: c.Account}, &space)
+	err = cloudClient.Get(ctx, types.NamespacedName{Name: spaceName, Namespace: organization}, &space)
 	if err != nil {
 		return nil, err
 	}
 
-	// uniquely identify the space and the profile used to authenticate it
-	contextName := fmt.Sprintf("%s-%s", spaceName, profileName)
+	// uniquely identify the space
+	contextName := fmt.Sprintf("upbound/%s", spaceName)
 
 	clusters := make(map[string]*clientcmdapi.Cluster)
 	clusters[spaceName] = &clientcmdapi.Cluster{
-		Server: fmt.Sprintf("https://%s.%s", c.Account, space.Status.FQDN),
+		Server: fmt.Sprintf("https://%s.%s", organization, space.Status.FQDN),
 		// todo(redbackthomson): replace once a public CA is configured
 		InsecureSkipTLSVerify: true, //nolint:gosec
 	}
@@ -326,7 +357,7 @@ func (c *Context) BuildCloudSpaceClientConfig(ctx context.Context, spaceName, pr
 	if c.Profile.Session != "" {
 		// uniquely identify the profile auth info, prefixed to protect against
 		// overriding existing auth info in the customer's kubeconfig
-		authInfoName := fmt.Sprintf("upbound-profile-%s", profileName)
+		authInfoName := fmt.Sprintf("upbound/%s", organization)
 		authInfos[authInfoName] = &clientcmdapi.AuthInfo{
 			Token: c.Profile.Session,
 		}
@@ -406,6 +437,7 @@ func (f Flags) MarshalJSON() ([]byte, error) {
 		InsecureSkipTLSVerify bool   `json:"insecure_skip_tls_verify,omitempty"`
 		Debug                 int    `json:"debug,omitempty"`
 		APIEndpoint           string `json:"override_api_endpoint,omitempty"`
+		AuthEndpoint          string `json:"override_auth_endpoint,omitempty"`
 		ProxyEndpoint         string `json:"override_proxy_endpoint,omitempty"`
 		RegistryEndpoint      string `json:"override_registry_endpoint,omitempty"`
 	}{
@@ -415,6 +447,7 @@ func (f Flags) MarshalJSON() ([]byte, error) {
 		InsecureSkipTLSVerify: f.InsecureSkipTLSVerify,
 		Debug:                 f.Debug,
 		APIEndpoint:           nullableURL(f.APIEndpoint),
+		AuthEndpoint:          nullableURL(f.AuthEndpoint),
 		ProxyEndpoint:         nullableURL(f.ProxyEndpoint),
 		RegistryEndpoint:      nullableURL(f.RegistryEndpoint),
 	}

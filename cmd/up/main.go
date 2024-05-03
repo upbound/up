@@ -100,8 +100,8 @@ type cli struct {
 	Login              login.LoginCmd               `cmd:"" help:"Login to Upbound."`
 	Logout             login.LogoutCmd              `cmd:"" help:"Logout of Upbound."`
 	Configuration      configuration.Cmd            `cmd:"" name:"configuration" aliases:"cfg" help:"Interact with configurations."`
-	ControlPlane       controlplane.Cmd             `cmd:"" name:"controlplane" aliases:"ctp" help:"Interact with control planes of the current profile, both in Upbound and local Spaces."`
-	Space              space.Cmd                    `cmd:"" help:"Interact with local Spaces."`
+	ControlPlane       controlplane.Cmd             `cmd:"" hidden:"" name:"controlplane" aliases:"ctp" help:"Interact with control planes in the current context, both in the cloud and in a local space."`
+	Space              space.Cmd                    `cmd:"" help:"Interact with Spaces."`
 	Group              group.Cmd                    `cmd:"" help:"Interact with groups inside Spaces."`
 	Organization       organization.Cmd             `cmd:"" name:"organization" aliases:"org" help:"Interact with Upbound organizations."`
 	Profile            profile.Cmd                  `cmd:"" help:"Interact with Upbound profiles or local Spaces."`
@@ -133,7 +133,7 @@ func (a *alpha) BeforeReset(ctx *kong.Context) error { //nolint:unparam
 type alpha struct {
 	// For now, we maintain compatibility for systems that may still use the alpha variant.
 	// This nudges users towards the stable variant when they attempt to emit help.
-	ControlPlane  controlplane.Cmd  `cmd:"" hidden:"" name:"controlplane" aliases:"ctp" help:"Interact with control planes of the current profile, both in the cloud and in a local space."`
+	ControlPlane  controlplane.Cmd  `cmd:"" hidden:"" name:"controlplane" aliases:"ctp" help:"Interact with control planes in the current context, both in the cloud and in a local space."`
 	Upbound       upbound.Cmd       `cmd:"" maturity:"alpha" help:"Interact with Upbound."`
 	XPKG          xpkg.Cmd          `cmd:"" maturity:"alpha" help:"Interact with UXP packages."`
 	Migration     migration.Cmd     `cmd:"" maturity:"alpha" help:"Migrate control planes to Upbound Managed Control Planes."`
@@ -142,7 +142,7 @@ type alpha struct {
 	Query         query.QueryCmd    `cmd:"" maturity:"alpha" hidden:"" help:"Query objects in one or many control planes."`
 	Get           query.GetCmd      `cmd:"" maturity:"alpha" hidden:"" help:"Get objects in the current control plane."`
 	WebLogin      login.LoginWebCmd `cmd:"" maturity:"alpha" help:"Use web browser to login to up cli."`
-	Space         space.Cmd         `cmd:"" maturity:"alpha" help:"Interact with local Spaces."`
+	Space         space.Cmd         `cmd:"" maturity:"alpha" help:"Interact with Spaces."`
 	Ctx           ctx.Cmd           `cmd:"" maturity:"alpha" help:"Select an Upbound kubeconfig context."`
 }
 

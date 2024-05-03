@@ -22,7 +22,7 @@ import (
 	"github.com/pterm/pterm"
 	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/types"
-	ctrlclient "sigs.k8s.io/controller-runtime/pkg/client"
+	"sigs.k8s.io/controller-runtime/pkg/client"
 
 	spacesv1beta1 "github.com/upbound/up-sdk-go/apis/spaces/v1beta1"
 	"github.com/upbound/up/internal/upbound"
@@ -42,26 +42,10 @@ func (c *getCmd) AfterApply(kongCtx *kong.Context) error {
 }
 
 // Run executes the list command.
-func (c *getCmd) Run(ctx context.Context, printer upterm.ObjectPrinter, upCtx *upbound.Context, p pterm.TextPrinter) error { // nolint:gocyclo
-	// get profile
-	currentProfile, err := getCurrentProfile(ctx, upCtx)
-	if err != nil {
-		return err
-	}
-
-	// create client
-	restConfig, _, err := currentProfile.GetSpaceRestConfig()
-	if err != nil {
-		return err
-	}
-	cl, err := ctrlclient.New(restConfig, ctrlclient.Options{})
-	if err != nil {
-		return err
-	}
-
+func (c *getCmd) Run(ctx context.Context, printer upterm.ObjectPrinter, upCtx *upbound.Context, client client.Client, p pterm.TextPrinter) error { // nolint:gocyclo
 	// list groups
 	var ns corev1.Namespace
-	if err := cl.Get(ctx, types.NamespacedName{Name: c.Name}, &ns); err != nil {
+	if err := client.Get(ctx, types.NamespacedName{Name: c.Name}, &ns); err != nil {
 		return err
 	}
 

@@ -115,14 +115,9 @@ type installCmd struct {
 
 // Run executes the connect command.
 func (c *installCmd) Run(p pterm.TextPrinter, upCtx *upbound.Context) error {
-	token := "not defined"
-	var err error
-
-	if !upCtx.Profile.IsSpace() {
-		token, err = c.getToken(p, upCtx)
-		if err != nil {
-			return errors.Wrap(err, "failed to get token")
-		}
+	token, err := c.getToken(p, upCtx)
+	if err != nil {
+		return errors.Wrap(err, "failed to get token")
 	}
 	params, err := c.parser.Parse()
 	if err != nil {

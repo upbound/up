@@ -63,14 +63,14 @@ func (c *GetCmd) AfterApply(kongCtx *kong.Context) error {
 
 	// extract control plane from controlplane kubeconfig context
 	// example: https://host/apis/spaces.upbound.io/v1beta1/namespaces/default/controlplanes/ctp-kine/k8s
-	controlPlane, found := profile.ParseSpacesK8sURL(ctpConfig.Host)
+	_, controlPlane, found := profile.ParseSpacesK8sURL(ctpConfig.Host)
 	if !found {
 		return errors.New("You are not connected to a control plane.")
 	}
 
 	// create Spaces API kubeconfig
 	// TODO(sttts): here we have to continue with baseURL := m[1] to talk to Spaces API. For now we use the spaces profile instead.
-	spacesKubeconfig, _, err := upCtx.Profile.GetSpaceRestConfig()
+	spacesKubeconfig, err := upCtx.Kubecfg.RawConfig()
 	if err != nil {
 		return err
 	}

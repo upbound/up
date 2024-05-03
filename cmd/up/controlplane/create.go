@@ -18,79 +18,49 @@ import (
 	"context"
 
 	"github.com/alecthomas/kong"
+	"github.com/pkg/errors"
 	"github.com/pterm/pterm"
-	"k8s.io/apimachinery/pkg/types"
-	"k8s.io/client-go/dynamic"
+	v1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"sigs.k8s.io/controller-runtime/pkg/client"
 
-	"github.com/upbound/up-sdk-go/service/configurations"
-	cp "github.com/upbound/up-sdk-go/service/controlplanes"
-	"github.com/upbound/up/internal/controlplane"
-	"github.com/upbound/up/internal/controlplane/cloud"
-	"github.com/upbound/up/internal/controlplane/space"
+	spacesv1beta1 "github.com/upbound/up-sdk-go/apis/spaces/v1beta1"
 	"github.com/upbound/up/internal/upbound"
 )
 
-type ctpCreator interface {
-	Create(ctx context.Context, ctp types.NamespacedName, opts controlplane.Options) (*controlplane.Response, error)
-}
-
 // createCmd creates a control plane on Upbound.
 type createCmd struct {
-	Name string `arg:"" required:"" help:"Name of control plane."`
-
-	ConfigurationName *string `help:"The optional name of the Configuration."`
-	Description       string  `short:"d" help:"Description for control plane."`
+	Name  string `arg:"" required:"" help:"Name of control plane."`
+	Group string `short:"g" default:"" help:"The control plane group that the control plane is contained in. This defaults to the group specified in the current context"`
+	// todo(redbackthomson): Support all overrides for control planes
+	// ConfigurationName *string `help:"The optional name of the Configuration."`
 
 	SecretName string `help:"The name of the control plane's secret. Defaults to 'kubeconfig-{control plane name}'. Only applicable for Space control planes."`
-	Group      string `short:"g" help:"The control plane group that the control plane is contained in. This defaults to the group specified in the current profile."`
-
-	client ctpCreator
 }
 
 // AfterApply sets default values in command after assignment and validation.
 func (c *createCmd) AfterApply(kongCtx *kong.Context, upCtx *upbound.Context) error {
-	if upCtx.Profile.IsSpace() {
-		kubeconfig, ns, err := upCtx.Profile.GetSpaceRestConfig()
-		if err != nil {
-			return err
-		}
-		if c.Group == "" {
-			c.Group = ns
-		}
-
-		client, err := dynamic.NewForConfig(kubeconfig)
-		if err != nil {
-			return err
-		}
-		c.client = space.New(client)
-	} else {
-		cfg, err := upCtx.BuildSDKConfig()
-		if err != nil {
-			return err
-		}
-		ctpclient := cp.NewClient(cfg)
-		cfgclient := configurations.NewClient(cfg)
-
-		c.client = cloud.New(ctpclient, cfgclient, upCtx.Account)
-	}
-
 	kongCtx.Bind(pterm.DefaultTable.WithWriter(kongCtx.Stdout).WithSeparator("   "))
+	if c.Group == "" {
+		ns, _, err := upCtx.Kubecfg.Namespace()
+		if err != nil {
+			return err
+		}
+		c.Group = ns
+	}
 	return nil
 }
 
 // Run executes the create command.
-func (c *createCmd) Run(ctx context.Context, p pterm.TextPrinter, upCtx *upbound.Context) error {
-	_, err := c.client.Create(
-		ctx,
-		types.NamespacedName{Name: c.Name, Namespace: c.Group},
-		controlplane.Options{
-			SecretName:        c.SecretName,
-			SecretNamespace:   c.Group,
-			ConfigurationName: c.ConfigurationName,
+func (c *createCmd) Run(ctx context.Context, p pterm.TextPrinter, upCtx *upbound.Context, client client.Client) error {
+	ctp := &spacesv1beta1.ControlPlane{
+		ObjectMeta: v1.ObjectMeta{
+			Name:      c.Name,
+			Namespace: c.Group,
 		},
-	)
-	if err != nil {
-		return err
+	}
+
+	if err := client.Create(ctx, ctp); err != nil {
+		return errors.Wrap(err, "error creating control plane")
 	}
 
 	p.Printfln("%s created", c.Name)

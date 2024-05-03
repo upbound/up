@@ -19,22 +19,25 @@ import (
 	"time"
 
 	"github.com/alecthomas/kong"
+	"github.com/pkg/errors"
 	"github.com/posener/complete"
 	"k8s.io/apimachinery/pkg/util/duration"
+	"k8s.io/utils/ptr"
+	"sigs.k8s.io/controller-runtime/pkg/client"
 
-	cp "github.com/upbound/up-sdk-go/service/controlplanes"
+	xpcommonv1 "github.com/crossplane/crossplane-runtime/apis/common/v1"
+
+	spacesv1beta1 "github.com/upbound/up-sdk-go/apis/spaces/v1beta1"
+
 	"github.com/upbound/up/cmd/up/controlplane/connector"
-	"github.com/upbound/up/cmd/up/controlplane/kubeconfig"
 	"github.com/upbound/up/cmd/up/controlplane/pkg"
 	"github.com/upbound/up/cmd/up/controlplane/pullsecret"
-	"github.com/upbound/up/internal/controlplane"
 	"github.com/upbound/up/internal/feature"
 	"github.com/upbound/up/internal/upbound"
 	"github.com/upbound/up/internal/upterm"
 )
 
 var (
-	cloudfieldNames = []string{"NAME", "CONFIGURATION", "UPDATED", "SYNCED", "READY", "MESSAGE", "AGE"}
 	spacefieldNames = []string{"GROUP", "NAME", "CROSSPLANE", "SYNCED", "READY", "MESSAGE", "AGE"}
 )
 
@@ -52,6 +55,17 @@ func (c *Cmd) AfterApply(kongCtx *kong.Context) error {
 	}
 	kongCtx.Bind(upCtx)
 
+	// we can't use control planes from inside a control plane
+	if _, _, ok := upCtx.GetCurrentSpaceContextScope(); ok {
+		return errors.New("cannot view control planes from inside a control plane context. Use 'up ctx ..' to go up to the group context")
+	}
+
+	cl, err := upCtx.BuildCurrentContextClient()
+	if err != nil {
+		return errors.Wrap(err, "unable to get kube client")
+	}
+	kongCtx.BindTo(cl, (*client.Client)(nil))
+
 	return nil
 }
 
@@ -61,28 +75,24 @@ func PredictControlPlanes() complete.Predictor {
 		if err != nil {
 			return nil
 		}
-		cfg, err := upCtx.BuildSDKConfig()
+
+		client, err := upCtx.BuildCurrentContextClient()
 		if err != nil {
 			return nil
 		}
 
-		cp := cp.NewClient(cfg)
-		if cp == nil {
+		var l spacesv1beta1.ControlPlaneList
+		if err := client.List(context.Background(), &l); err != nil {
 			return nil
 		}
 
-		ctps, err := cp.List(context.Background(), upCtx.Account)
-		if err != nil {
+		if len(l.Items) == 0 {
 			return nil
 		}
 
-		if len(ctps.ControlPlanes) == 0 {
-			return nil
-		}
-
-		data := make([]string, len(ctps.ControlPlanes))
-		for i, ctp := range ctps.ControlPlanes {
-			data[i] = ctp.ControlPlane.Name
+		data := make([]string, len(l.Items))
+		for i, ctp := range l.Items {
+			data[i] = ctp.Name
 		}
 		return data
 	})
@@ -90,12 +100,10 @@ func PredictControlPlanes() complete.Predictor {
 
 // Cmd contains commands for interacting with control planes.
 type Cmd struct {
-	Connect    connectCmd    `cmd:"" help:"Connect kubectl to control plane."`
-	Disconnect disconnectCmd `cmd:"" help:"Disconnect kubectl from control plane."`
-	Create     createCmd     `cmd:"" help:"Create a managed control plane."`
-	Delete     deleteCmd     `cmd:"" help:"Delete a control plane."`
-	List       listCmd       `cmd:"" help:"List control planes for the account."`
-	Get        getCmd        `cmd:"" help:"Get a single control plane."`
+	Create createCmd `cmd:"" help:"Create a managed control plane."`
+	Delete deleteCmd `cmd:"" help:"Delete a control plane."`
+	List   listCmd   `cmd:"" help:"List control planes for the account."`
+	Get    getCmd    `cmd:"" help:"Get a single control plane."`
 
 	Connector connector.Cmd `cmd:"" help:"Connect an App Cluster to a managed control plane."`
 
@@ -104,7 +112,9 @@ type Cmd struct {
 
 	PullSecret pullsecret.Cmd `cmd:"" help:"Manage package pull secrets."`
 
-	Kubeconfig kubeconfig.Cmd `cmd:"" name:"kubeconfig" help:"Manage control plane kubeconfig data."`
+	// Deprecated commands
+	Connect    connectCmd    `cmd:"" help:"Deprecated: Connect kubectl to control plane."`
+	Disconnect disconnectCmd `cmd:"" help:"Deprecated: Disconnect kubectl from control plane."`
 
 	// Common Upbound API configuration
 	Flags upbound.Flags `embed:""`
@@ -117,37 +127,25 @@ local Spaces are supported. Use the "profile" management command to switch
 between different Upbound profiles or to connect to a local Space.`
 }
 
-func extractCloudFields(obj any) []string {
-	resp, ok := obj.(*controlplane.Response)
-	if !ok {
-		return []string{"unknown", "unknown", "", "", "", "", ""}
-	}
-
-	return []string{
-		resp.Name,
-		resp.Cfg,
-		resp.Updated,
-		resp.Synced,
-		resp.Ready,
-		resp.Message,
-		formatAge(resp.Age),
-	}
-}
-
 func extractSpaceFields(obj any) []string {
-	resp, ok := obj.(*controlplane.Response)
+	ctp, ok := obj.(spacesv1beta1.ControlPlane)
 	if !ok {
 		return []string{"unknown", "unknown", "", "", "", "", ""}
 	}
 
+	v := ""
+	if pv := ctp.Spec.Crossplane.Version; pv != nil {
+		v = *pv
+	}
+
 	return []string{
-		resp.Group,
-		resp.Name,
-		resp.CrossplaneVersion,
-		resp.Synced,
-		resp.Ready,
-		resp.Message,
-		formatAge(resp.Age),
+		ctp.GetNamespace(),
+		ctp.GetName(),
+		v,
+		string(ctp.GetCondition(xpcommonv1.TypeSynced).Status),
+		string(ctp.GetCondition(xpcommonv1.TypeReady).Status),
+		ctp.Annotations["internal.spaces.upbound.io/message"],
+		formatAge(ptr.To(time.Since(ctp.CreationTimestamp.Time))),
 	}
 }
 
@@ -160,8 +158,5 @@ func formatAge(age *time.Duration) string {
 }
 
 func tabularPrint(obj any, printer upterm.ObjectPrinter, upCtx *upbound.Context) error {
-	if upCtx.Profile.IsSpace() {
-		return printer.Print(obj, spacefieldNames, extractSpaceFields)
-	}
-	return printer.Print(obj, cloudfieldNames, extractCloudFields)
+	return printer.Print(obj, spacefieldNames, extractSpaceFields)
 }

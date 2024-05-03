@@ -24,8 +24,7 @@ import (
 	"github.com/charmbracelet/bubbles/list"
 	tea "github.com/charmbracelet/bubbletea"
 	"github.com/charmbracelet/lipgloss"
-
-	"github.com/upbound/up/internal/upbound"
+	"k8s.io/apimachinery/pkg/util/sets"
 )
 
 var (
@@ -54,7 +53,7 @@ var quitBinding = key.NewBinding(
 	key.WithHelp("q/f10", "switch context & quit"),
 )
 
-type KeyFunc func(ctx context.Context, upCtx *upbound.Context, m model) (model, error)
+type KeyFunc func(m model) (model, error)
 
 type item struct {
 	text string
@@ -63,6 +62,8 @@ type item struct {
 	onEnter KeyFunc
 
 	padding []int
+
+	matchingTerms []string
 
 	// emptyList denotes that the item is marking that the list is empty, and
 	// should not be considered an element in the list itself
@@ -73,6 +74,13 @@ type item struct {
 }
 
 func (i item) FilterValue() string { return "" }
+func (i item) Matches(s string) bool {
+	if strings.EqualFold(s, i.text) {
+		return true
+	}
+
+	return sets.New(i.matchingTerms...).Has(s)
+}
 
 type itemDelegate struct{}
 
@@ -98,8 +106,8 @@ func (d itemDelegate) Render(w io.Writer, m list.Model, index int, listItem list
 		kind = fmt.Sprintf("[%s]", str.kind)
 	}
 
-	fmt.Fprintf(w, lipgloss.JoinHorizontal(lipgloss.Top, // nolint:staticcheck
-		kindStyle.Render(fmt.Sprintf("%10s ", kind)),
+	fmt.Fprint(w, lipgloss.JoinHorizontal(lipgloss.Top, // nolint:staticcheck
+		kindStyle.Render(fmt.Sprintf("%15s ", kind)),
 		mainStyle.Render(str.text),
 	))
 }
@@ -192,7 +200,7 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) { // nolint:gocyclo // T
 			return m, tea.Quit
 		case key.Matches(msg, quitBinding):
 			if state, ok := m.state.(Accepting); ok {
-				msg, err := state.Accept(context.Background(), m.upCtx, m.kubeContext)
+				msg, err := state.Accept(m.contextWriter)
 				if err != nil {
 					m.err = err
 					return m, nil
@@ -207,7 +215,9 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) { // nolint:gocyclo // T
 			switch {
 			case key.Matches(msg, backNavBinding):
 				if state, ok := m.state.(Back); ok {
-					fn = state.Back
+					if state.CanBack() {
+						fn = state.Back
+					}
 				}
 			case key.Matches(msg, selectNavBinding):
 				if i, ok := m.list.SelectedItem().(item); ok {
@@ -215,7 +225,7 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) { // nolint:gocyclo // T
 				}
 			}
 			if fn != nil {
-				newState, err := fn(context.Background(), m.upCtx, m)
+				newState, err := fn(m)
 				if err != nil {
 					m.err = err
 					return m, nil
