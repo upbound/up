@@ -23,5 +23,5 @@ type disconnectCmd struct{}
 
 // Run executes the get command.
 func (c *disconnectCmd) Run(ctx context.Context) error {
-	return errors.New("this command has been removed in favor of 'up ctx'")
+	return errors.New("this command has been removed in favor of 'up ctx'. Use 'up ctx -' to return to the previous context")
 }
