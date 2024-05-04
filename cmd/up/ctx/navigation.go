@@ -120,7 +120,7 @@ func (o *Organization) Items(ctx context.Context, upCtx *upbound.Context) ([]lis
 		return nil, err
 	}
 
-	authInfo, err := o.getOrgScopedAuthInfo(upCtx)
+	authInfo, err := getOrgScopedAuthInfo(upCtx, o.Name)
 	if err != nil {
 		return nil, err
 	}
@@ -162,39 +162,6 @@ func (o *Organization) CanBack() bool {
 
 func (o *Organization) Breadcrumbs() string {
 	return upboundRootStyle.Render("Upbound") + " spaces"
-}
-
-func (o *Organization) getOrgScopedAuthInfo(upCtx *upbound.Context) (*clientcmdapi.AuthInfo, error) {
-	var cmd string
-	switch version.GetReleaseTarget() {
-	case version.ReleaseTargetRelease:
-		cmd = "up"
-	case version.ReleaseTargetDebug:
-		var err error
-		cmd, err = os.Executable()
-		if err != nil {
-			return nil, err
-		}
-	}
-
-	return &clientcmdapi.AuthInfo{
-		Exec: &clientcmdapi.ExecConfig{
-			APIVersion: "client.authentication.k8s.io/v1",
-			Command:    cmd,
-			Args:       []string{"organization", "token"},
-			Env: []clientcmdapi.ExecEnvVar{
-				{
-					Name:  "ORGANIZATION",
-					Value: o.Name,
-				},
-				{
-					Name:  "UP_PROFILE",
-					Value: upCtx.ProfileName,
-				},
-			},
-			InteractiveMode: clientcmdapi.IfAvailableExecInteractiveMode,
-		},
-	}, nil
 }
 
 type sortedItems []list.Item
@@ -416,4 +383,37 @@ func buildSpacesClient(ingress string, ca []byte, authInfo *clientcmdapi.AuthInf
 		CurrentContext: ref,
 		AuthInfos:      authInfos,
 	}, &clientcmd.ConfigOverrides{})
+}
+
+func getOrgScopedAuthInfo(upCtx *upbound.Context, orgName string) (*clientcmdapi.AuthInfo, error) {
+	var cmd string
+	switch version.GetReleaseTarget() {
+	case version.ReleaseTargetRelease:
+		cmd = "up"
+	case version.ReleaseTargetDebug:
+		var err error
+		cmd, err = os.Executable()
+		if err != nil {
+			return nil, err
+		}
+	}
+
+	return &clientcmdapi.AuthInfo{
+		Exec: &clientcmdapi.ExecConfig{
+			APIVersion: "client.authentication.k8s.io/v1",
+			Command:    cmd,
+			Args:       []string{"organization", "token"},
+			Env: []clientcmdapi.ExecEnvVar{
+				{
+					Name:  "ORGANIZATION",
+					Value: orgName,
+				},
+				{
+					Name:  "UP_PROFILE",
+					Value: upCtx.ProfileName,
+				},
+			},
+			InteractiveMode: clientcmdapi.IfAvailableExecInteractiveMode,
+		},
+	}, nil
 }
