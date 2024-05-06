@@ -99,13 +99,13 @@ type cli struct {
 	Help               helpCmd                      `cmd:"" help:"Show help."`
 	Login              login.LoginCmd               `cmd:"" help:"Login to Upbound."`
 	Logout             login.LogoutCmd              `cmd:"" help:"Logout of Upbound."`
-	Configuration      configuration.Cmd            `cmd:"" name:"configuration" aliases:"cfg" help:"Interact with configurations."`
-	ControlPlane       controlplane.Cmd             `cmd:"" hidden:"" name:"controlplane" aliases:"ctp" help:"Interact with control planes in the current context, both in the cloud and in a local space."`
+	Ctx                ctx.Cmd                      `cmd:"" help:"Select an Upbound kubeconfig context."`
 	Space              space.Cmd                    `cmd:"" help:"Interact with Spaces."`
 	Group              group.Cmd                    `cmd:"" help:"Interact with groups inside Spaces."`
+	ControlPlane       controlplane.Cmd             `cmd:"" name:"controlplane" aliases:"ctp" help:"Interact with control planes in the current context, both in the cloud and in a local Space."`
+	Configuration      configuration.Cmd            `cmd:"" name:"configuration" aliases:"cfg" help:"Interact with configurations."`
 	Organization       organization.Cmd             `cmd:"" name:"organization" aliases:"org" help:"Interact with Upbound organizations."`
 	Profile            profile.Cmd                  `cmd:"" help:"Interact with Upbound profiles or local Spaces."`
-	Ctx                ctx.Cmd                      `cmd:"" maturity:"alpha" hidden:"" help:"Select an Upbound kubeconfig context."`
 	Repository         repository.Cmd               `cmd:"" name:"repository" aliases:"repo" help:"Interact with repositories."`
 	Robot              robot.Cmd                    `cmd:"" name:"robot" help:"Interact with robots."`
 	UXP                uxp.Cmd                      `cmd:"" help:"Interact with UXP."`
