@@ -27,7 +27,7 @@ const (
 // Accept upserts the "upbound" kubeconfig context and cluster to the chosen
 // kubeconfig, pointing to the space.
 func (s *Space) Accept(writer kubeContextWriter) (msg string, err error) {
-	config, err := buildSpacesClient(s.Ingress, s.CA, s.AuthInfo, types.NamespacedName{}).RawConfig()
+	config, err := buildSpacesClient(*s, types.NamespacedName{}).RawConfig()
 	if err != nil {
 		return "", err
 	}
@@ -41,9 +41,7 @@ func (s *Space) Accept(writer kubeContextWriter) (msg string, err error) {
 // Accept upserts the "upbound" kubeconfig context and cluster to the chosen
 // kubeconfig, pointing to the group.
 func (g *Group) Accept(writer kubeContextWriter) (msg string, err error) {
-	space := g.Space
-
-	config, err := buildSpacesClient(space.Ingress, space.CA, space.AuthInfo, types.NamespacedName{Namespace: g.Name}).RawConfig()
+	config, err := buildSpacesClient(g.Space, types.NamespacedName{Namespace: g.Name}).RawConfig()
 	if err != nil {
 		return "", err
 	}
@@ -56,9 +54,7 @@ func (g *Group) Accept(writer kubeContextWriter) (msg string, err error) {
 
 // Accept upserts a controlplane context and cluster to the chosen kubeconfig.
 func (ctp *ControlPlane) Accept(writer kubeContextWriter) (msg string, err error) {
-	space := ctp.Group.Space
-
-	config, err := buildSpacesClient(space.Ingress, space.CA, space.AuthInfo, ctp.NamespacedName()).RawConfig()
+	config, err := buildSpacesClient(ctp.Group.Space, ctp.NamespacedName()).RawConfig()
 	if err != nil {
 		return "", err
 	}

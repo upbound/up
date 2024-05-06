@@ -19,6 +19,7 @@ import (
 	"testing"
 
 	"github.com/google/go-cmp/cmp"
+	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/client-go/tools/clientcmd"
 	clientcmdapi "k8s.io/client-go/tools/clientcmd/api"
@@ -26,7 +27,10 @@ import (
 	"github.com/upbound/up/internal/upbound"
 )
 
-func TestGroupAccept(t *testing.T) {
+func TestDisconnectedGroupAccept(t *testing.T) {
+	spaceExtension := NewDisconnectedV1alpha1SpaceExtension("profile")
+	extensionMap := map[string]runtime.Object{ExtensionSpace: spaceExtension}
+
 	tests := map[string]struct {
 		conf      *clientcmdapi.Config
 		group     string
@@ -51,7 +55,7 @@ func TestGroupAccept(t *testing.T) {
 			wantConf: &clientcmdapi.Config{
 				CurrentContext: "upbound",
 				Contexts: map[string]*clientcmdapi.Context{
-					"upbound": {Namespace: "group", Cluster: "upbound", AuthInfo: "upbound"},
+					"upbound": {Namespace: "group", Cluster: "upbound", AuthInfo: "upbound", Extensions: extensionMap},
 					"profile": {Namespace: "group", Cluster: "profile", AuthInfo: "profile"},
 				},
 				Clusters:  map[string]*clientcmdapi.Cluster{"upbound": {Server: "https://ingress", CertificateAuthorityData: []uint8{1, 2, 3}}, "upbound-previous": {Server: "server1"}, "profile": {Server: "profile"}},
@@ -76,7 +80,7 @@ func TestGroupAccept(t *testing.T) {
 			wantConf: &clientcmdapi.Config{
 				CurrentContext: "upbound",
 				Contexts: map[string]*clientcmdapi.Context{
-					"upbound":          {Namespace: "other", Cluster: "upbound", AuthInfo: "upbound"},
+					"upbound":          {Namespace: "other", Cluster: "upbound", AuthInfo: "upbound", Extensions: extensionMap},
 					"upbound-previous": {Namespace: "namespace1", Cluster: "upbound-previous", AuthInfo: "upbound-previous"},
 					"profile":          {Namespace: "group", Cluster: "profile", AuthInfo: "profile"},
 				},
@@ -102,7 +106,137 @@ func TestGroupAccept(t *testing.T) {
 			wantConf: &clientcmdapi.Config{
 				CurrentContext: "upbound",
 				Contexts: map[string]*clientcmdapi.Context{
-					"upbound":          {Namespace: "other", Cluster: "upbound", AuthInfo: "upbound"},
+					"upbound":          {Namespace: "other", Cluster: "upbound", AuthInfo: "upbound", Extensions: extensionMap},
+					"upbound-previous": {Namespace: "namespace2", Cluster: "upbound", AuthInfo: "upbound"},
+					"profile":          {Namespace: "group", Cluster: "profile", AuthInfo: "profile"},
+				},
+				Clusters:  map[string]*clientcmdapi.Cluster{"upbound": {Server: "https://ingress", CertificateAuthorityData: []uint8{1, 2, 3}}, "upbound-previous": {Server: "server1"}, "profile": {Server: "profile"}},
+				AuthInfos: map[string]*clientcmdapi.AuthInfo{"upbound": {Token: "token2"}, "upbound-previous": {Token: "token1"}, "profile": {Token: "profile"}},
+			},
+			wantLast: "upbound-previous",
+			wantErr:  "<nil>",
+		},
+	}
+	for name, tt := range tests {
+		t.Run(name, func(t *testing.T) {
+			var last string
+			var conf *clientcmdapi.Config
+			writer := &fileWriter{
+				upCtx:            &upbound.Context{Kubecfg: clientcmd.NewDefaultClientConfig(*tt.conf, nil)},
+				kubeContext:      tt.preferred,
+				writeLastContext: func(c string) error { last = c; return nil },
+				verify:           func(c *clientcmdapi.Config) error { return nil },
+				modifyConfig: func(configAccess clientcmd.ConfigAccess, newConfig clientcmdapi.Config, relativizePaths bool) error {
+					conf = &newConfig
+					return nil
+				},
+			}
+
+			g := &Group{
+				Space: Space{
+					Org:        Organization{},
+					Name:       "space",
+					Ingress:    "ingress",
+					CA:         []byte{1, 2, 3},
+					AuthInfo:   tt.conf.AuthInfos[tt.conf.Contexts[tt.conf.CurrentContext].AuthInfo],
+					HubCluster: "profile",
+				},
+				Name: tt.group,
+			}
+			_, err := g.Accept(writer)
+			if diff := cmp.Diff(tt.wantErr, fmt.Sprintf("%v", err)); diff != "" {
+				t.Fatalf("g.Accept(...): -want err, +got err:\n%s", diff)
+			}
+			if diff := cmp.Diff(tt.wantConf, conf); diff != "" {
+				t.Errorf("g.Accept(...): -want conf, +got conf:\n%s", diff)
+			}
+			if diff := cmp.Diff(tt.wantLast, last); diff != "" {
+				t.Errorf("g.Accept(...): -want last, +got last:\n%s", diff)
+			}
+		})
+	}
+}
+
+func TestCloudGroupAccept(t *testing.T) {
+	spaceExtension := NewCloudV1alpha1SpaceExtension("org")
+	extensionMap := map[string]runtime.Object{ExtensionSpace: spaceExtension}
+
+	tests := map[string]struct {
+		conf      *clientcmdapi.Config
+		group     string
+		preferred string
+		wantConf  *clientcmdapi.Config
+		wantLast  string
+		wantErr   string
+	}{
+		"ProfileToUpbound": {
+			conf: &clientcmdapi.Config{
+				CurrentContext: "profile",
+				Contexts: map[string]*clientcmdapi.Context{
+					"upbound":          {Namespace: "namespace1", Cluster: "upbound", AuthInfo: "upbound"},
+					"upbound-previous": {Namespace: "namespace2", Cluster: "upbound-previous", AuthInfo: "upbound-previous"},
+					"profile":          {Namespace: "group", Cluster: "profile", AuthInfo: "profile"},
+				},
+				Clusters:  map[string]*clientcmdapi.Cluster{"upbound": {Server: "server1"}, "upbound-previous": {Server: "server2"}, "profile": {Server: "profile"}},
+				AuthInfos: map[string]*clientcmdapi.AuthInfo{"upbound": {Token: "token1"}, "upbound-previous": {Token: "token2"}, "profile": {Token: "profile"}},
+			},
+			group:     "group",
+			preferred: "upbound",
+			wantConf: &clientcmdapi.Config{
+				CurrentContext: "upbound",
+				Contexts: map[string]*clientcmdapi.Context{
+					"upbound": {Namespace: "group", Cluster: "upbound", AuthInfo: "upbound", Extensions: extensionMap},
+					"profile": {Namespace: "group", Cluster: "profile", AuthInfo: "profile"},
+				},
+				Clusters:  map[string]*clientcmdapi.Cluster{"upbound": {Server: "https://ingress", CertificateAuthorityData: []uint8{1, 2, 3}}, "upbound-previous": {Server: "server1"}, "profile": {Server: "profile"}},
+				AuthInfos: map[string]*clientcmdapi.AuthInfo{"upbound": {Token: "profile"}, "upbound-previous": {Token: "token1"}, "profile": {Token: "profile"}},
+			},
+			wantLast: "profile",
+			wantErr:  "<nil>",
+		},
+		"UpboundToDifferentGroup": {
+			conf: &clientcmdapi.Config{
+				CurrentContext: "upbound",
+				Contexts: map[string]*clientcmdapi.Context{
+					"upbound":          {Namespace: "namespace1", Cluster: "upbound", AuthInfo: "upbound"},
+					"upbound-previous": {Namespace: "namespace2", Cluster: "upbound-previous", AuthInfo: "upbound-previous"},
+					"profile":          {Namespace: "group", Cluster: "profile", AuthInfo: "profile"},
+				},
+				Clusters:  map[string]*clientcmdapi.Cluster{"upbound": {Server: "server1"}, "upbound-previous": {Server: "server2"}, "profile": {Server: "profile"}},
+				AuthInfos: map[string]*clientcmdapi.AuthInfo{"upbound": {Token: "token1"}, "upbound-previous": {Token: "token2"}, "profile": {Token: "profile"}},
+			},
+			group:     "other",
+			preferred: "upbound",
+			wantConf: &clientcmdapi.Config{
+				CurrentContext: "upbound",
+				Contexts: map[string]*clientcmdapi.Context{
+					"upbound":          {Namespace: "other", Cluster: "upbound", AuthInfo: "upbound", Extensions: extensionMap},
+					"upbound-previous": {Namespace: "namespace1", Cluster: "upbound-previous", AuthInfo: "upbound-previous"},
+					"profile":          {Namespace: "group", Cluster: "profile", AuthInfo: "profile"},
+				},
+				Clusters:  map[string]*clientcmdapi.Cluster{"upbound": {Server: "https://ingress", CertificateAuthorityData: []uint8{1, 2, 3}}, "upbound-previous": {Server: "server1"}, "profile": {Server: "profile"}},
+				AuthInfos: map[string]*clientcmdapi.AuthInfo{"upbound": {Token: "token1"}, "upbound-previous": {Token: "token1"}, "profile": {Token: "profile"}},
+			},
+			wantLast: "upbound-previous",
+			wantErr:  "<nil>",
+		},
+		"UpboundPreviousToDifferentGroup": {
+			conf: &clientcmdapi.Config{
+				CurrentContext: "upbound-previous",
+				Contexts: map[string]*clientcmdapi.Context{
+					"upbound":          {Namespace: "namespace1", Cluster: "upbound", AuthInfo: "upbound"},
+					"upbound-previous": {Namespace: "namespace2", Cluster: "upbound-previous", AuthInfo: "upbound-previous"},
+					"profile":          {Namespace: "group", Cluster: "profile", AuthInfo: "profile"},
+				},
+				Clusters:  map[string]*clientcmdapi.Cluster{"upbound": {Server: "server1"}, "upbound-previous": {Server: "server2"}, "profile": {Server: "profile"}},
+				AuthInfos: map[string]*clientcmdapi.AuthInfo{"upbound": {Token: "token1"}, "upbound-previous": {Token: "token2"}, "profile": {Token: "profile"}},
+			},
+			group:     "other",
+			preferred: "upbound",
+			wantConf: &clientcmdapi.Config{
+				CurrentContext: "upbound",
+				Contexts: map[string]*clientcmdapi.Context{
+					"upbound":          {Namespace: "other", Cluster: "upbound", AuthInfo: "upbound", Extensions: extensionMap},
 					"upbound-previous": {Namespace: "namespace2", Cluster: "upbound", AuthInfo: "upbound"},
 					"profile":          {Namespace: "group", Cluster: "profile", AuthInfo: "profile"},
 				},
@@ -153,6 +287,9 @@ func TestGroupAccept(t *testing.T) {
 }
 
 func TestControlPlaneAccept(t *testing.T) {
+	spaceExtension := NewCloudV1alpha1SpaceExtension("org")
+	extensionMap := map[string]runtime.Object{ExtensionSpace: spaceExtension}
+
 	tests := map[string]struct {
 		conf      *clientcmdapi.Config
 		ctp       types.NamespacedName
@@ -177,7 +314,7 @@ func TestControlPlaneAccept(t *testing.T) {
 			wantConf: &clientcmdapi.Config{
 				CurrentContext: "upbound",
 				Contexts: map[string]*clientcmdapi.Context{
-					"upbound": {Namespace: "default", Cluster: "upbound", AuthInfo: "upbound"},
+					"upbound": {Namespace: "default", Cluster: "upbound", AuthInfo: "upbound", Extensions: extensionMap},
 					"profile": {Namespace: "group", Cluster: "profile", AuthInfo: "profile"},
 				},
 				Clusters:  map[string]*clientcmdapi.Cluster{"upbound": {Server: "https://ingress/apis/spaces.upbound.io/v1beta1/namespaces/group/controlplanes/ctp/k8s", CertificateAuthorityData: []byte{1, 2, 3}}, "upbound-previous": {Server: "server1"}, "profile": {Server: "profile"}},
@@ -202,7 +339,7 @@ func TestControlPlaneAccept(t *testing.T) {
 			wantConf: &clientcmdapi.Config{
 				CurrentContext: "upbound",
 				Contexts: map[string]*clientcmdapi.Context{
-					"upbound":          {Namespace: "default", Cluster: "upbound", AuthInfo: "upbound"},
+					"upbound":          {Namespace: "default", Cluster: "upbound", AuthInfo: "upbound", Extensions: extensionMap},
 					"upbound-previous": {Namespace: "namespace1", Cluster: "upbound-previous", AuthInfo: "upbound-previous"},
 					"profile":          {Namespace: "group", Cluster: "profile", AuthInfo: "profile"},
 				},
@@ -228,7 +365,7 @@ func TestControlPlaneAccept(t *testing.T) {
 			wantConf: &clientcmdapi.Config{
 				CurrentContext: "upbound",
 				Contexts: map[string]*clientcmdapi.Context{
-					"upbound":          {Namespace: "default", Cluster: "upbound", AuthInfo: "upbound"},
+					"upbound":          {Namespace: "default", Cluster: "upbound", AuthInfo: "upbound", Extensions: extensionMap},
 					"upbound-previous": {Namespace: "default", Cluster: "upbound-previous", AuthInfo: "profile"},
 					"profile":          {Namespace: "group", Cluster: "profile", AuthInfo: "profile"},
 				},
@@ -257,7 +394,7 @@ func TestControlPlaneAccept(t *testing.T) {
 			wantConf: &clientcmdapi.Config{
 				CurrentContext: "upbound",
 				Contexts: map[string]*clientcmdapi.Context{
-					"upbound":          {Namespace: "default", Cluster: "upbound", AuthInfo: "upbound"},
+					"upbound":          {Namespace: "default", Cluster: "upbound", AuthInfo: "upbound", Extensions: extensionMap},
 					"upbound-previous": {Namespace: "default", Cluster: "upbound-previous", AuthInfo: "profile"},
 					"profile":          {Namespace: "group", Cluster: "profile", AuthInfo: "profile"},
 				},
@@ -287,7 +424,7 @@ func TestControlPlaneAccept(t *testing.T) {
 			wantConf: &clientcmdapi.Config{
 				CurrentContext: "upbound",
 				Contexts: map[string]*clientcmdapi.Context{
-					"upbound":          {Namespace: "default", Cluster: "upbound", AuthInfo: "upbound"},
+					"upbound":          {Namespace: "default", Cluster: "upbound", AuthInfo: "upbound", Extensions: extensionMap},
 					"upbound-previous": {Namespace: "namespace2", Cluster: "upbound", AuthInfo: "upbound"},
 					"profile":          {Namespace: "group", Cluster: "profile", AuthInfo: "profile"},
 				},

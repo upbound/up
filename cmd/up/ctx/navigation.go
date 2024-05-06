@@ -23,6 +23,7 @@ import (
 	"github.com/charmbracelet/lipgloss"
 	"github.com/pkg/errors"
 	corev1 "k8s.io/api/core/v1"
+	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/client-go/tools/clientcmd"
 	clientcmdapi "k8s.io/client-go/tools/clientcmd/api"
@@ -180,6 +181,10 @@ type Space struct {
 	Ingress  string
 	CA       []byte
 	AuthInfo *clientcmdapi.AuthInfo
+
+	// HubCluster is an optional field that stores which cluster in the
+	// kubeconfig points at the hub
+	HubCluster string
 }
 
 func (s *Space) Items(ctx context.Context, upCtx *upbound.Context) ([]list.Item, error) {
@@ -230,7 +235,7 @@ func (s *Space) Breadcrumbs() string {
 
 // GetClient returns a kube client pointed at the current space
 func (s *Space) GetClient() (client.Client, error) {
-	rest, err := buildSpacesClient(s.Ingress, s.CA, s.AuthInfo, types.NamespacedName{}).ClientConfig()
+	rest, err := buildSpacesClient(*s, types.NamespacedName{}).ClientConfig()
 	if err != nil {
 		return nil, err
 	}
@@ -338,48 +343,60 @@ func (ctp *ControlPlane) NamespacedName() types.NamespacedName {
 	return types.NamespacedName{Name: ctp.Name, Namespace: ctp.Group.Name}
 }
 
+const (
+	ExtensionSpaceHub = "spaces.upbound.io/hub"
+	ExtensionSpace    = "spaces.upbound.io/space"
+)
+
 // buildSpacesClient creates a new kubeconfig hardcoded to match the provided
 // spaces access configuration and pointed directly at the resource.
-func buildSpacesClient(ingress string, ca []byte, authInfo *clientcmdapi.AuthInfo, resource types.NamespacedName) clientcmd.ClientConfig {
+func buildSpacesClient(space Space, resource types.NamespacedName) clientcmd.ClientConfig {
 	ref := "upbound"
 
 	clusters := make(map[string]*clientcmdapi.Cluster)
 	clusters[ref] = &clientcmdapi.Cluster{
 		// when accessing any resource on the space, reference the server from
 		// the space level
-		Server: profile.ToSpacesK8sURL(ingress, resource),
+		Server: profile.ToSpacesK8sURL(space.Ingress, resource),
 	}
-	if len(ca) == 0 {
+	if len(space.CA) == 0 {
 		clusters[ref].InsecureSkipTLSVerify = true
 	} else {
-		clusters[ref].CertificateAuthorityData = ca
+		clusters[ref].CertificateAuthorityData = space.CA
 	}
 
-	contexts := map[string]*clientcmdapi.Context{
-		ref: {
-			Cluster: ref,
-		},
+	context := &clientcmdapi.Context{
+		Cluster:    ref,
+		Extensions: make(map[string]runtime.Object),
+	}
+
+	if space.IsCloud() {
+		context.Extensions[ExtensionSpace] = NewCloudV1alpha1SpaceExtension(space.Org.Name)
+	} else {
+		context.Extensions[ExtensionSpace] = NewDisconnectedV1alpha1SpaceExtension(space.HubCluster)
 	}
 
 	// since we are pointing at an individual control plane, we'll point at the
 	// "default" namespace inside
 	if resource.Name != "" {
-		contexts[ref].Namespace = "default"
+		context.Namespace = "default"
 	} else {
-		contexts[ref].Namespace = resource.Namespace
+		context.Namespace = resource.Namespace
 	}
 
 	authInfos := make(map[string]*clientcmdapi.AuthInfo)
-	if authInfo != nil {
-		authInfos[ref] = authInfo
-		contexts[ref].AuthInfo = ref
+	if space.AuthInfo != nil {
+		authInfos[ref] = space.AuthInfo
+		context.AuthInfo = ref
 	}
 
 	return clientcmd.NewDefaultClientConfig(clientcmdapi.Config{
-		Kind:           "Config",
-		APIVersion:     "v1",
-		Clusters:       clusters,
-		Contexts:       contexts,
+		Kind:       "Config",
+		APIVersion: "v1",
+		Clusters:   clusters,
+		Contexts: map[string]*clientcmdapi.Context{
+			ref: context,
+		},
 		CurrentContext: ref,
 		AuthInfos:      authInfos,
 	}, &clientcmd.ConfigOverrides{})
