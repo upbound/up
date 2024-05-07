@@ -16,25 +16,34 @@ package space
 
 import (
 	"context"
+	"net/http"
 
 	"github.com/alecthomas/kong"
 	"github.com/pterm/pterm"
-	"k8s.io/client-go/rest"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 
+	"github.com/crossplane/crossplane-runtime/pkg/errors"
+
 	upboundv1alpha1 "github.com/upbound/up-sdk-go/apis/upbound/v1alpha1"
+	uerrors "github.com/upbound/up-sdk-go/errors"
 	"github.com/upbound/up-sdk-go/service/accounts"
+
 	"github.com/upbound/up/internal/upbound"
 	"github.com/upbound/up/internal/upterm"
 )
 
 var (
 	spacelistFieldNames = []string{"NAME", "MODE", "PROVIDER", "REGION"}
+
+	errListSpaces = "unable to list Upbound Spaces"
 )
 
 // listCmd lists all of the spaces in Upbound.
 type listCmd struct {
 	Upbound upbound.Flags `embed:""`
+
+	kc client.Client
+	ac *accounts.Client
 }
 
 // AfterApply sets default values in command after assignment and validation.
@@ -52,32 +61,39 @@ func (c *listCmd) AfterApply(kongCtx *kong.Context) error {
 	if err != nil {
 		return err
 	}
+	c.ac = accounts.NewClient(cfg)
+
+	kc, err := client.New(ctrlCfg, client.Options{})
+	if err != nil {
+		return errors.Wrap(err, errListSpaces)
+	}
+	c.kc = kc
 
 	kongCtx.Bind(upCtx)
-	kongCtx.Bind(ctrlCfg)
-	kongCtx.Bind(accounts.NewClient(cfg))
-
 	kongCtx.Bind(pterm.DefaultTable.WithWriter(kongCtx.Stdout).WithSeparator("   "))
 
 	return nil
 }
 
 // Run executes the list command.
-func (c *listCmd) Run(ctx context.Context, printer upterm.ObjectPrinter, p pterm.TextPrinter, upCtx *upbound.Context, ac *accounts.Client, rest *rest.Config) error {
-	a, err := upbound.GetOrganization(ctx, ac, upCtx.Account)
-	if err != nil {
-		return err
+func (c *listCmd) Run(ctx context.Context, printer upterm.Printer, p pterm.TextPrinter, upCtx *upbound.Context) error {
+	a, err := upbound.GetOrganization(ctx, c.ac, upCtx.Account)
+	var uerr *uerrors.Error
+	if errors.As(err, &uerr) {
+		if uerr.Status == http.StatusUnauthorized {
+			p.Println("You must be logged in and authorized to list Upbound Cloud Spaces")
+			return uerr
+		}
 	}
 
-	sc, err := client.New(rest, client.Options{})
 	if err != nil {
-		return err
+		return errors.Wrap(err, errListSpaces)
 	}
 
 	var l upboundv1alpha1.SpaceList
-	err = sc.List(ctx, &l, &client.ListOptions{Namespace: a.Organization.Name})
+	err = c.kc.List(ctx, &l, &client.ListOptions{Namespace: a.Organization.Name})
 	if err != nil {
-		return err
+		return errors.Wrap(err, errListSpaces)
 	}
 
 	if len(l.Items) == 0 {
