@@ -64,6 +64,7 @@ func TestListCommand(t *testing.T) {
 							MockNewRequest: fake.NewMockNewRequestFn(nil, nil),
 							MockDo: fake.NewMockDoFn(&uerrors.Error{
 								Status: http.StatusUnauthorized,
+								Title:  http.StatusText(http.StatusUnauthorized),
 							}),
 						},
 					}),
@@ -72,7 +73,12 @@ func TestListCommand(t *testing.T) {
 					Account: "some-account",
 				},
 			},
-			want: want{},
+			want: want{
+				err: &uerrors.Error{
+					Status: http.StatusUnauthorized,
+					Title:  http.StatusText(http.StatusUnauthorized),
+				},
+			},
 		},
 		"ErrFailedToQueryForAccount": {
 			reason: "If the user could not query cloud due to service availability we should return an error.",

@@ -35,7 +35,7 @@ import (
 var (
 	spacelistFieldNames = []string{"NAME", "MODE", "PROVIDER", "REGION"}
 
-	errListSpaces = "unable to list Upbound Cloud Spaces"
+	errListSpaces = "unable to list Upbound Spaces"
 )
 
 // listCmd lists all of the spaces in Upbound.
@@ -82,7 +82,7 @@ func (c *listCmd) Run(ctx context.Context, printer upterm.Printer, p pterm.TextP
 	if errors.As(err, &uerr) {
 		if uerr.Status == http.StatusUnauthorized {
 			p.Println("You must be logged in and authorized to list Upbound Cloud Spaces")
-			return nil
+			return uerr
 		}
 	}
 
