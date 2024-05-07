@@ -28,8 +28,8 @@ import (
 )
 
 func TestDisconnectedGroupAccept(t *testing.T) {
-	spaceExtension := NewDisconnectedV1alpha1SpaceExtension("profile")
-	extensionMap := map[string]runtime.Object{ExtensionSpace: spaceExtension}
+	spaceExtension := NewDisconnectedV1Alpha1SpaceExtension("profile")
+	extensionMap := map[string]runtime.Object{ContextExtensionKeySpace: spaceExtension}
 
 	tests := map[string]struct {
 		conf      *clientcmdapi.Config
@@ -158,8 +158,8 @@ func TestDisconnectedGroupAccept(t *testing.T) {
 }
 
 func TestCloudGroupAccept(t *testing.T) {
-	spaceExtension := NewCloudV1alpha1SpaceExtension("org")
-	extensionMap := map[string]runtime.Object{ExtensionSpace: spaceExtension}
+	spaceExtension := NewCloudV1Alpha1SpaceExtension("org")
+	extensionMap := map[string]runtime.Object{ContextExtensionKeySpace: spaceExtension}
 
 	tests := map[string]struct {
 		conf      *clientcmdapi.Config
@@ -287,8 +287,8 @@ func TestCloudGroupAccept(t *testing.T) {
 }
 
 func TestControlPlaneAccept(t *testing.T) {
-	spaceExtension := NewCloudV1alpha1SpaceExtension("org")
-	extensionMap := map[string]runtime.Object{ExtensionSpace: spaceExtension}
+	spaceExtension := NewCloudV1Alpha1SpaceExtension("org")
+	extensionMap := map[string]runtime.Object{ContextExtensionKeySpace: spaceExtension}
 
 	tests := map[string]struct {
 		conf      *clientcmdapi.Config

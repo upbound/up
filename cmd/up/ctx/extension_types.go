@@ -18,6 +18,8 @@ import (
 	"reflect"
 
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+
+	upboundv1alpha1 "github.com/upbound/up-sdk-go/apis/upbound/v1alpha1"
 )
 
 // DisconnectedConfiguration is the configuration for a disconnected space
@@ -53,11 +55,11 @@ var (
 	SpaceExtensionKind = reflect.TypeOf(SpaceExtension{}).Name()
 )
 
-func NewCloudV1alpha1SpaceExtension(org string) *SpaceExtension {
+func NewCloudV1Alpha1SpaceExtension(org string) *SpaceExtension {
 	return &SpaceExtension{
 		TypeMeta: metav1.TypeMeta{
 			Kind:       SpaceExtensionKind,
-			APIVersion: "spaces.upbound.io/v1alpha1",
+			APIVersion: upboundv1alpha1.SchemeGroupVersion.String(),
 		},
 		Spec: &SpaceExtensionSpec{
 			Cloud: &CloudConfiguration{
@@ -67,7 +69,7 @@ func NewCloudV1alpha1SpaceExtension(org string) *SpaceExtension {
 	}
 }
 
-func NewDisconnectedV1alpha1SpaceExtension(hubCluster string) *SpaceExtension {
+func NewDisconnectedV1Alpha1SpaceExtension(hubCluster string) *SpaceExtension {
 	return &SpaceExtension{
 		TypeMeta: metav1.TypeMeta{
 			Kind:       SpaceExtensionKind,

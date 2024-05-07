@@ -344,8 +344,9 @@ func (ctp *ControlPlane) NamespacedName() types.NamespacedName {
 }
 
 const (
-	ExtensionSpaceHub = "spaces.upbound.io/hub"
-	ExtensionSpace    = "spaces.upbound.io/space"
+	// ContextExtensionKeySpace is the key used in a context extension for a
+	// space extension
+	ContextExtensionKeySpace = "spaces.upbound.io/space"
 )
 
 // buildSpacesClient creates a new kubeconfig hardcoded to match the provided
@@ -371,9 +372,9 @@ func buildSpacesClient(space Space, resource types.NamespacedName) clientcmd.Cli
 	}
 
 	if space.IsCloud() {
-		context.Extensions[ExtensionSpace] = NewCloudV1alpha1SpaceExtension(space.Org.Name)
+		context.Extensions[ContextExtensionKeySpace] = NewCloudV1Alpha1SpaceExtension(space.Org.Name)
 	} else {
-		context.Extensions[ExtensionSpace] = NewDisconnectedV1alpha1SpaceExtension(space.HubCluster)
+		context.Extensions[ContextExtensionKeySpace] = NewDisconnectedV1Alpha1SpaceExtension(space.HubCluster)
 	}
 
 	// since we are pointing at an individual control plane, we'll point at the
