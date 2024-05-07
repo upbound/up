@@ -29,6 +29,7 @@ import (
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/client-go/tools/clientcmd"
 	clientcmdapi "k8s.io/client-go/tools/clientcmd/api"
+	"k8s.io/utils/ptr"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 
 	spacesv1beta1 "github.com/upbound/up-sdk-go/apis/spaces/v1beta1"
@@ -59,7 +60,7 @@ type NavigationState interface {
 // Accepting is a model state that provides a method to accept a navigation node.
 type Accepting interface {
 	NavigationState
-	Accept(writer kubeContextWriter) (string, error)
+	Accept(upCtx *upbound.Context, writer kubeContextWriter) (string, error)
 }
 
 // Back is a model state that provides a method to go back to the parent navigation node.
@@ -216,13 +217,13 @@ type Space struct {
 	CA       []byte
 	AuthInfo *clientcmdapi.AuthInfo
 
-	// HubCluster is an optional field that stores which cluster in the
+	// HubContext is an optional field that stores which context in the
 	// kubeconfig points at the hub
-	HubCluster string
+	HubContext string
 }
 
 func (s *Space) Items(ctx context.Context, upCtx *upbound.Context) ([]list.Item, error) {
-	cl, err := s.GetClient()
+	cl, err := s.GetClient(upCtx)
 	if err != nil {
 		return nil, err
 	}
@@ -275,8 +276,13 @@ func (s *Space) Breadcrumbs() string {
 }
 
 // GetClient returns a kube client pointed at the current space
-func (s *Space) GetClient() (client.Client, error) {
-	rest, err := s.buildClient(types.NamespacedName{}).ClientConfig()
+func (s *Space) GetClient(upCtx *upbound.Context) (client.Client, error) {
+	conf, err := s.buildClient(upCtx, types.NamespacedName{})
+	if err != nil {
+		return nil, err
+	}
+
+	rest, err := conf.ClientConfig()
 	if err != nil {
 		return nil, err
 	}
@@ -290,57 +296,96 @@ func (s *Space) GetClient() (client.Client, error) {
 // hub and the context will be set at the namespace. If the resource specifies
 // both a namespace and a name, then the client will point directly at the
 // control plane ingress and set the namespace to "default".
-func (s *Space) buildClient(resource types.NamespacedName) clientcmd.ClientConfig {
+// TODO(redbackthomson): Refactor into smaller methods (one for space-level, one
+// for ctp-level)
+func (s *Space) buildClient(upCtx *upbound.Context, resource types.NamespacedName) (clientcmd.ClientConfig, error) { // nolint:gocyclo
+	// reference name for all context, cluster and authinfo for in-memory
+	// kubeconfig
 	ref := "upbound"
 
-	clusters := make(map[string]*clientcmdapi.Cluster)
-	clusters[ref] = &clientcmdapi.Cluster{
-		// when accessing any resource on the space, reference the server from
-		// the space level
-		Server: profile.ToSpacesK8sURL(s.Ingress, resource),
+	prev, err := upCtx.Kubecfg.RawConfig()
+	if err != nil {
+		return nil, err
 	}
 
-	if len(s.CA) == 0 {
-		clusters[ref].InsecureSkipTLSVerify = true
-	} else {
-		clusters[ref].CertificateAuthorityData = s.CA
+	config := clientcmdapi.Config{
+		Kind:           "Config",
+		APIVersion:     "v1",
+		CurrentContext: ref,
+		Clusters:       make(map[string]*clientcmdapi.Cluster),
+		Contexts:       make(map[string]*clientcmdapi.Context),
+		AuthInfos:      make(map[string]*clientcmdapi.AuthInfo),
 	}
 
-	context := &clientcmdapi.Context{
-		Cluster:    ref,
+	refContext := &clientcmdapi.Context{
 		Extensions: make(map[string]runtime.Object),
 	}
 
+	if resource.Name == "" {
+		// point at the space hub
+		refContext.Namespace = resource.Namespace
+
+		hubContext, ok := prev.Contexts[s.HubContext]
+		if s.HubContext != "" && ok {
+			// import the cluster and authinfo from the hub context
+			refContext.Cluster = hubContext.Cluster
+			config.Clusters[hubContext.Cluster] = ptr.To(*prev.Clusters[hubContext.Cluster])
+			refContext.AuthInfo = hubContext.AuthInfo
+			config.AuthInfos[hubContext.AuthInfo] = ptr.To(*prev.AuthInfos[hubContext.AuthInfo])
+		} else {
+			// fall back to ingress if hub context not available
+			config.Clusters[ref] = &clientcmdapi.Cluster{
+				Server: profile.ToSpacesK8sURL(s.Ingress, resource),
+			}
+			if len(s.CA) == 0 {
+				config.Clusters[ref].InsecureSkipTLSVerify = true
+			} else {
+				config.Clusters[ref].CertificateAuthorityData = s.CA
+			}
+			refContext.Cluster = ref
+
+			if s.AuthInfo != nil {
+				config.AuthInfos[ref] = s.AuthInfo
+				refContext.AuthInfo = ref
+			}
+		}
+	} else {
+		// since we are pointing at an individual control plane, point at the
+		// "default" namespace inside it
+		refContext.Namespace = "default"
+
+		config.Clusters[ref] = &clientcmdapi.Cluster{
+			Server: profile.ToSpacesK8sURL(s.Ingress, resource),
+		}
+		refContext.Cluster = ref
+
+		if len(s.CA) == 0 {
+			config.Clusters[ref].InsecureSkipTLSVerify = true
+		} else {
+			config.Clusters[ref].CertificateAuthorityData = s.CA
+		}
+
+		if s.AuthInfo != nil {
+			config.AuthInfos[ref] = s.AuthInfo
+			refContext.AuthInfo = ref
+		} else if s.HubContext != "" {
+			hubContext, ok := prev.Contexts[s.HubContext]
+			if ok {
+				// import the authinfo from the hub context
+				refContext.AuthInfo = hubContext.AuthInfo
+				config.AuthInfos[hubContext.AuthInfo] = ptr.To(*prev.AuthInfos[hubContext.AuthInfo])
+			}
+		}
+	}
+
 	if s.IsCloud() {
-		context.Extensions[ContextExtensionKeySpace] = NewCloudV1Alpha1SpaceExtension(s.Org.Name)
+		refContext.Extensions[ContextExtensionKeySpace] = NewCloudV1Alpha1SpaceExtension(s.Org.Name)
 	} else {
-		context.Extensions[ContextExtensionKeySpace] = NewDisconnectedV1Alpha1SpaceExtension(s.HubCluster)
+		refContext.Extensions[ContextExtensionKeySpace] = NewDisconnectedV1Alpha1SpaceExtension(s.HubContext)
 	}
 
-	// since we are pointing at an individual control plane, we'll point at the
-	// "default" namespace inside
-	if resource.Name != "" {
-		context.Namespace = "default"
-	} else {
-		context.Namespace = resource.Namespace
-	}
-
-	authInfos := make(map[string]*clientcmdapi.AuthInfo)
-	if s.AuthInfo != nil {
-		authInfos[ref] = s.AuthInfo
-		context.AuthInfo = ref
-	}
-
-	return clientcmd.NewDefaultClientConfig(clientcmdapi.Config{
-		Kind:       "Config",
-		APIVersion: "v1",
-		Clusters:   clusters,
-		Contexts: map[string]*clientcmdapi.Context{
-			ref: context,
-		},
-		CurrentContext: ref,
-		AuthInfos:      authInfos,
-	}, &clientcmd.ConfigOverrides{})
+	config.Contexts[ref] = refContext
+	return clientcmd.NewDefaultClientConfig(config, &clientcmd.ConfigOverrides{}), nil
 }
 
 // Group provides the navigation node for a concrete group aka namespace.
@@ -353,7 +398,7 @@ var _ Accepting = &Group{}
 var _ Back = &Group{}
 
 func (g *Group) Items(ctx context.Context, upCtx *upbound.Context) ([]list.Item, error) {
-	cl, err := g.Space.GetClient()
+	cl, err := g.Space.GetClient(upCtx)
 	if err != nil {
 		return nil, err
 	}

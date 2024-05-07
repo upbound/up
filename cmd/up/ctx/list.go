@@ -200,7 +200,7 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) { // nolint:gocyclo // T
 			return m, tea.Quit
 		case key.Matches(msg, quitBinding):
 			if state, ok := m.state.(Accepting); ok {
-				msg, err := state.Accept(m.contextWriter)
+				msg, err := state.Accept(m.upCtx, m.contextWriter)
 				if err != nil {
 					m.err = err
 					return m, nil

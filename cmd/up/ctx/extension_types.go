@@ -24,7 +24,7 @@ import (
 
 // DisconnectedConfiguration is the configuration for a disconnected space
 type DisconnectedConfiguration struct {
-	HubCluster string `json:"hubCluster"`
+	HubContext string `json:"hubContext"`
 }
 
 // CloudConfiguration is the configuration of a cloud space
@@ -69,7 +69,7 @@ func NewCloudV1Alpha1SpaceExtension(org string) *SpaceExtension {
 	}
 }
 
-func NewDisconnectedV1Alpha1SpaceExtension(hubCluster string) *SpaceExtension {
+func NewDisconnectedV1Alpha1SpaceExtension(hubContext string) *SpaceExtension {
 	return &SpaceExtension{
 		TypeMeta: metav1.TypeMeta{
 			Kind:       SpaceExtensionKind,
@@ -77,7 +77,7 @@ func NewDisconnectedV1Alpha1SpaceExtension(hubCluster string) *SpaceExtension {
 		},
 		Spec: &SpaceExtensionSpec{
 			Disconnected: &DisconnectedConfiguration{
-				HubCluster: hubCluster,
+				HubContext: hubContext,
 			},
 		},
 	}

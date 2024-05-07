@@ -58,6 +58,17 @@ func (c *Context) BuildCurrentContextClient() (client.Client, error) {
 	return sc, nil
 }
 
+func (c *Context) GetCurrentContextName() (string, error) {
+	// todo: Add support for overriding current context as part of CLI args
+
+	config, err := c.Kubecfg.RawConfig()
+	if err != nil {
+		return "", err
+	}
+
+	return config.CurrentContext, nil
+}
+
 func (c *Context) GetCurrentContext() (context *clientcmdapi.Context, cluster *clientcmdapi.Cluster, auth *clientcmdapi.AuthInfo, exists bool) {
 	// todo: Add support for overriding current context as part of CLI args
 
@@ -86,7 +97,7 @@ func (c *Context) GetCurrentContext() (context *clientcmdapi.Context, cluster *c
 	return context, cluster, auth, exists
 }
 
-func (c *Context) GetCurrentSpaceContextScope() (string, types.NamespacedName, bool) {
+func (c *Context) GetCurrentSpaceContextScope() (ingressHost string, resource types.NamespacedName, exists bool) {
 	context, cluster, _, exists := c.GetCurrentContext()
 	if !exists {
 		return "", types.NamespacedName{}, false
@@ -99,7 +110,7 @@ func (c *Context) GetCurrentSpaceContextScope() (string, types.NamespacedName, b
 	base, nsn, exists := profile.ParseSpacesK8sURL(strings.TrimSuffix(cluster.Server, "/"))
 	// we are inside a ctp scope
 	if exists {
-		return base, nsn, exists
+		return strings.TrimPrefix(base, "https://"), nsn, exists
 	}
 
 	// we aren't inside a group scope
@@ -107,5 +118,5 @@ func (c *Context) GetCurrentSpaceContextScope() (string, types.NamespacedName, b
 		return "", types.NamespacedName{}, false
 	}
 
-	return cluster.Server, types.NamespacedName{Namespace: context.Namespace}, true
+	return strings.TrimPrefix(cluster.Server, "https://"), types.NamespacedName{Namespace: context.Namespace}, true
 }

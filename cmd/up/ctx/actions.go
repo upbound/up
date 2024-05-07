@@ -18,6 +18,8 @@ import (
 	"fmt"
 
 	"k8s.io/apimachinery/pkg/types"
+
+	"github.com/upbound/up/internal/upbound"
 )
 
 const (
@@ -26,41 +28,56 @@ const (
 
 // Accept upserts the "upbound" kubeconfig context and cluster to the chosen
 // kubeconfig, pointing to the space.
-func (s *Space) Accept(writer kubeContextWriter) (msg string, err error) {
-	config, err := s.buildClient(types.NamespacedName{}).RawConfig()
+func (s *Space) Accept(upCtx *upbound.Context, writer kubeContextWriter) (msg string, err error) {
+	config, err := s.buildClient(upCtx, types.NamespacedName{})
 	if err != nil {
 		return "", err
 	}
-	if err := writer.Write(&config); err != nil {
+	raw, err := config.RawConfig()
+	if err != nil {
+		return "", err
+	}
+	if err := writer.Write(&raw); err != nil {
 		return "", err
 	}
 
-	return fmt.Sprintf(contextSwitchedFmt, config.CurrentContext, s.Breadcrumbs()), nil
+	prev, _ := upCtx.GetCurrentContextName()
+	return fmt.Sprintf(contextSwitchedFmt, prev, s.Breadcrumbs()), nil
 }
 
 // Accept upserts the "upbound" kubeconfig context and cluster to the chosen
 // kubeconfig, pointing to the group.
-func (g *Group) Accept(writer kubeContextWriter) (msg string, err error) {
-	config, err := g.Space.buildClient(types.NamespacedName{Namespace: g.Name}).RawConfig()
+func (g *Group) Accept(upCtx *upbound.Context, writer kubeContextWriter) (msg string, err error) {
+	config, err := g.Space.buildClient(upCtx, types.NamespacedName{Namespace: g.Name})
 	if err != nil {
 		return "", err
 	}
-	if err := writer.Write(&config); err != nil {
+	raw, err := config.RawConfig()
+	if err != nil {
+		return "", err
+	}
+	if err := writer.Write(&raw); err != nil {
 		return "", err
 	}
 
-	return fmt.Sprintf(contextSwitchedFmt, config.CurrentContext, g.Breadcrumbs()), nil
+	prev, _ := upCtx.GetCurrentContextName()
+	return fmt.Sprintf(contextSwitchedFmt, prev, g.Breadcrumbs()), nil
 }
 
 // Accept upserts a controlplane context and cluster to the chosen kubeconfig.
-func (ctp *ControlPlane) Accept(writer kubeContextWriter) (msg string, err error) {
-	config, err := ctp.Group.Space.buildClient(ctp.NamespacedName()).RawConfig()
+func (ctp *ControlPlane) Accept(upCtx *upbound.Context, writer kubeContextWriter) (msg string, err error) {
+	config, err := ctp.Group.Space.buildClient(upCtx, ctp.NamespacedName())
 	if err != nil {
 		return "", err
 	}
-	if err := writer.Write(&config); err != nil {
+	raw, err := config.RawConfig()
+	if err != nil {
+		return "", err
+	}
+	if err := writer.Write(&raw); err != nil {
 		return "", err
 	}
 
-	return fmt.Sprintf(contextSwitchedFmt, config.CurrentContext, ctp.Breadcrumbs()), nil
+	prev, _ := upCtx.GetCurrentContextName()
+	return fmt.Sprintf(contextSwitchedFmt, prev, ctp.Breadcrumbs()), nil
 }
