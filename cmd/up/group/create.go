@@ -16,22 +16,19 @@ package group
 
 import (
 	"context"
-	"strconv"
 
 	"github.com/pterm/pterm"
 	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 
-	spacesv1beta1 "github.com/upbound/up-sdk-go/apis/spaces/v1beta1"
 	"github.com/upbound/up/internal/upbound"
 	"github.com/upbound/up/internal/upterm"
 )
 
 // createCmd creates a group in a space.
 type createCmd struct {
-	Name               string `arg:"" required:"" help:"Name of group."`
-	DeletionProtection bool   `name:"deletion-protection" optional:"" default:"false" help:"Enable deletion protection on the new group." negatable:""`
+	Name string `arg:"" required:"" help:"Name of group."`
 }
 
 // Run executes the create command.
@@ -40,9 +37,6 @@ func (c *createCmd) Run(ctx context.Context, printer upterm.ObjectPrinter, upCtx
 	group := corev1.Namespace{
 		ObjectMeta: metav1.ObjectMeta{
 			Name: c.Name,
-			Labels: map[string]string{
-				spacesv1beta1.ControlPlaneGroupProtectionKey: strconv.FormatBool(c.DeletionProtection),
-			},
 		},
 	}
 
