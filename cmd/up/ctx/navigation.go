@@ -229,7 +229,7 @@ func (s *Space) Items(ctx context.Context, upCtx *upbound.Context) ([]list.Item,
 
 	items := make([]list.Item, 0, len(nss.Items)+1)
 	if s.CanBack() {
-		items = append(items, item{text: "..", kind: "profiles", onEnter: s.Back, back: true})
+		items = append(items, item{text: "..", kind: "spaces", onEnter: s.Back, back: true})
 	}
 	for _, ns := range nss.Items {
 		items = append(items, item{text: ns.Name, kind: "group", onEnter: func(m model) (model, error) {
