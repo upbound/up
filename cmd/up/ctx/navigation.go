@@ -17,6 +17,7 @@ package ctx
 import (
 	"context"
 	"os"
+	"os/exec"
 	"sort"
 
 	"github.com/charmbracelet/bubbles/list"
@@ -33,7 +34,6 @@ import (
 	"github.com/upbound/up-sdk-go/service/organizations"
 	"github.com/upbound/up/internal/profile"
 	"github.com/upbound/up/internal/upbound"
-	"github.com/upbound/up/internal/version"
 )
 
 var (
@@ -386,16 +386,16 @@ func buildSpacesClient(ingress string, ca []byte, authInfo *clientcmdapi.AuthInf
 }
 
 func getOrgScopedAuthInfo(upCtx *upbound.Context, orgName string) (*clientcmdapi.AuthInfo, error) {
-	var cmd string
-	switch version.GetReleaseTarget() {
-	case version.ReleaseTargetRelease:
+	// find the current executable path
+	cmd, err := os.Executable()
+	if err != nil {
+		return nil, err
+	}
+
+	// if the current executable was the same `up` that is found in PATH
+	path, err := exec.LookPath("up")
+	if err == nil && path == cmd {
 		cmd = "up"
-	case version.ReleaseTargetDebug:
-		var err error
-		cmd, err = os.Executable()
-		if err != nil {
-			return nil, err
-		}
 	}
 
 	return &clientcmdapi.AuthInfo{
