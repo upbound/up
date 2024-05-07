@@ -26,6 +26,13 @@ import (
 	"gopkg.in/yaml.v3"
 )
 
+// Printer describes interactions for working with the ObjectPrinter below.
+// NOTE(tnthornton) ideally this would be called "ObjectPrinter".
+// TODO(tnthornton) rename this to ObjectPrinter.
+type Printer interface {
+	Print(obj any, fieldNames []string, extractFields func(any) []string) error
+}
+
 // The ObjectPrinter is intended to make it easy to print individual structs
 // and lists of structs for the 'get' and 'list' commands. It can print as
 // a human-readable table, or computer-readable (JSON or YAML)
@@ -124,4 +131,47 @@ func (p *ObjectPrinter) printDefaultObj(obj any, fieldNames []string, extractFie
 	data[0] = fieldNames
 	data[1] = extractFields(obj)
 	return p.TablePrinter.WithHasHeader().WithData(data).Render()
+}
+
+// NewNopObjectPrinter returns a Printer that does nothing.
+func NewNopObjectPrinter() Printer { return nopObjectPrinter{} }
+
+type nopObjectPrinter struct{}
+
+func (p nopObjectPrinter) Print(obj any, fieldNames []string, extractFields func(any) []string) error {
+	return nil
+}
+
+// NewNopTextPrinter returns a TextPrinter that does nothing.
+func NewNopTextPrinter() pterm.TextPrinter { return nopTextPrinter{} }
+
+type nopTextPrinter struct{}
+
+func (p nopTextPrinter) Sprint(a ...interface{}) string                   { return "" }
+func (p nopTextPrinter) Sprintln(a ...interface{}) string                 { return "" }
+func (p nopTextPrinter) Sprintf(format string, a ...interface{}) string   { return "" }
+func (p nopTextPrinter) Sprintfln(format string, a ...interface{}) string { return "" }
+func (p nopTextPrinter) Print(a ...interface{}) *pterm.TextPrinter {
+	tp := pterm.TextPrinter(nopTextPrinter{})
+	return &tp
+}
+func (p nopTextPrinter) Println(a ...interface{}) *pterm.TextPrinter {
+	tp := pterm.TextPrinter(nopTextPrinter{})
+	return &tp
+}
+func (p nopTextPrinter) Printf(format string, a ...interface{}) *pterm.TextPrinter {
+	tp := pterm.TextPrinter(nopTextPrinter{})
+	return &tp
+}
+func (p nopTextPrinter) Printfln(format string, a ...interface{}) *pterm.TextPrinter {
+	tp := pterm.TextPrinter(nopTextPrinter{})
+	return &tp
+}
+func (p nopTextPrinter) PrintOnError(a ...interface{}) *pterm.TextPrinter {
+	tp := pterm.TextPrinter(nopTextPrinter{})
+	return &tp
+}
+func (p nopTextPrinter) PrintOnErrorf(format string, a ...interface{}) *pterm.TextPrinter {
+	tp := pterm.TextPrinter(nopTextPrinter{})
+	return &tp
 }

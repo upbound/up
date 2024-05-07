@@ -75,6 +75,7 @@ func (c *cli) AfterApply(ctx *kong.Context) error { //nolint:unparam
 	printer.Quiet = c.Quiet
 
 	ctx.Bind(printer)
+	ctx.BindTo(&printer, (*upterm.Printer)(nil))
 	ctx.Bind(c.Quiet)
 	return nil
 }
