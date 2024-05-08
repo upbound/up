@@ -16,6 +16,7 @@ package profile
 
 import (
 	"context"
+	"strings"
 
 	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/types"
@@ -31,5 +32,5 @@ func GetIngressHost(ctx context.Context, cl client.Client) (host string, ca []by
 	}
 	host = mxpConfig.Data["ingress-host"]
 	ca = []byte(mxpConfig.Data["ingress-ca"])
-	return host, ca, nil
+	return strings.TrimPrefix(host, "https://"), ca, nil
 }
