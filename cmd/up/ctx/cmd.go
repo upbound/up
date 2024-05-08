@@ -16,6 +16,7 @@ package ctx
 
 import (
 	"context"
+	"encoding/json"
 	"fmt"
 	"io"
 	"strings"
@@ -25,8 +26,9 @@ import (
 	"github.com/charmbracelet/bubbles/list"
 	tea "github.com/charmbracelet/bubbletea"
 	"github.com/pkg/errors"
+	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/types"
-	"k8s.io/apimachinery/pkg/util/runtime"
+	kruntime "k8s.io/apimachinery/pkg/util/runtime"
 	"k8s.io/client-go/kubernetes/scheme"
 	"k8s.io/client-go/tools/clientcmd"
 	clientcmdapi "k8s.io/client-go/tools/clientcmd/api"
@@ -49,7 +51,7 @@ var (
 )
 
 func init() {
-	runtime.Must(spacesv1beta1.AddToScheme(scheme.Scheme))
+	kruntime.Must(spacesv1beta1.AddToScheme(scheme.Scheme))
 }
 
 type Cmd struct {
@@ -376,9 +378,9 @@ func DeriveState(ctx context.Context, upCtx *upbound.Context, conf *clientcmdapi
 	var spaceExt *SpaceExtension
 	if conf.CurrentContext == "" || currentCtx == nil {
 		return DeriveNewState(ctx, conf, getIngressHost)
-	} else if ext, ok := currentCtx.Extensions[ContextExtensionKeySpace]; !ok {
+	} else if ext, ok := currentCtx.Extensions[ContextExtensionKeySpace].(*runtime.Unknown); !ok {
 		return DeriveNewState(ctx, conf, getIngressHost)
-	} else if spaceExt, ok = ext.(*SpaceExtension); !ok {
+	} else if err := json.Unmarshal(ext.Raw, &spaceExt); err != nil {
 		return nil, errors.New("unable to parse space extension to go struct")
 	}
 
