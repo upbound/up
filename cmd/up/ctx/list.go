@@ -29,8 +29,8 @@ import (
 
 var (
 	itemStyle         = lipgloss.NewStyle()
-	kindStyle         = lipgloss.NewStyle().Foreground(lipgloss.ANSIColor(8))
-	selectedItemStyle = lipgloss.NewStyle().Foreground(lipgloss.Color("170"))
+	kindStyle         = lipgloss.NewStyle().Foreground(neutralColor)
+	selectedItemStyle = lipgloss.NewStyle().Foreground(upboundBrandColor)
 )
 
 var backNavBinding = key.NewBinding(

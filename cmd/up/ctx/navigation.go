@@ -16,6 +16,7 @@ package ctx
 
 import (
 	"context"
+	"fmt"
 	"os"
 	"os/exec"
 	"sort"
@@ -38,9 +39,15 @@ import (
 )
 
 var (
-	upboundRootStyle   = lipgloss.NewStyle().Foreground(lipgloss.Color("170"))
-	pathSeparatorStyle = lipgloss.NewStyle().Foreground(lipgloss.ANSIColor(8))
-	pathSegmentStyle   = lipgloss.NewStyle()
+	upboundBrandColor = lipgloss.AdaptiveColor{Light: "#5e3ba5", Dark: "#af7efd"}
+	neutralColor      = lipgloss.AdaptiveColor{Light: "#4e5165", Dark: "#9a9ca7"}
+)
+
+var (
+	// all adaptive colors have a minimum of 7:1 against #fff or #000
+	upboundRootStyle         = lipgloss.NewStyle().Foreground(upboundBrandColor)
+	pathInactiveSegmentStyle = lipgloss.NewStyle().Foreground(neutralColor)
+	pathSegmentStyle         = lipgloss.NewStyle()
 )
 
 // NavigationState is a model state that provides a list of items for a navigation node.
@@ -66,6 +73,25 @@ type AcceptingFunc func(ctx context.Context, upCtx *upbound.Context) error
 
 func (f AcceptingFunc) Accept(ctx context.Context, upCtx *upbound.Context) error {
 	return f(ctx, upCtx)
+}
+
+// breadcrumbStyle defines the styles to be used in the breadcrumbs of a list
+type breadcrumbStyle struct {
+	// previousLevel is the style of the previous levels in the path (higher
+	// order items). For example, when listing control planes then the
+	// breadcrumb labels for groups, spaces, orgs and root will be rendered with
+	// this style.
+	previousLevel lipgloss.Style
+
+	// currentLevel is the style of the current level in the path. For example,
+	// when listing control planes then the breadcrumb label for control planes
+	// will be rendered with this style.
+	currentLevel lipgloss.Style
+}
+
+var defaultBreadcrumbStyle = breadcrumbStyle{
+	previousLevel: pathInactiveSegmentStyle,
+	currentLevel:  pathSegmentStyle,
 }
 
 type Root struct{}
@@ -94,8 +120,12 @@ func (r *Root) Items(ctx context.Context, upCtx *upbound.Context) ([]list.Item, 
 	return items, nil
 }
 
+func (r *Root) breadcrumbs() string {
+	return upboundRootStyle.Render("Upbound")
+}
+
 func (r *Root) Breadcrumbs() string {
-	return upboundRootStyle.Render("Upbound") + " organizations"
+	return r.breadcrumbs()
 }
 
 var _ Back = &Organization{}
@@ -161,8 +191,12 @@ func (o *Organization) CanBack() bool {
 	return true
 }
 
+func (o *Organization) breadcrumbs(styles breadcrumbStyle) string {
+	return upboundRootStyle.Render("Upbound ") + styles.previousLevel.Render(fmt.Sprintf("%s/", o.Name))
+}
+
 func (o *Organization) Breadcrumbs() string {
-	return upboundRootStyle.Render("Upbound") + " spaces"
+	return o.breadcrumbs(defaultBreadcrumbStyle)
 }
 
 type sortedItems []list.Item
@@ -200,7 +234,7 @@ func (s *Space) Items(ctx context.Context, upCtx *upbound.Context) ([]list.Item,
 
 	items := make([]list.Item, 0, len(nss.Items)+1)
 	if s.CanBack() {
-		items = append(items, item{text: "..", kind: "profiles", onEnter: s.Back, back: true})
+		items = append(items, item{text: "..", kind: "spaces", onEnter: s.Back, back: true})
 	}
 	for _, ns := range nss.Items {
 		items = append(items, item{text: ns.Name, kind: "group", onEnter: func(m model) (model, error) {
@@ -229,8 +263,15 @@ func (s *Space) CanBack() bool {
 	return s.IsCloud()
 }
 
+func (s *Space) breadcrumbs(styles breadcrumbStyle) string {
+	return s.Org.breadcrumbs(breadcrumbStyle{
+		currentLevel:  styles.previousLevel,
+		previousLevel: styles.previousLevel,
+	}) + styles.previousLevel.Render(fmt.Sprintf("%s/", s.Name))
+}
+
 func (s *Space) Breadcrumbs() string {
-	return upboundRootStyle.Render("Upbound") + pathSegmentStyle.Render(" space ") + pathSegmentStyle.Render(s.Name)
+	return s.breadcrumbs(defaultBreadcrumbStyle)
 }
 
 // GetClient returns a kube client pointed at the current space
@@ -348,8 +389,15 @@ func (g *Group) Items(ctx context.Context, upCtx *upbound.Context) ([]list.Item,
 	return items, nil
 }
 
+func (g *Group) breadcrumbs(styles breadcrumbStyle) string {
+	return g.Space.breadcrumbs(breadcrumbStyle{
+		currentLevel:  styles.previousLevel,
+		previousLevel: styles.previousLevel,
+	}) + styles.previousLevel.Render(fmt.Sprintf("%s/", g.Name))
+}
+
 func (g *Group) Breadcrumbs() string {
-	return g.Space.Breadcrumbs() + pathSeparatorStyle.Render(" > ") + pathSegmentStyle.Render(g.Name)
+	return g.breadcrumbs(defaultBreadcrumbStyle)
 }
 
 func (g *Group) Back(m model) (model, error) {
@@ -385,8 +433,16 @@ func (ctp *ControlPlane) Items(ctx context.Context, upCtx *upbound.Context) ([]l
 	}, nil
 }
 
+func (ctp *ControlPlane) breadcrumbs(styles breadcrumbStyle) string {
+	// use current level to highlight the entire breadcrumb chain
+	return ctp.Group.breadcrumbs(breadcrumbStyle{
+		currentLevel:  styles.currentLevel,
+		previousLevel: styles.currentLevel,
+	}) + pathSegmentStyle.Render(ctp.Name)
+}
+
 func (ctp *ControlPlane) Breadcrumbs() string {
-	return ctp.Group.Space.Breadcrumbs() + pathSeparatorStyle.Render(" > ") + pathSegmentStyle.Render(ctp.Group.Name) + pathSeparatorStyle.Render("/") + pathSegmentStyle.Render(ctp.Name)
+	return ctp.breadcrumbs(defaultBreadcrumbStyle)
 }
 
 func (ctp *ControlPlane) Back(m model) (model, error) {
