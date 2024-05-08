@@ -177,10 +177,12 @@ func activateContext(conf *clientcmdapi.Config, sourceContext, preferredContext 
 	if !ok {
 		return nil, "", fmt.Errorf("no %q context found", preferredContext+upboundPreviousContextSuffix)
 	}
-	// todo(redbackthomson): Handle the case of no current context
-	current, ok := conf.Contexts[conf.CurrentContext]
-	if !ok {
-		return nil, "", fmt.Errorf("no %q context found", conf.CurrentContext)
+	var current *clientcmdapi.Context
+	if conf.CurrentContext != "" {
+		current, ok = conf.Contexts[conf.CurrentContext]
+		if !ok {
+			return nil, "", fmt.Errorf("no %q context found", conf.CurrentContext)
+		}
 	}
 	if conf.CurrentContext == preferredContext {
 		conf.Contexts[preferredContext] = source
