@@ -52,7 +52,9 @@ func (c *Cmd) AfterApply(kongCtx *kong.Context) error {
 	kongCtx.Bind(upCtx)
 
 	// we can't use groups from inside a control plane
-	if _, ctp, exists := upCtx.GetCurrentSpaceContextScope(); exists && ctp.Name != "" {
+	if _, ctp, inSpace := upCtx.GetCurrentSpaceContextScope(); !inSpace {
+		return errors.New("your kubeconfig must be pointing at a space context")
+	} else if ctp.Name != "" {
 		return errors.New("cannot view groups from inside a control plane context. Use 'up ctx ..' to go up to the group context")
 	}
 
