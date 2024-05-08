@@ -19,6 +19,7 @@ import (
 	"context"
 	"flag"
 	"fmt"
+	"os"
 
 	"github.com/pkg/errors"
 
@@ -28,6 +29,15 @@ import (
 const (
 	errGetCrossplaneVersion = "unable to get crossplane version"
 	errGetSpacesVersion     = "unable to get spaces version"
+)
+
+const (
+	versionUnknown         = "<unknown>"
+	versionClientOutputFmt = "Client Version: %s"
+	versionFullOutputFmt   = `Client Version: %s
+Server Version: %s
+Spaces Controller Version: %s
+`
 )
 
 type Cmd struct {
@@ -53,26 +63,28 @@ Usage:
 }
 
 func (c *Cmd) Run(ctx context.Context) error {
-	fmt.Println("Client Version: " + version.GetVersion())
+	client := version.GetVersion()
 	if c.Client {
+		fmt.Printf(versionClientOutputFmt, client)
 		return nil
 	}
 
 	vxp, err := FetchCrossplaneVersion(ctx)
 	if err != nil {
-		return errors.Wrap(err, errGetCrossplaneVersion)
+		fmt.Fprintln(os.Stderr, errors.Wrap(err, errGetCrossplaneVersion).Error())
 	}
-	if vxp != "" {
-		fmt.Println("Server Version: " + vxp)
+	if vxp == "" {
+		vxp = versionUnknown
 	}
 
 	sc, err := FetchSpacesVersion(ctx)
 	if err != nil {
-		return errors.Wrap(err, errGetSpacesVersion)
+		fmt.Fprintln(os.Stderr, errors.Wrap(err, errGetSpacesVersion).Error())
 	}
-	if sc != "" {
-		fmt.Println("Spaces Controller Version: " + sc)
+	if sc == "" {
+		sc = versionUnknown
 	}
+	fmt.Printf(versionFullOutputFmt, client, vxp, sc)
 
 	return nil
 }
