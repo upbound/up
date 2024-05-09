@@ -21,16 +21,16 @@ import (
 	"fmt"
 
 	"k8s.io/client-go/kubernetes"
-	ctrl "sigs.k8s.io/controller-runtime"
 
 	"github.com/alecthomas/kong"
+	"github.com/upbound/up/internal/upbound"
 	"github.com/upbound/up/internal/upterm"
 	"github.com/upbound/up/internal/version"
 )
 
 const (
-	errKubeConfig         = "failed to get kubeconfig"
-	errCreateK8sClientset = "failed to connect to cluster"
+	errKubeConfig      = "failed to get kubeconfig"
+	errCreateK8sClient = "failed to connect to cluster"
 
 	errGetCrossplaneVersion = "unable to get crossplane version. Is your kubecontext pointed at a control plane?"
 	errGetSpacesVersion     = "unable to get spaces version. Is your kubecontext pointed at a Space?"
@@ -66,6 +66,19 @@ type versionInfo struct {
 
 type Cmd struct {
 	Client bool `env:"" help:"If true, shows client version only (no server required)." json:"client,omitempty"`
+
+	// Common Upbound API configuration
+	Flags upbound.Flags `embed:""`
+}
+
+func (c *Cmd) AfterApply(kongCtx *kong.Context) error {
+	upCtx, err := upbound.NewFromFlags(c.Flags)
+	if err != nil {
+		return err
+	}
+	kongCtx.Bind(upCtx)
+
+	return nil
 }
 
 // BeforeApply sets default values and parses flags
@@ -86,22 +99,28 @@ Usage:
 `
 }
 
-func (c *Cmd) BuildVersionInfo(ctx context.Context, kongCtx *kong.Context) (v versionInfo) {
+func (c *Cmd) BuildVersionInfo(ctx context.Context, kongCtx *kong.Context, upCtx *upbound.Context) (v versionInfo) {
 	v.Client.Version = version.GetVersion()
 
 	if c.Client {
 		return v
 	}
 
-	config, err := ctrl.GetConfig()
-	if err != nil {
+	context, _, _, ok := upCtx.GetCurrentContext()
+	if !ok || context == nil {
 		fmt.Fprintln(kongCtx.Stderr, errKubeConfig)
 		return v
 	}
 
-	clientset, err := kubernetes.NewForConfig(config)
+	rest, err := upCtx.Kubecfg.ClientConfig()
 	if err != nil {
-		fmt.Fprintln(kongCtx.Stderr, errCreateK8sClientset)
+		fmt.Fprintln(kongCtx.Stderr, errCreateK8sClient)
+		return v
+	}
+
+	clientset, err := kubernetes.NewForConfig(rest)
+	if err != nil {
+		fmt.Fprintln(kongCtx.Stderr, errCreateK8sClient)
 		return v
 	}
 
@@ -116,7 +135,13 @@ func (c *Cmd) BuildVersionInfo(ctx context.Context, kongCtx *kong.Context) (v ve
 
 	v.Server.SpacesControllerVersion, err = FetchSpacesVersion(ctx, *clientset)
 	if err != nil {
-		fmt.Fprintln(kongCtx.Stderr, errGetSpacesVersion)
+		// check to see if we're in a cloud space
+		ext, err := upbound.GetSpaceExtension(context)
+		if err != nil || (ext == nil || ext.Spec.Cloud == nil) {
+			fmt.Fprintln(kongCtx.Stderr, errGetSpacesVersion)
+		} else {
+			v.Server.SpacesControllerVersion = "Upbound Cloud Managed"
+		}
 	}
 	if v.Server.SpacesControllerVersion == "" {
 		v.Server.SpacesControllerVersion = versionUnknown
@@ -125,8 +150,8 @@ func (c *Cmd) BuildVersionInfo(ctx context.Context, kongCtx *kong.Context) (v ve
 	return v
 }
 
-func (c *Cmd) Run(ctx context.Context, kongCtx *kong.Context, printer upterm.Printer) error {
-	v := c.BuildVersionInfo(ctx, kongCtx)
+func (c *Cmd) Run(ctx context.Context, kongCtx *kong.Context, upCtx *upbound.Context, printer upterm.Printer) error {
+	v := c.BuildVersionInfo(ctx, kongCtx, upCtx)
 
 	return printer.PrintTemplate(v, versionTemplate)
 }
