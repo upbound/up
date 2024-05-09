@@ -37,31 +37,37 @@ const (
 	errNotSemVerFmt           = "%s; couldn't covert version to semver"
 )
 
-type ReleaseTarget string
+type releaseTarget string
 
 const (
-	ReleaseTargetRelease ReleaseTarget = "release"
-	ReleaseTargetDebug   ReleaseTarget = "debug"
+	ReleaseTargetRelease releaseTarget = "release"
+	ReleaseTargetDebug   releaseTarget = "debug"
 )
 
 var (
 	version      string
 	agentVersion string
+	gitCommit    string = "unknown-commit"
 	target       string = string(ReleaseTargetDebug)
 )
 
-// GetVersion returns the current build version.
-func GetVersion() string {
+// Version returns the current build version.
+func Version() string {
 	return version
 }
 
-// GetAgentVersion returns the connect agent version.
-func GetAgentVersion() string {
+// GitCommit returns the commit SHA that was used to build the current version.
+func GitCommit() string {
+	return gitCommit
+}
+
+// AgentVersion returns the connect agent version.
+func AgentVersion() string {
 	return agentVersion
 }
 
-// GetReleaseTarget returns the target type that the binary was built with.
-func GetReleaseTarget() ReleaseTarget {
+// ReleaseTarget returns the target type that the binary was built with.
+func ReleaseTarget() releaseTarget {
 	switch target {
 	case string(ReleaseTargetRelease):
 		return ReleaseTargetRelease
@@ -115,7 +121,7 @@ func WithLogger(l logging.Logger) Option {
 // to check what the currently published version of up is and returns the local
 // and remote versions and whether or not we could upgrade up.
 func (i *Informer) CanUpgrade(ctx context.Context) (string, string, bool) {
-	local := GetVersion()
+	local := Version()
 	remote, err := i.getCurrent(ctx)
 	if err != nil {
 		i.log.Debug(fmt.Sprintf(errFailedToQueryRemoteFmt, cliURL), "error", err)

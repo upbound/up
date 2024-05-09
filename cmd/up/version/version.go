@@ -19,6 +19,7 @@ import (
 	"context"
 	"flag"
 	"fmt"
+	"runtime"
 
 	"k8s.io/client-go/kubernetes"
 
@@ -42,6 +43,9 @@ const (
 	versionTemplate = `{{with .Client -}}
 Client:
   Version:	{{.Version}}
+  Go Version:	{{.GoVersion}}
+  Git Commit: 	{{.GitCommit}}
+  OS/Arch:	{{.OS}}/{{.Arch}}
 {{- end}}
 
 {{- if ne .Server nil}}{{with .Server}}
@@ -52,7 +56,11 @@ Server:
 )
 
 type clientVersion struct {
-	Version string `json:"version,omitempty"`
+	Arch      string `json:"arch,omitempty"`
+	GitCommit string `json:"gitCommit,omitempty"`
+	GoVersion string `json:"goVersion,omitempty"`
+	OS        string `json:"os,omitempty"`
+	Version   string `json:"version,omitempty"`
 }
 
 type serverVersion struct {
@@ -101,7 +109,13 @@ Usage:
 }
 
 func (c *Cmd) BuildVersionInfo(ctx context.Context, kongCtx *kong.Context, upCtx *upbound.Context) (v versionInfo) {
-	v.Client.Version = version.GetVersion()
+	v.Client = clientVersion{
+		Version:   version.Version(),
+		Arch:      runtime.GOARCH,
+		OS:        runtime.GOOS,
+		GoVersion: runtime.Version(),
+		GitCommit: version.GitCommit(),
+	}
 
 	if c.Client {
 		return v

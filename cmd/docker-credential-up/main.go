@@ -41,7 +41,7 @@ func main() {
 	flag.Parse()
 
 	if v {
-		fmt.Fprintln(os.Stdout, version.GetVersion())
+		fmt.Fprintln(os.Stdout, version.Version())
 		os.Exit(0)
 	}
 
