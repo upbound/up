@@ -19,26 +19,50 @@ import (
 	"context"
 	"flag"
 	"fmt"
-	"os"
 
-	"github.com/pkg/errors"
+	"k8s.io/client-go/kubernetes"
+	ctrl "sigs.k8s.io/controller-runtime"
 
+	"github.com/alecthomas/kong"
+	"github.com/upbound/up/internal/upterm"
 	"github.com/upbound/up/internal/version"
 )
 
 const (
-	errGetCrossplaneVersion = "unable to get crossplane version"
-	errGetSpacesVersion     = "unable to get spaces version"
+	errKubeConfig         = "failed to get kubeconfig"
+	errCreateK8sClientset = "failed to connect to cluster"
+
+	errGetCrossplaneVersion = "unable to get crossplane version. Is your kubecontext pointed at a control plane?"
+	errGetSpacesVersion     = "unable to get spaces version. Is your kubecontext pointed at a Space?"
 )
 
 const (
-	versionUnknown         = "<unknown>"
-	versionClientOutputFmt = "Client Version: %s"
-	versionFullOutputFmt   = `Client Version: %s
-Server Version: %s
-Spaces Controller Version: %s
-`
+	versionUnknown  = "unknown"
+	versionTemplate = `{{with .Client -}}
+Client:
+  Version:	{{.Version}}
+{{- end}}
+
+{{- if ne .Server nil}}{{with .Server}}
+Server:
+  Crossplane Version:	{{.CrossplaneVersion}}
+  Spaces Controller Version:	{{.SpacesControllerVersion}}
+{{- end}}{{- end}}`
 )
+
+type clientVersion struct {
+	Version string `json:"version,omitempty"`
+}
+
+type serverVersion struct {
+	CrossplaneVersion       string `json:"crossplaneVersion,omitempty" yaml:"crossplaneVersion,omitempty"`
+	SpacesControllerVersion string `json:"spacesControllerVersion,omitempty" yaml:"spacesControllerVersion,omitempty"`
+}
+
+type versionInfo struct {
+	Client clientVersion  `json:"client" yaml:"client"`
+	Server *serverVersion `json:"server,omitempty" yaml:"server,omitempty"`
+}
 
 type Cmd struct {
 	Client bool `env:"" help:"If true, shows client version only (no server required)." json:"client,omitempty"`
@@ -62,29 +86,47 @@ Usage:
 `
 }
 
-func (c *Cmd) Run(ctx context.Context) error {
-	client := version.GetVersion()
+func (c *Cmd) BuildVersionInfo(ctx context.Context, kongCtx *kong.Context) (v versionInfo) {
+	v.Client.Version = version.GetVersion()
+
 	if c.Client {
-		fmt.Printf(versionClientOutputFmt, client)
-		return nil
+		return v
 	}
 
-	vxp, err := FetchCrossplaneVersion(ctx)
+	config, err := ctrl.GetConfig()
 	if err != nil {
-		fmt.Fprintln(os.Stderr, errors.Wrap(err, errGetCrossplaneVersion).Error())
-	}
-	if vxp == "" {
-		vxp = versionUnknown
+		fmt.Fprintln(kongCtx.Stderr, errKubeConfig)
+		return v
 	}
 
-	sc, err := FetchSpacesVersion(ctx)
+	clientset, err := kubernetes.NewForConfig(config)
 	if err != nil {
-		fmt.Fprintln(os.Stderr, errors.Wrap(err, errGetSpacesVersion).Error())
+		fmt.Fprintln(kongCtx.Stderr, errCreateK8sClientset)
+		return v
 	}
-	if sc == "" {
-		sc = versionUnknown
-	}
-	fmt.Printf(versionFullOutputFmt, client, vxp, sc)
 
-	return nil
+	v.Server = &serverVersion{}
+	v.Server.CrossplaneVersion, err = FetchCrossplaneVersion(ctx, *clientset)
+	if err != nil {
+		fmt.Fprintln(kongCtx.Stderr, errGetCrossplaneVersion)
+	}
+	if v.Server.CrossplaneVersion == "" {
+		v.Server.CrossplaneVersion = versionUnknown
+	}
+
+	v.Server.SpacesControllerVersion, err = FetchSpacesVersion(ctx, *clientset)
+	if err != nil {
+		fmt.Fprintln(kongCtx.Stderr, errGetSpacesVersion)
+	}
+	if v.Server.SpacesControllerVersion == "" {
+		v.Server.SpacesControllerVersion = versionUnknown
+	}
+
+	return v
+}
+
+func (c *Cmd) Run(ctx context.Context, kongCtx *kong.Context, printer upterm.Printer) error {
+	v := c.BuildVersionInfo(ctx, kongCtx)
+
+	return printer.PrintTemplate(v, versionTemplate)
 }

@@ -17,7 +17,10 @@ package upterm
 import (
 	"encoding/json"
 	"fmt"
+	"os"
 	"reflect"
+	"text/tabwriter"
+	"text/template"
 
 	"github.com/pterm/pterm"
 
@@ -31,6 +34,10 @@ import (
 // TODO(tnthornton) rename this to ObjectPrinter.
 type Printer interface {
 	Print(obj any, fieldNames []string, extractFields func(any) []string) error
+
+	// PrintTemplate prints the object using the provided Go template, if format
+	// is set to default, otherwise prints to JSON or YAML.
+	PrintTemplate(obj any, template string) error
 }
 
 // The ObjectPrinter is intended to make it easy to print individual structs
@@ -87,6 +94,40 @@ func (p *ObjectPrinter) Print(obj any, fieldNames []string, extractFields func(a
 	}
 }
 
+func (p *ObjectPrinter) PrintTemplate(obj any, tmpl string) error {
+	// Step 1: If user specified quiet, skip printing entirely
+	if p.Quiet {
+		return nil
+	}
+
+	// Step 2: Enable color printing if desired. Note: This is only
+	// implemented for the default table printing, not JSON or YAML.
+	if p.Pretty {
+		pterm.EnableStyling()
+	}
+
+	// Step 3: Print the object with the appropriate formatting.
+	switch p.Format { //nolint:exhaustive
+	case config.JSON:
+		return printJSON(obj)
+	case config.YAML:
+		return printYAML(obj)
+	default:
+		templ, err := template.New("out").Parse(tmpl)
+		if err != nil {
+			return err
+		}
+
+		w := tabwriter.NewWriter(os.Stdout, 8, 1, 1, ' ', 0)
+		if err := templ.Execute(w, obj); err != nil {
+			return err
+		}
+		w.Write([]byte("\n"))
+		w.Flush()
+	}
+	return nil
+}
+
 func printJSON(obj any) error {
 	js, err := json.MarshalIndent(obj, "", "    ")
 	if err != nil {
@@ -139,6 +180,10 @@ func NewNopObjectPrinter() Printer { return nopObjectPrinter{} }
 type nopObjectPrinter struct{}
 
 func (p nopObjectPrinter) Print(obj any, fieldNames []string, extractFields func(any) []string) error {
+	return nil
+}
+
+func (p nopObjectPrinter) PrintTemplate(obj any, template string) error {
 	return nil
 }
 
