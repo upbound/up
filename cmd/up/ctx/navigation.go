@@ -428,7 +428,7 @@ func (g *Group) Items(ctx context.Context, upCtx *upbound.Context) ([]list.Item,
 	*/
 
 	if len(ctps.Items) == 0 {
-		items = append(items, item{text: "No ControlPlanes found", emptyList: true})
+		items = append(items, item{text: "No control planes found in group", emptyList: true})
 	}
 
 	return items, nil
@@ -466,15 +466,13 @@ var _ Back = &ControlPlane{}
 func (ctp *ControlPlane) Items(ctx context.Context, upCtx *upbound.Context) ([]list.Item, error) {
 	return []list.Item{
 		item{text: "..", kind: "controlplanes", onEnter: ctp.Back, back: true},
-		/*
-			item{text: fmt.Sprintf("Connect to %s", ctp.NamespacedName), onEnter: KeyFunc(func(ctx context.Context, upCtx *upbound.Context, m model) (model, error) {
-				msg, err := ctp.Accept(ctx, upCtx)
-				if err != nil {
-					return m, err
-				}
-				return m.WithTermination(msg, nil), nil
-			}), padding: []int{1, 0, 0}},
-		*/
+		item{text: fmt.Sprintf("Connect to %s", ctp.NamespacedName().Name), onEnter: KeyFunc(func(m model) (model, error) {
+			msg, err := ctp.Accept(m.upCtx, m.contextWriter)
+			if err != nil {
+				return m, err
+			}
+			return m.WithTermination(msg, nil), nil
+		}), padding: []int{1, 0, 0}},
 	}, nil
 }
 
