@@ -71,6 +71,9 @@ type item struct {
 
 	// back denotes that the item will return the user to the previous menu
 	back bool
+
+	// notSelectable marks an item as unselectable in the list and will be skipped in navigation
+	notSelectable bool
 }
 
 func (i item) FilterValue() string { return "" }
@@ -257,5 +260,31 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) { // nolint:gocyclo // T
 
 	var cmd tea.Cmd
 	m.list, cmd = m.list.Update(msg)
+
+	m.list = m.moveToSelectableItem(msg)
+
 	return m, cmd
+}
+
+func (m model) moveToSelectableItem(msg tea.Msg) list.Model {
+	keyMsg, ok := msg.(tea.KeyMsg)
+	if !ok {
+		return m.list
+	}
+
+	for {
+		if i, ok := m.list.SelectedItem().(item); ok {
+			if !i.notSelectable {
+				break
+			}
+		}
+		switch {
+		case key.Matches(keyMsg, m.list.KeyMap.CursorUp):
+			m.list.CursorUp()
+
+		case key.Matches(keyMsg, m.list.KeyMap.CursorDown):
+			m.list.CursorDown()
+		}
+	}
+	return m.list
 }

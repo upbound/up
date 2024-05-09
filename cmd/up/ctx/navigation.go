@@ -233,7 +233,7 @@ func (s *Space) Items(ctx context.Context, upCtx *upbound.Context) ([]list.Item,
 		return nil, err
 	}
 
-	items := make([]list.Item, 0, len(nss.Items)+1)
+	items := make([]list.Item, 0, len(nss.Items)+3)
 	if s.CanBack() {
 		items = append(items, item{text: "..", kind: "spaces", onEnter: s.Back, back: true})
 	}
@@ -245,8 +245,16 @@ func (s *Space) Items(ctx context.Context, upCtx *upbound.Context) ([]list.Item,
 	}
 
 	if len(nss.Items) == 0 {
-		items = append(items, item{text: "No groups found", emptyList: true})
+		items = append(items, item{text: "No groups found", notSelectable: true})
 	}
+
+	items = append(items, item{text: fmt.Sprintf("Switch kubeconfig to %q and quit", s.Name), onEnter: func(m model) (model, error) {
+		msg, err := s.Accept(m.upCtx, m.contextWriter)
+		if err != nil {
+			return m, err
+		}
+		return m.WithTermination(msg, nil), nil
+	}, padding: []int{1, 0, 0}})
 
 	return items, nil
 }
@@ -408,7 +416,7 @@ func (g *Group) Items(ctx context.Context, upCtx *upbound.Context) ([]list.Item,
 		return nil, err
 	}
 
-	items := make([]list.Item, 0, len(ctps.Items)+2)
+	items := make([]list.Item, 0, len(ctps.Items)+3)
 	items = append(items, item{text: "..", kind: "groups", onEnter: g.Back, back: true})
 
 	for _, ctp := range ctps.Items {
@@ -417,19 +425,18 @@ func (g *Group) Items(ctx context.Context, upCtx *upbound.Context) ([]list.Item,
 			return m, nil
 		}})
 	}
-	/*
-		items = append(items, item{text: "Save as kubectl context", onEnter: func(ctx context.Context, upCtx *upbound.Context, m model) (model, error) {
-			msg, err := g.Accept(ctx, upCtx)
-			if err != nil {
-				return m, err
-			}
-			return m.WithTermination(msg, nil), nil
-		}, padding: []int{1, 0, 0}})
-	*/
 
 	if len(ctps.Items) == 0 {
-		items = append(items, item{text: "No control planes found in group", emptyList: true})
+		items = append(items, item{text: fmt.Sprintf("No control planes found in the %q group", g.Name), notSelectable: true})
 	}
+
+	items = append(items, item{text: fmt.Sprintf("Switch kubeconfig to %q and quit", fmt.Sprintf("%s/%s", g.Space.Name, g.Name)), onEnter: func(m model) (model, error) {
+		msg, err := g.Accept(m.upCtx, m.contextWriter)
+		if err != nil {
+			return m, err
+		}
+		return m.WithTermination(msg, nil), nil
+	}, padding: []int{1, 0, 0}})
 
 	return items, nil
 }
@@ -466,7 +473,7 @@ var _ Back = &ControlPlane{}
 func (ctp *ControlPlane) Items(ctx context.Context, upCtx *upbound.Context) ([]list.Item, error) {
 	return []list.Item{
 		item{text: "..", kind: "controlplanes", onEnter: ctp.Back, back: true},
-		item{text: fmt.Sprintf("Connect to %s", ctp.NamespacedName().Name), onEnter: KeyFunc(func(m model) (model, error) {
+		item{text: fmt.Sprintf("Connect to %q and quit", ctp.NamespacedName().Name), onEnter: KeyFunc(func(m model) (model, error) {
 			msg, err := ctp.Accept(m.upCtx, m.contextWriter)
 			if err != nil {
 				return m, err
