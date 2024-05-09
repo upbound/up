@@ -19,6 +19,7 @@ import (
 	"fmt"
 	"io"
 	"net/http"
+	"runtime"
 	"strings"
 	"time"
 
@@ -27,6 +28,8 @@ import (
 )
 
 const (
+	productName = "up-cli"
+
 	// 5 seconds should be more than enough time.
 	clientTimeout = 5 * time.Second
 	cliURL        = "https://cli.upbound.io/stable/current/version"
@@ -49,6 +52,10 @@ var (
 	agentVersion string
 	target       string = string(ReleaseTargetDebug)
 )
+
+func UserAgent() string {
+	return fmt.Sprintf("%s/%s (%s; %s)", productName, version, runtime.GOOS, runtime.GOARCH)
+}
 
 // GetVersion returns the current build version.
 func GetVersion() string {

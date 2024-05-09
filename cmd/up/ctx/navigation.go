@@ -37,6 +37,7 @@ import (
 	"github.com/upbound/up-sdk-go/service/organizations"
 	"github.com/upbound/up/internal/profile"
 	"github.com/upbound/up/internal/upbound"
+	"github.com/upbound/up/internal/version"
 )
 
 var (
@@ -286,6 +287,7 @@ func (s *Space) GetClient(upCtx *upbound.Context) (client.Client, error) {
 	if err != nil {
 		return nil, err
 	}
+	rest.UserAgent = version.UserAgent()
 
 	return client.New(rest, client.Options{})
 }

@@ -33,6 +33,7 @@ import (
 	"github.com/upbound/up/internal/resources"
 	"github.com/upbound/up/internal/upbound"
 	"github.com/upbound/up/internal/upterm"
+	"github.com/upbound/up/internal/version"
 	"github.com/upbound/up/internal/xpkg"
 )
 
@@ -80,10 +81,13 @@ func (c *installCmd) AfterApply(kongCtx *kong.Context, upCtx *upbound.Context) e
 	if err != nil {
 		return err
 	}
+	kubeconfig.UserAgent = version.UserAgent()
+
 	if upCtx.WrapTransport != nil {
 		kubeconfig.Wrap(upCtx.WrapTransport)
 	}
 
+	// todo(redbackthomson): Migrate to using client.Client for standardization
 	client, err := dynamic.NewForConfig(kubeconfig)
 	if err != nil {
 		return err

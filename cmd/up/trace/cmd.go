@@ -30,6 +30,7 @@ import (
 	"github.com/upbound/up/cmd/up/query"
 	"github.com/upbound/up/cmd/up/query/resource"
 	"github.com/upbound/up/internal/upbound"
+	"github.com/upbound/up/internal/version"
 )
 
 type Cmd struct {
@@ -81,6 +82,7 @@ func (c *Cmd) Run(ctx context.Context, kongCtx *kong.Context, upCtx *upbound.Con
 	if err != nil {
 		return err
 	}
+	kubeconfig.UserAgent = version.UserAgent()
 
 	_, ctp, isSpace := upCtx.GetCurrentSpaceContextScope()
 
