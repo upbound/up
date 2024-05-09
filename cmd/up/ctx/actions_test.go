@@ -28,8 +28,8 @@ import (
 )
 
 func TestDisconnectedGroupAccept(t *testing.T) {
-	spaceExtension := NewDisconnectedV1Alpha1SpaceExtension("profile")
-	extensionMap := map[string]runtime.Object{ContextExtensionKeySpace: spaceExtension}
+	spaceExtension := upbound.NewDisconnectedV1Alpha1SpaceExtension("profile")
+	extensionMap := map[string]runtime.Object{upbound.ContextExtensionKeySpace: spaceExtension}
 
 	tests := map[string]struct {
 		conf      *clientcmdapi.Config
@@ -157,8 +157,8 @@ func TestDisconnectedGroupAccept(t *testing.T) {
 }
 
 func TestCloudGroupAccept(t *testing.T) {
-	spaceExtension := NewCloudV1Alpha1SpaceExtension("org")
-	extensionMap := map[string]runtime.Object{ContextExtensionKeySpace: spaceExtension}
+	spaceExtension := upbound.NewCloudV1Alpha1SpaceExtension("org")
+	extensionMap := map[string]runtime.Object{upbound.ContextExtensionKeySpace: spaceExtension}
 	spaceAuth := clientcmdapi.AuthInfo{Token: "space"}
 
 	tests := map[string]struct {
@@ -288,8 +288,8 @@ func TestCloudGroupAccept(t *testing.T) {
 }
 
 func TestDisconnectedControlPlaneAccept(t *testing.T) {
-	spaceExtension := NewDisconnectedV1Alpha1SpaceExtension("profile")
-	extensionMap := map[string]runtime.Object{ContextExtensionKeySpace: spaceExtension}
+	spaceExtension := upbound.NewDisconnectedV1Alpha1SpaceExtension("profile")
+	extensionMap := map[string]runtime.Object{upbound.ContextExtensionKeySpace: spaceExtension}
 
 	tests := map[string]struct {
 		conf      *clientcmdapi.Config
@@ -479,8 +479,8 @@ func TestDisconnectedControlPlaneAccept(t *testing.T) {
 }
 
 func TestCloudControlPlaneAccept(t *testing.T) {
-	spaceExtension := NewCloudV1Alpha1SpaceExtension("org")
-	extensionMap := map[string]runtime.Object{ContextExtensionKeySpace: spaceExtension}
+	spaceExtension := upbound.NewCloudV1Alpha1SpaceExtension("org")
+	extensionMap := map[string]runtime.Object{upbound.ContextExtensionKeySpace: spaceExtension}
 
 	tests := map[string]struct {
 		conf      *clientcmdapi.Config

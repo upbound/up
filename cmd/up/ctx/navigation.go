@@ -379,9 +379,9 @@ func (s *Space) buildClient(upCtx *upbound.Context, resource types.NamespacedNam
 	}
 
 	if s.IsCloud() {
-		refContext.Extensions[ContextExtensionKeySpace] = NewCloudV1Alpha1SpaceExtension(s.Org.Name)
+		refContext.Extensions[upbound.ContextExtensionKeySpace] = upbound.NewCloudV1Alpha1SpaceExtension(s.Org.Name)
 	} else {
-		refContext.Extensions[ContextExtensionKeySpace] = NewDisconnectedV1Alpha1SpaceExtension(s.HubContext)
+		refContext.Extensions[upbound.ContextExtensionKeySpace] = upbound.NewDisconnectedV1Alpha1SpaceExtension(s.HubContext)
 	}
 
 	config.Contexts[ref] = refContext
@@ -502,12 +502,6 @@ func (ctp *ControlPlane) CanBack() bool {
 func (ctp *ControlPlane) NamespacedName() types.NamespacedName {
 	return types.NamespacedName{Name: ctp.Name, Namespace: ctp.Group.Name}
 }
-
-const (
-	// ContextExtensionKeySpace is the key used in a context extension for a
-	// space extension
-	ContextExtensionKeySpace = "spaces.upbound.io/space"
-)
 
 func getOrgScopedAuthInfo(upCtx *upbound.Context, orgName string) (*clientcmdapi.AuthInfo, error) {
 	// find the current executable path

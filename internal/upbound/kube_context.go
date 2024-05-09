@@ -15,15 +15,23 @@
 package upbound
 
 import (
+	"encoding/json"
 	"strings"
 
 	"github.com/crossplane/crossplane-runtime/pkg/errors"
+	runtime "k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/client-go/tools/clientcmd"
 	clientcmdapi "k8s.io/client-go/tools/clientcmd/api"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 
 	"github.com/upbound/up/internal/profile"
+)
+
+const (
+	// ContextExtensionKeySpace is the key used in a context extension for a
+	// space extension
+	ContextExtensionKeySpace = "spaces.upbound.io/space"
 )
 
 // HasValidContext returns true if the kube configuration attached to the
@@ -121,4 +129,17 @@ func (c *Context) GetCurrentSpaceContextScope() (ingressHost string, resource ty
 	}
 
 	return ingressHost, types.NamespacedName{Namespace: context.Namespace}, true
+}
+
+// GetSpaceExtension attempts to get the context space extension for the
+// provided context, if it exists
+func GetSpaceExtension(context *clientcmdapi.Context) (extension *SpaceExtension, err error) {
+	if context == nil {
+		return nil, nil
+	} else if ext, ok := context.Extensions[ContextExtensionKeySpace].(*runtime.Unknown); !ok {
+		return nil, nil
+	} else if err := json.Unmarshal(ext.Raw, &extension); err != nil {
+		return nil, errors.New("unable to parse space extension to go struct")
+	}
+	return extension, nil
 }
