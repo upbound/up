@@ -21,8 +21,11 @@ import (
 
 	v1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/client-go/kubernetes"
+	clientcmdapi "k8s.io/client-go/tools/clientcmd/api"
 
 	"github.com/crossplane/crossplane-runtime/pkg/errors"
+
+	"github.com/upbound/up/internal/upbound"
 )
 
 const (
@@ -69,7 +72,7 @@ func FetchCrossplaneVersion(ctx context.Context, clientset kubernetes.Clientset)
 
 // FetchSpacesVersion initializes a Kubernetes client and fetches
 // and returns the version of the spaces-controller deployment.
-func FetchSpacesVersion(ctx context.Context, clientset kubernetes.Clientset) (string, error) {
+func FetchSpacesVersion(ctx context.Context, context *clientcmdapi.Context, clientset kubernetes.Clientset) (string, error) {
 	deployments, err := clientset.AppsV1().Deployments("").List(ctx, v1.ListOptions{
 		LabelSelector: "app=spaces-controller",
 	})
@@ -82,6 +85,11 @@ func FetchSpacesVersion(ctx context.Context, clientset kubernetes.Clientset) (st
 		if ok {
 			return v, nil
 		}
+	}
+
+	ext, err := upbound.GetSpaceExtension(context)
+	if err == nil && ext != nil && ext.Spec.Cloud != nil {
+		return "Upbound Cloud Managed", nil
 	}
 
 	return "", errors.New("spaces-controller version not found")

@@ -23,6 +23,7 @@ import (
 	"k8s.io/client-go/kubernetes"
 
 	"github.com/alecthomas/kong"
+
 	"github.com/upbound/up/internal/upbound"
 	"github.com/upbound/up/internal/upterm"
 	"github.com/upbound/up/internal/version"
@@ -133,15 +134,9 @@ func (c *Cmd) BuildVersionInfo(ctx context.Context, kongCtx *kong.Context, upCtx
 		v.Server.CrossplaneVersion = versionUnknown
 	}
 
-	v.Server.SpacesControllerVersion, err = FetchSpacesVersion(ctx, *clientset)
+	v.Server.SpacesControllerVersion, err = FetchSpacesVersion(ctx, context, *clientset)
 	if err != nil {
-		// check to see if we're in a cloud space
-		ext, err := upbound.GetSpaceExtension(context)
-		if err != nil || (ext == nil || ext.Spec.Cloud == nil) {
-			fmt.Fprintln(kongCtx.Stderr, errGetSpacesVersion)
-		} else {
-			v.Server.SpacesControllerVersion = "Upbound Cloud Managed"
-		}
+		fmt.Fprintln(kongCtx.Stderr, errGetSpacesVersion)
 	}
 	if v.Server.SpacesControllerVersion == "" {
 		v.Server.SpacesControllerVersion = versionUnknown

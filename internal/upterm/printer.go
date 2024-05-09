@@ -122,8 +122,8 @@ func (p *ObjectPrinter) PrintTemplate(obj any, tmpl string) error {
 		if err := templ.Execute(w, obj); err != nil {
 			return err
 		}
-		w.Write([]byte("\n"))
-		w.Flush()
+		w.Write([]byte("\n")) // nolint:errcheck
+		w.Flush()             // nolint:errcheck
 	}
 	return nil
 }
