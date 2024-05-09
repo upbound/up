@@ -520,8 +520,8 @@ func DeriveExistingCloudState(upCtx *upbound.Context, conf *clientcmdapi.Config,
 		Name: cloud.Organization,
 	}
 
-	ingress, ctp, exists := upCtx.GetCurrentSpaceContextScope()
-	if !exists {
+	ingress, ctp, inSpace := upCtx.GetCurrentSpaceContextScope()
+	if !inSpace {
 		return nil, errParseSpaceContext
 	}
 

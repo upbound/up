@@ -82,10 +82,10 @@ func (c *Cmd) Run(ctx context.Context, kongCtx *kong.Context, upCtx *upbound.Con
 		return err
 	}
 
-	_, ctp, exists := upCtx.GetCurrentSpaceContextScope()
+	_, ctp, isSpace := upCtx.GetCurrentSpaceContextScope()
 
 	if c.Group == "" && !c.AllGroups {
-		if exists && ctp.Namespace != "" {
+		if isSpace && ctp.Namespace != "" {
 			c.Group = ctp.Namespace
 		}
 	}

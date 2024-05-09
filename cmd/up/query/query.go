@@ -54,10 +54,10 @@ func (c *QueryCmd) AfterApply(kongCtx *kong.Context) error { // nolint:gocyclo /
 	}
 	kongCtx.Bind(upCtx)
 
-	_, ctp, exists := upCtx.GetCurrentSpaceContextScope()
+	_, ctp, isSpace := upCtx.GetCurrentSpaceContextScope()
 
 	if c.Group == "" && !c.AllGroups {
-		if exists && ctp.Namespace != "" {
+		if isSpace && ctp.Namespace != "" {
 			c.Group = ctp.Namespace
 		}
 	}

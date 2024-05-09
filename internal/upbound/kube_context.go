@@ -97,7 +97,7 @@ func (c *Context) GetCurrentContext() (context *clientcmdapi.Context, cluster *c
 	return context, cluster, auth, exists
 }
 
-func (c *Context) GetCurrentSpaceContextScope() (ingressHost string, resource types.NamespacedName, exists bool) {
+func (c *Context) GetCurrentSpaceContextScope() (ingressHost string, resource types.NamespacedName, inSpace bool) {
 	context, cluster, _, exists := c.GetCurrentContext()
 	if !exists {
 		return "", types.NamespacedName{}, false
@@ -107,16 +107,18 @@ func (c *Context) GetCurrentSpaceContextScope() (ingressHost string, resource ty
 		return "", types.NamespacedName{}, false
 	}
 
-	base, nsn, exists := profile.ParseSpacesK8sURL(strings.TrimSuffix(cluster.Server, "/"))
+	base, nsn, inSpace := profile.ParseSpacesK8sURL(strings.TrimSuffix(cluster.Server, "/"))
 	// we are inside a ctp scope
-	if exists {
-		return strings.TrimPrefix(base, "https://"), nsn, exists
+	if inSpace {
+		return strings.TrimPrefix(base, "https://"), nsn, inSpace
 	}
+
+	ingressHost = strings.TrimPrefix(cluster.Server, "https://")
 
 	// we aren't inside a group scope
 	if context.Namespace == "" {
-		return "", types.NamespacedName{}, false
+		return ingressHost, types.NamespacedName{}, true
 	}
 
-	return strings.TrimPrefix(cluster.Server, "https://"), types.NamespacedName{Namespace: context.Namespace}, true
+	return ingressHost, types.NamespacedName{Namespace: context.Namespace}, true
 }

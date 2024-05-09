@@ -56,7 +56,7 @@ func (c *Cmd) AfterApply(kongCtx *kong.Context) error {
 	kongCtx.Bind(upCtx)
 
 	// we can't use control planes from inside a control plane
-	if _, ctp, exists := upCtx.GetCurrentSpaceContextScope(); exists && ctp.Name != "" {
+	if _, ctp, isSpace := upCtx.GetCurrentSpaceContextScope(); isSpace && ctp.Name != "" {
 		return errors.New("cannot view control planes from inside a control plane context. Use 'up ctx ..' to go up to the group context")
 	}
 
