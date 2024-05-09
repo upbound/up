@@ -56,11 +56,11 @@ Server:
 )
 
 type clientVersion struct {
-	Arch      string `json:"arch,omitempty"`
-	GitCommit string `json:"gitCommit,omitempty"`
-	GoVersion string `json:"goVersion,omitempty"`
-	OS        string `json:"os,omitempty"`
-	Version   string `json:"version,omitempty"`
+	Arch      string `json:"arch,omitempty" yaml:"arch,omitempty"`
+	GitCommit string `json:"gitCommit,omitempty" yaml:"gitCommit,omitempty"`
+	GoVersion string `json:"goVersion,omitempty" yaml:"goVersion,omitempty"`
+	OS        string `json:"os,omitempty" yaml:"os,omitempty"`
+	Version   string `json:"version,omitempty" yaml:"version,omitempty"`
 }
 
 type serverVersion struct {
