@@ -19,6 +19,8 @@ import (
 
 	"k8s.io/client-go/rest"
 	"k8s.io/client-go/tools/clientcmd"
+
+	"github.com/upbound/up/internal/version"
 )
 
 // Flags are common flags used by commands that interact with Upbound.
@@ -75,6 +77,7 @@ func (f *KubeFlags) AfterApply() error {
 	if err != nil {
 		return err
 	}
+	restConfig.UserAgent = version.UserAgent()
 	f.config = restConfig
 
 	ns, _, err := loader.Namespace()

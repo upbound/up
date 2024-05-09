@@ -40,12 +40,10 @@ import (
 	upboundv1alpha1 "github.com/upbound/up-sdk-go/apis/upbound/v1alpha1"
 	"github.com/upbound/up/internal/config"
 	"github.com/upbound/up/internal/profile"
+	"github.com/upbound/up/internal/version"
 )
 
 const (
-	// UserAgent is the default user agent to use to make requests to the
-	// Upbound API.
-	UserAgent = "up-cli"
 	// CookieName is the default cookie name used to identify a session token.
 	CookieName = "SID"
 
@@ -266,7 +264,7 @@ func (c *Context) buildSDKConfig(endpoint *url.URL) (*up.Config, error) {
 			Jar:       cj,
 			Transport: tr,
 		}
-		u.UserAgent = UserAgent
+		u.UserAgent = version.UserAgent()
 	})
 	return up.NewConfig(func(conf *up.Config) {
 		conf.Client = client
@@ -309,7 +307,7 @@ func (c *Context) BuildControllerClientConfig() (*rest.Config, error) {
 		Host:      c.APIEndpoint.String(),
 		APIPath:   controllerClientPath,
 		Transport: tr,
-		UserAgent: UserAgent,
+		UserAgent: version.UserAgent(),
 	}
 
 	if c.Profile.Session != "" {
@@ -387,7 +385,7 @@ func (c *Context) BuildCloudSpaceRestConfig(ctx context.Context, spaceName, prof
 		return nil, err
 	}
 
-	restCfg.UserAgent = UserAgent
+	restCfg.UserAgent = version.UserAgent()
 
 	return restCfg, nil
 }

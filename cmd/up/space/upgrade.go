@@ -35,6 +35,7 @@ import (
 	"github.com/upbound/up/internal/kube"
 	"github.com/upbound/up/internal/upbound"
 	"github.com/upbound/up/internal/upterm"
+	"github.com/upbound/up/internal/version"
 )
 
 const (
@@ -95,7 +96,9 @@ func (c *upgradeCmd) AfterApply(quiet config.QuietFlag) error { //nolint:gocyclo
 	if err != nil {
 		return err
 	}
+	kubeconfig.UserAgent = version.UserAgent()
 
+	// todo(redbackthomson): Migrate to using client.Client for standardization
 	kClient, err := kubernetes.NewForConfig(kubeconfig)
 	if err != nil {
 		return err
