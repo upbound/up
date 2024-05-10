@@ -100,6 +100,7 @@ type cli struct {
 	Help               helpCmd                      `cmd:"" help:"Show help."`
 	Login              login.LoginCmd               `cmd:"" help:"Login to Upbound."`
 	Logout             login.LogoutCmd              `cmd:"" help:"Logout of Upbound."`
+	WebLogin           login.LoginWebCmd            `cmd:"" help:"Use web browser to login to up cli."`
 	Ctx                ctx.Cmd                      `cmd:"" help:"Select an Upbound kubeconfig context."`
 	Space              space.Cmd                    `cmd:"" help:"Interact with Spaces."`
 	Group              group.Cmd                    `cmd:"" help:"Interact with groups inside Spaces."`
@@ -132,7 +133,7 @@ func (a *alpha) BeforeReset(ctx *kong.Context) error { //nolint:unparam
 }
 
 type alpha struct {
-	// For now, we maintain compatibility for systems that may still use the alpha variant.
+	// For now, we maintain compatibility for systems that may still use the alpha variant of `controlplane` and `web-login`.
 	// This nudges users towards the stable variant when they attempt to emit help.
 	ControlPlane  controlplane.Cmd  `cmd:"" hidden:"" name:"controlplane" aliases:"ctp" help:"Interact with control planes in the current context, both in the cloud and in a local space."`
 	Upbound       upbound.Cmd       `cmd:"" maturity:"alpha" help:"Interact with Upbound."`
@@ -142,7 +143,7 @@ type alpha struct {
 	TviewTemplate tviewtemplate.Cmd `cmd:"" maturity:"alpha" hidden:"" help:"TView example."`
 	Query         query.QueryCmd    `cmd:"" maturity:"alpha" hidden:"" help:"Query objects in one or many control planes."`
 	Get           query.GetCmd      `cmd:"" maturity:"alpha" hidden:"" help:"Get objects in the current control plane."`
-	WebLogin      login.LoginWebCmd `cmd:"" maturity:"alpha" help:"Use web browser to login to up cli."`
+	WebLogin      login.LoginWebCmd `cmd:"" hidden:"" help:"Use web browser to login to up cli."`
 	Space         space.Cmd         `cmd:"" maturity:"alpha" help:"Interact with Spaces."`
 	Ctx           ctx.Cmd           `cmd:"" maturity:"alpha" help:"Select an Upbound kubeconfig context."`
 }
