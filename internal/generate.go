@@ -22,7 +22,7 @@
 //go:generate go run -tags generate github.com/google/addlicense -v -ignore **/testdata/*.yaml -ignore **/vendor/** -c "Upbound Inc" . ../cmd
 
 // Generate deepcopy methodsets and CRD manifests
-//go:generate go run -tags generate sigs.k8s.io/controller-tools/cmd/controller-gen object:headerFile=../hack/boilerplate.go.txt paths=../cmd/...
+//go:generate go run -tags generate sigs.k8s.io/controller-tools/cmd/controller-gen object:headerFile=../hack/boilerplate.go.txt paths=../internal/upbound/...
 
 package internal
 

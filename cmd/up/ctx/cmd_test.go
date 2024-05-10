@@ -765,15 +765,15 @@ func TestDeriveExistingDisconnectedState(t *testing.T) {
 		return "eu-west-1.ibm-cloud.com", []byte(ingressCA), nil
 	}
 
-	buildDisconnectedExtension := func(hubCtx string) DisconnectedConfiguration {
-		return DisconnectedConfiguration{
+	buildDisconnectedExtension := func(hubCtx string) upbound.DisconnectedConfiguration {
+		return upbound.DisconnectedConfiguration{
 			HubContext: hubCtx,
 		}
 	}
 
 	tests := map[string]struct {
 		conf           clientcmdapi.Config
-		dcConfig       DisconnectedConfiguration
+		dcConfig       upbound.DisconnectedConfiguration
 		getIngressHost getIngressHostFn
 
 		want    NavigationState
@@ -896,15 +896,15 @@ func TestDeriveExistingDisconnectedState(t *testing.T) {
 func TestDeriveExistingCloudState(t *testing.T) {
 	authOrgExec, _ := getOrgScopedAuthInfo(&upbound.Context{ProfileName: "profile"}, "org")
 
-	buildCloudExtension := func(org string) CloudConfiguration {
-		return CloudConfiguration{
+	buildCloudExtension := func(org string) upbound.CloudConfiguration {
+		return upbound.CloudConfiguration{
 			Organization: org,
 		}
 	}
 
 	tests := map[string]struct {
 		conf        clientcmdapi.Config
-		cloudConfig CloudConfiguration
+		cloudConfig upbound.CloudConfiguration
 
 		want    NavigationState
 		wantErr string

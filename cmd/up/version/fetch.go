@@ -21,31 +21,22 @@ import (
 
 	v1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/client-go/kubernetes"
-	ctrl "sigs.k8s.io/controller-runtime"
+	clientcmdapi "k8s.io/client-go/tools/clientcmd/api"
 
 	"github.com/crossplane/crossplane-runtime/pkg/errors"
+
+	"github.com/upbound/up/internal/upbound"
 )
 
 const (
-	errKubeConfig         = "failed to get kubeconfig"
-	errCreateK8sClientset = "could not create the clientset for Kubernetes"
-	errFetchDeployment    = "could not fetch deployments"
+	errFetchDeployment = "could not fetch deployments"
 )
 
 // FetchCrossplaneVersion initializes a Kubernetes client and fetches
 // and returns the version of the Crossplane deployment. If the version
 // does not have a leading 'v', it prepends it.
-func FetchCrossplaneVersion(ctx context.Context) (string, error) {
+func FetchCrossplaneVersion(ctx context.Context, clientset kubernetes.Clientset) (string, error) {
 	var version string
-	config, err := ctrl.GetConfig()
-	if err != nil {
-		return "", errors.Wrap(err, errKubeConfig)
-	}
-
-	clientset, err := kubernetes.NewForConfig(config)
-	if err != nil {
-		return "", errors.Wrap(err, errCreateK8sClientset)
-	}
 
 	deployments, err := clientset.AppsV1().Deployments("").List(ctx, v1.ListOptions{
 		LabelSelector: "app=crossplane",
@@ -81,17 +72,7 @@ func FetchCrossplaneVersion(ctx context.Context) (string, error) {
 
 // FetchSpacesVersion initializes a Kubernetes client and fetches
 // and returns the version of the spaces-controller deployment.
-func FetchSpacesVersion(ctx context.Context) (string, error) {
-	config, err := ctrl.GetConfig()
-	if err != nil {
-		return "", errors.Wrap(err, errKubeConfig)
-	}
-
-	clientset, err := kubernetes.NewForConfig(config)
-	if err != nil {
-		return "", errors.Wrap(err, errCreateK8sClientset)
-	}
-
+func FetchSpacesVersion(ctx context.Context, context *clientcmdapi.Context, clientset kubernetes.Clientset) (string, error) {
 	deployments, err := clientset.AppsV1().Deployments("").List(ctx, v1.ListOptions{
 		LabelSelector: "app=spaces-controller",
 	})
@@ -104,6 +85,11 @@ func FetchSpacesVersion(ctx context.Context) (string, error) {
 		if ok {
 			return v, nil
 		}
+	}
+
+	ext, err := upbound.GetSpaceExtension(context)
+	if err == nil && ext != nil && ext.Spec.Cloud != nil {
+		return "Upbound Cloud Managed", nil
 	}
 
 	return "", errors.New("spaces-controller version not found")

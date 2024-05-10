@@ -16,7 +16,6 @@ package ctx
 
 import (
 	"context"
-	"encoding/json"
 	"fmt"
 	"io"
 	"strings"
@@ -26,7 +25,6 @@ import (
 	"github.com/charmbracelet/bubbles/list"
 	tea "github.com/charmbracelet/bubbletea"
 	"github.com/pkg/errors"
-	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/types"
 	kruntime "k8s.io/apimachinery/pkg/util/runtime"
 	"k8s.io/client-go/kubernetes/scheme"
@@ -377,13 +375,11 @@ type getIngressHostFn func(ctx context.Context, cl client.Client) (host string, 
 func DeriveState(ctx context.Context, upCtx *upbound.Context, conf *clientcmdapi.Config, getIngressHost getIngressHostFn) (NavigationState, error) {
 	currentCtx := conf.Contexts[conf.CurrentContext]
 
-	var spaceExt *SpaceExtension
-	if conf.CurrentContext == "" || currentCtx == nil {
+	spaceExt, err := upbound.GetSpaceExtension(currentCtx)
+	if err != nil {
+		return nil, err
+	} else if spaceExt == nil {
 		return DeriveNewState(ctx, conf, getIngressHost)
-	} else if ext, ok := currentCtx.Extensions[ContextExtensionKeySpace].(*runtime.Unknown); !ok {
-		return DeriveNewState(ctx, conf, getIngressHost)
-	} else if err := json.Unmarshal(ext.Raw, &spaceExt); err != nil {
-		return nil, errors.New("unable to parse space extension to go struct")
 	}
 
 	if spaceExt.Spec.Cloud != nil {
@@ -439,7 +435,7 @@ func DeriveNewState(ctx context.Context, conf *clientcmdapi.Config, getIngressHo
 // DeriveExistingDisconnectedState derives the navigation state assuming the
 // current context in the passed kubeconfig is pointing at an existing
 // disconnected space created by the CLI
-func DeriveExistingDisconnectedState(ctx context.Context, upCtx *upbound.Context, conf *clientcmdapi.Config, disconnected *DisconnectedConfiguration, getIngressHost getIngressHostFn) (NavigationState, error) {
+func DeriveExistingDisconnectedState(ctx context.Context, upCtx *upbound.Context, conf *clientcmdapi.Config, disconnected *upbound.DisconnectedConfiguration, getIngressHost getIngressHostFn) (NavigationState, error) {
 	if _, ok := conf.Contexts[disconnected.HubContext]; !ok {
 		return nil, fmt.Errorf("cannot find space hub context %q", disconnected.HubContext)
 	}
@@ -507,7 +503,7 @@ func DeriveExistingDisconnectedState(ctx context.Context, upCtx *upbound.Context
 // DeriveExistingCloudState derives the navigation state assuming that the
 // current context in the passed kubeconfig is pointing at an existing Cloud
 // space previously created by the CLI
-func DeriveExistingCloudState(upCtx *upbound.Context, conf *clientcmdapi.Config, cloud *CloudConfiguration) (NavigationState, error) {
+func DeriveExistingCloudState(upCtx *upbound.Context, conf *clientcmdapi.Config, cloud *upbound.CloudConfiguration) (NavigationState, error) {
 	auth := conf.AuthInfos[conf.Contexts[conf.CurrentContext].AuthInfo]
 	ca := conf.Clusters[conf.Contexts[conf.CurrentContext].Cluster].CertificateAuthorityData
 

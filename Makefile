@@ -38,6 +38,7 @@ GO_STATIC_PACKAGES = $(GO_PROJECT)/cmd/up $(GO_PROJECT)/cmd/docker-credential-up
 GO_LDFLAGS += -X $(GO_PROJECT)/internal/version.version=$(VERSION)
 GO_LDFLAGS += -X $(GO_PROJECT)/internal/version.agentVersion=$(UP_CONNECT_AGENT_VERSION)
 GO_LDFLAGS += -X $(GO_PROJECT)/internal/version.target=$(RELEASE_TARGET)
+GO_LDFLAGS += -X $(GO_PROJECT)/internal/version.gitCommit=$(shell git rev-parse --short HEAD 2> /dev/null || true)
 GO_SUBDIRS += cmd internal
 GO111MODULE = on
 GO_REQUIRED_VERSION = 1.22

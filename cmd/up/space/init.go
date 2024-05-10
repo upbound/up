@@ -344,7 +344,7 @@ func upVersionBounds(ch *chart.Chart) error {
 		return fmt.Errorf("up version constraints %q provided by the chart are invalid: %w", s, err)
 	}
 
-	return checkVersion(fmt.Sprintf("unsupported up version %q", version.GetVersion()), constraints, version.GetVersion())
+	return checkVersion(fmt.Sprintf("unsupported up version %q", version.Version()), constraints, version.Version())
 }
 
 func (c *initCmd) deploySpace(ctx context.Context, params map[string]any) error {

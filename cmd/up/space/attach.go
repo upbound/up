@@ -201,7 +201,7 @@ func (c *attachCmd) installAgent(p pterm.TextPrinter, mgr *helm.Installer, a *ac
 	}
 
 	p.Printfln(`Installing Chart "%s/%s"`, agentNs, agentChart)
-	if err := mgr.Install(version.GetAgentVersion(), c.deriveParams(a)); err != nil {
+	if err := mgr.Install(version.AgentVersion(), c.deriveParams(a)); err != nil {
 		return errors.Wrapf(err, `failed to install Chart "%s/%s"`, agentNs, agentChart)
 	}
 	u.Undo(func() error {
@@ -211,17 +211,17 @@ func (c *attachCmd) installAgent(p pterm.TextPrinter, mgr *helm.Installer, a *ac
 		p.Printfln(`Chart "%s/%s" uninstalled`, agentNs, agentChart)
 		return nil
 	})
-	p.Printfln(`Chart "%s/%s" version %s installed`, agentNs, agentChart, version.GetAgentVersion())
+	p.Printfln(`Chart "%s/%s" version %s installed`, agentNs, agentChart, version.AgentVersion())
 	return nil
 }
 
 func (c *attachCmd) upgradeAgent(p pterm.TextPrinter, mgr *helm.Installer, a *accounts.AccountResponse, currentVersion string, u undo.Undoer) error {
-	if currentVersion != version.GetAgentVersion() {
-		p.Printfln(`Upgrading Chart "%s/%s" %s => %s`, agentNs, agentChart, currentVersion, version.GetAgentVersion())
+	if currentVersion != version.AgentVersion() {
+		p.Printfln(`Upgrading Chart "%s/%s" %s => %s`, agentNs, agentChart, currentVersion, version.AgentVersion())
 	} else {
-		p.Printfln(`Reinstalling Chart "%s/%s" %s`, agentNs, agentChart, version.GetAgentVersion())
+		p.Printfln(`Reinstalling Chart "%s/%s" %s`, agentNs, agentChart, version.AgentVersion())
 	}
-	if err := mgr.Upgrade(version.GetAgentVersion(), c.deriveParams(a)); err != nil {
+	if err := mgr.Upgrade(version.AgentVersion(), c.deriveParams(a)); err != nil {
 		return errors.Wrapf(err, `failed to upgrade Chart "%s/%s"`, agentNs, agentChart)
 	}
 	u.Undo(func() error {
