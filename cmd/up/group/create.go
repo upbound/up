@@ -22,6 +22,7 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 
+	spacesv1beta1 "github.com/upbound/up-sdk-go/apis/spaces/v1beta1"
 	"github.com/upbound/up/internal/upbound"
 	"github.com/upbound/up/internal/upterm"
 )
@@ -37,6 +38,9 @@ func (c *createCmd) Run(ctx context.Context, printer upterm.ObjectPrinter, upCtx
 	group := corev1.Namespace{
 		ObjectMeta: metav1.ObjectMeta{
 			Name: c.Name,
+			Labels: map[string]string{
+				spacesv1beta1.ControlPlaneGroupLabelKey: "true",
+			},
 		},
 	}
 
