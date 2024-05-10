@@ -26,6 +26,7 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/client"
 
 	"github.com/upbound/up/internal/profile"
+	"github.com/upbound/up/internal/version"
 )
 
 const (
@@ -54,6 +55,8 @@ func (c *Context) BuildCurrentContextClient() (client.Client, error) {
 	if err != nil {
 		return nil, errors.Wrap(err, "unable to get kube config")
 	}
+
+	rest.UserAgent = version.UserAgent()
 
 	// todo(redbackthomson): Delete once spaces-api is able to accept protobuf
 	// requests

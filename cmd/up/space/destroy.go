@@ -28,6 +28,7 @@ import (
 	"github.com/upbound/up/internal/install/helm"
 	"github.com/upbound/up/internal/upbound"
 	"github.com/upbound/up/internal/upterm"
+	"github.com/upbound/up/internal/version"
 )
 
 const (
@@ -60,7 +61,9 @@ func (c *destroyCmd) AfterApply(kongCtx *kong.Context) error {
 	if err != nil {
 		return err
 	}
+	kubeconfig.UserAgent = version.UserAgent()
 
+	// todo(redbackthomson): Migrate to using client.Client for standardization
 	kClient, err := kubernetes.NewForConfig(kubeconfig)
 	if err != nil {
 		return err
