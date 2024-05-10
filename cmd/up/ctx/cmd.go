@@ -308,6 +308,8 @@ func (c *Cmd) RunRelative(ctx context.Context, upCtx *upbound.Context, initialSt
 	if c.File != "-" {
 		if c.Short {
 			switch state := m.state.(type) {
+			case *Space:
+				fmt.Printf("%s/%s\n", state.Org.Name, state.Name)
 			case *Group:
 				fmt.Printf("%s/%s/%s\n", state.Space.Org.Name, state.Space.Name, state.Name)
 			case *ControlPlane:
