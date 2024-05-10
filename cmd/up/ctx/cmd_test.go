@@ -285,7 +285,17 @@ func TestSwapContext(t *testing.T) {
 			},
 			last:      "upbound-previous",
 			preferred: "upbound",
-			wantErr:   `no "upbound" context found`,
+			wantConf: &clientcmdapi.Config{
+				CurrentContext: "upbound",
+				Contexts: map[string]*clientcmdapi.Context{
+					"upbound": {Namespace: "namespace1", Cluster: "upbound", AuthInfo: "upbound"},
+					"other":   {Namespace: "other", Cluster: "other", AuthInfo: "other"},
+				},
+				Clusters:  map[string]*clientcmdapi.Cluster{"upbound": {Server: "server1"}, "upbound-previous": {Server: "server2"}, "other": {Server: "other"}},
+				AuthInfos: map[string]*clientcmdapi.AuthInfo{"upbound": {Token: "token1"}, "upbound-previous": {Token: "token2"}, "other": {Token: "other"}},
+			},
+			wantLast: "upbound",
+			wantErr:  `<nil>`,
 		},
 		"LastNotFound": {
 			conf: &clientcmdapi.Config{
