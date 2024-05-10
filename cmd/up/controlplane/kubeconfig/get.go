@@ -29,5 +29,5 @@ type getCmd struct {
 
 // Run executes the get command.
 func (c *getCmd) Run(ctx context.Context) error {
-	return fmt.Errorf("this command has been removed in favor of 'up ctx <space name>/%s/%s'", c.Group, c.Name)
+	return fmt.Errorf("this command has been removed in favor of 'up ctx <organization>/<space name>/%s/%s'", c.Group, c.Name)
 }
