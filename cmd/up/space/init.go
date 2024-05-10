@@ -167,6 +167,12 @@ func (c *initCmd) AfterApply(kongCtx *kong.Context, quiet config.QuietFlag) erro
 		pterm.Info.Println("Public ingress will be exposed")
 	}
 
+	// todo(redbackthomson): Remove these defaults once we can default to using
+	// Upbound IAM, through connected spaces, to authenticate users in the
+	// cluster
+	defs.SpacesValues["authentication.hubIdentities"] = "true"
+	defs.SpacesValues["authorization.hubRBAC"] = "true"
+
 	secret := kube.NewSecretApplicator(kClient)
 	c.pullSecret = kube.NewImagePullApplicator(secret)
 	dClient, err := dynamic.NewForConfig(kubeconfig)
