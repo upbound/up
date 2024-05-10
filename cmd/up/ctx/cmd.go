@@ -41,7 +41,7 @@ import (
 )
 
 const (
-	contextSwitchedFmt = "Added new context to kubeconfig: %s\n"
+	contextSwitchedFmt = "Switched kubeconfig context to: %s\n"
 )
 
 var (
@@ -181,8 +181,14 @@ func activateContext(conf *clientcmdapi.Config, sourceContext, preferredContext 
 	}
 	if conf.CurrentContext == preferredContext {
 		conf.Contexts[preferredContext] = source
-		conf.Contexts[preferredContext+upboundPreviousContextSuffix] = current
-		newLastContext = preferredContext + upboundPreviousContextSuffix
+
+		if current == nil {
+			delete(conf.Contexts, preferredContext+upboundPreviousContextSuffix)
+			newLastContext = conf.CurrentContext
+		} else {
+			conf.Contexts[preferredContext+upboundPreviousContextSuffix] = current
+			newLastContext = preferredContext + upboundPreviousContextSuffix
+		}
 	} else {
 		// For other <-> upbound-previous, keep "other" for last context
 		conf.Contexts[preferredContext] = source
