@@ -41,8 +41,7 @@ func (s *Space) Accept(upCtx *upbound.Context, writer kubeContextWriter) (msg st
 		return "", err
 	}
 
-	prev, _ := upCtx.GetCurrentContextName()
-	return fmt.Sprintf(contextSwitchedFmt, prev, s.Breadcrumbs()), nil
+	return fmt.Sprintf(contextSwitchedFmt, s.Breadcrumbs()), nil
 }
 
 // Accept upserts the "upbound" kubeconfig context and cluster to the chosen
@@ -60,8 +59,7 @@ func (g *Group) Accept(upCtx *upbound.Context, writer kubeContextWriter) (msg st
 		return "", err
 	}
 
-	prev, _ := upCtx.GetCurrentContextName()
-	return fmt.Sprintf(contextSwitchedFmt, prev, g.Breadcrumbs()), nil
+	return fmt.Sprintf(contextSwitchedFmt, g.Breadcrumbs()), nil
 }
 
 // Accept upserts a controlplane context and cluster to the chosen kubeconfig.
@@ -78,6 +76,5 @@ func (ctp *ControlPlane) Accept(upCtx *upbound.Context, writer kubeContextWriter
 		return "", err
 	}
 
-	prev, _ := upCtx.GetCurrentContextName()
-	return fmt.Sprintf(contextSwitchedFmt, prev, ctp.Breadcrumbs()), nil
+	return fmt.Sprintf(contextSwitchedFmt, ctp.Breadcrumbs()), nil
 }

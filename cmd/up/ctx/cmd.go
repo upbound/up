@@ -41,7 +41,7 @@ import (
 )
 
 const (
-	contextSwitchedFmt = "Kubeconfig context %q switched to: %s\n"
+	contextSwitchedFmt = "Added new context to kubeconfig: %s\n"
 )
 
 var (
@@ -152,7 +152,7 @@ func (c *Cmd) RunSwap(ctx context.Context, upCtx *upbound.Context) error { // no
 	if err := writeLastContext(oldContext); err != nil {
 		return err
 	}
-	fmt.Printf(contextSwitchedFmt, c.KubeContext, state.Breadcrumbs())
+	fmt.Printf(contextSwitchedFmt, state.Breadcrumbs())
 	return nil
 }
 
@@ -177,10 +177,7 @@ func activateContext(conf *clientcmdapi.Config, sourceContext, preferredContext 
 	}
 	var current *clientcmdapi.Context
 	if conf.CurrentContext != "" {
-		current, ok = conf.Contexts[conf.CurrentContext]
-		if !ok {
-			return nil, "", fmt.Errorf("no %q context found", conf.CurrentContext)
-		}
+		current = conf.Contexts[conf.CurrentContext]
 	}
 	if conf.CurrentContext == preferredContext {
 		conf.Contexts[preferredContext] = source
@@ -219,7 +216,7 @@ func activateContext(conf *clientcmdapi.Config, sourceContext, preferredContext 
 	if conf.Contexts[preferredContext].AuthInfo == preferredContext+upboundPreviousContextSuffix {
 		prev := conf.AuthInfos[preferredContext+upboundPreviousContextSuffix]
 		if prev == nil {
-			return nil, "", fmt.Errorf("no %q authInfo found", preferredContext+upboundPreviousContextSuffix)
+			return nil, "", fmt.Errorf("no %q user found", preferredContext+upboundPreviousContextSuffix)
 		}
 		if current := conf.AuthInfos[preferredContext]; current == nil {
 			delete(conf.AuthInfos, preferredContext+upboundPreviousContextSuffix)
