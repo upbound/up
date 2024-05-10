@@ -25,7 +25,6 @@ import (
 	"github.com/willabides/kongplete"
 
 	"github.com/upbound/up/cmd/up/configuration"
-	"github.com/upbound/up/cmd/up/configuration/template"
 	"github.com/upbound/up/cmd/up/controlplane"
 	"github.com/upbound/up/cmd/up/ctx"
 	"github.com/upbound/up/cmd/up/group"
@@ -105,7 +104,7 @@ type cli struct {
 	Space              space.Cmd                    `cmd:"" help:"Interact with Spaces."`
 	Group              group.Cmd                    `cmd:"" help:"Interact with groups inside Spaces."`
 	ControlPlane       controlplane.Cmd             `cmd:"" name:"controlplane" aliases:"ctp" help:"Interact with control planes in the current context, both in the cloud and in a local Space."`
-	Configuration      configuration.Cmd            `cmd:"" name:"configuration" aliases:"cfg" help:"Interact with configurations."`
+	Configuration      configuration.Cmd            `cmd:"" name:"configuration" aliases:"cfg" help:"Deprecated: Interact with configurations."`
 	Organization       organization.Cmd             `cmd:"" name:"organization" aliases:"org" help:"Interact with Upbound organizations."`
 	Profile            profile.Cmd                  `cmd:"" help:"Interact with Upbound profiles or local Spaces."`
 	Repository         repository.Cmd               `cmd:"" name:"repository" aliases:"repo" help:"Interact with repositories."`
@@ -165,8 +164,6 @@ func main() {
 		kongplete.WithPredictor("repos", repository.PredictRepos()),
 		kongplete.WithPredictor("robots", robot.PredictRobots()),
 		kongplete.WithPredictor("profiles", profile.PredictProfiles()),
-		kongplete.WithPredictor("configs", configuration.PredictConfigurations()),
-		kongplete.WithPredictor("templates", template.PredictTemplates()),
 		// TODO(sttts): add get and query
 	)
 
