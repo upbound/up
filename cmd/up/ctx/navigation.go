@@ -249,13 +249,13 @@ func (s *Space) Items(ctx context.Context, upCtx *upbound.Context) ([]list.Item,
 		items = append(items, item{text: "No groups found", notSelectable: true})
 	}
 
-	items = append(items, item{text: fmt.Sprintf("Switch kubeconfig to %q and quit", s.Name), onEnter: func(m model) (model, error) {
+	items = append(items, item{text: fmt.Sprintf("Switch context to %q", s.Name), onEnter: func(m model) (model, error) {
 		msg, err := s.Accept(m.upCtx, m.contextWriter)
 		if err != nil {
 			return m, err
 		}
 		return m.WithTermination(msg, nil), nil
-	}, padding: []int{1, 0, 0}})
+	}})
 
 	return items, nil
 }
@@ -432,13 +432,13 @@ func (g *Group) Items(ctx context.Context, upCtx *upbound.Context) ([]list.Item,
 		items = append(items, item{text: fmt.Sprintf("No control planes found in the %q group", g.Name), notSelectable: true})
 	}
 
-	items = append(items, item{text: fmt.Sprintf("Switch kubeconfig to %q and quit", fmt.Sprintf("%s/%s", g.Space.Name, g.Name)), onEnter: func(m model) (model, error) {
+	items = append(items, item{text: fmt.Sprintf("Switch context to %q", fmt.Sprintf("%s/%s", g.Space.Name, g.Name)), onEnter: func(m model) (model, error) {
 		msg, err := g.Accept(m.upCtx, m.contextWriter)
 		if err != nil {
 			return m, err
 		}
 		return m.WithTermination(msg, nil), nil
-	}, padding: []int{1, 0, 0}})
+	}})
 
 	return items, nil
 }
@@ -481,7 +481,7 @@ func (ctp *ControlPlane) Items(ctx context.Context, upCtx *upbound.Context) ([]l
 				return m, err
 			}
 			return m.WithTermination(msg, nil), nil
-		}), padding: []int{1, 0, 0}},
+		})},
 	}, nil
 }
 
