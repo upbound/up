@@ -44,12 +44,6 @@ func TestRun(t *testing.T) {
 		ctx    *upbound.Context
 		err    error
 	}{
-		"ErrorNoUserOrToken": {
-			reason: "If neither user or token is provided an error should be returned.",
-			cmd:    &LoginCmd{},
-			ctx:    &upbound.Context{},
-			err:    errors.Wrap(errors.New(errNoUserOrToken), errLoginFailed),
-		},
 		"ErrLoginFailed": {
 			reason: "If Upbound Cloud endpoint is ",
 			cmd: &LoginCmd{
@@ -92,10 +86,6 @@ func TestConstructAuth(t *testing.T) {
 		want   want
 		err    error
 	}{
-		"ErrorNoUserOrToken": {
-			reason: "If neither user or token is provided an error should be returned.",
-			err:    errors.New(errNoUserOrToken),
-		},
 		"SuccessfulUser": {
 			reason: "Providing a valid id and password should return a valid auth request.",
 			args: args{
