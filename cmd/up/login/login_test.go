@@ -30,6 +30,7 @@ import (
 	"github.com/pterm/pterm"
 
 	"github.com/upbound/up/internal/http/mocks"
+	inputmocks "github.com/upbound/up/internal/input/mocks"
 	"github.com/upbound/up/internal/profile"
 	"github.com/upbound/up/internal/upbound"
 )
@@ -59,6 +60,22 @@ func TestRun(t *testing.T) {
 				APIEndpoint: defaultURL,
 			},
 			err: errors.Wrap(errBoom, errLoginFailed),
+		},
+		"ErrCannotLaunchBrowser": {
+			reason: "non-interactive terminals won't prompt",
+			cmd: &LoginCmd{
+				client: &mocks.MockClient{
+					DoFn: func(req *http.Request) (*http.Response, error) {
+						return nil, errBoom
+					},
+				},
+				prompter: &inputmocks.MockPrompter{},
+				Username: "",
+			},
+			ctx: &upbound.Context{
+				APIEndpoint: defaultURL,
+			},
+			err: errors.Wrap(errors.New(inputmocks.ErrCannotPrompt), errLoginFailed),
 		},
 	}
 	for name, tc := range cases {
