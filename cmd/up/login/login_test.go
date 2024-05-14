@@ -30,6 +30,7 @@ import (
 	"github.com/pterm/pterm"
 
 	"github.com/upbound/up/internal/http/mocks"
+	inputmocks "github.com/upbound/up/internal/input/mocks"
 	"github.com/upbound/up/internal/profile"
 	"github.com/upbound/up/internal/upbound"
 )
@@ -44,12 +45,6 @@ func TestRun(t *testing.T) {
 		ctx    *upbound.Context
 		err    error
 	}{
-		"ErrorNoUserOrToken": {
-			reason: "If neither user or token is provided an error should be returned.",
-			cmd:    &LoginCmd{},
-			ctx:    &upbound.Context{},
-			err:    errors.Wrap(errors.New(errNoUserOrToken), errLoginFailed),
-		},
 		"ErrLoginFailed": {
 			reason: "If Upbound Cloud endpoint is ",
 			cmd: &LoginCmd{
@@ -65,6 +60,22 @@ func TestRun(t *testing.T) {
 				APIEndpoint: defaultURL,
 			},
 			err: errors.Wrap(errBoom, errLoginFailed),
+		},
+		"ErrCannotLaunchBrowser": {
+			reason: "non-interactive terminals won't prompt",
+			cmd: &LoginCmd{
+				client: &mocks.MockClient{
+					DoFn: func(req *http.Request) (*http.Response, error) {
+						return nil, errBoom
+					},
+				},
+				prompter: &inputmocks.MockPrompter{},
+				Username: "",
+			},
+			ctx: &upbound.Context{
+				APIEndpoint: defaultURL,
+			},
+			err: errors.Wrap(errors.New(inputmocks.ErrCannotPrompt), errLoginFailed),
 		},
 	}
 	for name, tc := range cases {
@@ -92,10 +103,6 @@ func TestConstructAuth(t *testing.T) {
 		want   want
 		err    error
 	}{
-		"ErrorNoUserOrToken": {
-			reason: "If neither user or token is provided an error should be returned.",
-			err:    errors.New(errNoUserOrToken),
-		},
 		"SuccessfulUser": {
 			reason: "Providing a valid id and password should return a valid auth request.",
 			args: args{
