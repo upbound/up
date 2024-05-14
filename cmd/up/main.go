@@ -98,7 +98,7 @@ type cli struct {
 	License licenseCmd `cmd:"" help:"Print Up license information."`
 
 	Help               helpCmd                      `cmd:"" help:"Show help."`
-	Login              login.LoginCmd               `cmd:"" help:"Login to Upbound."`
+	Login              login.LoginCmd               `cmd:"" help:"Login to Upbound. Will attempt to launch a web browser by default. Use --username and --password flags for automations."`
 	Logout             login.LogoutCmd              `cmd:"" help:"Logout of Upbound."`
 	Ctx                ctx.Cmd                      `cmd:"" help:"Select an Upbound kubeconfig context."`
 	Space              space.Cmd                    `cmd:"" help:"Interact with Spaces."`
