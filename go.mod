@@ -30,7 +30,7 @@ require (
 	github.com/navidys/tvxwidgets v0.6.0
 	github.com/pkg/browser v0.0.0-20240102092130-5ac0b6a4141c
 	github.com/posener/complete v1.2.3
-	github.com/pterm/pterm v0.12.62
+	github.com/pterm/pterm v0.12.79
 	github.com/radovskyb/watcher v1.0.7
 	github.com/rivo/tview v0.0.0-20240201191747-007cbb1d1344
 	github.com/sourcegraph/go-lsp v0.0.0-20200429204803-219e11d77f5d
@@ -96,9 +96,9 @@ require (
 )
 
 require (
-	atomicgo.dev/cursor v0.1.2 // indirect
+	atomicgo.dev/cursor v0.2.0 // indirect
 	atomicgo.dev/keyboard v0.2.9 // indirect
-	atomicgo.dev/schedule v0.0.2 // indirect
+	atomicgo.dev/schedule v0.1.0 // indirect
 	cloud.google.com/go v0.112.0 // indirect
 	cloud.google.com/go/compute v1.24.0 // indirect
 	cloud.google.com/go/compute/metadata v0.2.3 // indirect
@@ -173,7 +173,7 @@ require (
 	github.com/google/shlex v0.0.0-20191202100458-e7afc7fbc510 // indirect
 	github.com/googleapis/enterprise-certificate-proxy v0.3.2 // indirect
 	github.com/googleapis/gax-go/v2 v2.12.0 // indirect
-	github.com/gookit/color v1.5.3 // indirect
+	github.com/gookit/color v1.5.4 // indirect
 	github.com/goreleaser/chglog v0.5.0 // indirect
 	github.com/goreleaser/fileglob v1.3.0 // indirect
 	github.com/gorilla/mux v1.8.0 // indirect
