@@ -18,7 +18,6 @@ import (
 	"context"
 	"io"
 	"os"
-	"os/signal"
 
 	"github.com/alecthomas/kong"
 	"github.com/pterm/pterm"
@@ -178,17 +177,6 @@ func main() {
 
 	kongCtx, err := parser.Parse(os.Args[1:])
 	parser.FatalIfErrorf(err)
-
-	ctx, cancel := context.WithCancel(context.Background())
-	sigCh := make(chan os.Signal, 1)
-	signal.Notify(sigCh, os.Interrupt)
-	defer signal.Stop(sigCh)
-	go func() {
-		defer cancel()
-		<-sigCh
-		kongCtx.Exit(1)
-	}()
-
-	kongCtx.BindTo(ctx, (*context.Context)(nil))
+	kongCtx.BindTo(context.Background(), (*context.Context)(nil))
 	kongCtx.FatalIfErrorf(kongCtx.Run())
 }
