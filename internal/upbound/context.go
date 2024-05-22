@@ -40,6 +40,7 @@ import (
 	upboundv1alpha1 "github.com/upbound/up-sdk-go/apis/upbound/v1alpha1"
 	"github.com/upbound/up/internal/config"
 	"github.com/upbound/up/internal/profile"
+	"github.com/upbound/up/internal/spaces"
 	"github.com/upbound/up/internal/version"
 )
 
@@ -336,14 +337,18 @@ func (c *Context) BuildCloudSpaceClientConfig(ctx context.Context, spaceName, or
 		return nil, err
 	}
 
+	ingress, ca, err := spaces.GetIngressFromSpace(ctx, space, c.Profile.Session)
+	if err != nil {
+		return nil, err
+	}
+
 	// uniquely identify the space
 	contextName := fmt.Sprintf("upbound/%s", spaceName)
 
 	clusters := make(map[string]*clientcmdapi.Cluster)
 	clusters[spaceName] = &clientcmdapi.Cluster{
-		Server: fmt.Sprintf("https://%s.%s", organization, space.Status.FQDN),
-		// todo(redbackthomson): replace once a public CA is configured
-		InsecureSkipTLSVerify: true, //nolint:gosec
+		Server:                   ingress,
+		CertificateAuthorityData: ca,
 	}
 
 	contexts := make(map[string]*clientcmdapi.Context)

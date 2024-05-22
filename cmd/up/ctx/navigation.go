@@ -36,6 +36,7 @@ import (
 	upboundv1alpha1 "github.com/upbound/up-sdk-go/apis/upbound/v1alpha1"
 	"github.com/upbound/up-sdk-go/service/organizations"
 	"github.com/upbound/up/internal/profile"
+	"github.com/upbound/up/internal/spaces"
 	"github.com/upbound/up/internal/upbound"
 	"github.com/upbound/up/internal/version"
 )
@@ -162,19 +163,22 @@ func (o *Organization) Items(ctx context.Context, upCtx *upbound.Context) ([]lis
 	items = append(items, item{text: "..", kind: "organizations", onEnter: o.Back, back: true})
 	for _, space := range l.Items {
 		if mode, ok := space.ObjectMeta.Labels[upboundv1alpha1.SpaceModeLabelKey]; ok {
-			// todo(redbackthomson): Add support for connected spaces
-			if mode == string(upboundv1alpha1.ModeLegacy) || mode == string(upboundv1alpha1.ModeConnected) {
+			if mode == string(upboundv1alpha1.ModeLegacy) {
 				continue
 			}
 		}
 
+		ingress, ca, err := spaces.GetIngressFromSpace(ctx, space, upCtx.Profile.Session)
+		if err != nil {
+			return nil, errors.New("unable to load ingress from space")
+		}
+
 		items = append(items, item{text: space.GetObjectMeta().GetName(), kind: "space", onEnter: func(m model) (model, error) {
 			m.state = &Space{
-				Org:     *o,
-				Name:    space.GetObjectMeta().GetName(),
-				Ingress: space.Status.FQDN,
-				// todo(redbackthomson): Replace with public CA data once available
-				CA:       make([]byte, 0),
+				Org:      *o,
+				Name:     space.GetObjectMeta().GetName(),
+				Ingress:  ingress,
+				CA:       ca,
 				AuthInfo: authInfo,
 			}
 			return m, nil
