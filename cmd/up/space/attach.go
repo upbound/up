@@ -24,7 +24,6 @@ import (
 	"strings"
 
 	"github.com/alecthomas/kong"
-	"github.com/crossplane/crossplane-runtime/pkg/errors"
 	"github.com/google/uuid"
 	"github.com/pterm/pterm"
 	"helm.sh/helm/v3/pkg/storage/driver"
@@ -34,6 +33,8 @@ import (
 	"k8s.io/client-go/kubernetes"
 	"k8s.io/client-go/rest"
 	"sigs.k8s.io/controller-runtime/pkg/client"
+
+	"github.com/crossplane/crossplane-runtime/pkg/errors"
 
 	upboundv1alpha1 "github.com/upbound/up-sdk-go/apis/upbound/v1alpha1"
 	sdkerrs "github.com/upbound/up-sdk-go/errors"
@@ -49,10 +50,11 @@ import (
 )
 
 const (
-	agentChart  = "agent"
-	agentNs     = "upbound-system"
-	agentSecret = "space-token"
-	connConfMap = "space-connect"
+	agentChart   = "agent"
+	agentNs      = "upbound-system"
+	agentSecret  = "space-token"
+	connConfMap  = "space-connect"
+	mxpConfigMap = "mxp-config"
 
 	keySpace   = "space"
 	keyToken   = "token"
@@ -142,6 +144,16 @@ func (c *attachCmd) AfterApply(kongCtx *kong.Context) error {
 
 // Run executes the install command.
 func (c *attachCmd) Run(ctx context.Context, mgr *helm.Installer, kClient *kubernetes.Clientset, upCtx *upbound.Context, ac *accounts.Client, oc *organizations.Client, tc *tokens.Client, rc *robots.Client, rest *rest.Config) (rErr error) { //nolint:gocyclo
+	mxpConfig, err := kClient.CoreV1().ConfigMaps(agentNs).Get(ctx, mxpConfigMap, metav1.GetOptions{})
+	if kerrors.IsNotFound(err) {
+		return errors.New("failed to detect Space. Please run `up space init` first.")
+	} else if err != nil {
+		return errors.Wrapf(err, `failed to get ConfigMap "%s/%s"`, agentNs, mxpConfigMap)
+	}
+	if spaceAcc := mxpConfig.Data["account"]; spaceAcc != c.Upbound.Account {
+		return errors.Errorf("account of the Space %q and account of the profile %q mismatch. Use `--account=%s` to attach to the right organization.", spaceAcc, c.Upbound.Account, spaceAcc)
+	}
+
 	attachSpinner, err := upterm.CheckmarkSuccessSpinner.Start("Connecting Space to Upbound Console...")
 	if err != nil {
 		return err
