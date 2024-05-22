@@ -218,7 +218,7 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) { // nolint:gocyclo // T
 			switch {
 			case key.Matches(msg, backNavBinding):
 				if state, ok := m.state.(Back); ok {
-					if state.CanBack() {
+					if state.CanBack(m) {
 						fn = state.Back
 					}
 				}

@@ -20,6 +20,7 @@ import (
 	"os"
 	"os/exec"
 	"sort"
+	"strings"
 
 	"github.com/charmbracelet/bubbles/list"
 	"github.com/charmbracelet/lipgloss"
@@ -68,7 +69,7 @@ type Accepting interface {
 type Back interface {
 	NavigationState
 	Back(m model) (model, error)
-	CanBack() bool
+	CanBack(m model) bool
 }
 
 type AcceptingFunc func(ctx context.Context, upCtx *upbound.Context) error
@@ -115,6 +116,9 @@ func (r *Root) Items(ctx context.Context, upCtx *upbound.Context) ([]list.Item, 
 	for _, org := range orgs {
 		items = append(items, item{text: org.DisplayName, kind: "organization", matchingTerms: []string{org.Name}, onEnter: func(m model) (model, error) {
 			m.state = &Organization{Name: org.Name}
+			if m.localSpace != nil && m.localSpace.Org.Name == org.Name {
+				m.state.(*Organization).localSpace = m.localSpace
+			}
 			return m, nil
 		}})
 	}
@@ -133,54 +137,69 @@ func (r *Root) Breadcrumbs() string {
 var _ Back = &Organization{}
 
 type Organization struct {
-	Name string
+	Name       string
+	localSpace *LocalSpace
 }
 
 func (o *Organization) Items(ctx context.Context, upCtx *upbound.Context) ([]list.Item, error) { //nolint:gocyclo
-	cloudCfg, err := upCtx.BuildControllerClientConfig()
-	if err != nil {
-		return nil, err
-	}
-
-	cloudClient, err := client.New(cloudCfg, client.Options{})
-	if err != nil {
-		return nil, err
-	}
-
-	var l upboundv1alpha1.SpaceList
-	err = cloudClient.List(ctx, &l, &client.ListOptions{Namespace: o.Name})
-	if err != nil {
-		return nil, err
-	}
-
-	authInfo, err := getOrgScopedAuthInfo(upCtx, o.Name)
-	if err != nil {
-		return nil, err
-	}
-
 	items := make([]list.Item, 0)
-	items = append(items, item{text: "..", kind: "organizations", onEnter: o.Back, back: true})
-	for _, space := range l.Items {
-		if mode, ok := space.ObjectMeta.Labels[upboundv1alpha1.SpaceModeLabelKey]; ok {
-			// todo(redbackthomson): Add support for connected spaces
-			if mode == string(upboundv1alpha1.ModeLegacy) || mode == string(upboundv1alpha1.ModeConnected) {
-				continue
-			}
+	if upCtx.Cfg != nil && upCtx.Cfg.Upbound.Default != "" {
+		cloudCfg, err := upCtx.BuildControllerClientConfig()
+		if err != nil {
+			return nil, err
 		}
 
-		items = append(items, item{text: space.GetObjectMeta().GetName(), kind: "space", onEnter: func(m model) (model, error) {
-			m.state = &Space{
-				Org:     *o,
-				Name:    space.GetObjectMeta().GetName(),
-				Ingress: space.Status.FQDN,
-				// todo(redbackthomson): Replace with public CA data once available
-				CA:       make([]byte, 0),
-				AuthInfo: authInfo,
+		cloudClient, err := client.New(cloudCfg, client.Options{})
+		if err != nil {
+			return nil, err
+		}
+
+		var l upboundv1alpha1.SpaceList
+		err = cloudClient.List(ctx, &l, &client.ListOptions{Namespace: o.Name})
+		if err != nil {
+			return nil, err
+		}
+
+		authInfo, err := getOrgScopedAuthInfo(upCtx, o.Name)
+		if err != nil {
+			return nil, err
+		}
+
+		items = append(items, item{text: "..", kind: "organizations", onEnter: o.Back, back: true})
+		for _, space := range l.Items {
+			if mode, ok := space.ObjectMeta.Labels[upboundv1alpha1.SpaceModeLabelKey]; ok {
+				// todo(redbackthomson): Add support for connected spaces
+				if mode == string(upboundv1alpha1.ModeLegacy) || mode == string(upboundv1alpha1.ModeConnected) {
+					continue
+				}
 			}
+
+			items = append(items, item{text: space.GetObjectMeta().GetName(), kind: "space", onEnter: func(m model) (model, error) {
+				m.state = &Space{
+					Org:     *o,
+					Name:    space.GetObjectMeta().GetName(),
+					Ingress: space.Status.FQDN,
+					// todo(redbackthomson): Replace with public CA data once available
+					CA:       make([]byte, 0),
+					AuthInfo: authInfo,
+				}
+				return m, nil
+			}})
+		}
+		sort.Sort(sortedItems(items))
+	}
+
+	if o.localSpace != nil && o.Name == o.localSpace.Org.Name {
+		if len(items) > 0 {
+			items = append(items, item{notSelectable: true})
+		}
+		items = append(items, item{text: "Local Space", kind: "space", onEnter: func(m model) (model, error) {
+			space := Space(*o.localSpace)
+			m.state = &space
 			return m, nil
 		}})
 	}
-	sort.Sort(sortedItems(items))
+
 	return items, nil
 }
 
@@ -189,7 +208,7 @@ func (o *Organization) Back(m model) (model, error) {
 	return m, nil
 }
 
-func (o *Organization) CanBack() bool {
+func (o *Organization) CanBack(m model) bool {
 	return true
 }
 
@@ -223,6 +242,9 @@ type Space struct {
 	HubContext string
 }
 
+// LocalSpace is space connected to locally.
+type LocalSpace Space
+
 func (s *Space) Items(ctx context.Context, upCtx *upbound.Context) ([]list.Item, error) {
 	cl, err := s.GetClient(upCtx)
 	if err != nil {
@@ -235,7 +257,7 @@ func (s *Space) Items(ctx context.Context, upCtx *upbound.Context) ([]list.Item,
 	}
 
 	items := make([]list.Item, 0, len(nss.Items)+3)
-	if s.CanBack() {
+	if upCtx.Cfg != nil && upCtx.Cfg.Upbound.Default != "" {
 		items = append(items, item{text: "..", kind: "spaces", onEnter: s.Back, back: true})
 	}
 	for _, ns := range nss.Items {
@@ -263,6 +285,9 @@ func (s *Space) Items(ctx context.Context, upCtx *upbound.Context) ([]list.Item,
 
 func (s *Space) Back(m model) (model, error) {
 	m.state = &s.Org
+	if m.localSpace != nil && m.localSpace.Org.Name == s.Org.Name {
+		m.state.(*Organization).localSpace = m.localSpace
+	}
 	return m, nil
 }
 
@@ -270,8 +295,8 @@ func (s *Space) IsCloud() bool {
 	return s.Org.Name != ""
 }
 
-func (s *Space) CanBack() bool {
-	return s.IsCloud()
+func (s *Space) CanBack(m model) bool {
+	return m.upCtx.Cfg != nil
 }
 
 func (s *Space) breadcrumbs(styles breadcrumbStyle) string {
@@ -389,7 +414,7 @@ func (s *Space) buildClient(upCtx *upbound.Context, resource types.NamespacedNam
 		}
 	}
 
-	if s.IsCloud() {
+	if strings.HasSuffix(s.Ingress, ".upbound.io") {
 		refContext.Extensions[upbound.ContextExtensionKeySpace] = upbound.NewCloudV1Alpha1SpaceExtension(s.Org.Name)
 	} else {
 		refContext.Extensions[upbound.ContextExtensionKeySpace] = upbound.NewDisconnectedV1Alpha1SpaceExtension(s.HubContext)
@@ -460,7 +485,7 @@ func (g *Group) Back(m model) (model, error) {
 	return m, nil
 }
 
-func (g *Group) CanBack() bool {
+func (g *Group) CanBack(m model) bool {
 	return true
 }
 
@@ -503,7 +528,7 @@ func (ctp *ControlPlane) Back(m model) (model, error) {
 	return m, nil
 }
 
-func (ctp *ControlPlane) CanBack() bool {
+func (ctp *ControlPlane) CanBack(m model) bool {
 	return true
 }
 

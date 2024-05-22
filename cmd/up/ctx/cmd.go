@@ -25,6 +25,7 @@ import (
 	"github.com/charmbracelet/bubbles/list"
 	tea "github.com/charmbracelet/bubbletea"
 	"github.com/pkg/errors"
+	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/types"
 	kruntime "k8s.io/apimachinery/pkg/util/runtime"
 	"k8s.io/client-go/kubernetes/scheme"
@@ -86,6 +87,8 @@ type model struct {
 	state NavigationState
 	err   error
 
+	localSpace *LocalSpace
+
 	termination *Termination
 
 	upCtx         *upbound.Context
@@ -106,7 +109,7 @@ func (c *Cmd) Run(ctx context.Context, kongCtx *kong.Context, upCtx *upbound.Con
 	if err != nil {
 		return err
 	}
-	initialState, err := DeriveState(ctx, upCtx, conf, profile.GetIngressHost)
+	initialState, localSpace, err := DeriveState(ctx, upCtx, conf, profile.GetIngressHost)
 	if err != nil {
 		return err
 	}
@@ -116,9 +119,9 @@ func (c *Cmd) Run(ctx context.Context, kongCtx *kong.Context, upCtx *upbound.Con
 	case "-":
 		return c.RunSwap(ctx, upCtx)
 	case "":
-		return c.RunInteractive(ctx, kongCtx, upCtx, initialState)
+		return c.RunInteractive(ctx, kongCtx, upCtx, initialState, localSpace)
 	default:
-		return c.RunRelative(ctx, upCtx, initialState)
+		return c.RunRelative(ctx, upCtx, initialState, localSpace)
 	}
 }
 
@@ -142,7 +145,7 @@ func (c *Cmd) RunSwap(ctx context.Context, upCtx *upbound.Context) error { // no
 	}
 
 	// write kubeconfig
-	state, err := DeriveState(ctx, upCtx, conf, profile.GetIngressHost)
+	state, _, err := DeriveState(ctx, upCtx, conf, profile.GetIngressHost)
 	if err != nil {
 		return err
 	}
@@ -242,7 +245,7 @@ func activateContext(conf *clientcmdapi.Config, sourceContext, preferredContext 
 	return conf, newLastContext, nil
 }
 
-func (c *Cmd) RunRelative(ctx context.Context, upCtx *upbound.Context, initialState NavigationState) error { // nolint:gocyclo // a bit long but ¯\_(ツ)_/¯
+func (c *Cmd) RunRelative(ctx context.Context, upCtx *upbound.Context, initialState NavigationState, local *LocalSpace) error { // nolint:gocyclo // a bit long but ¯\_(ツ)_/¯
 	// begin from root unless we're starting from a relative . or ..
 	state := initialState
 	if !strings.HasPrefix(c.Argument, ".") {
@@ -253,6 +256,7 @@ func (c *Cmd) RunRelative(ctx context.Context, upCtx *upbound.Context, initialSt
 		state:         state,
 		upCtx:         upCtx,
 		contextWriter: c.kubeContextWriter(upCtx),
+		localSpace:    local,
 	}
 	for _, s := range strings.Split(c.Argument, "/") {
 		switch s {
@@ -326,12 +330,13 @@ func (c *Cmd) RunRelative(ctx context.Context, upCtx *upbound.Context, initialSt
 	return nil
 }
 
-func (c *Cmd) RunInteractive(ctx context.Context, kongCtx *kong.Context, upCtx *upbound.Context, initialState NavigationState) error {
+func (c *Cmd) RunInteractive(ctx context.Context, kongCtx *kong.Context, upCtx *upbound.Context, initialState NavigationState, local *LocalSpace) error {
 	// start interactive mode
 	m := model{
 		state:         initialState,
 		upCtx:         upCtx,
 		contextWriter: c.kubeContextWriter(upCtx),
+		localSpace:    local,
 	}
 	items, err := m.state.Items(ctx, upCtx)
 	if err != nil {
@@ -377,22 +382,28 @@ type getIngressHostFn func(ctx context.Context, cl client.Client) (host string, 
 
 // DeriveState returns the navigation state based on the current context set in
 // the given kubeconfig
-func DeriveState(ctx context.Context, upCtx *upbound.Context, conf *clientcmdapi.Config, getIngressHost getIngressHostFn) (NavigationState, error) {
+func DeriveState(ctx context.Context, upCtx *upbound.Context, conf *clientcmdapi.Config, getIngressHost getIngressHostFn) (NavigationState, *LocalSpace, error) {
 	currentCtx := conf.Contexts[conf.CurrentContext]
 
 	spaceExt, err := upbound.GetSpaceExtension(currentCtx)
 	if err != nil {
-		return nil, err
+		return nil, nil, err
 	} else if spaceExt == nil {
-		return DeriveNewState(ctx, conf, getIngressHost)
+		state, err := DeriveNewState(ctx, conf, getIngressHost)
+		if space, ok := state.(*Space); ok {
+			local := LocalSpace(*space)
+			return state, &local, err
+		}
+		return state, nil, err
 	}
 
 	if spaceExt.Spec.Cloud != nil {
-		return DeriveExistingCloudState(upCtx, conf, spaceExt.Spec.Cloud)
+		state, err := DeriveExistingCloudState(upCtx, conf, spaceExt.Spec.Cloud)
+		return state, nil, err
 	} else if spaceExt.Spec.Disconnected != nil {
 		return DeriveExistingDisconnectedState(ctx, upCtx, conf, spaceExt.Spec.Disconnected, getIngressHost)
 	}
-	return nil, errors.New("unable to derive state using context extension")
+	return nil, nil, errors.New("unable to derive state using context extension")
 }
 
 // DeriveNewState derives the current navigation state assuming that the current
@@ -428,7 +439,13 @@ func DeriveNewState(ctx context.Context, conf *clientcmdapi.Config, getIngressHo
 		return &Root{}, nil // nolint:nilerr
 	}
 
+	mxpConfig := &corev1.ConfigMap{}
+	if err := cl.Get(ctx, types.NamespacedName{Name: "mxp-config", Namespace: "upbound-system"}, mxpConfig); err != nil {
+		return &Root{}, nil // nolint:nilerr
+	}
+
 	return &Space{
+		Org:     Organization{Name: mxpConfig.Data["account"]},
 		Name:    conf.CurrentContext,
 		Ingress: ingress,
 		CA:      ca,
@@ -440,9 +457,9 @@ func DeriveNewState(ctx context.Context, conf *clientcmdapi.Config, getIngressHo
 // DeriveExistingDisconnectedState derives the navigation state assuming the
 // current context in the passed kubeconfig is pointing at an existing
 // disconnected space created by the CLI
-func DeriveExistingDisconnectedState(ctx context.Context, upCtx *upbound.Context, conf *clientcmdapi.Config, disconnected *upbound.DisconnectedConfiguration, getIngressHost getIngressHostFn) (NavigationState, error) {
+func DeriveExistingDisconnectedState(ctx context.Context, upCtx *upbound.Context, conf *clientcmdapi.Config, disconnected *upbound.DisconnectedConfiguration, getIngressHost getIngressHostFn) (NavigationState, *LocalSpace, error) {
 	if _, ok := conf.Contexts[disconnected.HubContext]; !ok {
-		return nil, fmt.Errorf("cannot find space hub context %q", disconnected.HubContext)
+		return nil, nil, fmt.Errorf("cannot find space hub context %q", disconnected.HubContext)
 	}
 
 	var ingress string
@@ -452,38 +469,45 @@ func DeriveExistingDisconnectedState(ctx context.Context, upCtx *upbound.Context
 	// determine the ingress either by looking up the base URL if we're in a
 	// ctp, or querying for the config map if we're in a group
 
+	rest, err := clientcmd.NewDefaultClientConfig(*conf, &clientcmd.ConfigOverrides{
+		CurrentContext: disconnected.HubContext,
+	}).ClientConfig()
+	if err != nil {
+		return &Root{}, nil, nil // nolint:nilerr
+	}
+
+	cl, err := client.New(rest, client.Options{})
+	if err != nil {
+		return &Root{}, nil, nil // nolint:nilerr
+	}
+
 	ingress, ctp, _ = upCtx.GetCurrentSpaceContextScope()
 	if ctp.Name != "" {
 		// we're in a ctp, so re-use the CA of the current cluster
 		ca = conf.Clusters[conf.Contexts[conf.CurrentContext].Cluster].CertificateAuthorityData
 	} else {
 		// get ingress from hub
-		rest, err := clientcmd.NewDefaultClientConfig(*conf, &clientcmd.ConfigOverrides{
-			CurrentContext: disconnected.HubContext,
-		}).ClientConfig()
-		if err != nil {
-			return &Root{}, nil // nolint:nilerr
-		}
-
-		cl, err := client.New(rest, client.Options{})
-		if err != nil {
-			return &Root{}, nil // nolint:nilerr
-		}
-
 		ingress, ca, err = getIngressHost(ctx, cl)
 		if err != nil {
 			// ingress inaccessible or doesn't exist
-			return &Root{}, nil // nolint:nilerr
+			return &Root{}, nil, nil // nolint:nilerr
 		}
 	}
 
+	mpxConfig := &corev1.ConfigMap{}
+	if err := cl.Get(ctx, types.NamespacedName{Name: "mxp-config", Namespace: "upbound-system"}, mpxConfig); err != nil {
+		return &Root{}, nil, nil // nolint:nilerr
+	}
+
 	space := Space{
+		Org:     Organization{Name: mpxConfig.Data["account"]},
 		Name:    disconnected.HubContext,
 		Ingress: ingress,
 		CA:      ca,
 
 		HubContext: disconnected.HubContext,
 	}
+	local := LocalSpace(space)
 
 	// derive navigation state
 	switch {
@@ -494,14 +518,14 @@ func DeriveExistingDisconnectedState(ctx context.Context, upCtx *upbound.Context
 				Name:  ctp.Namespace,
 			},
 			Name: ctp.Name,
-		}, nil
+		}, &local, nil
 	case ctp.Namespace != "":
 		return &Group{
 			Space: space,
 			Name:  ctp.Namespace,
-		}, nil
+		}, &local, nil
 	default:
-		return &space, nil
+		return &space, &local, nil
 	}
 }
 
