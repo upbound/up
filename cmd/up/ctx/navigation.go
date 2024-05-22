@@ -249,6 +249,7 @@ func (s *Space) Items(ctx context.Context, upCtx *upbound.Context) ([]list.Item,
 		items = append(items, item{text: "No groups found", notSelectable: true})
 	}
 
+	items = append(items, item{notSelectable: true})
 	items = append(items, item{text: fmt.Sprintf("Switch context to %q", s.Name), onEnter: func(m model) (model, error) {
 		msg, err := s.Accept(m.upCtx, m.contextWriter)
 		if err != nil {
