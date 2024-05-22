@@ -24,6 +24,7 @@ import (
 	"time"
 
 	"github.com/Masterminds/semver/v3"
+
 	"github.com/crossplane/crossplane-runtime/pkg/logging"
 )
 
@@ -49,7 +50,7 @@ const (
 
 var (
 	version      string
-	agentVersion string
+	agentVersion string = "0.0.0-408.g343d295"
 	gitCommit    string = "unknown-commit"
 	target       string = string(ReleaseTargetDebug)
 )
