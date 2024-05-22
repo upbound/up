@@ -10,8 +10,8 @@ PLATFORMS ?= linux_amd64 linux_arm64 linux_arm darwin_amd64 darwin_arm64 windows
 # to run a target until the include commands succeeded.
 -include build/makelib/common.mk
 
-# Connect agent version
-UP_CONNECT_AGENT_VERSION = 0.0.0-408.g343d295
+# Connect agent version (overrides the version referenced in internal/version).
+UP_CONNECT_AGENT_VERSION ?=
 
 # Release target version
 RELEASE_TARGET ?= debug
@@ -36,7 +36,9 @@ GO_TEST_PARALLEL := $(shell echo $$(( $(NPROCS) / 2 )))
 
 GO_STATIC_PACKAGES = $(GO_PROJECT)/cmd/up $(GO_PROJECT)/cmd/docker-credential-up
 GO_LDFLAGS += -X $(GO_PROJECT)/internal/version.version=$(VERSION)
+ifneq ($(UP_CONNECT_AGENT_VERSION),)
 GO_LDFLAGS += -X $(GO_PROJECT)/internal/version.agentVersion=$(UP_CONNECT_AGENT_VERSION)
+endif
 GO_LDFLAGS += -X $(GO_PROJECT)/internal/version.target=$(RELEASE_TARGET)
 GO_LDFLAGS += -X $(GO_PROJECT)/internal/version.gitCommit=$(shell git rev-parse --short HEAD 2> /dev/null || true)
 GO_SUBDIRS += cmd internal
