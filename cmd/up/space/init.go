@@ -69,7 +69,7 @@ var (
 		Resource: hcResourcePlural,
 	}
 
-	defaultAcct = "notdemo"
+	defaultAcct = "disconnected"
 )
 
 const (
@@ -227,7 +227,7 @@ func (c *initCmd) AfterApply(kongCtx *kong.Context, quiet config.QuietFlag) erro
 // Run executes the install command.
 func (c *initCmd) Run(ctx context.Context, upCtx *upbound.Context) error {
 	overrideRegistry(c.Registry.Repository.String(), c.helmParams)
-	ensureAccount(c.helmParams)
+	ensureAccount(upCtx, c.helmParams)
 
 	// check if required prerequisites are installed
 	status, err := c.prereqs.Check()
