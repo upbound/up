@@ -19,6 +19,7 @@ import (
 
 	"github.com/upbound/up/cmd/up/space/billing"
 	"github.com/upbound/up/internal/feature"
+	"github.com/upbound/up/internal/upbound"
 )
 
 const (
@@ -55,9 +56,21 @@ func overrideRegistry(candidate string, params map[string]any) {
 	}
 }
 
-func ensureAccount(params map[string]any) {
+func ensureAccount(upCtx *upbound.Context, params map[string]any) {
+	// If the account name was explicitly set via helm flags, keep it.
 	_, ok := params["account"]
-	if !ok {
-		params["account"] = defaultAcct
+	if ok {
+		return
 	}
+
+	// Get the account from the active profile if it's set.
+	if upCtx.Account != "" {
+		params["account"] = upCtx.Account
+		return
+	}
+
+	// Fall back to the default if we didn't find an account name
+	// elsewhere. Spaces created with the default can't be attached to the
+	// console, so this is not ideal, but they can be used in disconnected mode.
+	params["account"] = defaultAcct
 }

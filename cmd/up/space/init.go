@@ -69,7 +69,7 @@ var (
 		Resource: hcResourcePlural,
 	}
 
-	defaultAcct = "notdemo"
+	defaultAcct = "disconnected"
 )
 
 const (
@@ -85,8 +85,6 @@ const (
 	errParseInstallParameters = "unable to parse install parameters"
 	errCreateImagePullSecret  = "failed to create image pull secret"
 	errFmtCreateNamespace     = "failed to create namespace %q"
-	errUpdateConfig           = "unable to update config file"
-	errUpdateProfile          = "unable to update profile"
 	errCreateSpace            = "failed to create Space"
 )
 
@@ -227,9 +225,20 @@ func (c *initCmd) AfterApply(kongCtx *kong.Context, quiet config.QuietFlag) erro
 }
 
 // Run executes the install command.
-func (c *initCmd) Run(ctx context.Context, upCtx *upbound.Context) error {
+func (c *initCmd) Run(ctx context.Context, upCtx *upbound.Context) error { //nolint:gocyclo
 	overrideRegistry(c.Registry.Repository.String(), c.helmParams)
-	ensureAccount(c.helmParams)
+	ensureAccount(upCtx, c.helmParams)
+
+	if c.helmParams["account"] == defaultAcct {
+		pterm.Warning.Println("No account name was provided. Spaces initialized without an account name cannot be attached to the Upbound console! This cannot be changed later.")
+		confirm := pterm.DefaultInteractiveConfirm
+		confirm.DefaultText = fmt.Sprintf("Would you like to proceed with the default account name %q?", defaultAcct)
+		result, _ := confirm.Show()
+		if !result {
+			pterm.Error.Println("Not proceeding without an account name; use --account or `up login` to create a profile.")
+			return nil
+		}
+	}
 
 	// check if required prerequisites are installed
 	status, err := c.prereqs.Check()

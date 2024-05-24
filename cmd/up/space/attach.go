@@ -150,7 +150,7 @@ func (c *attachCmd) Run(ctx context.Context, mgr *helm.Installer, kClient *kuber
 	} else if err != nil {
 		return errors.Wrapf(err, `failed to get ConfigMap "%s/%s"`, agentNs, mxpConfigMap)
 	}
-	if spaceAcc := mxpConfig.Data["account"]; spaceAcc != c.Upbound.Account {
+	if spaceAcc := mxpConfig.Data["account"]; spaceAcc != upCtx.Account {
 		return errors.Errorf("account of the Space %q and account of the profile %q mismatch. Use `--account=%s` to attach to the right organization.", spaceAcc, c.Upbound.Account, spaceAcc)
 	}
 
