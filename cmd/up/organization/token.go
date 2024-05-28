@@ -34,7 +34,8 @@ import (
 type tokenCmd struct {
 	Upbound upbound.Flags `embed:""`
 
-	Name string `arg:"" env:"ORGANIZATION" required:"" help:"Name of organization." predictor:"orgs"`
+	Name  string `arg:"" env:"ORGANIZATION" required:"" help:"Name of organization." predictor:"orgs"`
+	Token string `short:"t" env:"UP_TOKEN" help:"Token used to execute command. Overrides the token present in the profile."`
 }
 
 // AfterApply sets default values in command after assignment and validation.
@@ -55,13 +56,18 @@ func (c *tokenCmd) Run(ctx context.Context, printer upterm.ObjectPrinter, p pter
 		return err
 	}
 
+	sessionToken := c.Token
+	if sessionToken == "" {
+		sessionToken = upCtx.Profile.Session
+	}
+
 	client := auth.NewClient(cfg)
-	token, err := client.GetOrgScopedToken(ctx, c.Name, upCtx.Profile.Session)
+	orgToken, err := client.GetOrgScopedToken(ctx, c.Name, sessionToken)
 	if err != nil {
 		return err
 	}
 
-	exp := v1.NewTime(time.Now().Add(time.Duration(token.ExpiresIn) * time.Second))
+	exp := v1.NewTime(time.Now().Add(time.Duration(orgToken.ExpiresIn) * time.Second))
 
 	creds := clientauthentication.ExecCredential{
 		TypeMeta: v1.TypeMeta{
@@ -70,7 +76,7 @@ func (c *tokenCmd) Run(ctx context.Context, printer upterm.ObjectPrinter, p pter
 		},
 		Status: &clientauthentication.ExecCredentialStatus{
 			ExpirationTimestamp: &exp,
-			Token:               token.AccessToken,
+			Token:               orgToken.AccessToken,
 		},
 	}
 
