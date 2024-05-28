@@ -61,7 +61,7 @@ func (c *QueryCmd) AfterApply(kongCtx *kong.Context) error { // nolint:gocyclo /
 			c.Group = ctp.Namespace
 		}
 	}
-	kubeconfig, err := upCtx.Kubecfg.RawConfig()
+	kubeconfig, err := upCtx.Kubecfg.ClientConfig()
 	if err != nil {
 		return err
 	}
