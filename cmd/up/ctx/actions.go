@@ -28,7 +28,7 @@ const (
 
 // Accept upserts the "upbound" kubeconfig context and cluster to the chosen
 // kubeconfig, pointing to the space.
-func (s *Space) Accept(upCtx *upbound.Context, writer kubeContextWriter) (msg string, err error) {
+func (s *Space) Accept(upCtx *upbound.Context, navCtx *navContext) (msg string, err error) {
 	config, err := s.buildClient(upCtx, types.NamespacedName{})
 	if err != nil {
 		return "", err
@@ -37,7 +37,7 @@ func (s *Space) Accept(upCtx *upbound.Context, writer kubeContextWriter) (msg st
 	if err != nil {
 		return "", err
 	}
-	if err := writer.Write(&raw); err != nil {
+	if err := navCtx.contextWriter.Write(&raw); err != nil {
 		return "", err
 	}
 
@@ -46,7 +46,7 @@ func (s *Space) Accept(upCtx *upbound.Context, writer kubeContextWriter) (msg st
 
 // Accept upserts the "upbound" kubeconfig context and cluster to the chosen
 // kubeconfig, pointing to the group.
-func (g *Group) Accept(upCtx *upbound.Context, writer kubeContextWriter) (msg string, err error) {
+func (g *Group) Accept(upCtx *upbound.Context, navCtx *navContext) (msg string, err error) {
 	config, err := g.Space.buildClient(upCtx, types.NamespacedName{Namespace: g.Name})
 	if err != nil {
 		return "", err
@@ -55,7 +55,7 @@ func (g *Group) Accept(upCtx *upbound.Context, writer kubeContextWriter) (msg st
 	if err != nil {
 		return "", err
 	}
-	if err := writer.Write(&raw); err != nil {
+	if err := navCtx.contextWriter.Write(&raw); err != nil {
 		return "", err
 	}
 
@@ -63,7 +63,7 @@ func (g *Group) Accept(upCtx *upbound.Context, writer kubeContextWriter) (msg st
 }
 
 // Accept upserts a controlplane context and cluster to the chosen kubeconfig.
-func (ctp *ControlPlane) Accept(upCtx *upbound.Context, writer kubeContextWriter) (msg string, err error) {
+func (ctp *ControlPlane) Accept(upCtx *upbound.Context, navCtx *navContext) (msg string, err error) {
 	config, err := ctp.Group.Space.buildClient(upCtx, ctp.NamespacedName())
 	if err != nil {
 		return "", err
@@ -72,7 +72,7 @@ func (ctp *ControlPlane) Accept(upCtx *upbound.Context, writer kubeContextWriter
 	if err != nil {
 		return "", err
 	}
-	if err := writer.Write(&raw); err != nil {
+	if err := navCtx.contextWriter.Write(&raw); err != nil {
 		return "", err
 	}
 

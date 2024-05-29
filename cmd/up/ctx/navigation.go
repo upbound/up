@@ -55,14 +55,14 @@ var (
 
 // NavigationState is a model state that provides a list of items for a navigation node.
 type NavigationState interface {
-	Items(ctx context.Context, upCtx *upbound.Context) ([]list.Item, error)
+	Items(ctx context.Context, upCtx *upbound.Context, navCtx *navContext) ([]list.Item, error)
 	Breadcrumbs() string
 }
 
 // Accepting is a model state that provides a method to accept a navigation node.
 type Accepting interface {
 	NavigationState
-	Accept(upCtx *upbound.Context, writer kubeContextWriter) (string, error)
+	Accept(upCtx *upbound.Context, navCtx *navContext) (string, error)
 }
 
 // Back is a model state that provides a method to go back to the parent navigation node.
@@ -99,7 +99,7 @@ var defaultBreadcrumbStyle = breadcrumbStyle{
 
 type Root struct{}
 
-func (r *Root) Items(ctx context.Context, upCtx *upbound.Context) ([]list.Item, error) { //nolint:gocyclo
+func (r *Root) Items(ctx context.Context, upCtx *upbound.Context, navCtx *navContext) ([]list.Item, error) { //nolint:gocyclo
 	cfg, err := upCtx.BuildSDKConfig()
 	if err != nil {
 		return nil, err
@@ -137,7 +137,7 @@ type Organization struct {
 	Name string
 }
 
-func (o *Organization) Items(ctx context.Context, upCtx *upbound.Context) ([]list.Item, error) { //nolint:gocyclo
+func (o *Organization) Items(ctx context.Context, upCtx *upbound.Context, navCtx *navContext) ([]list.Item, error) { //nolint:gocyclo
 	cloudCfg, err := upCtx.BuildControllerClientConfig()
 	if err != nil {
 		return nil, err
@@ -168,7 +168,7 @@ func (o *Organization) Items(ctx context.Context, upCtx *upbound.Context) ([]lis
 			}
 		}
 
-		ingress, ca, err := spaces.GetIngressFromSpace(ctx, space, upCtx.Profile.Session)
+		ingress, err := navCtx.ingressReader.Get(ctx, space)
 		if err != nil {
 			return nil, errors.New("unable to load ingress from space")
 		}
@@ -177,8 +177,7 @@ func (o *Organization) Items(ctx context.Context, upCtx *upbound.Context) ([]lis
 			m.state = &Space{
 				Org:      *o,
 				Name:     space.GetObjectMeta().GetName(),
-				Ingress:  ingress,
-				CA:       ca,
+				Ingress:  *ingress,
 				AuthInfo: authInfo,
 			}
 			return m, nil
@@ -218,8 +217,7 @@ type Space struct {
 	Org  Organization
 	Name string
 
-	Ingress  string
-	CA       []byte
+	Ingress  spaces.SpaceIngress
 	AuthInfo *clientcmdapi.AuthInfo
 
 	// HubContext is an optional field that stores which context in the
@@ -227,7 +225,7 @@ type Space struct {
 	HubContext string
 }
 
-func (s *Space) Items(ctx context.Context, upCtx *upbound.Context) ([]list.Item, error) {
+func (s *Space) Items(ctx context.Context, upCtx *upbound.Context, navCtx *navContext) ([]list.Item, error) {
 	cl, err := s.GetClient(upCtx)
 	if err != nil {
 		return nil, err
@@ -254,7 +252,7 @@ func (s *Space) Items(ctx context.Context, upCtx *upbound.Context) ([]list.Item,
 	}
 
 	items = append(items, item{text: fmt.Sprintf("Switch context to %q", s.Name), onEnter: func(m model) (model, error) {
-		msg, err := s.Accept(m.upCtx, m.contextWriter)
+		msg, err := s.Accept(m.upCtx, m.navContext)
 		if err != nil {
 			return m, err
 		}
@@ -349,12 +347,12 @@ func (s *Space) buildClient(upCtx *upbound.Context, resource types.NamespacedNam
 		} else {
 			// fall back to ingress if hub context not available
 			config.Clusters[ref] = &clientcmdapi.Cluster{
-				Server: profile.ToSpacesK8sURL(s.Ingress, resource),
+				Server: profile.ToSpacesK8sURL(s.Ingress.Host, resource),
 			}
-			if len(s.CA) == 0 {
+			if len(s.Ingress.CAData) == 0 {
 				config.Clusters[ref].InsecureSkipTLSVerify = true
 			} else {
-				config.Clusters[ref].CertificateAuthorityData = s.CA
+				config.Clusters[ref].CertificateAuthorityData = s.Ingress.CAData
 			}
 			refContext.Cluster = ref
 
@@ -369,14 +367,14 @@ func (s *Space) buildClient(upCtx *upbound.Context, resource types.NamespacedNam
 		refContext.Namespace = "default"
 
 		config.Clusters[ref] = &clientcmdapi.Cluster{
-			Server: profile.ToSpacesK8sURL(s.Ingress, resource),
+			Server: profile.ToSpacesK8sURL(s.Ingress.Host, resource),
 		}
 		refContext.Cluster = ref
 
-		if len(s.CA) == 0 {
+		if len(s.Ingress.CAData) == 0 {
 			config.Clusters[ref].InsecureSkipTLSVerify = true
 		} else {
-			config.Clusters[ref].CertificateAuthorityData = s.CA
+			config.Clusters[ref].CertificateAuthorityData = s.Ingress.CAData
 		}
 
 		if s.AuthInfo != nil {
@@ -411,7 +409,7 @@ type Group struct {
 var _ Accepting = &Group{}
 var _ Back = &Group{}
 
-func (g *Group) Items(ctx context.Context, upCtx *upbound.Context) ([]list.Item, error) {
+func (g *Group) Items(ctx context.Context, upCtx *upbound.Context, navCtx *navContext) ([]list.Item, error) {
 	cl, err := g.Space.GetClient(upCtx)
 	if err != nil {
 		return nil, err
@@ -437,7 +435,7 @@ func (g *Group) Items(ctx context.Context, upCtx *upbound.Context) ([]list.Item,
 	}
 
 	items = append(items, item{text: fmt.Sprintf("Switch context to %q", fmt.Sprintf("%s/%s", g.Space.Name, g.Name)), onEnter: func(m model) (model, error) {
-		msg, err := g.Accept(m.upCtx, m.contextWriter)
+		msg, err := g.Accept(m.upCtx, m.navContext)
 		if err != nil {
 			return m, err
 		}
@@ -476,11 +474,11 @@ type ControlPlane struct {
 var _ Accepting = &ControlPlane{}
 var _ Back = &ControlPlane{}
 
-func (ctp *ControlPlane) Items(ctx context.Context, upCtx *upbound.Context) ([]list.Item, error) {
+func (ctp *ControlPlane) Items(ctx context.Context, upCtx *upbound.Context, navCtx *navContext) ([]list.Item, error) {
 	return []list.Item{
 		item{text: "..", kind: "controlplanes", onEnter: ctp.Back, back: true},
 		item{text: fmt.Sprintf("Connect to %q and quit", ctp.NamespacedName().Name), onEnter: KeyFunc(func(m model) (model, error) {
-			msg, err := ctp.Accept(m.upCtx, m.contextWriter)
+			msg, err := ctp.Accept(m.upCtx, m.navContext)
 			if err != nil {
 				return m, err
 			}

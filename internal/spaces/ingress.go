@@ -29,41 +29,79 @@ import (
 	"github.com/upbound/up/internal/version"
 )
 
-func GetIngressFromSpace(ctx context.Context, space v1alpha1.Space, bearer string) (host string, ca []byte, err error) {
+var connectionError = errors.New("failed to connect to space through the API client")
+
+type SpaceIngress struct {
+	Host   string
+	CAData []byte
+}
+
+type IngressReader interface {
+	Get(ctx context.Context, space v1alpha1.Space) (ingress *SpaceIngress, err error)
+}
+
+var _ IngressReader = &ingressCache{}
+
+type ingressCache struct {
+	// ingresses contains a map of a space's namespaced name to its
+	// corresponding ingress configuration
+	ingresses map[types.NamespacedName]SpaceIngress
+
+	bearer string
+}
+
+func NewCachedReader(bearer string) *ingressCache {
+	return &ingressCache{
+		ingresses: make(map[types.NamespacedName]SpaceIngress),
+		bearer:    bearer,
+	}
+}
+
+func (c *ingressCache) Get(ctx context.Context, space v1alpha1.Space) (ingress *SpaceIngress, err error) {
+	nsn := types.NamespacedName{Name: space.Name, Namespace: space.Namespace}
+
+	// cache hit
+	if i, ok := c.ingresses[nsn]; ok {
+		return &i, nil
+	}
+
+	ingress = &SpaceIngress{}
 	if space.Status.APIURL == "" {
-		return "", []byte{}, errors.New("API URL not defined on space")
+		return nil, errors.New("API URL not defined on space")
 	}
 
 	cfg := &rest.Config{
 		Host:        space.Status.APIURL,
 		APIPath:     "/apis",
 		UserAgent:   version.UserAgent(),
-		BearerToken: bearer,
+		BearerToken: c.bearer,
 	}
 
 	connectClient, err := client.New(cfg, client.Options{})
 	if err != nil {
-		return "", []byte{}, errors.New("unable to construct connect client to space")
+		return nil, connectionError
 	}
 
 	var ingressPublic corev1.ConfigMap
 	if err := connectClient.Get(ctx, types.NamespacedName{Namespace: "upbound-system", Name: "ingress-public"}, &ingressPublic); err != nil {
-		return "", []byte{}, errors.Wrap(err, "failed to query public ingress configmap")
+		return nil, connectionError
 	}
 
 	var ok bool
-	if host, ok = ingressPublic.Data["ingress-host"]; !ok {
-		return "", []byte{}, errors.Wrap(err, `"ingress-host" not found in public ingress configmap`)
+	if ingress.Host, ok = ingressPublic.Data["ingress-host"]; !ok {
+		return nil, errors.Wrap(err, `"ingress-host" not found in public ingress configmap`)
 	}
 	if caString, ok := ingressPublic.Data["ingress-ca"]; !ok {
-		return "", []byte{}, errors.Wrap(err, `"ingress-ca" not found in public ingress configmap`)
+		return nil, errors.Wrap(err, `"ingress-ca" not found in public ingress configmap`)
 	} else if err = ensureCertificateAuthorityData(caString); err != nil {
-		return "", []byte{}, err
+		return nil, err
 	} else {
-		ca = []byte(caString)
+		ingress.CAData = []byte(caString)
 	}
 
-	return host, ca, err
+	c.ingresses[nsn] = *ingress
+
+	return ingress, err
 }
 
 func ensureCertificateAuthorityData(tlsCert string) error {

@@ -15,6 +15,7 @@
 package ctx
 
 import (
+	"context"
 	"fmt"
 	"testing"
 
@@ -24,6 +25,8 @@ import (
 	"k8s.io/client-go/tools/clientcmd"
 	clientcmdapi "k8s.io/client-go/tools/clientcmd/api"
 
+	"github.com/upbound/up-sdk-go/apis/upbound/v1alpha1"
+	"github.com/upbound/up/internal/spaces"
 	"github.com/upbound/up/internal/upbound"
 )
 
@@ -132,17 +135,23 @@ func TestDisconnectedGroupAccept(t *testing.T) {
 					return nil
 				},
 			}
+			navCtx := &navContext{
+				contextWriter: writer,
+				ingressReader: &mockIngressReader{},
+			}
 
 			g := &Group{
 				Space: Space{
-					Name:       "space",
-					Ingress:    "ingress",
-					CA:         []byte{1, 2, 3},
+					Name: "space",
+					Ingress: spaces.SpaceIngress{
+						Host:   "ingress",
+						CAData: []byte{1, 2, 3},
+					},
 					HubContext: "profile",
 				},
 				Name: tt.group,
 			}
-			_, err := g.Accept(upCtx, writer)
+			_, err := g.Accept(upCtx, navCtx)
 			if diff := cmp.Diff(tt.wantErr, fmt.Sprintf("%v", err)); diff != "" {
 				t.Fatalf("g.Accept(...): -want err, +got err:\n%s", diff)
 			}
@@ -262,18 +271,24 @@ func TestCloudGroupAccept(t *testing.T) {
 					return nil
 				},
 			}
+			navCtx := &navContext{
+				contextWriter: writer,
+				ingressReader: &mockIngressReader{},
+			}
 
 			g := &Group{
 				Space: Space{
-					Org:      Organization{Name: "org"},
-					Name:     "space",
-					Ingress:  "ingress",
-					CA:       []byte{1, 2, 3},
+					Org:  Organization{Name: "org"},
+					Name: "space",
+					Ingress: spaces.SpaceIngress{
+						Host:   "ingress",
+						CAData: []byte{1, 2, 3},
+					},
 					AuthInfo: &spaceAuth,
 				},
 				Name: tt.group,
 			}
-			_, err := g.Accept(upCtx, writer)
+			_, err := g.Accept(upCtx, navCtx)
 			if diff := cmp.Diff(tt.wantErr, fmt.Sprintf("%v", err)); diff != "" {
 				t.Fatalf("g.Accept(...): -want err, +got err:\n%s", diff)
 			}
@@ -451,20 +466,26 @@ func TestDisconnectedControlPlaneAccept(t *testing.T) {
 					return nil
 				},
 			}
+			navCtx := &navContext{
+				contextWriter: writer,
+				ingressReader: &mockIngressReader{},
+			}
 
 			ctp := &ControlPlane{
 				Group: Group{
 					Space: Space{
-						Name:       "space",
-						Ingress:    "ingress",
-						CA:         []byte{1, 2, 3},
+						Name: "space",
+						Ingress: spaces.SpaceIngress{
+							Host:   "ingress",
+							CAData: []byte{1, 2, 3},
+						},
 						HubContext: "profile",
 					},
 					Name: tt.ctp.Namespace,
 				},
 				Name: tt.ctp.Name,
 			}
-			_, err := ctp.Accept(upCtx, writer)
+			_, err := ctp.Accept(upCtx, navCtx)
 			if diff := cmp.Diff(tt.wantErr, fmt.Sprintf("%v", err)); diff != "" {
 				t.Fatalf("g.Accept(...): -want err, +got err:\n%s", diff)
 			}
@@ -642,21 +663,27 @@ func TestCloudControlPlaneAccept(t *testing.T) {
 					return nil
 				},
 			}
+			navCtx := &navContext{
+				contextWriter: writer,
+				ingressReader: &mockIngressReader{},
+			}
 
 			ctp := &ControlPlane{
 				Group: Group{
 					Space: Space{
-						Org:      Organization{Name: "org"},
-						Name:     "space",
-						Ingress:  "ingress",
-						CA:       []byte{1, 2, 3},
+						Org:  Organization{Name: "org"},
+						Name: "space",
+						Ingress: spaces.SpaceIngress{
+							Host:   "ingress",
+							CAData: []byte{1, 2, 3},
+						},
 						AuthInfo: tt.conf.AuthInfos[tt.conf.Contexts[tt.conf.CurrentContext].AuthInfo],
 					},
 					Name: tt.ctp.Namespace,
 				},
 				Name: tt.ctp.Name,
 			}
-			_, err := ctp.Accept(upCtx, writer)
+			_, err := ctp.Accept(upCtx, navCtx)
 			if diff := cmp.Diff(tt.wantErr, fmt.Sprintf("%v", err)); diff != "" {
 				t.Fatalf("g.Accept(...): -want err, +got err:\n%s", diff)
 			}
@@ -668,4 +695,15 @@ func TestCloudControlPlaneAccept(t *testing.T) {
 			}
 		})
 	}
+}
+
+var _ spaces.IngressReader = &mockIngressReader{}
+
+type mockIngressReader struct{}
+
+func (m *mockIngressReader) Get(ctx context.Context, space v1alpha1.Space) (ingress *spaces.SpaceIngress, err error) {
+	return &spaces.SpaceIngress{
+		Host:   "ingress",
+		CAData: []byte{1, 2, 3},
+	}, nil
 }
