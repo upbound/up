@@ -168,9 +168,18 @@ func (o *Organization) Items(ctx context.Context, upCtx *upbound.Context, navCtx
 			}
 		}
 
+		// todo(redbackthomson): Should the space still appear, even if it's
+		// unreachable? Maybe mark it with an icon and make it unselectable?
+		if space.Status.ConnectionDetails.Status == upboundv1alpha1.ConnectionStatusUnreachable {
+			continue
+		}
+
 		ingress, err := navCtx.ingressReader.Get(ctx, space)
 		if err != nil {
-			return nil, errors.New("unable to load ingress from space")
+			if errors.Is(err, spaces.SpaceConnectionError) {
+				// we found the space to be unreachable
+				continue
+			}
 		}
 
 		items = append(items, item{text: space.GetObjectMeta().GetName(), kind: "space", onEnter: func(m model) (model, error) {
