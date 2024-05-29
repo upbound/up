@@ -71,6 +71,7 @@ require (
 )
 
 require (
+	github.com/Azure/azure-sdk-for-go/sdk/resourcemanager/storage/armstorage v1.3.0 // indirect
 	github.com/Microsoft/hcsshim v0.11.4 // indirect
 	github.com/atotto/clipboard v0.1.4 // indirect
 	github.com/bahlo/generic-list-go v0.2.0 // indirect
@@ -81,6 +82,7 @@ require (
 	github.com/containerd/log v0.1.0 // indirect
 	github.com/golang-jwt/jwt/v5 v5.0.0 // indirect
 	github.com/invopop/jsonschema v0.12.0 // indirect
+	github.com/klauspost/cpuid/v2 v2.2.5 // indirect
 	github.com/klauspost/pgzip v1.2.6 // indirect
 	github.com/muesli/mango v0.1.0 // indirect
 	github.com/muesli/mango-cobra v1.2.0 // indirect
@@ -89,7 +91,6 @@ require (
 	github.com/pjbgf/sha1cd v0.3.0 // indirect
 	github.com/sahilm/fuzzy v0.1.0 // indirect
 	github.com/skeema/knownhosts v1.2.1 // indirect
-	github.com/vmware-tanzu/velero v1.13.0 // indirect
 	github.com/wk8/go-ordered-map/v2 v2.1.8 // indirect
 	gitlab.com/digitalxero/go-conventional-commit v1.0.7 // indirect
 	go.opentelemetry.io/contrib/instrumentation/google.golang.org/grpc/otelgrpc v0.47.0 // indirect
