@@ -41,9 +41,6 @@ type createCmd struct {
 		} `embed:""`
 	} `embed:"" prefix:"crossplane-"`
 
-	// todo(redbackthomson): Support all overrides for control planes
-	// ConfigurationName *string `help:"The optional name of the Configuration."`
-
 	SecretName string `help:"The name of the control plane's secret. Defaults to 'kubeconfig-{control plane name}'. Only applicable for Space control planes."`
 }
 
