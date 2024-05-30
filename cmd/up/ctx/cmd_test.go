@@ -27,6 +27,7 @@ import (
 	clientcmdapi "k8s.io/client-go/tools/clientcmd/api"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 
+	"github.com/upbound/up/internal/spaces"
 	"github.com/upbound/up/internal/upbound"
 )
 
@@ -746,10 +747,12 @@ func TestDeriveNewState(t *testing.T) {
 			},
 			getIngressHost: ingressFound,
 			want: &Space{
-				Org:        Organization{},
-				Name:       "hub",
-				Ingress:    "eu-west-1.ibm-cloud.com",
-				CA:         []byte(ingressCA),
+				Org:  Organization{},
+				Name: "hub",
+				Ingress: spaces.SpaceIngress{
+					Host:   "eu-west-1.ibm-cloud.com",
+					CAData: []byte(ingressCA),
+				},
 				HubContext: "hub",
 			},
 			wantErr: "<nil>",
@@ -838,10 +841,12 @@ func TestDeriveExistingDisconnectedState(t *testing.T) {
 			dcConfig:       buildDisconnectedExtension("hub"),
 			want: &Group{
 				Space: Space{
-					Org:        Organization{},
-					Name:       "hub",
-					Ingress:    "eu-west-1.ibm-cloud.com",
-					CA:         []byte(ingressCA),
+					Org:  Organization{},
+					Name: "hub",
+					Ingress: spaces.SpaceIngress{
+						Host:   "eu-west-1.ibm-cloud.com",
+						CAData: []byte(ingressCA),
+					},
 					HubContext: "hub",
 				},
 				Name: "group",
@@ -874,10 +879,12 @@ func TestDeriveExistingDisconnectedState(t *testing.T) {
 			want: &ControlPlane{
 				Group: Group{
 					Space: Space{
-						Org:        Organization{},
-						Name:       "hub",
-						Ingress:    "eu-west-1.ibm-cloud.com",
-						CA:         []byte(ingressCA),
+						Org:  Organization{},
+						Name: "hub",
+						Ingress: spaces.SpaceIngress{
+							Host:   "eu-west-1.ibm-cloud.com",
+							CAData: []byte(ingressCA),
+						},
 						HubContext: "hub",
 					},
 					Name: "default",
@@ -979,9 +986,11 @@ func TestDeriveExistingCloudState(t *testing.T) {
 					Org: Organization{
 						Name: "org",
 					},
-					Name:     "eu-west-1",
-					Ingress:  "eu-west-1.ibm-cloud.com",
-					CA:       []byte(ingressCA),
+					Name: "eu-west-1",
+					Ingress: spaces.SpaceIngress{
+						Host:   "eu-west-1.ibm-cloud.com",
+						CAData: []byte(ingressCA),
+					},
 					AuthInfo: authOrgExec,
 				},
 				Name: "default",
@@ -1009,9 +1018,11 @@ func TestDeriveExistingCloudState(t *testing.T) {
 					Org: Organization{
 						Name: "org",
 					},
-					Name:     "eu-west-1",
-					Ingress:  "eu-west-1.ibm-cloud.com",
-					CA:       []byte(ingressCA),
+					Name: "eu-west-1",
+					Ingress: spaces.SpaceIngress{
+						Host:   "eu-west-1.ibm-cloud.com",
+						CAData: []byte(ingressCA),
+					},
 					AuthInfo: authOrgExec,
 				},
 				Name: "group",
@@ -1040,9 +1051,11 @@ func TestDeriveExistingCloudState(t *testing.T) {
 						Org: Organization{
 							Name: "org",
 						},
-						Name:     "eu-west-1",
-						Ingress:  "eu-west-1.ibm-cloud.com",
-						CA:       []byte(ingressCA),
+						Name: "eu-west-1",
+						Ingress: spaces.SpaceIngress{
+							Host:   "eu-west-1.ibm-cloud.com",
+							CAData: []byte(ingressCA),
+						},
 						AuthInfo: authOrgExec,
 					},
 					Name: "default",

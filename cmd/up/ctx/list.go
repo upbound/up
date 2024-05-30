@@ -203,7 +203,7 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) { // nolint:gocyclo // T
 			return m, tea.Quit
 		case key.Matches(msg, quitBinding):
 			if state, ok := m.state.(Accepting); ok {
-				msg, err := state.Accept(m.upCtx, m.contextWriter)
+				msg, err := state.Accept(m.upCtx, m.navContext)
 				if err != nil {
 					m.err = err
 					return m, nil
@@ -235,7 +235,7 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) { // nolint:gocyclo // T
 				}
 				m = newState
 
-				items, err := m.state.Items(context.Background(), m.upCtx)
+				items, err := m.state.Items(context.Background(), m.upCtx, m.navContext)
 				if err != nil {
 					m.err = err
 					return m, nil

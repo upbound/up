@@ -37,6 +37,7 @@ import (
 	spacesv1beta1 "github.com/upbound/up-sdk-go/apis/spaces/v1beta1"
 	"github.com/upbound/up/internal/kube"
 	"github.com/upbound/up/internal/profile"
+	"github.com/upbound/up/internal/spaces"
 	"github.com/upbound/up/internal/upbound"
 )
 
@@ -79,6 +80,13 @@ type Termination struct {
 	Message string
 }
 
+// navContext contains the helpers and functions used when navigating through
+// the up ctx flow
+type navContext struct {
+	ingressReader spaces.IngressReader
+	contextWriter kubeContextWriter
+}
+
 type model struct {
 	windowHeight int
 	list         list.Model
@@ -88,8 +96,8 @@ type model struct {
 
 	termination *Termination
 
-	upCtx         *upbound.Context
-	contextWriter kubeContextWriter
+	upCtx      *upbound.Context
+	navContext *navContext
 }
 
 func (m model) WithTermination(msg string, err error) model {
@@ -111,18 +119,23 @@ func (c *Cmd) Run(ctx context.Context, kongCtx *kong.Context, upCtx *upbound.Con
 		return err
 	}
 
+	navCtx := &navContext{
+		ingressReader: spaces.NewCachedReader(upCtx.Profile.Session),
+		contextWriter: c.kubeContextWriter(upCtx),
+	}
+
 	// non-interactive mode via positional argument
 	switch c.Argument {
 	case "-":
-		return c.RunSwap(ctx, upCtx)
+		return c.RunSwap(ctx, upCtx, navCtx)
 	case "":
-		return c.RunInteractive(ctx, kongCtx, upCtx, initialState)
+		return c.RunInteractive(ctx, kongCtx, upCtx, navCtx, initialState)
 	default:
-		return c.RunRelative(ctx, upCtx, initialState)
+		return c.RunRelative(ctx, upCtx, navCtx, initialState)
 	}
 }
 
-func (c *Cmd) RunSwap(ctx context.Context, upCtx *upbound.Context) error { // nolint:gocyclo // TODO: shorten
+func (c *Cmd) RunSwap(ctx context.Context, upCtx *upbound.Context, navCtx *navContext) error { // nolint:gocyclo // TODO: shorten
 	last, err := readLastContext()
 	if err != nil {
 		return err
@@ -242,7 +255,7 @@ func activateContext(conf *clientcmdapi.Config, sourceContext, preferredContext 
 	return conf, newLastContext, nil
 }
 
-func (c *Cmd) RunRelative(ctx context.Context, upCtx *upbound.Context, initialState NavigationState) error { // nolint:gocyclo // a bit long but ¯\_(ツ)_/¯
+func (c *Cmd) RunRelative(ctx context.Context, upCtx *upbound.Context, navCtx *navContext, initialState NavigationState) error { // nolint:gocyclo // a bit long but ¯\_(ツ)_/¯
 	// begin from root unless we're starting from a relative . or ..
 	state := initialState
 	if !strings.HasPrefix(c.Argument, ".") {
@@ -250,9 +263,9 @@ func (c *Cmd) RunRelative(ctx context.Context, upCtx *upbound.Context, initialSt
 	}
 
 	m := model{
-		state:         state,
-		upCtx:         upCtx,
-		contextWriter: c.kubeContextWriter(upCtx),
+		state:      state,
+		upCtx:      upCtx,
+		navContext: navCtx,
 	}
 	for _, s := range strings.Split(c.Argument, "/") {
 		switch s {
@@ -269,7 +282,7 @@ func (c *Cmd) RunRelative(ctx context.Context, upCtx *upbound.Context, initialSt
 			}
 		default:
 			// find the string as item
-			items, err := m.state.Items(ctx, upCtx)
+			items, err := m.state.Items(ctx, m.upCtx, m.navContext)
 			if err != nil {
 				return err
 			}
@@ -301,7 +314,7 @@ func (c *Cmd) RunRelative(ctx context.Context, upCtx *upbound.Context, initialSt
 			return fmt.Errorf("cannot move context to: %s", m.state.Breadcrumbs())
 		}
 		var err error
-		msg, err = accepting.Accept(m.upCtx, m.contextWriter)
+		msg, err = accepting.Accept(m.upCtx, m.navContext)
 		if err != nil {
 			return err
 		}
@@ -326,14 +339,14 @@ func (c *Cmd) RunRelative(ctx context.Context, upCtx *upbound.Context, initialSt
 	return nil
 }
 
-func (c *Cmd) RunInteractive(ctx context.Context, kongCtx *kong.Context, upCtx *upbound.Context, initialState NavigationState) error {
+func (c *Cmd) RunInteractive(ctx context.Context, kongCtx *kong.Context, upCtx *upbound.Context, navCtx *navContext, initialState NavigationState) error {
 	// start interactive mode
 	m := model{
-		state:         initialState,
-		upCtx:         upCtx,
-		contextWriter: c.kubeContextWriter(upCtx),
+		state:      initialState,
+		upCtx:      upCtx,
+		navContext: navCtx,
 	}
-	items, err := m.state.Items(ctx, upCtx)
+	items, err := m.state.Items(ctx, m.upCtx, m.navContext)
 	if err != nil {
 		return err
 	}
@@ -429,9 +442,11 @@ func DeriveNewState(ctx context.Context, conf *clientcmdapi.Config, getIngressHo
 	}
 
 	return &Space{
-		Name:    conf.CurrentContext,
-		Ingress: ingress,
-		CA:      ca,
+		Name: conf.CurrentContext,
+		Ingress: spaces.SpaceIngress{
+			Host:   ingress,
+			CAData: ca,
+		},
 
 		HubContext: conf.CurrentContext,
 	}, nil
@@ -478,9 +493,11 @@ func DeriveExistingDisconnectedState(ctx context.Context, upCtx *upbound.Context
 	}
 
 	space := Space{
-		Name:    disconnected.HubContext,
-		Ingress: ingress,
-		CA:      ca,
+		Name: disconnected.HubContext,
+		Ingress: spaces.SpaceIngress{
+			Host:   ingress,
+			CAData: ca,
+		},
 
 		HubContext: disconnected.HubContext,
 	}
@@ -531,8 +548,11 @@ func DeriveExistingCloudState(upCtx *upbound.Context, conf *clientcmdapi.Config,
 		Org:  *org,
 		Name: spaceName,
 
-		Ingress:  strings.TrimPrefix(ingress, "https://"),
-		CA:       ca,
+		Ingress: spaces.SpaceIngress{
+			Host:   strings.TrimPrefix(ingress, "https://"),
+			CAData: ca,
+		},
+
 		AuthInfo: auth,
 	}
 
