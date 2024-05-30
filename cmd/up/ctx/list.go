@@ -55,13 +55,20 @@ var quitBinding = key.NewBinding(
 
 type KeyFunc func(m model) (model, error)
 
+type padding struct {
+	top    int
+	bottom int
+	left   int
+	right  int
+}
+
 type item struct {
 	text string
 	kind string
 
 	onEnter KeyFunc
 
-	padding []int
+	padding padding
 
 	matchingTerms []string
 
@@ -100,9 +107,8 @@ func (d itemDelegate) Render(w io.Writer, m list.Model, index int, listItem list
 	if index == m.Index() {
 		mainStyle = selectedItemStyle
 	}
-	if len(str.padding) > 0 {
-		mainStyle = mainStyle.Copy().Padding(str.padding...)
-	}
+	padding := str.padding
+	mainStyle = mainStyle.Copy().Padding(padding.top, padding.right, padding.bottom, padding.left)
 
 	var kind string
 	if str.kind != "" {
@@ -159,12 +165,7 @@ func (m model) ListHeight() int {
 	for _, i := range m.list.Items() {
 		itm := i.(item)
 		lines += 1 + strings.Count(itm.text, "\n")
-		switch len(itm.padding) {
-		case 1, 2:
-			lines += itm.padding[0]
-		case 3, 4:
-			lines += itm.padding[0] + itm.padding[2]
-		}
+		lines += itm.padding.top + itm.padding.bottom
 	}
 	lines += 2 // help text
 
