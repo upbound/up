@@ -72,10 +72,6 @@ type item struct {
 
 	matchingTerms []string
 
-	// emptyList denotes that the item is marking that the list is empty, and
-	// should not be considered an element in the list itself
-	emptyList bool
-
 	// back denotes that the item will return the user to the previous menu
 	back bool
 
@@ -144,16 +140,10 @@ func NewList(items []list.Item) list.Model {
 	// check for initial cursor conditions
 	if len(items) > 1 {
 		nested := items[0].(item).back
-		empty := items[1].(item).emptyList
 
-		if nested && !empty {
+		if nested {
 			// move the cursor down below the '..' button
 			l.CursorDown()
-		}
-
-		if nested && empty {
-			// disable selecting the empty list item
-			l.KeyMap.CursorDown = key.NewBinding(key.WithDisabled())
 		}
 	}
 
