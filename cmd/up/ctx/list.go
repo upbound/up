@@ -137,15 +137,14 @@ func NewList(items []list.Item) list.Model {
 	l.KeyMap.ShowFullHelp = key.NewBinding(key.WithDisabled())
 	l.KeyMap.CloseFullHelp = key.NewBinding(key.WithDisabled())
 
-	// check for initial cursor conditions
-	if len(items) > 1 {
-		nested := items[0].(item).back
-
-		if nested {
-			// move the cursor down below the '..' button
-			l.CursorDown()
+	// Try not to start on a back button or unselectable item.
+	moveCursorDownUntil(&l, func(cur list.Item) bool {
+		i, ok := cur.(item)
+		if !ok {
+			return true
 		}
-	}
+		return !i.back && !i.notSelectable
+	})
 
 	return l
 }
@@ -263,19 +262,61 @@ func (m model) moveToSelectableItem(msg tea.Msg) list.Model {
 		return m.list
 	}
 
-	for {
-		if i, ok := m.list.SelectedItem().(item); ok {
-			if !i.notSelectable {
-				break
-			}
-		}
-		switch {
-		case key.Matches(keyMsg, m.list.KeyMap.CursorUp):
-			m.list.CursorUp()
+	itemSelectable := func(cur list.Item) bool {
+		return !cur.(item).notSelectable
+	}
 
-		case key.Matches(keyMsg, m.list.KeyMap.CursorDown):
-			m.list.CursorDown()
+	switch {
+	case key.Matches(keyMsg, m.list.KeyMap.CursorUp):
+		moveCursorUpUntil(&m.list, itemSelectable)
+
+	case key.Matches(keyMsg, m.list.KeyMap.CursorDown):
+		moveCursorDownUntil(&m.list, itemSelectable)
+	}
+
+	return m.list
+}
+
+type moveCursorConditionFn func(list.Item) bool
+
+// moveCursorDownUntil moves the model's cursor down until cond returns true for
+// the selected item. If the bottom of the list is reached without cond
+// returning true, the cursor will be moved back up to the last item for which
+// cond is true. If no such items exist the first item in the list will be
+// selected.
+func moveCursorDownUntil(m *list.Model, cond moveCursorConditionFn) {
+	moveCursorUntil(m, m.CursorDown, m.CursorUp, cond, true)
+}
+
+// moveCursorUpUntil moves the model's cursor up until cond returns true for the
+// selected item. If the top of the list is reached without cond returning true,
+// the cursor will be moved back down to the first item for which cond is
+// true. If no such items exist the last item in the list will be selected.
+func moveCursorUpUntil(m *list.Model, cond moveCursorConditionFn) {
+	moveCursorUntil(m, m.CursorUp, m.CursorDown, cond, true)
+}
+
+// moveCursorUntil uses forward to move the cursor until cond is true. If the
+// cursor reaches the first or last item, and bounce is true, backward will be
+// used to move back until cond is true or the other end of the list is reached.
+//
+// Most callers will want to use the wrappers moveCursorDownUntil or
+// moveCursorUpUntil.
+func moveCursorUntil(m *list.Model, forward, backward func(), cond moveCursorConditionFn, bounce bool) {
+	for {
+		selected := m.SelectedItem()
+		if cond(selected) {
+			break
+		}
+
+		before := m.Index()
+		forward()
+		// If we're at the top or bottom, and want to bounce, move the other way.
+		if m.Index() == before {
+			if bounce {
+				moveCursorUntil(m, backward, forward, cond, false)
+			}
+			break
 		}
 	}
-	return m.list
 }
