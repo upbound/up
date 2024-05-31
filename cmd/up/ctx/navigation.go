@@ -210,7 +210,7 @@ func (d *Disconnected) Items(ctx context.Context, upCtx *upbound.Context, navCtx
 }
 
 func (d *Disconnected) breadcrumbs(styles breadcrumbStyle) string {
-	return upboundRootStyle.Render("Upbound ") + styles.previousLevel.Render("disconnected/")
+	return upboundRootStyle.Render("Upbound ") + styles.currentLevel.Render("disconnected/")
 }
 
 func (d *Disconnected) Breadcrumbs() string {
@@ -301,7 +301,7 @@ func (o *Organization) BackLabel() string {
 }
 
 func (o *Organization) breadcrumbs(styles breadcrumbStyle) string {
-	return upboundRootStyle.Render("Upbound ") + styles.previousLevel.Render(fmt.Sprintf("%s/", o.Name))
+	return upboundRootStyle.Render("Upbound ") + styles.currentLevel.Render(fmt.Sprintf("%s/", o.Name))
 }
 
 func (o *Organization) Breadcrumbs() string {
@@ -386,12 +386,12 @@ func (s *Space) breadcrumbs(styles breadcrumbStyle) string {
 		return s.Org.breadcrumbs(breadcrumbStyle{
 			currentLevel:  styles.previousLevel,
 			previousLevel: styles.previousLevel,
-		}) + styles.previousLevel.Render(fmt.Sprintf("%s/", s.Name))
+		}) + styles.currentLevel.Render(fmt.Sprintf("%s/", s.Name))
 	} else {
 		return (&Disconnected{}).breadcrumbs(breadcrumbStyle{
 			currentLevel:  styles.previousLevel,
 			previousLevel: styles.previousLevel,
-		}) + styles.previousLevel.Render(fmt.Sprintf("%s/", s.Name))
+		}) + styles.currentLevel.Render(fmt.Sprintf("%s/", s.Name))
 	}
 }
 
@@ -562,7 +562,7 @@ func (g *Group) breadcrumbs(styles breadcrumbStyle) string {
 	return g.Space.breadcrumbs(breadcrumbStyle{
 		currentLevel:  styles.previousLevel,
 		previousLevel: styles.previousLevel,
-	}) + styles.previousLevel.Render(fmt.Sprintf("%s/", g.Name))
+	}) + styles.currentLevel.Render(fmt.Sprintf("%s/", g.Name))
 }
 
 func (g *Group) Breadcrumbs() string {
@@ -603,9 +603,9 @@ func (ctp *ControlPlane) Items(ctx context.Context, upCtx *upbound.Context, navC
 func (ctp *ControlPlane) breadcrumbs(styles breadcrumbStyle) string {
 	// use current level to highlight the entire breadcrumb chain
 	return ctp.Group.breadcrumbs(breadcrumbStyle{
-		currentLevel:  styles.currentLevel,
-		previousLevel: styles.currentLevel,
-	}) + pathSegmentStyle.Render(ctp.Name)
+		currentLevel:  styles.previousLevel,
+		previousLevel: styles.previousLevel,
+	}) + styles.currentLevel.Render(ctp.Name)
 }
 
 func (ctp *ControlPlane) Breadcrumbs() string {
