@@ -46,6 +46,7 @@ require (
 	google.golang.org/api v0.164.0
 	gopkg.in/yaml.v2 v2.4.0
 	gopkg.in/yaml.v3 v3.0.1
+	gotest.tools/v3 v3.5.1
 	helm.sh/helm/v3 v3.12.0
 	k8s.io/api v0.29.1
 	k8s.io/apiextensions-apiserver v0.29.1

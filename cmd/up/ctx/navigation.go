@@ -16,6 +16,7 @@ package ctx
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"os"
 	"os/exec"
@@ -23,7 +24,6 @@ import (
 
 	"github.com/charmbracelet/bubbles/list"
 	"github.com/charmbracelet/lipgloss"
-	"github.com/pkg/errors"
 	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/types"
@@ -69,7 +69,7 @@ type Accepting interface {
 type Back interface {
 	NavigationState
 	Back(m model) (model, error)
-	CanBack() bool
+	BackLabel() string
 }
 
 type AcceptingFunc func(ctx context.Context, upCtx *upbound.Context) error
@@ -99,7 +99,7 @@ var defaultBreadcrumbStyle = breadcrumbStyle{
 
 type Root struct{}
 
-func (r *Root) Items(ctx context.Context, upCtx *upbound.Context, navCtx *navContext) ([]list.Item, error) { //nolint:gocyclo
+func (r *Root) Items(ctx context.Context, upCtx *upbound.Context, navCtx *navContext) ([]list.Item, error) {
 	cfg, err := upCtx.BuildSDKConfig()
 	if err != nil {
 		return nil, err
@@ -107,20 +107,38 @@ func (r *Root) Items(ctx context.Context, upCtx *upbound.Context, navCtx *navCon
 
 	client := organizations.NewClient(cfg)
 
+	items := make([]list.Item, 0, 1)
+
 	orgs, err := client.List(ctx)
 	if err != nil {
-		return nil, errors.Wrap(err, "error listing organizations")
+		// We want `up ctx` to be usable for disconnected spaces even if the
+		// user isn't logged in or can't connect to Upbound. Return a friendly
+		// message instead of an error.
+		items = append(items, item{ //nolint:nilerr
+			text:          "Could not list Upbound organizations; are you logged in?",
+			notSelectable: true,
+		})
 	}
 
-	items := make([]list.Item, 0, len(orgs))
 	for _, org := range orgs {
 		items = append(items, item{text: org.DisplayName, kind: "organization", matchingTerms: []string{org.Name}, onEnter: func(m model) (model, error) {
 			m.state = &Organization{Name: org.Name}
 			return m, nil
 		}})
 	}
+
 	sort.Sort(sortedItems(items))
-	return items, nil
+	return append(items, item{
+		text: "Disconnected Spaces",
+		onEnter: func(m model) (model, error) {
+			m.state = &Disconnected{}
+			return m, nil
+		},
+		padding: padding{
+			top: 1,
+		},
+		matchingTerms: []string{"disconnected"},
+	}), nil
 }
 
 func (r *Root) breadcrumbs() string {
@@ -129,6 +147,83 @@ func (r *Root) breadcrumbs() string {
 
 func (r *Root) Breadcrumbs() string {
 	return r.breadcrumbs()
+}
+
+type Disconnected struct{}
+
+func (d *Disconnected) Items(ctx context.Context, upCtx *upbound.Context, navCtx *navContext) ([]list.Item, error) {
+	kubeconfig, err := upCtx.Kubecfg.RawConfig()
+	if err != nil {
+		return nil, err
+	}
+
+	items := make([]list.Item, 0, 1)
+	items = append(items, item{text: "..", kind: d.BackLabel(), onEnter: d.Back, back: true})
+
+	for name, kubectx := range kubeconfig.Contexts {
+		spacesExt, err := upbound.GetSpaceExtension(kubectx)
+		if err != nil {
+			continue
+		}
+		if spacesExt != nil {
+			// This is an up-managed context, which means it's either a cloud
+			// Space, or a disconnected Space represented by some other
+			// kubeconfig context, which we'll find later.
+			continue
+		}
+
+		// If the context points at a Space, it will have a ConfigMap containing
+		// the Space's ingress information. If we can't fetch the ConfigMap for
+		// any reason, assume the context isn't a Space.
+
+		rest, err := clientcmd.NewDefaultClientConfig(kubeconfig, &clientcmd.ConfigOverrides{
+			CurrentContext: name,
+		}).ClientConfig()
+		if err != nil {
+			continue
+		}
+
+		cl, err := client.New(rest, client.Options{})
+		if err != nil {
+			continue
+		}
+
+		ingressHost, ingressCA, err := profile.GetIngressHost(ctx, cl)
+		if err != nil {
+			continue
+		}
+
+		items = append(items, item{text: name, kind: "space", onEnter: func(m model) (model, error) {
+			m.state = &Space{
+				Name: name,
+				Ingress: spaces.SpaceIngress{
+					Host:   ingressHost,
+					CAData: ingressCA,
+				},
+				HubContext: name,
+			}
+			return m, nil
+		}})
+	}
+
+	return items, nil
+}
+
+func (d *Disconnected) breadcrumbs(styles breadcrumbStyle) string {
+	return upboundRootStyle.Render("Upbound ") + styles.currentLevel.Render("disconnected/")
+}
+
+func (d *Disconnected) Breadcrumbs() string {
+	return d.breadcrumbs(defaultBreadcrumbStyle)
+}
+
+func (d *Disconnected) Back(m model) (model, error) {
+	m.state = &Root{}
+	return m, nil
+}
+
+func (d *Disconnected) BackLabel() string {
+	return "home"
 }
 
 var _ Back = &Organization{}
@@ -160,7 +255,7 @@ func (o *Organization) Items(ctx context.Context, upCtx *upbound.Context, navCtx
 	}
 
 	items := make([]list.Item, 0)
-	items = append(items, item{text: "..", kind: "organizations", onEnter: o.Back, back: true})
+	items = append(items, item{text: "..", kind: o.BackLabel(), onEnter: o.Back, back: true})
 	for _, space := range l.Items {
 		if mode, ok := space.ObjectMeta.Labels[upboundv1alpha1.SpaceModeLabelKey]; ok {
 			if mode == string(upboundv1alpha1.ModeLegacy) {
@@ -201,12 +296,12 @@ func (o *Organization) Back(m model) (model, error) {
 	return m, nil
 }
 
-func (o *Organization) CanBack() bool {
-	return true
+func (o *Organization) BackLabel() string {
+	return "home"
 }
 
 func (o *Organization) breadcrumbs(styles breadcrumbStyle) string {
-	return upboundRootStyle.Render("Upbound ") + styles.previousLevel.Render(fmt.Sprintf("%s/", o.Name))
+	return upboundRootStyle.Render("Upbound ") + styles.currentLevel.Render(fmt.Sprintf("%s/", o.Name))
 }
 
 func (o *Organization) Breadcrumbs() string {
@@ -246,9 +341,7 @@ func (s *Space) Items(ctx context.Context, upCtx *upbound.Context, navCtx *navCo
 	}
 
 	items := make([]list.Item, 0, len(nss.Items)+3)
-	if s.CanBack() {
-		items = append(items, item{text: "..", kind: "spaces", onEnter: s.Back, back: true})
-	}
+	items = append(items, item{text: "..", kind: s.BackLabel(), onEnter: s.Back, back: true})
 	for _, ns := range nss.Items {
 		items = append(items, item{text: ns.Name, kind: "group", onEnter: func(m model) (model, error) {
 			m.state = &Group{Space: *s, Name: ns.Name}
@@ -272,23 +365,34 @@ func (s *Space) Items(ctx context.Context, upCtx *upbound.Context, navCtx *navCo
 }
 
 func (s *Space) Back(m model) (model, error) {
-	m.state = &s.Org
+	if s.IsCloud() {
+		m.state = &s.Org
+	} else {
+		m.state = &Disconnected{}
+	}
 	return m, nil
+}
+
+func (s *Space) BackLabel() string {
+	return "spaces"
 }
 
 func (s *Space) IsCloud() bool {
 	return s.Org.Name != ""
 }
 
-func (s *Space) CanBack() bool {
-	return s.IsCloud()
-}
-
 func (s *Space) breadcrumbs(styles breadcrumbStyle) string {
-	return s.Org.breadcrumbs(breadcrumbStyle{
-		currentLevel:  styles.previousLevel,
-		previousLevel: styles.previousLevel,
-	}) + styles.previousLevel.Render(fmt.Sprintf("%s/", s.Name))
+	if s.IsCloud() {
+		return s.Org.breadcrumbs(breadcrumbStyle{
+			currentLevel:  styles.previousLevel,
+			previousLevel: styles.previousLevel,
+		}) + styles.currentLevel.Render(fmt.Sprintf("%s/", s.Name))
+	} else {
+		return (&Disconnected{}).breadcrumbs(breadcrumbStyle{
+			currentLevel:  styles.previousLevel,
+			previousLevel: styles.previousLevel,
+		}) + styles.currentLevel.Render(fmt.Sprintf("%s/", s.Name))
+	}
 }
 
 func (s *Space) Breadcrumbs() string {
@@ -430,7 +534,7 @@ func (g *Group) Items(ctx context.Context, upCtx *upbound.Context, navCtx *navCo
 	}
 
 	items := make([]list.Item, 0, len(ctps.Items)+3)
-	items = append(items, item{text: "..", kind: "groups", onEnter: g.Back, back: true})
+	items = append(items, item{text: "..", kind: g.BackLabel(), onEnter: g.Back, back: true})
 
 	for _, ctp := range ctps.Items {
 		items = append(items, item{text: ctp.Name, kind: "controlplane", onEnter: func(m model) (model, error) {
@@ -458,7 +562,7 @@ func (g *Group) breadcrumbs(styles breadcrumbStyle) string {
 	return g.Space.breadcrumbs(breadcrumbStyle{
 		currentLevel:  styles.previousLevel,
 		previousLevel: styles.previousLevel,
-	}) + styles.previousLevel.Render(fmt.Sprintf("%s/", g.Name))
+	}) + styles.currentLevel.Render(fmt.Sprintf("%s/", g.Name))
 }
 
 func (g *Group) Breadcrumbs() string {
@@ -470,8 +574,8 @@ func (g *Group) Back(m model) (model, error) {
 	return m, nil
 }
 
-func (g *Group) CanBack() bool {
-	return true
+func (g *Group) BackLabel() string {
+	return "groups"
 }
 
 // ControlPlane provides the navigation node for a concrete controlplane.
@@ -485,7 +589,7 @@ var _ Back = &ControlPlane{}
 
 func (ctp *ControlPlane) Items(ctx context.Context, upCtx *upbound.Context, navCtx *navContext) ([]list.Item, error) {
 	return []list.Item{
-		item{text: "..", kind: "controlplanes", onEnter: ctp.Back, back: true},
+		item{text: "..", kind: ctp.BackLabel(), onEnter: ctp.Back, back: true},
 		item{text: fmt.Sprintf("Connect to %q and quit", ctp.NamespacedName().Name), onEnter: KeyFunc(func(m model) (model, error) {
 			msg, err := ctp.Accept(m.upCtx, m.navContext)
 			if err != nil {
@@ -499,9 +603,9 @@ func (ctp *ControlPlane) Items(ctx context.Context, upCtx *upbound.Context, navC
 func (ctp *ControlPlane) breadcrumbs(styles breadcrumbStyle) string {
 	// use current level to highlight the entire breadcrumb chain
 	return ctp.Group.breadcrumbs(breadcrumbStyle{
-		currentLevel:  styles.currentLevel,
-		previousLevel: styles.currentLevel,
-	}) + pathSegmentStyle.Render(ctp.Name)
+		currentLevel:  styles.previousLevel,
+		previousLevel: styles.previousLevel,
+	}) + styles.currentLevel.Render(ctp.Name)
 }
 
 func (ctp *ControlPlane) Breadcrumbs() string {
@@ -513,8 +617,8 @@ func (ctp *ControlPlane) Back(m model) (model, error) {
 	return m, nil
 }
 
-func (ctp *ControlPlane) CanBack() bool {
-	return true
+func (ctp *ControlPlane) BackLabel() string {
+	return "controlplanes"
 }
 
 func (ctp *ControlPlane) NamespacedName() types.NamespacedName {
