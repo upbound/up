@@ -44,6 +44,7 @@ import (
 var (
 	upboundBrandColor = lipgloss.AdaptiveColor{Light: "#5e3ba5", Dark: "#af7efd"}
 	neutralColor      = lipgloss.AdaptiveColor{Light: "#4e5165", Dark: "#9a9ca7"}
+	dimColor          = lipgloss.AdaptiveColor{Light: "#9B9B9B", Dark: "#5C5C5C"}
 )
 
 var (
