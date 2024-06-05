@@ -287,6 +287,9 @@ func (o *Organization) Items(ctx context.Context, upCtx *upbound.Context, navCtx
 
 	items := make([]list.Item, 0)
 	items = append(items, item{text: "..", kind: o.BackLabel(), onEnter: o.Back, back: true})
+
+	var wg sync.WaitGroup
+	var mu sync.Mutex
 	for _, space := range l.Items {
 		if mode, ok := space.ObjectMeta.Labels[upboundv1alpha1.SpaceModeLabelKey]; ok {
 			if mode == string(upboundv1alpha1.ModeLegacy) {
@@ -300,24 +303,33 @@ func (o *Organization) Items(ctx context.Context, upCtx *upbound.Context, navCtx
 			continue
 		}
 
-		ingress, err := navCtx.ingressReader.Get(ctx, space)
-		if err != nil {
-			if errors.Is(err, spaces.SpaceConnectionError) {
-				// we found the space to be unreachable
-				continue
+		wg.Add(1)
+		go func(space upboundv1alpha1.Space) {
+			defer wg.Done()
+			ingress, err := navCtx.ingressReader.Get(ctx, space)
+			if err != nil {
+				if errors.Is(err, spaces.SpaceConnectionError) {
+					// we found the space to be unreachable
+					return
+				}
 			}
-		}
 
-		items = append(items, item{text: space.GetObjectMeta().GetName(), kind: "space", onEnter: func(m model) (model, error) {
-			m.state = &Space{
-				Org:      *o,
-				Name:     space.GetObjectMeta().GetName(),
-				Ingress:  *ingress,
-				AuthInfo: authInfo,
-			}
-			return m, nil
-		}})
+			mu.Lock()
+			items = append(items, item{text: space.GetObjectMeta().GetName(), kind: "space", onEnter: func(m model) (model, error) {
+				m.state = &Space{
+					Org:      *o,
+					Name:     space.GetObjectMeta().GetName(),
+					Ingress:  *ingress,
+					AuthInfo: authInfo,
+				}
+				return m, nil
+			}})
+			mu.Unlock()
+		}(space)
 	}
+
+	wg.Wait()
+
 	sort.Sort(sortedItems(items))
 	return items, nil
 }
