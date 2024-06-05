@@ -545,7 +545,7 @@ func (g *Group) Items(ctx context.Context, upCtx *upbound.Context, navCtx *navCo
 	}
 
 	if len(ctps.Items) == 0 {
-		items = append(items, item{text: fmt.Sprintf("No control planes found in the %q group", g.Name), notSelectable: true})
+		items = append(items, item{text: fmt.Sprintf("No control planes found in group %q", g.Name), notSelectable: true})
 	}
 
 	items = append(items, item{text: fmt.Sprintf("Switch context to %q", fmt.Sprintf("%s/%s", g.Space.Name, g.Name)), onEnter: func(m model) (model, error) {
