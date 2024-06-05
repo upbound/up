@@ -21,12 +21,16 @@ import (
 	"os"
 	"os/exec"
 	"sort"
+	"sync"
+	"time"
 
 	"github.com/charmbracelet/bubbles/list"
 	"github.com/charmbracelet/lipgloss"
 	corev1 "k8s.io/api/core/v1"
+	kerrors "k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/types"
+	corev1client "k8s.io/client-go/kubernetes/typed/core/v1"
 	"k8s.io/client-go/tools/clientcmd"
 	clientcmdapi "k8s.io/client-go/tools/clientcmd/api"
 	"k8s.io/utils/ptr"
@@ -161,53 +165,79 @@ func (d *Disconnected) Items(ctx context.Context, upCtx *upbound.Context, navCtx
 	items := make([]list.Item, 0, 1)
 	items = append(items, item{text: "..", kind: d.BackLabel(), onEnter: d.Back, back: true})
 
-	for name, kubectx := range kubeconfig.Contexts {
-		spacesExt, err := upbound.GetSpaceExtension(kubectx)
-		if err != nil {
-			continue
-		}
-		if spacesExt != nil {
-			// This is an up-managed context, which means it's either a cloud
-			// Space, or a disconnected Space represented by some other
-			// kubeconfig context, which we'll find later.
-			continue
-		}
-
-		// If the context points at a Space, it will have a ConfigMap containing
-		// the Space's ingress information. If we can't fetch the ConfigMap for
-		// any reason, assume the context isn't a Space.
-
-		rest, err := clientcmd.NewDefaultClientConfig(kubeconfig, &clientcmd.ConfigOverrides{
-			CurrentContext: name,
-		}).ClientConfig()
-		if err != nil {
-			continue
-		}
-
-		cl, err := client.New(rest, client.Options{})
-		if err != nil {
-			continue
-		}
-
-		ingressHost, ingressCA, err := profile.GetIngressHost(ctx, cl)
-		if err != nil {
-			continue
-		}
-
-		items = append(items, item{text: name, kind: "space", onEnter: func(m model) (model, error) {
-			m.state = &Space{
-				Name: name,
-				Ingress: spaces.SpaceIngress{
-					Host:   ingressHost,
-					CAData: ingressCA,
-				},
-				HubContext: name,
+	var wg sync.WaitGroup
+	var mu sync.Mutex
+	for name := range kubeconfig.Contexts {
+		wg.Add(1)
+		go func(name string) {
+			defer wg.Done()
+			itm, err := spaceItemFromKubeContext(ctx, kubeconfig, name)
+			if err != nil || itm == nil {
+				// Context is not a Space, or we can't tell due to an error.
+				return
 			}
-			return m, nil
-		}})
+
+			mu.Lock()
+			items = append(items, itm)
+			mu.Unlock()
+		}(name)
+	}
+	wg.Wait()
+
+	sort.Sort(sortedItems(items))
+	return items, nil
+}
+
+func spaceItemFromKubeContext(ctx context.Context, kubeconfig clientcmdapi.Config, ctxName string) (list.Item, error) {
+	kubectx := kubeconfig.Contexts[ctxName]
+	spacesExt, err := upbound.GetSpaceExtension(kubectx)
+	if err != nil {
+		return nil, err
+	}
+	if spacesExt != nil {
+		// This is an up-managed context, which means it's either a cloud
+		// Space, or a disconnected Space represented by some other
+		// kubeconfig context, which we'll find later.
+		return nil, nil
 	}
 
-	return items, nil
+	// If the context points at a Space, it will have a ConfigMap containing
+	// the Space's ingress information. If we can't fetch the ConfigMap for
+	// any reason, assume the context isn't a Space.
+
+	rest, err := clientcmd.NewDefaultClientConfig(kubeconfig, &clientcmd.ConfigOverrides{
+		CurrentContext: ctxName,
+	}).ClientConfig()
+	if err != nil {
+		return nil, err
+	}
+
+	cl, err := corev1client.NewForConfig(rest)
+	if err != nil {
+		return nil, err
+	}
+
+	reqCtx, cancel := context.WithTimeout(ctx, 2*time.Second)
+	defer cancel()
+	ingressHost, ingressCA, err := profile.GetIngressHost(reqCtx, cl)
+	if err != nil {
+		if kerrors.IsNotFound(err) {
+			return nil, nil
+		}
+		return nil, err
+	}
+
+	return item{text: ctxName, kind: "space", onEnter: func(m model) (model, error) {
+		m.state = &Space{
+			Name: ctxName,
+			Ingress: spaces.SpaceIngress{
+				Host:   ingressHost,
+				CAData: ingressCA,
+			},
+			HubContext: ctxName,
+		}
+		return m, nil
+	}}, nil
 }
 
 func (d *Disconnected) breadcrumbs(styles breadcrumbStyle) string {

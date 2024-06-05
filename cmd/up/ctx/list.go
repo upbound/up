@@ -22,6 +22,7 @@ import (
 
 	"github.com/charmbracelet/bubbles/key"
 	"github.com/charmbracelet/bubbles/list"
+	"github.com/charmbracelet/bubbles/spinner"
 	tea "github.com/charmbracelet/bubbletea"
 	"github.com/charmbracelet/lipgloss"
 	"k8s.io/apimachinery/pkg/util/sets"
@@ -124,7 +125,9 @@ func (d itemDelegate) Render(w io.Writer, m list.Model, index int, listItem list
 func NewList(items []list.Item) list.Model {
 	l := list.New(items, itemDelegate{}, 80, 3)
 
-	l.SetShowTitle(false)
+	l.SetShowTitle(true)
+	l.Styles.Title = lipgloss.NewStyle()
+	l.SetSpinner(spinner.MiniDot)
 	l.SetShowHelp(true)
 	l.SetShowStatusBar(false)
 	l.SetFilteringEnabled(false)
@@ -154,7 +157,7 @@ func NewList(items []list.Item) list.Model {
 }
 
 func (m model) ListHeight() int {
-	lines := 0
+	lines := 2 // title bar
 	for _, i := range m.list.Items() {
 		itm := i.(item)
 		lines += 1 + strings.Count(itm.text, "\n")
@@ -170,12 +173,14 @@ func (m model) View() string {
 		return ""
 	}
 
+	m.list.Title = m.state.Breadcrumbs()
 	l := m.list.View()
+
 	if m.err != nil {
-		return fmt.Sprintf("%s\n\n%s\nError: %v", m.state.Breadcrumbs(), l, m.err)
+		return fmt.Sprintf("%s\nError: %v", l, m.err)
 	}
 
-	return fmt.Sprintf("%s\n\n%s", m.state.Breadcrumbs(), l)
+	return l
 }
 
 func (m model) Init() tea.Cmd {
@@ -206,47 +211,25 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) { // nolint:gocyclo // T
 			}
 
 		case key.Matches(msg, selectNavBinding):
-			fallthrough
+			if i, ok := m.list.SelectedItem().(item); ok {
+				// Disable keys and run the spinner while the state updates.
+				m.list.KeyMap = list.KeyMap{}
+				return m, tea.Sequence(m.list.StartSpinner(), m.updateListState(i.onEnter))
+			}
+
 		case key.Matches(msg, backNavBinding):
-			var fn KeyFunc
-			switch {
-			case key.Matches(msg, backNavBinding):
-				if state, ok := m.state.(Back); ok {
-					fn = state.Back
-				}
-			case key.Matches(msg, selectNavBinding):
-				if i, ok := m.list.SelectedItem().(item); ok {
-					fn = i.onEnter
-				}
+			if state, ok := m.state.(Back); ok {
+				// Disable keys and run the spinner while the state updates.
+				m.list.KeyMap = list.KeyMap{}
+				return m, tea.Sequence(m.list.StartSpinner(), m.updateListState(state.Back))
 			}
-			if fn != nil {
-				newState, err := fn(m)
-				if err != nil {
-					m.err = err
-					return m, nil
-				}
-				m = newState
+		}
 
-				items, err := m.state.Items(context.Background(), m.upCtx, m.navContext)
-				if err != nil {
-					m.err = err
-					return m, nil
-				}
-
-				// recreate the list to reset the cursor position
-				m.list = NewList(items)
-				m.list.SetHeight(min(m.windowHeight-2, m.ListHeight()))
-				if _, ok := m.state.(Accepting); ok {
-					m.list.KeyMap.Quit = quitBinding
-				} else {
-					m.list.KeyMap.Quit = key.NewBinding(key.WithDisabled())
-				}
-
-				if m.termination != nil {
-					return m, tea.Quit
-				}
-			}
-			return m, nil
+	case model:
+		m = msg
+		m.list.StopSpinner()
+		if m.termination != nil {
+			return m, tea.Quit
 		}
 	}
 
@@ -256,6 +239,33 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) { // nolint:gocyclo // T
 	m.list = m.moveToSelectableItem(msg)
 
 	return m, cmd
+}
+
+func (m model) updateListState(fn KeyFunc) func() tea.Msg {
+	return func() tea.Msg {
+		newState, err := fn(m)
+		if err != nil {
+			m.err = err
+			return nil
+		}
+		m = newState
+
+		items, err := m.state.Items(context.Background(), m.upCtx, m.navContext)
+		m.err = err
+
+		// recreate the list to reset the cursor position
+		if items != nil {
+			m.list = NewList(items)
+			m.list.SetHeight(min(m.windowHeight-2, m.ListHeight()))
+			if _, ok := m.state.(Accepting); ok {
+				m.list.KeyMap.Quit = quitBinding
+			} else {
+				m.list.KeyMap.Quit = key.NewBinding(key.WithDisabled())
+			}
+		}
+
+		return m
+	}
 }
 
 func (m model) moveToSelectableItem(msg tea.Msg) list.Model {
