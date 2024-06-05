@@ -30,6 +30,7 @@ import (
 	kerrors "k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/types"
+	corev1client "k8s.io/client-go/kubernetes/typed/core/v1"
 	"k8s.io/client-go/tools/clientcmd"
 	clientcmdapi "k8s.io/client-go/tools/clientcmd/api"
 	"k8s.io/utils/ptr"
@@ -210,7 +211,7 @@ func spaceItemFromKubeContext(ctx context.Context, kubeconfig clientcmdapi.Confi
 		return nil, err
 	}
 
-	cl, err := client.New(rest, client.Options{})
+	cl, err := corev1client.NewForConfig(rest)
 	if err != nil {
 		return nil, err
 	}

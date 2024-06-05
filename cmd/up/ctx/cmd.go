@@ -28,10 +28,10 @@ import (
 	"k8s.io/apimachinery/pkg/types"
 	kruntime "k8s.io/apimachinery/pkg/util/runtime"
 	"k8s.io/client-go/kubernetes/scheme"
+	corev1client "k8s.io/client-go/kubernetes/typed/core/v1"
 	"k8s.io/client-go/tools/clientcmd"
 	clientcmdapi "k8s.io/client-go/tools/clientcmd/api"
 	ctrl "sigs.k8s.io/controller-runtime"
-	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/log/zap"
 
 	spacesv1beta1 "github.com/upbound/up-sdk-go/apis/spaces/v1beta1"
@@ -386,7 +386,7 @@ func (c *Cmd) kubeContextWriter(upCtx *upbound.Context) kubeContextWriter {
 	}
 }
 
-type getIngressHostFn func(ctx context.Context, cl client.Client) (host string, ca []byte, err error)
+type getIngressHostFn func(ctx context.Context, cl corev1client.ConfigMapsGetter) (host string, ca []byte, err error)
 
 // DeriveState returns the navigation state based on the current context set in
 // the given kubeconfig
@@ -430,7 +430,7 @@ func DeriveNewState(ctx context.Context, conf *clientcmdapi.Config, getIngressHo
 		return &Root{}, nil // nolint:nilerr
 	}
 
-	cl, err := client.New(rest, client.Options{})
+	cl, err := corev1client.NewForConfig(rest)
 	if err != nil {
 		return &Root{}, nil // nolint:nilerr
 	}
@@ -480,7 +480,7 @@ func DeriveExistingDisconnectedState(ctx context.Context, upCtx *upbound.Context
 			return &Root{}, nil // nolint:nilerr
 		}
 
-		cl, err := client.New(rest, client.Options{})
+		cl, err := corev1client.NewForConfig(rest)
 		if err != nil {
 			return &Root{}, nil // nolint:nilerr
 		}
