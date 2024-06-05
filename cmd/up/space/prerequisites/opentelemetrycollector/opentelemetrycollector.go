@@ -18,12 +18,14 @@ import (
 	"context"
 	"fmt"
 	"net/url"
+	"time"
 
 	"github.com/crossplane/crossplane-runtime/pkg/errors"
 	corev1 "k8s.io/api/core/v1"
 	apixv1client "k8s.io/apiextensions-apiserver/pkg/client/clientset/clientset/typed/apiextensions/v1"
 	kerrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/util/wait"
 	"k8s.io/client-go/kubernetes"
 	"k8s.io/client-go/rest"
 
@@ -117,7 +119,33 @@ func (o *OpenTelemetryCollectorOperator) Install() error {
 		return errors.Wrap(err, fmt.Sprintf(errFmtCreateNamespace, chartName))
 	}
 
-	return o.mgr.Install(version, values)
+	if err = o.mgr.Install(version, values); err != nil {
+		return err
+	}
+
+	// wait until the operator pod is ready because Spaces
+	// OpenTelemetryCollector needs the mutating webhook to be ready
+	// to not fail the installation.
+	return o.waitUntilReady()
+}
+
+// waitUntilReady waits until the opentelemetry-operator pod is ready, or
+// until the timeout.
+func (o *OpenTelemetryCollectorOperator) waitUntilReady() error {
+	return errors.Wrap(wait.PollUntilContextTimeout(context.Background(), 2*time.Second, 30*time.Second, true, func(ctx context.Context) (bool, error) {
+		pods, err := o.kclient.CoreV1().Pods(chartName).List(ctx, metav1.ListOptions{
+			LabelSelector: "app.kubernetes.io/name=opentelemetry-operator",
+		})
+		if err != nil || pods == nil || len(pods.Items) != 1 {
+			return false, err
+		}
+		for _, condition := range pods.Items[0].Status.Conditions {
+			if condition.Type == corev1.PodReady && condition.Status == corev1.ConditionTrue {
+				return true, nil
+			}
+		}
+		return false, nil
+	}), "failed to wait for opentelemetry-operator pod to be ready")
 }
 
 // IsInstalled checks if opentelemetry operator has been installed in the target cluster.
