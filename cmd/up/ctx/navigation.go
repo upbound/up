@@ -21,6 +21,7 @@ import (
 	"os"
 	"os/exec"
 	"sort"
+	"sync"
 	"time"
 
 	"github.com/charmbracelet/bubbles/list"
@@ -162,15 +163,24 @@ func (d *Disconnected) Items(ctx context.Context, upCtx *upbound.Context, navCtx
 	items := make([]list.Item, 0, 1)
 	items = append(items, item{text: "..", kind: d.BackLabel(), onEnter: d.Back, back: true})
 
+	var wg sync.WaitGroup
+	var mu sync.Mutex
 	for name := range kubeconfig.Contexts {
-		itm, err := spaceItemFromKubeContext(ctx, kubeconfig, name)
-		if err != nil || itm == nil {
-			// Context is not a Space, or we can't tell due to an error.
-			continue
-		}
+		wg.Add(1)
+		go func(name string) {
+			defer wg.Done()
+			itm, err := spaceItemFromKubeContext(ctx, kubeconfig, name)
+			if err != nil || itm == nil {
+				// Context is not a Space, or we can't tell due to an error.
+				return
+			}
 
-		items = append(items, itm)
+			mu.Lock()
+			items = append(items, itm)
+			mu.Unlock()
+		}(name)
 	}
+	wg.Wait()
 
 	sort.Sort(sortedItems(items))
 	return items, nil
