@@ -28,9 +28,10 @@ import (
 )
 
 var (
-	itemStyle         = lipgloss.NewStyle()
-	kindStyle         = lipgloss.NewStyle().Foreground(neutralColor)
-	selectedItemStyle = lipgloss.NewStyle().Foreground(upboundBrandColor)
+	itemStyle             = lipgloss.NewStyle()
+	unselectableItemStyle = lipgloss.NewStyle().Foreground(dimColor)
+	kindStyle             = lipgloss.NewStyle().Foreground(neutralColor)
+	selectedItemStyle     = lipgloss.NewStyle().Foreground(upboundBrandColor)
 )
 
 var backNavBinding = key.NewBinding(
@@ -102,6 +103,9 @@ func (d itemDelegate) Render(w io.Writer, m list.Model, index int, listItem list
 	mainStyle := itemStyle
 	if index == m.Index() {
 		mainStyle = selectedItemStyle
+	}
+	if str.notSelectable {
+		mainStyle = unselectableItemStyle
 	}
 	padding := str.padding
 	mainStyle = mainStyle.Copy().Padding(padding.top, padding.right, padding.bottom, padding.left)
