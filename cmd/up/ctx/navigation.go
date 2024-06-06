@@ -288,46 +288,55 @@ func (o *Organization) Items(ctx context.Context, upCtx *upbound.Context, navCtx
 	items := make([]list.Item, 0)
 	items = append(items, item{text: "..", kind: o.BackLabel(), onEnter: o.Back, back: true})
 
+	// Find ingresses for up to 20 Spaces in parallel to construct items for the
+	// list.
 	var wg sync.WaitGroup
 	var mu sync.Mutex
-	for _, space := range l.Items {
-		if mode, ok := space.ObjectMeta.Labels[upboundv1alpha1.SpaceModeLabelKey]; ok {
-			if mode == string(upboundv1alpha1.ModeLegacy) {
-				continue
-			}
-		}
-
-		// todo(redbackthomson): Should the space still appear, even if it's
-		// unreachable? Maybe mark it with an icon and make it unselectable?
-		if space.Status.ConnectionDetails.Status == upboundv1alpha1.ConnectionStatusUnreachable {
-			continue
-		}
-
+	ch := make(chan upboundv1alpha1.Space, len(l.Items))
+	for i := 0; i < min(20, len(l.Items)); i++ {
 		wg.Add(1)
-		go func(space upboundv1alpha1.Space) {
+		go func() {
 			defer wg.Done()
-			ingress, err := navCtx.ingressReader.Get(ctx, space)
-			if err != nil {
-				if errors.Is(err, spaces.SpaceConnectionError) {
-					// we found the space to be unreachable
-					return
+
+			for space := range ch {
+				if mode, ok := space.ObjectMeta.Labels[upboundv1alpha1.SpaceModeLabelKey]; ok {
+					if mode == string(upboundv1alpha1.ModeLegacy) {
+						continue
+					}
 				}
+
+				// todo(redbackthomson): Should the space still appear, even if it's
+				// unreachable? Maybe mark it with an icon and make it unselectable?
+				if space.Status.ConnectionDetails.Status == upboundv1alpha1.ConnectionStatusUnreachable {
+					continue
+				}
+
+				ingress, err := navCtx.ingressReader.Get(ctx, space)
+				if err != nil {
+					if errors.Is(err, spaces.SpaceConnectionError) {
+						// we found the space to be unreachable
+						continue
+					}
+				}
+
+				mu.Lock()
+				items = append(items, item{text: space.GetObjectMeta().GetName(), kind: "space", onEnter: func(m model) (model, error) {
+					m.state = &Space{
+						Org:      *o,
+						Name:     space.GetObjectMeta().GetName(),
+						Ingress:  *ingress,
+						AuthInfo: authInfo,
+					}
+					return m, nil
+				}})
+				mu.Unlock()
 			}
-
-			mu.Lock()
-			items = append(items, item{text: space.GetObjectMeta().GetName(), kind: "space", onEnter: func(m model) (model, error) {
-				m.state = &Space{
-					Org:      *o,
-					Name:     space.GetObjectMeta().GetName(),
-					Ingress:  *ingress,
-					AuthInfo: authInfo,
-				}
-				return m, nil
-			}})
-			mu.Unlock()
-		}(space)
+		}()
 	}
-
+	for _, space := range l.Items {
+		ch <- space
+	}
+	close(ch)
 	wg.Wait()
 
 	sort.Sort(sortedItems(items))
