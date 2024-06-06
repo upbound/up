@@ -70,11 +70,11 @@ func (c *GetCmd) AfterApply(kongCtx *kong.Context) error {
 
 	// create Spaces API kubeconfig
 	// TODO(sttts): here we have to continue with baseURL := m[1] to talk to Spaces API. For now we use the spaces profile instead.
-	spacesKubeconfig, err := upCtx.Kubecfg.RawConfig()
+	kubeconfig, err := upCtx.Kubecfg.ClientConfig()
 	if err != nil {
 		return err
 	}
-	kongCtx.Bind(spacesKubeconfig)
+	kongCtx.Bind(kubeconfig)
 
 	// default namespace flag from kubeconfig context
 	if !c.AllNamespaces {
