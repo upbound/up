@@ -16,6 +16,7 @@ package ctx
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"os"
 	"os/exec"
@@ -304,16 +305,34 @@ func (o *Organization) Items(ctx context.Context, upCtx *upbound.Context, navCtx
 					}
 				}
 
-				// todo(redbackthomson): Should the space still appear, even if it's
-				// unreachable? Maybe mark it with an icon and make it unselectable?
 				if space.Status.ConnectionDetails.Status == upboundv1alpha1.ConnectionStatusUnreachable {
+					mu.Lock()
+					items = append(items, item{
+						text:          space.GetObjectMeta().GetName() + " (unreachable)",
+						kind:          "space",
+						notSelectable: true,
+					})
+					mu.Unlock()
 					continue
 				}
 
 				ingress, err := navCtx.ingressReader.Get(ctx, space)
 				if err != nil {
-					// TODO(adamwg): Add an unselectable item for the Space with
-					// relevant text depending on the type of error.
+					mu.Lock()
+					if errors.Is(err, spaces.SpaceConnectionError) {
+						items = append(items, item{
+							text:          space.GetObjectMeta().GetName() + " (unreachable)",
+							kind:          "space",
+							notSelectable: true,
+						})
+					} else {
+						items = append(items, item{
+							text:          fmt.Sprintf("%s (error: %v)", space.GetObjectMeta().GetName(), err),
+							kind:          "space",
+							notSelectable: true,
+						})
+					}
+					mu.Unlock()
 					continue
 				}
 
@@ -360,9 +379,22 @@ func (o *Organization) Breadcrumbs() string {
 
 type sortedItems []list.Item
 
-func (s sortedItems) Len() int           { return len(s) }
-func (s sortedItems) Less(i, j int) bool { return s[i].(item).text < s[j].(item).text }
-func (s sortedItems) Swap(i, j int)      { s[i], s[j] = s[j], s[i] }
+func (s sortedItems) Len() int { return len(s) }
+func (s sortedItems) Less(i, j int) bool {
+	itmI := s[i].(item)
+	itmJ := s[j].(item)
+
+	// Sort unselectable items last.
+	if itmI.notSelectable && !itmJ.notSelectable {
+		return false
+	}
+	if !itmI.notSelectable && itmJ.notSelectable {
+		return true
+	}
+
+	return s[i].(item).text < s[j].(item).text
+}
+func (s sortedItems) Swap(i, j int) { s[i], s[j] = s[j], s[i] }
 
 var _ Back = &Space{}
 
