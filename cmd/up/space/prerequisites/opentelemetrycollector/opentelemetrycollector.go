@@ -18,22 +18,27 @@ import (
 	"context"
 	"fmt"
 	"net/url"
+	"time"
 
 	"github.com/crossplane/crossplane-runtime/pkg/errors"
+	"github.com/pterm/pterm"
 	corev1 "k8s.io/api/core/v1"
 	apixv1client "k8s.io/apiextensions-apiserver/pkg/client/clientset/clientset/typed/apiextensions/v1"
 	kerrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/util/wait"
 	"k8s.io/client-go/kubernetes"
 	"k8s.io/client-go/rest"
+	"k8s.io/kubectl/pkg/util/podutils"
 
 	"github.com/upbound/up/internal/install"
 	"github.com/upbound/up/internal/install/helm"
 )
 
 var (
-	chartName     = "opentelemetry-operator"
-	otelMgrURL, _ = url.Parse("https://open-telemetry.github.io/opentelemetry-helm-charts")
+	chartName      = "opentelemetry-operator"
+	chartNamespace = chartName
+	otelMgrURL, _  = url.Parse("https://open-telemetry.github.io/opentelemetry-helm-charts")
 
 	// Chart version to be installed
 	version = "0.56.0"
@@ -67,7 +72,7 @@ func New(config *rest.Config) (*OpenTelemetryCollectorOperator, error) {
 	mgr, err := helm.NewManager(config,
 		chartName,
 		otelMgrURL,
-		helm.WithNamespace(chartName),
+		helm.WithNamespace(chartNamespace),
 	)
 	if err != nil {
 		return nil, errors.Wrap(err, fmt.Sprintf(errFmtCreateHelmManager, chartName))
@@ -110,14 +115,44 @@ func (o *OpenTelemetryCollectorOperator) Install() error {
 		Create(context.Background(),
 			&corev1.Namespace{
 				ObjectMeta: metav1.ObjectMeta{
-					Name: chartName,
+					Name: chartNamespace,
 				},
 			}, metav1.CreateOptions{})
 	if err != nil && !kerrors.IsAlreadyExists(err) {
-		return errors.Wrap(err, fmt.Sprintf(errFmtCreateNamespace, chartName))
+		return errors.Wrap(err, fmt.Sprintf(errFmtCreateNamespace, chartNamespace))
 	}
 
-	return o.mgr.Install(version, values)
+	if err = o.mgr.Install(version, values); err != nil {
+		return err
+	}
+
+	// wait until the operator pod is ready because Spaces
+	// OpenTelemetryCollector needs the mutating webhook to be ready
+	// to not fail the installation.
+	return o.waitUntilReady()
+}
+
+// waitUntilReady waits until the opentelemetry-operator pod is ready, or
+// until the timeout.
+func (o *OpenTelemetryCollectorOperator) waitUntilReady() error {
+	return errors.Wrap(wait.PollUntilContextTimeout(context.Background(), 2*time.Second, 10*time.Minute, true, func(ctx context.Context) (bool, error) {
+		pods, err := o.kclient.CoreV1().Pods(chartNamespace).List(ctx, metav1.ListOptions{
+			LabelSelector: "app.kubernetes.io/name=opentelemetry-operator",
+		})
+		if err != nil {
+			pterm.Info.Printf("Cannot list pods in namespace %q: %v \n", chartNamespace, err)
+			return false, err
+		}
+		if pods == nil || len(pods.Items) != 1 {
+			pterm.Info.Println("Cannot find the opentelemetry-operator pod...")
+			return false, err
+		}
+		if podutils.IsPodReady(&pods.Items[0]) {
+			return true, nil
+		}
+		pterm.Info.Println("Waiting for opentelemetry-operator pod to get ready...")
+		return false, nil
+	}), "failed to wait for opentelemetry-operator pod to be ready")
 }
 
 // IsInstalled checks if opentelemetry operator has been installed in the target cluster.
