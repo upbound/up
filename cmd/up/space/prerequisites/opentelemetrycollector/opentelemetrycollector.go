@@ -36,8 +36,9 @@ import (
 )
 
 var (
-	chartName     = "opentelemetry-operator"
-	otelMgrURL, _ = url.Parse("https://open-telemetry.github.io/opentelemetry-helm-charts")
+	chartName      = "opentelemetry-operator"
+	chartNamespace = chartName
+	otelMgrURL, _  = url.Parse("https://open-telemetry.github.io/opentelemetry-helm-charts")
 
 	// Chart version to be installed
 	version = "0.56.0"
@@ -71,7 +72,7 @@ func New(config *rest.Config) (*OpenTelemetryCollectorOperator, error) {
 	mgr, err := helm.NewManager(config,
 		chartName,
 		otelMgrURL,
-		helm.WithNamespace(chartName),
+		helm.WithNamespace(chartNamespace),
 	)
 	if err != nil {
 		return nil, errors.Wrap(err, fmt.Sprintf(errFmtCreateHelmManager, chartName))
@@ -114,11 +115,11 @@ func (o *OpenTelemetryCollectorOperator) Install() error {
 		Create(context.Background(),
 			&corev1.Namespace{
 				ObjectMeta: metav1.ObjectMeta{
-					Name: chartName,
+					Name: chartNamespace,
 				},
 			}, metav1.CreateOptions{})
 	if err != nil && !kerrors.IsAlreadyExists(err) {
-		return errors.Wrap(err, fmt.Sprintf(errFmtCreateNamespace, chartName))
+		return errors.Wrap(err, fmt.Sprintf(errFmtCreateNamespace, chartNamespace))
 	}
 
 	if err = o.mgr.Install(version, values); err != nil {
@@ -134,12 +135,16 @@ func (o *OpenTelemetryCollectorOperator) Install() error {
 // waitUntilReady waits until the opentelemetry-operator pod is ready, or
 // until the timeout.
 func (o *OpenTelemetryCollectorOperator) waitUntilReady() error {
-	return errors.Wrap(wait.PollUntilContextTimeout(context.Background(), 2*time.Second, 30*time.Second, true, func(ctx context.Context) (bool, error) {
-		pods, err := o.kclient.CoreV1().Pods(chartName).List(ctx, metav1.ListOptions{
+	return errors.Wrap(wait.PollUntilContextTimeout(context.Background(), 2*time.Second, 10*time.Minute, true, func(ctx context.Context) (bool, error) {
+		pods, err := o.kclient.CoreV1().Pods(chartNamespace).List(ctx, metav1.ListOptions{
 			LabelSelector: "app.kubernetes.io/name=opentelemetry-operator",
 		})
-		if err != nil || pods == nil || len(pods.Items) != 1 {
-			pterm.Info.Println("Cant find opentelemetry-operator pod...")
+		if err != nil {
+			pterm.Info.Printf("Cannot list pods in namespace %q: %v \n", chartNamespace, err)
+			return false, err
+		}
+		if pods == nil || len(pods.Items) != 1 {
+			pterm.Info.Println("Cannot find the opentelemetry-operator pod...")
 			return false, err
 		}
 		if podutils.IsPodReady(&pods.Items[0]) {
