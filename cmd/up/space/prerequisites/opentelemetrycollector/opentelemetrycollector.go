@@ -21,6 +21,7 @@ import (
 	"time"
 
 	"github.com/crossplane/crossplane-runtime/pkg/errors"
+	"github.com/pterm/pterm"
 	corev1 "k8s.io/api/core/v1"
 	apixv1client "k8s.io/apiextensions-apiserver/pkg/client/clientset/clientset/typed/apiextensions/v1"
 	kerrors "k8s.io/apimachinery/pkg/api/errors"
@@ -28,6 +29,7 @@ import (
 	"k8s.io/apimachinery/pkg/util/wait"
 	"k8s.io/client-go/kubernetes"
 	"k8s.io/client-go/rest"
+	"k8s.io/kubectl/pkg/util/podutils"
 
 	"github.com/upbound/up/internal/install"
 	"github.com/upbound/up/internal/install/helm"
@@ -137,13 +139,13 @@ func (o *OpenTelemetryCollectorOperator) waitUntilReady() error {
 			LabelSelector: "app.kubernetes.io/name=opentelemetry-operator",
 		})
 		if err != nil || pods == nil || len(pods.Items) != 1 {
+			pterm.Info.Println("Cant find opentelemetry-operator pod...")
 			return false, err
 		}
-		for _, condition := range pods.Items[0].Status.Conditions {
-			if condition.Type == corev1.PodReady && condition.Status == corev1.ConditionTrue {
-				return true, nil
-			}
+		if podutils.IsPodReady(&pods.Items[0]) {
+			return true, nil
 		}
+		pterm.Info.Println("Waiting for opentelemetry-operator pod to get ready...")
 		return false, nil
 	}), "failed to wait for opentelemetry-operator pod to be ready")
 }
