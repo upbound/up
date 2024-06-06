@@ -285,13 +285,12 @@ func (o *Organization) Items(ctx context.Context, upCtx *upbound.Context, navCtx
 		return nil, err
 	}
 
-	items := make([]list.Item, 0)
-	items = append(items, item{text: "..", kind: o.BackLabel(), onEnter: o.Back, back: true})
-
 	// Find ingresses for up to 20 Spaces in parallel to construct items for the
 	// list.
 	var wg sync.WaitGroup
 	var mu sync.Mutex
+	items := make([]list.Item, 0)
+	unselectableItems := make([]list.Item, 0)
 	ch := make(chan upboundv1alpha1.Space, len(l.Items))
 	for i := 0; i < min(20, len(l.Items)); i++ {
 		wg.Add(1)
@@ -307,7 +306,7 @@ func (o *Organization) Items(ctx context.Context, upCtx *upbound.Context, navCtx
 
 				if space.Status.ConnectionDetails.Status == upboundv1alpha1.ConnectionStatusUnreachable {
 					mu.Lock()
-					items = append(items, item{
+					unselectableItems = append(unselectableItems, item{
 						text:          space.GetObjectMeta().GetName() + " (unreachable)",
 						kind:          "space",
 						notSelectable: true,
@@ -320,13 +319,13 @@ func (o *Organization) Items(ctx context.Context, upCtx *upbound.Context, navCtx
 				if err != nil {
 					mu.Lock()
 					if errors.Is(err, spaces.SpaceConnectionError) {
-						items = append(items, item{
+						unselectableItems = append(unselectableItems, item{
 							text:          space.GetObjectMeta().GetName() + " (unreachable)",
 							kind:          "space",
 							notSelectable: true,
 						})
 					} else {
-						items = append(items, item{
+						unselectableItems = append(unselectableItems, item{
 							text:          fmt.Sprintf("%s (error: %v)", space.GetObjectMeta().GetName(), err),
 							kind:          "space",
 							notSelectable: true,
@@ -357,7 +356,12 @@ func (o *Organization) Items(ctx context.Context, upCtx *upbound.Context, navCtx
 	wg.Wait()
 
 	sort.Sort(sortedItems(items))
-	return items, nil
+	sort.Sort(sortedItems(unselectableItems))
+
+	ret := []list.Item{item{text: "..", kind: o.BackLabel(), onEnter: o.Back, back: true}}
+	ret = append(ret, items...)
+	ret = append(ret, unselectableItems...)
+	return ret, nil
 }
 
 func (o *Organization) Back(m model) (model, error) {
@@ -379,22 +383,9 @@ func (o *Organization) Breadcrumbs() string {
 
 type sortedItems []list.Item
 
-func (s sortedItems) Len() int { return len(s) }
-func (s sortedItems) Less(i, j int) bool {
-	itmI := s[i].(item)
-	itmJ := s[j].(item)
-
-	// Sort unselectable items last.
-	if itmI.notSelectable && !itmJ.notSelectable {
-		return false
-	}
-	if !itmI.notSelectable && itmJ.notSelectable {
-		return true
-	}
-
-	return s[i].(item).text < s[j].(item).text
-}
-func (s sortedItems) Swap(i, j int) { s[i], s[j] = s[j], s[i] }
+func (s sortedItems) Len() int           { return len(s) }
+func (s sortedItems) Less(i, j int) bool { return s[i].(item).text < s[j].(item).text }
+func (s sortedItems) Swap(i, j int)      { s[i], s[j] = s[j], s[i] }
 
 var _ Back = &Space{}
 
