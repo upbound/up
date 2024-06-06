@@ -16,7 +16,6 @@ package ctx
 
 import (
 	"context"
-	"errors"
 	"fmt"
 	"os"
 	"os/exec"
@@ -313,10 +312,9 @@ func (o *Organization) Items(ctx context.Context, upCtx *upbound.Context, navCtx
 
 				ingress, err := navCtx.ingressReader.Get(ctx, space)
 				if err != nil {
-					if errors.Is(err, spaces.SpaceConnectionError) {
-						// we found the space to be unreachable
-						continue
-					}
+					// TODO(adamwg): Add an unselectable item for the Space with
+					// relevant text depending on the type of error.
+					continue
 				}
 
 				mu.Lock()
