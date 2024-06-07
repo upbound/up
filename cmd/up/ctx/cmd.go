@@ -546,7 +546,12 @@ func DeriveExistingCloudState(upCtx *upbound.Context, conf *clientcmdapi.Config,
 		return nil, errParseSpaceContext
 	}
 
-	spaceName := strings.TrimPrefix(strings.Split(ingress, ".")[0], "https://")
+	spaceName := cloud.SpaceName
+	if spaceName == "" {
+		// The space name wasn't always present in the extension. Fall back to
+		// the old behavior of deriving it from the ingress URL.
+		spaceName = strings.TrimPrefix(strings.Split(ingress, ".")[0], "https://")
+	}
 	space := Space{
 		Org:  *org,
 		Name: spaceName,

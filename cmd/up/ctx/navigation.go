@@ -577,7 +577,7 @@ func (s *Space) buildClient(upCtx *upbound.Context, resource types.NamespacedNam
 	}
 
 	if s.IsCloud() {
-		refContext.Extensions[upbound.ContextExtensionKeySpace] = upbound.NewCloudV1Alpha1SpaceExtension(s.Org.Name)
+		refContext.Extensions[upbound.ContextExtensionKeySpace] = upbound.NewCloudV1Alpha1SpaceExtension(s.Org.Name, s.Name)
 	} else {
 		refContext.Extensions[upbound.ContextExtensionKeySpace] = upbound.NewDisconnectedV1Alpha1SpaceExtension(s.HubContext)
 	}

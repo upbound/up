@@ -913,9 +913,10 @@ func TestDeriveExistingDisconnectedState(t *testing.T) {
 func TestDeriveExistingCloudState(t *testing.T) {
 	authOrgExec, _ := getOrgScopedAuthInfo(&upbound.Context{ProfileName: "profile"}, "org")
 
-	buildCloudExtension := func(org string) upbound.CloudConfiguration {
+	buildCloudExtension := func(org, space string) upbound.CloudConfiguration {
 		return upbound.CloudConfiguration{
 			Organization: org,
+			SpaceName:    space,
 		}
 	}
 
@@ -942,9 +943,38 @@ func TestDeriveExistingCloudState(t *testing.T) {
 				},
 				AuthInfos: map[string]*clientcmdapi.AuthInfo{"upbound": authOrgExec},
 			},
-			cloudConfig: buildCloudExtension("org"),
+			cloudConfig: buildCloudExtension("org", "space"),
 			want:        nil,
 			wantErr:     errParseSpaceContext.Error(),
+		},
+		"UnknownSpace": {
+			conf: clientcmdapi.Config{
+				CurrentContext: "upbound",
+				Contexts: map[string]*clientcmdapi.Context{
+					"upbound": {
+						Namespace: "",
+						Cluster:   "upbound",
+						AuthInfo:  "upbound",
+					},
+				},
+				Clusters: map[string]*clientcmdapi.Cluster{
+					"upbound": {Server: "https://eu-west-1.ibm-cloud.com", CertificateAuthorityData: []byte(ingressCA)},
+				},
+				AuthInfos: map[string]*clientcmdapi.AuthInfo{"upbound": authOrgExec},
+			},
+			cloudConfig: buildCloudExtension("org", ""),
+			want: &Space{
+				Org: Organization{
+					Name: "org",
+				},
+				Name: "eu-west-1",
+				Ingress: spaces.SpaceIngress{
+					Host:   "eu-west-1.ibm-cloud.com",
+					CAData: []byte(ingressCA),
+				},
+				AuthInfo: authOrgExec,
+			},
+			wantErr: "<nil>",
 		},
 		"UnknownOrganization": {
 			conf: clientcmdapi.Config{
@@ -961,7 +991,7 @@ func TestDeriveExistingCloudState(t *testing.T) {
 				},
 				AuthInfos: map[string]*clientcmdapi.AuthInfo{"upbound": authOrgExec},
 			},
-			cloudConfig: buildCloudExtension(""),
+			cloudConfig: buildCloudExtension("", ""),
 			want:        &Root{},
 			wantErr:     "<nil>",
 		},
@@ -980,13 +1010,13 @@ func TestDeriveExistingCloudState(t *testing.T) {
 				},
 				AuthInfos: map[string]*clientcmdapi.AuthInfo{"upbound": authOrgExec},
 			},
-			cloudConfig: buildCloudExtension("org"),
+			cloudConfig: buildCloudExtension("org", "eu-space"),
 			want: &Group{
 				Space: Space{
 					Org: Organization{
 						Name: "org",
 					},
-					Name: "eu-west-1",
+					Name: "eu-space",
 					Ingress: spaces.SpaceIngress{
 						Host:   "eu-west-1.ibm-cloud.com",
 						CAData: []byte(ingressCA),
@@ -1012,13 +1042,13 @@ func TestDeriveExistingCloudState(t *testing.T) {
 				},
 				AuthInfos: map[string]*clientcmdapi.AuthInfo{"upbound": authOrgExec},
 			},
-			cloudConfig: buildCloudExtension("org"),
+			cloudConfig: buildCloudExtension("org", "eu-space"),
 			want: &Group{
 				Space: Space{
 					Org: Organization{
 						Name: "org",
 					},
-					Name: "eu-west-1",
+					Name: "eu-space",
 					Ingress: spaces.SpaceIngress{
 						Host:   "eu-west-1.ibm-cloud.com",
 						CAData: []byte(ingressCA),
@@ -1044,14 +1074,14 @@ func TestDeriveExistingCloudState(t *testing.T) {
 				},
 				AuthInfos: map[string]*clientcmdapi.AuthInfo{"upbound": authOrgExec},
 			},
-			cloudConfig: buildCloudExtension("org"),
+			cloudConfig: buildCloudExtension("org", "eu-space"),
 			want: &ControlPlane{
 				Group: Group{
 					Space: Space{
 						Org: Organization{
 							Name: "org",
 						},
-						Name: "eu-west-1",
+						Name: "eu-space",
 						Ingress: spaces.SpaceIngress{
 							Host:   "eu-west-1.ibm-cloud.com",
 							CAData: []byte(ingressCA),
