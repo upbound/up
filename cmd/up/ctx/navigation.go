@@ -16,6 +16,7 @@ package ctx
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"os"
 	"os/exec"
@@ -284,13 +285,12 @@ func (o *Organization) Items(ctx context.Context, upCtx *upbound.Context, navCtx
 		return nil, err
 	}
 
-	items := make([]list.Item, 0)
-	items = append(items, item{text: "..", kind: o.BackLabel(), onEnter: o.Back, back: true})
-
 	// Find ingresses for up to 20 Spaces in parallel to construct items for the
 	// list.
 	var wg sync.WaitGroup
 	var mu sync.Mutex
+	items := make([]list.Item, 0)
+	unselectableItems := make([]list.Item, 0)
 	ch := make(chan upboundv1alpha1.Space, len(l.Items))
 	for i := 0; i < min(20, len(l.Items)); i++ {
 		wg.Add(1)
@@ -304,16 +304,34 @@ func (o *Organization) Items(ctx context.Context, upCtx *upbound.Context, navCtx
 					}
 				}
 
-				// todo(redbackthomson): Should the space still appear, even if it's
-				// unreachable? Maybe mark it with an icon and make it unselectable?
 				if space.Status.ConnectionDetails.Status == upboundv1alpha1.ConnectionStatusUnreachable {
+					mu.Lock()
+					unselectableItems = append(unselectableItems, item{
+						text:          space.GetObjectMeta().GetName() + " (unreachable)",
+						kind:          "space",
+						notSelectable: true,
+					})
+					mu.Unlock()
 					continue
 				}
 
 				ingress, err := navCtx.ingressReader.Get(ctx, space)
 				if err != nil {
-					// TODO(adamwg): Add an unselectable item for the Space with
-					// relevant text depending on the type of error.
+					mu.Lock()
+					if errors.Is(err, spaces.SpaceConnectionError) {
+						unselectableItems = append(unselectableItems, item{
+							text:          space.GetObjectMeta().GetName() + " (unreachable)",
+							kind:          "space",
+							notSelectable: true,
+						})
+					} else {
+						unselectableItems = append(unselectableItems, item{
+							text:          fmt.Sprintf("%s (error: %v)", space.GetObjectMeta().GetName(), err),
+							kind:          "space",
+							notSelectable: true,
+						})
+					}
+					mu.Unlock()
 					continue
 				}
 
@@ -338,7 +356,12 @@ func (o *Organization) Items(ctx context.Context, upCtx *upbound.Context, navCtx
 	wg.Wait()
 
 	sort.Sort(sortedItems(items))
-	return items, nil
+	sort.Sort(sortedItems(unselectableItems))
+
+	ret := []list.Item{item{text: "..", kind: o.BackLabel(), onEnter: o.Back, back: true}}
+	ret = append(ret, items...)
+	ret = append(ret, unselectableItems...)
+	return ret, nil
 }
 
 func (o *Organization) Back(m model) (model, error) {
