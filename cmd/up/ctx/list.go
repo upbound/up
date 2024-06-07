@@ -212,15 +212,13 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) { // nolint:gocyclo // T
 
 		case key.Matches(msg, selectNavBinding):
 			if i, ok := m.list.SelectedItem().(item); ok {
-				// Disable keys and run the spinner while the state updates.
-				m.list.KeyMap = list.KeyMap{}
+				m = m.withNavDisabled()
 				return m, tea.Sequence(m.list.StartSpinner(), m.updateListState(i.onEnter))
 			}
 
 		case key.Matches(msg, backNavBinding):
 			if state, ok := m.state.(Back); ok {
-				// Disable keys and run the spinner while the state updates.
-				m.list.KeyMap = list.KeyMap{}
+				m = m.withNavDisabled()
 				return m, tea.Sequence(m.list.StartSpinner(), m.updateListState(state.Back))
 			}
 		}
@@ -241,27 +239,60 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) { // nolint:gocyclo // T
 	return m, cmd
 }
 
+// withNavDisabled disables all keybindings except exit. It is used when we're
+// doing an asynchronous operation (e.g., fetching items for a list) and need
+// the user to wait before continuing to navigate. It is idempotent.
+func (m model) withNavDisabled() model {
+	if m.navDisabled {
+		return m
+	}
+
+	m.disabledKeyMap = m.list.KeyMap
+	m.list.KeyMap = list.KeyMap{
+		Quit: exitBinding,
+	}
+	m.navDisabled = true
+
+	return m
+}
+
+// withNavEnabled re-enables all keybindings disabled by withNavDisabled. If
+// disableNav has not been called it does nothing.
+func (m model) withNavEnabled() model {
+	if !m.navDisabled {
+		return m
+	}
+
+	m.list.KeyMap = m.disabledKeyMap
+	m.navDisabled = false
+
+	return m
+}
+
 func (m model) updateListState(fn KeyFunc) func() tea.Msg {
 	return func() tea.Msg {
 		newState, err := fn(m)
 		if err != nil {
+			m = m.withNavEnabled()
 			m.err = err
-			return nil
+			return m
 		}
 		m = newState
 
 		items, err := m.state.Items(context.Background(), m.upCtx, m.navContext)
-		m.err = err
+		if err != nil {
+			m = m.withNavEnabled()
+			m.err = err
+			return m
+		}
 
 		// recreate the list to reset the cursor position
-		if items != nil {
-			m.list = NewList(items)
-			m.list.SetHeight(min(m.windowHeight-2, m.ListHeight()))
-			if _, ok := m.state.(Accepting); ok {
-				m.list.KeyMap.Quit = quitBinding
-			} else {
-				m.list.KeyMap.Quit = key.NewBinding(key.WithDisabled())
-			}
+		m.list = NewList(items)
+		m.list.SetHeight(min(m.windowHeight-2, m.ListHeight()))
+		if _, ok := m.state.(Accepting); ok {
+			m.list.KeyMap.Quit = quitBinding
+		} else {
+			m.list.KeyMap.Quit = key.NewBinding(key.WithDisabled())
 		}
 
 		return m

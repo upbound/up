@@ -91,6 +91,9 @@ type model struct {
 	windowHeight int
 	list         list.Model
 
+	navDisabled    bool
+	disabledKeyMap list.KeyMap
+
 	state NavigationState
 	err   error
 
