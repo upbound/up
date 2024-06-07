@@ -225,6 +225,7 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) { // nolint:gocyclo // T
 
 	case model:
 		m = msg
+		m = m.withNavEnabled()
 		m.list.StopSpinner()
 		if m.termination != nil {
 			return m, tea.Quit
@@ -273,7 +274,6 @@ func (m model) updateListState(fn KeyFunc) func() tea.Msg {
 	return func() tea.Msg {
 		newState, err := fn(m)
 		if err != nil {
-			m = m.withNavEnabled()
 			m.err = err
 			return m
 		}
@@ -281,7 +281,6 @@ func (m model) updateListState(fn KeyFunc) func() tea.Msg {
 
 		items, err := m.state.Items(context.Background(), m.upCtx, m.navContext)
 		if err != nil {
-			m = m.withNavEnabled()
 			m.err = err
 			return m
 		}
