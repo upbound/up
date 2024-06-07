@@ -19,6 +19,7 @@ import (
 	"net/url"
 	"path"
 	"strings"
+	"time"
 
 	"k8s.io/client-go/kubernetes"
 	"k8s.io/client-go/rest"
@@ -75,6 +76,7 @@ func VerifyKubeConfig(wrapTransport transport.WrapperFunc) func(cfg *api.Config)
 		if err != nil {
 			return err
 		}
+		restConfig.Timeout = 2 * time.Second
 		if wrapTransport != nil {
 			restConfig.Wrap(wrapTransport)
 		}
