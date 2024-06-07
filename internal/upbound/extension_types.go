@@ -30,6 +30,7 @@ type DisconnectedConfiguration struct {
 // CloudConfiguration is the configuration of a cloud space
 type CloudConfiguration struct {
 	Organization string `json:"organization"`
+	SpaceName    string `json:"space"`
 }
 
 // SpaceExtensionSpec is the spec of SpaceExtension
@@ -55,7 +56,7 @@ var (
 	SpaceExtensionKind = reflect.TypeOf(SpaceExtension{}).Name()
 )
 
-func NewCloudV1Alpha1SpaceExtension(org string) *SpaceExtension {
+func NewCloudV1Alpha1SpaceExtension(org, space string) *SpaceExtension {
 	return &SpaceExtension{
 		TypeMeta: metav1.TypeMeta{
 			Kind:       SpaceExtensionKind,
@@ -64,6 +65,7 @@ func NewCloudV1Alpha1SpaceExtension(org string) *SpaceExtension {
 		Spec: &SpaceExtensionSpec{
 			Cloud: &CloudConfiguration{
 				Organization: org,
+				SpaceName:    space,
 			},
 		},
 	}
