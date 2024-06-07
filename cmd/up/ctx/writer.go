@@ -74,7 +74,8 @@ func (f *fileWriter) Write(config *clientcmdapi.Config) error {
 	pathOptions := clientcmd.NewDefaultPathOptions()
 	if f.fileOverride != "" {
 		pathOptions = &clientcmd.PathOptions{
-			GlobalFile: f.fileOverride,
+			GlobalFile:   f.fileOverride,
+			LoadingRules: &clientcmd.ClientConfigLoadingRules{},
 		}
 	}
 
