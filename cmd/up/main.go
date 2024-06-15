@@ -35,6 +35,7 @@ import (
 	"github.com/upbound/up/cmd/up/repository"
 	"github.com/upbound/up/cmd/up/robot"
 	"github.com/upbound/up/cmd/up/space"
+	"github.com/upbound/up/cmd/up/team"
 	"github.com/upbound/up/cmd/up/trace"
 	tviewtemplate "github.com/upbound/up/cmd/up/tview-template"
 	"github.com/upbound/up/cmd/up/upbound"
@@ -107,6 +108,7 @@ type cli struct {
 	Profile            profile.Cmd                  `cmd:"" help:"Interact with Upbound profiles or local Spaces."`
 	Repository         repository.Cmd               `cmd:"" name:"repository" aliases:"repo" help:"Interact with repositories."`
 	Robot              robot.Cmd                    `cmd:"" name:"robot" help:"Interact with robots."`
+	Team               team.Cmd                     `cmd:"" name:"team" help:"Interact with teams."`
 	UXP                uxp.Cmd                      `cmd:"" help:"Interact with UXP."`
 	XPKG               xpkg.Cmd                     `cmd:"" help:"Interact with UXP packages."`
 	XPLS               xpls.Cmd                     `cmd:"" help:"Start xpls language server."`
@@ -160,6 +162,7 @@ func main() {
 		kongplete.WithPredictor("ctps", controlplane.PredictControlPlanes()),
 		kongplete.WithPredictor("repos", repository.PredictRepos()),
 		kongplete.WithPredictor("robots", robot.PredictRobots()),
+		kongplete.WithPredictor("teams", team.PredictTeams()),
 		kongplete.WithPredictor("profiles", profile.PredictProfiles()),
 		// TODO(sttts): add get and query
 	)
