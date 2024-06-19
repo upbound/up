@@ -113,6 +113,7 @@ type cli struct {
 	Alpha              alpha                        `cmd:"" help:"Alpha features. Commands may be removed in future releases."`
 	InstallCompletions kongplete.InstallCompletions `cmd:"" help:"Install shell completions"`
 	Version            v.Cmd                        `cmd:"" help:"Print the client and server version information for the current context."`
+	GenerateDocs       docsCmd                      `cmd:"" hidden:"" help:"Generate documentation in YAML format."`
 }
 
 type helpCmd struct{}
