@@ -12,11 +12,10 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-package token
+package team
 
 import (
 	"context"
-	"fmt"
 
 	"github.com/alecthomas/kong"
 	"github.com/crossplane/crossplane-runtime/pkg/errors"
@@ -24,29 +23,29 @@ import (
 	"github.com/pterm/pterm"
 
 	"github.com/upbound/up-sdk-go/service/accounts"
-	"github.com/upbound/up-sdk-go/service/common"
 	"github.com/upbound/up-sdk-go/service/organizations"
 	"github.com/upbound/up-sdk-go/service/robots"
-	"github.com/upbound/up-sdk-go/service/tokens"
+	"github.com/upbound/up-sdk-go/service/teams"
 
 	"github.com/upbound/up/internal/upbound"
 	"github.com/upbound/up/internal/upterm"
 )
 
+var fieldNames = []string{"TEAMS"}
+
 // AfterApply sets default values in command after assignment and validation.
-func (c *getCmd) AfterApply(kongCtx *kong.Context, upCtx *upbound.Context) error {
+func (c *listCmd) AfterApply(kongCtx *kong.Context, upCtx *upbound.Context) error {
 	kongCtx.Bind(pterm.DefaultTable.WithWriter(kongCtx.Stdout).WithSeparator("   "))
 	return nil
 }
 
-// getCmd get a robot token on Upbound.
-type getCmd struct {
+// listCmd lists all teams a specific robot belongs to.
+type listCmd struct {
 	RobotName string `arg:"" required:"" help:"Name of robot."`
-	TokenName string `arg:"" required:"" help:"Name of token."`
 }
 
-// Run executes the get robot token command.
-func (c *getCmd) Run(ctx context.Context, printer upterm.ObjectPrinter, ac *accounts.Client, oc *organizations.Client, rc *robots.Client, tc *tokens.Client, upCtx *upbound.Context) error { //nolint:gocyclo
+// Run executes the get robot command to get all team memberships for a specific robot.
+func (c *listCmd) Run(ctx context.Context, printer upterm.ObjectPrinter, ac *accounts.Client, oc *organizations.Client, rc *robots.Client, tc *teams.Client, upCtx *upbound.Context) error { //nolint:gocyclo
 	a, err := ac.Get(ctx, upCtx.Account)
 	if err != nil {
 		return err
@@ -54,6 +53,7 @@ func (c *getCmd) Run(ctx context.Context, printer upterm.ObjectPrinter, ac *acco
 	if a.Account.Type != accounts.AccountOrganization {
 		return errors.New(errUserAccount)
 	}
+
 	rs, err := oc.ListRobots(ctx, a.Organization.ID)
 	if err != nil {
 		return err
@@ -62,13 +62,9 @@ func (c *getCmd) Run(ctx context.Context, printer upterm.ObjectPrinter, ac *acco
 		return errors.Errorf(errFindRobotFmt, c.RobotName, upCtx.Account)
 	}
 
-	// We pick the first robot account with this name, though there
-	// may be more than one. If a user wants to see all of the tokens
-	// for robots with the same name, they can use the list commands
 	var rid *uuid.UUID
 	for _, r := range rs {
 		if r.Name == c.RobotName {
-			// Pin range variable so that we can take address.
 			r := r
 			rid = &r.ID
 			break
@@ -78,28 +74,54 @@ func (c *getCmd) Run(ctx context.Context, printer upterm.ObjectPrinter, ac *acco
 		return errors.Errorf(errFindRobotFmt, c.RobotName, upCtx.Account)
 	}
 
-	ts, err := rc.ListTokens(ctx, *rid)
+	robot, err := rc.Get(ctx, *rid)
 	if err != nil {
 		return err
 	}
-	if len(ts.DataSet) == 0 {
-		return errors.Errorf(errFindTokenFmt, c.TokenName, c.RobotName, upCtx.Account)
+
+	teamsRs, ok := robot.RelationshipSet["teams"].(map[string]any)
+	if !ok {
+		return errors.New("unexpected format for team relationships")
 	}
 
-	// We pick the first token with this name, though there may be more
-	// than one. If a user wants to see all of the tokens with the same name
-	// they can use the list command.
-	var theToken *common.DataSet
-	for _, t := range ts.DataSet {
-		if fmt.Sprint(t.AttributeSet["name"]) == c.TokenName {
-			// Pin range variable so that we can take address.
-			t := t
-			theToken = &t
-			break
+	data, ok := teamsRs["data"].([]any)
+	if !ok {
+		return errors.New("unexpected format for team data")
+	}
+
+	teamIDs := []uuid.UUID{}
+
+	for _, d := range data {
+		team, ok := d.(map[string]any)
+		if !ok {
+			return errors.New("unexpected format for team relationship")
 		}
+
+		idStr, ok := team["id"].(string)
+		if !ok {
+			return errors.New("unexpected format for team ID")
+		}
+
+		id, err := uuid.Parse(idStr)
+		if err != nil {
+			return err
+		}
+		teamIDs = append(teamIDs, id)
 	}
-	if theToken == nil {
-		return errors.Errorf(errFindTokenFmt, c.TokenName, c.RobotName, upCtx.Account)
+
+	teamInfos := make([]teams.TeamResponse, 0, len(teamIDs))
+	for _, teamID := range teamIDs {
+		team, err := tc.Get(ctx, teamID)
+		if err != nil {
+			return err
+		}
+		teamInfos = append(teamInfos, *team)
 	}
-	return printer.Print(*theToken, fieldNames, extractFields)
+
+	return printer.Print(teamInfos, fieldNames, extractFields)
+}
+
+func extractFields(obj any) []string {
+	team := obj.(teams.TeamResponse)
+	return []string{team.Name}
 }

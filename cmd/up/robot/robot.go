@@ -24,6 +24,7 @@ import (
 	"github.com/upbound/up-sdk-go/service/organizations"
 	"github.com/upbound/up-sdk-go/service/robots"
 
+	"github.com/upbound/up/cmd/up/robot/team"
 	"github.com/upbound/up/cmd/up/robot/token"
 	"github.com/upbound/up/internal/upbound"
 )
@@ -100,6 +101,7 @@ type Cmd struct {
 	List   listCmd   `cmd:"" help:"List robots for the account."`
 	Get    getCmd    `cmd:"" help:"Get a robot for the account."`
 	Token  token.Cmd `cmd:"" help:"Interact with robot tokens."`
+	Team   team.Cmd  `cmd:"" help:"Interact with robot teams."`
 
 	// Common Upbound API configuration
 	Flags upbound.Flags `embed:""`
