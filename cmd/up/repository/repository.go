@@ -22,6 +22,7 @@ import (
 
 	"github.com/upbound/up-sdk-go/service/common"
 	"github.com/upbound/up-sdk-go/service/repositories"
+	"github.com/upbound/up/cmd/up/repository/permission"
 
 	"github.com/upbound/up/internal/upbound"
 )
@@ -77,10 +78,11 @@ func PredictRepos() complete.Predictor {
 
 // Cmd contains commands for interacting with repositories.
 type Cmd struct {
-	Create createCmd `cmd:"" help:"Create a repository."`
-	Delete deleteCmd `cmd:"" help:"Delete a repository."`
-	List   listCmd   `cmd:"" help:"List repositories for the account."`
-	Get    getCmd    `cmd:"" help:"Get a repository for the account."`
+	Create     createCmd      `cmd:"" help:"Create a repository."`
+	Delete     deleteCmd      `cmd:"" help:"Delete a repository."`
+	List       listCmd        `cmd:"" help:"List repositories for the account."`
+	Get        getCmd         `cmd:"" help:"Get a repository for the account."`
+	Permission permission.Cmd `cmd:"" help:"Manage permissions of a repository for a team in the account."`
 
 	// Common Upbound API configuration
 	Flags upbound.Flags `embed:""`
