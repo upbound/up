@@ -25,7 +25,6 @@ import (
 	"github.com/alecthomas/kong"
 	"github.com/crossplane/crossplane-runtime/pkg/errors"
 	"github.com/spf13/afero"
-	utilnet "k8s.io/apimachinery/pkg/util/net"
 	"k8s.io/client-go/rest"
 	"k8s.io/client-go/tools/clientcmd"
 	"k8s.io/client-go/transport"
@@ -265,42 +264,17 @@ func (c *Context) buildSDKConfig(endpoint *url.URL) (*up.Config, error) {
 	}), nil
 }
 
-type cookieImpersonatingRoundTripper struct {
-	session string
-	rt      http.RoundTripper
-}
-
-func (rt *cookieImpersonatingRoundTripper) RoundTrip(req *http.Request) (*http.Response, error) {
-	req = utilnet.CloneRequest(req)
-	req.AddCookie(&http.Cookie{
-		Name:  CookieName,
-		Value: rt.session,
-	})
-	return rt.rt.RoundTrip(req)
-}
-
 // BuildControllerClientConfig builds a REST config suitable for usage with any
 // K8s controller-runtime client.
 func (c *Context) BuildControllerClientConfig() (*rest.Config, error) {
-	var tr http.RoundTripper = &http.Transport{
-		TLSClientConfig: &tls.Config{
-			InsecureSkipVerify: c.InsecureSkipTLSVerify, //nolint:gosec
-		},
-	}
-
-	// mcp-api doesn't support bearer token auth through to spaces APIs, yet.
-	// For now, we need to add the SID cookie to every request to authenticate
-	// it.
-	tr = &cookieImpersonatingRoundTripper{session: c.Profile.Session, rt: tr}
-
-	if c.WrapTransport != nil {
-		tr = c.WrapTransport(tr)
-	}
-
 	cfg := &rest.Config{
-		Host:      c.APIEndpoint.String(),
-		APIPath:   controllerClientPath,
-		Transport: tr,
+		Host:    c.APIEndpoint.String(),
+		APIPath: controllerClientPath,
+		Transport: &http.Transport{
+			TLSClientConfig: &tls.Config{
+				InsecureSkipVerify: c.InsecureSkipTLSVerify, //nolint:gosec
+			},
+		},
 		UserAgent: version.UserAgent(),
 	}
 
