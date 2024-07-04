@@ -46,7 +46,11 @@ func mockLoaderLoad(name string) (*chart.Chart, error) {
 }
 
 func mockPullRun(src, version string) (string, error) {
-	return os.TempDir(), nil
+	dir, err := os.MkdirTemp("", "mock")
+	if err != nil {
+		return "", fmt.Errorf("failed to create temporary directory: %w", err)
+	}
+	return dir, nil
 }
 
 // TestGetValuesFromChart tests the GetValuesFromChart function
