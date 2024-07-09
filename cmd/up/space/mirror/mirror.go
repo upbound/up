@@ -20,6 +20,7 @@ import (
 	"os"
 	"strings"
 
+	"github.com/crossplane/crossplane-runtime/pkg/errors"
 	"github.com/google/go-containerregistry/pkg/authn"
 	"github.com/google/go-containerregistry/pkg/crane"
 	"github.com/pterm/pterm"
@@ -75,35 +76,35 @@ func (c *Cmd) Run(ctx context.Context, printer upterm.ObjectPrinter) (rErr error
 	c.Version = strings.TrimPrefix(c.Version, "v")
 
 	// use crane auth from local keychain
-	craneAuth := []crane.Option{
+	craneOpts := []crane.Option{
 		crane.WithAuthFromKeychain(authn.DefaultKeychain),
 	}
 
 	for _, repo := range artifacts.oci {
-		if err := c.mirrorWithExtraImages(ctx, printer, repo, craneAuth); err != nil {
-			return fmt.Errorf("mirror artifacts failed: %w", err)
+		if err := c.mirrorWithExtraImages(ctx, printer, repo, craneOpts); err != nil {
+			return errors.Wrap(err, "mirror artifacts failed")
 		}
 	}
 
 	for _, image := range artifacts.images {
-		if err := c.mirrorArtifact(printer, image, craneAuth); err != nil {
+		if err := c.mirrorArtifact(printer, image, craneOpts); err != nil {
 			return fmt.Errorf("mirror artifacts failed: %w", err)
 		}
 	}
 
 	if !printer.DryRun {
 		if len(c.ToDir) > 1 {
-			pterm.Println("\nSuccessfully exported artifacts for spaces!")
+			pterm.Println("\nSuccessfully exported artifacts for Spaces!")
 		}
 		if len(c.To) > 1 {
-			pterm.Println("\nSuccessfully mirrored artifacts for spaces!")
+			pterm.Println("\nSuccessfully mirrored artifacts for Spaces!")
 		}
 	}
 
 	return nil
 }
 
-func (c *Cmd) mirrorWithExtraImages(ctx context.Context, printer upterm.ObjectPrinter, repo repository, craneAuth []crane.Option) error { //nolint:gocyclo
+func (c *Cmd) mirrorWithExtraImages(ctx context.Context, printer upterm.ObjectPrinter, repo repository, craneOpts []crane.Option) error { //nolint:gocyclo
 	setupStyling(printer)
 	upterm.DefaultObjPrinter.Pretty = true
 
@@ -134,7 +135,7 @@ func (c *Cmd) mirrorWithExtraImages(ctx context.Context, printer upterm.ObjectPr
 		s.Success("Scanning tags to export...")
 	}
 	// mirror main chart
-	if err := c.mirrorArtifact(printer, fmt.Sprintf("%s:%s", repo.chart, c.Version), craneAuth); err != nil {
+	if err := c.mirrorArtifact(printer, fmt.Sprintf("%s:%s", repo.chart, c.Version), craneOpts); err != nil {
 		return fmt.Errorf("mirroring chart: %w", err)
 	}
 
@@ -147,12 +148,12 @@ func (c *Cmd) mirrorWithExtraImages(ctx context.Context, printer upterm.ObjectPr
 			}
 			for _, version := range versions {
 				// mirror sub chart
-				if err := c.mirrorArtifact(printer, fmt.Sprintf("%s:%s", subChart.chart, version), craneAuth); err != nil {
-					return fmt.Errorf("mirroring image %s: %w", subChart.chart, err)
+				if err := c.mirrorArtifact(printer, fmt.Sprintf("%s:%s", subChart.chart, version), craneOpts); err != nil {
+					return fmt.Errorf("mirroring chart image %s: %w", subChart.chart, err)
 				}
 				// mirror image for sub chart
-				if err := c.mirrorArtifact(printer, fmt.Sprintf("%s:v%s", subChart.image, version), craneAuth); err != nil {
-					return fmt.Errorf("mirroring image %s: %w", subChart.chart, err)
+				if err := c.mirrorArtifact(printer, fmt.Sprintf("%s:v%s", subChart.image, version), craneOpts); err != nil {
+					return fmt.Errorf("mirroring image %s: %w", subChart.image, err)
 				}
 			}
 
@@ -161,7 +162,7 @@ func (c *Cmd) mirrorWithExtraImages(ctx context.Context, printer upterm.ObjectPr
 
 	for _, image := range repo.images {
 		// mirror all other images with same tag than main chart
-		if err := c.mirrorArtifact(printer, fmt.Sprintf("%s:v%s", image, c.Version), craneAuth); err != nil {
+		if err := c.mirrorArtifact(printer, fmt.Sprintf("%s:v%s", image, c.Version), craneOpts); err != nil {
 			return fmt.Errorf("mirroring image %s: %w", image, err)
 		}
 	}
@@ -169,7 +170,7 @@ func (c *Cmd) mirrorWithExtraImages(ctx context.Context, printer upterm.ObjectPr
 	return nil
 }
 
-func (c *Cmd) mirrorArtifact(printer upterm.ObjectPrinter, artifact string, craneAuth []crane.Option) error {
+func (c *Cmd) mirrorArtifact(printer upterm.ObjectPrinter, artifact string, craneOpts []crane.Option) error {
 
 	path := fmt.Sprintf("%s%s.tgz", c.ToDir, oci.GetArtifactName(artifact))
 	rawArtifactName := oci.RemoveDomainAndOrg(artifact)
@@ -185,7 +186,7 @@ func (c *Cmd) mirrorArtifact(printer upterm.ObjectPrinter, artifact string, cran
 	}
 
 	if len(c.ToDir) > 1 {
-		img, err := crane.Pull(artifact, craneAuth...)
+		img, err := crane.Pull(artifact, craneOpts...)
 		if err != nil {
 			return fmt.Errorf("pulling image: %w", err)
 		}
@@ -199,9 +200,9 @@ func (c *Cmd) mirrorArtifact(printer upterm.ObjectPrinter, artifact string, cran
 	} else {
 		follow := fmt.Sprintf("mirror artifact %s to %s", rawArtifactName, c.To)
 		s := logAndStartSpinner(printer, follow)
-		if err := crane.Copy(artifact, fmt.Sprintf("%s/%s", c.To, rawArtifactName), craneAuth...); err != nil {
+		if err := crane.Copy(artifact, fmt.Sprintf("%s/%s", c.To, rawArtifactName), craneOpts...); err != nil {
 			s.Fail(follow)
-			return fmt.Errorf("push failed %s: %w", artifact, err)
+			return fmt.Errorf("copy/push failed %s: %w", artifact, err)
 		}
 		s.Success(follow)
 	}
