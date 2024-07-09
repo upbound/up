@@ -16,6 +16,7 @@ package category
 
 import (
 	"context"
+	"strings"
 
 	"github.com/crossplane/crossplane-runtime/pkg/errors"
 	"github.com/crossplane/crossplane-runtime/pkg/resource"
@@ -50,11 +51,25 @@ func (a *APICategoryModifier) ModifyResources(ctx context.Context, category stri
 		return 0, errors.Wrap(err, "cannot get server preferred resources")
 	}
 	for _, al := range apiLists {
+		var group, version string
+		// Split the GroupVersion foo.bar/v1
+		groupVersionParts := strings.Split(al.GroupVersion, "/")
+
+		if len(groupVersionParts) == 1 {
+			// If there's only one part (core), it's the version.
+			version = groupVersionParts[0]
+		} else {
+			// foo.bar
+			group = groupVersionParts[0]
+			// v1
+			version = groupVersionParts[1]
+		}
+
 		for _, r := range al.APIResources {
 			if contains(r.Categories, category) {
 				gvr := schema.GroupVersionResource{
-					Group:    r.Group,
-					Version:  r.Version,
+					Group:    group,
+					Version:  version,
 					Resource: r.Name,
 				}
 				ul, err := a.dynamicClient.Resource(gvr).Namespace("").List(ctx, metav1.ListOptions{})
