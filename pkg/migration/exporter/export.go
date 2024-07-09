@@ -152,8 +152,22 @@ func (e *ControlPlaneStateExporter) Export(ctx context.Context) error { // nolin
 			// Ignore CRDs that we don't want to export.
 			continue
 		}
+		shouldContinue := false
+		// - Excluded crossplane resources - Specified by the user.
+		for _, r := range e.options.ExcludeResources {
+			if crd.ObjectMeta.Name == r {
+				// Ignore CRDs that we don't want to export.
+				shouldContinue = true
+				break
+			}
+		}
+		if shouldContinue {
+			continue
+		}
+
 		exportList = append(exportList, crd)
 	}
+
 	s.Success(scanMsg + fmt.Sprintf("%d types found! 👀", len(exportList)))
 	//////////////////////
 
