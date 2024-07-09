@@ -46,6 +46,7 @@ type Printer interface {
 type ObjectPrinter struct {
 	Quiet  config.QuietFlag
 	Pretty bool
+	DryRun bool
 	Format config.Format
 
 	TablePrinter *pterm.TablePrinter
@@ -55,6 +56,7 @@ var (
 	DefaultObjPrinter = ObjectPrinter{
 		Quiet:        false,
 		Pretty:       false,
+		DryRun:       false,
 		Format:       config.Default,
 		TablePrinter: pterm.DefaultTable.WithSeparator("   "),
 	}

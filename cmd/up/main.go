@@ -69,6 +69,7 @@ func (c *cli) AfterApply(ctx *kong.Context) error { //nolint:unparam
 	}
 
 	printer := upterm.DefaultObjPrinter
+	printer.DryRun = c.DryRun
 	printer.Format = c.Format
 	printer.Pretty = c.Pretty
 	printer.Quiet = c.Quiet
@@ -93,6 +94,7 @@ type cli struct {
 	Format config.Format    `name:"format" enum:"default,json,yaml" default:"default" help:"Format for get/list commands. Can be: json, yaml, default"`
 	Quiet  config.QuietFlag `short:"q" name:"quiet" help:"Suppress all output."`
 	Pretty bool             `name:"pretty" help:"Pretty print output."`
+	DryRun bool             `name:"dry-run" help:"dry-run output."`
 
 	License licenseCmd `cmd:"" help:"Print Up license information."`
 

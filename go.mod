@@ -8,6 +8,7 @@ require (
 	github.com/Azure/azure-sdk-for-go/sdk/azidentity v1.3.1
 	github.com/Azure/azure-sdk-for-go/sdk/storage/azblob v1.1.0
 	github.com/Masterminds/semver/v3 v3.2.1
+	github.com/alecthomas/assert/v2 v2.1.0
 	github.com/alecthomas/chroma v0.10.0
 	github.com/alecthomas/kong v0.8.0
 	github.com/aws/aws-sdk-go v1.44.313
@@ -37,6 +38,7 @@ require (
 	github.com/sourcegraph/jsonrpc2 v0.2.0
 	github.com/spf13/afero v1.11.0
 	github.com/spf13/cobra v1.8.0
+	github.com/stretchr/testify v1.8.4
 	github.com/upbound/up-sdk-go v0.3.1-0.20240624053239-92e3d908f65f
 	github.com/upbound/up/pkg/migration v0.0.0-00010101000000-000000000000
 	github.com/willabides/kongplete v0.3.0
@@ -74,6 +76,7 @@ require (
 require (
 	github.com/Azure/azure-sdk-for-go/sdk/resourcemanager/storage/armstorage v1.3.0 // indirect
 	github.com/Microsoft/hcsshim v0.11.4 // indirect
+	github.com/alecthomas/repr v0.1.0 // indirect
 	github.com/atotto/clipboard v0.1.4 // indirect
 	github.com/bahlo/generic-list-go v0.2.0 // indirect
 	github.com/buger/jsonparser v1.1.1 // indirect
@@ -82,6 +85,7 @@ require (
 	github.com/cloudflare/circl v1.3.7 // indirect
 	github.com/containerd/log v0.1.0 // indirect
 	github.com/golang-jwt/jwt/v5 v5.0.0 // indirect
+	github.com/hexops/gotextdiff v1.0.3 // indirect
 	github.com/invopop/jsonschema v0.12.0 // indirect
 	github.com/klauspost/cpuid/v2 v2.2.5 // indirect
 	github.com/klauspost/pgzip v1.2.6 // indirect
@@ -90,6 +94,7 @@ require (
 	github.com/muesli/mango-pflag v0.1.0 // indirect
 	github.com/muesli/roff v0.1.0 // indirect
 	github.com/pjbgf/sha1cd v0.3.0 // indirect
+	github.com/pmezard/go-difflib v1.0.0 // indirect
 	github.com/sahilm/fuzzy v0.1.0 // indirect
 	github.com/skeema/knownhosts v1.2.1 // indirect
 	github.com/wk8/go-ordered-map/v2 v2.1.8 // indirect

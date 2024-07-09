@@ -18,6 +18,7 @@ import (
 	"github.com/alecthomas/kong"
 
 	"github.com/upbound/up/cmd/up/space/billing"
+	"github.com/upbound/up/cmd/up/space/mirror"
 	"github.com/upbound/up/internal/feature"
 	"github.com/upbound/up/internal/upbound"
 )
@@ -41,6 +42,7 @@ type Cmd struct {
 	Destroy destroyCmd `cmd:"" help:"Remove the Upbound Spaces deployment."`
 	Upgrade upgradeCmd `cmd:"" help:"Upgrade the Upbound Spaces deployment."`
 	List    listCmd    `cmd:"" help:"List all accessible spaces in Upbound."`
+	Mirror  mirror.Cmd `cmd:"" maturity:"alpha" help:"List of all OCI artifacts required for Spaces."`
 
 	Billing billing.Cmd `cmd:""`
 }
