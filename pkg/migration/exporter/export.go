@@ -152,16 +152,16 @@ func (e *ControlPlaneStateExporter) Export(ctx context.Context) error { // nolin
 			// Ignore CRDs that we don't want to export.
 			continue
 		}
-		shouldContinue := false
+		skip := false
 		// - Excluded crossplane resources - Specified by the user.
 		for _, r := range e.options.ExcludeResources {
 			if crd.ObjectMeta.Name == r {
 				// Ignore CRDs that we don't want to export.
-				shouldContinue = true
+				skip = true
 				break
 			}
 		}
-		if shouldContinue {
+		if skip {
 			continue
 		}
 
