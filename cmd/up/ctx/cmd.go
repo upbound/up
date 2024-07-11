@@ -134,7 +134,7 @@ func (c *Cmd) Run(ctx context.Context, kongCtx *kong.Context, upCtx *upbound.Con
 	case "":
 		return c.RunInteractive(ctx, kongCtx, upCtx, navCtx, initialState)
 	default:
-		return c.RunRelative(ctx, upCtx, navCtx, initialState)
+		return c.RunNonInteractive(ctx, upCtx, navCtx, initialState)
 	}
 }
 
@@ -168,8 +168,16 @@ func (c *Cmd) RunSwap(ctx context.Context, upCtx *upbound.Context, navCtx *navCo
 	if err := writeLastContext(oldContext); err != nil {
 		return err
 	}
-	fmt.Printf(contextSwitchedFmt, state.Breadcrumbs())
+	if c.Short {
+		fmt.Println(state.Breadcrumbs())
+	} else {
+		fmt.Printf(contextSwitchedFmt, withUpboundPrefix(state.Breadcrumbs()))
+	}
 	return nil
+}
+
+func withUpboundPrefix(s string) string {
+	return fmt.Sprintf("%s %s", upboundRootStyle.Render("Upbound"), s)
 }
 
 func activateContext(conf *clientcmdapi.Config, sourceContext, preferredContext string) (newConf *clientcmdapi.Config, newLastContext string, err error) { // nolint:gocyclo // little long, but well tested
@@ -258,7 +266,7 @@ func activateContext(conf *clientcmdapi.Config, sourceContext, preferredContext 
 	return conf, newLastContext, nil
 }
 
-func (c *Cmd) RunRelative(ctx context.Context, upCtx *upbound.Context, navCtx *navContext, initialState NavigationState) error { // nolint:gocyclo // a bit long but ¯\_(ツ)_/¯
+func (c *Cmd) RunNonInteractive(ctx context.Context, upCtx *upbound.Context, navCtx *navContext, initialState NavigationState) error { // nolint:gocyclo // a bit long but ¯\_(ツ)_/¯
 	// begin from root unless we're starting from a relative . or ..
 	state := initialState
 	if !strings.HasPrefix(c.Argument, ".") {
@@ -310,7 +318,7 @@ func (c *Cmd) RunRelative(ctx context.Context, upCtx *upbound.Context, navCtx *n
 	}
 
 	// final step if we moved: accept the state
-	msg := fmt.Sprintf("Kubeconfig context %q: %s\n", c.KubeContext, m.state.Breadcrumbs())
+	msg := fmt.Sprintf("Kubeconfig context %q: %s\n", c.KubeContext, withUpboundPrefix(m.state.Breadcrumbs()))
 	if m.state.Breadcrumbs() != initialState.Breadcrumbs() {
 		accepting, ok := m.state.(Accepting)
 		if !ok {
@@ -324,19 +332,10 @@ func (c *Cmd) RunRelative(ctx context.Context, upCtx *upbound.Context, navCtx *n
 	}
 
 	// don't print anything else or we are going to pollute stdout
-	if c.File != "-" {
-		if c.Short {
-			switch state := m.state.(type) {
-			case *Space:
-				fmt.Printf("%s/%s\n", state.Org.Name, state.Name)
-			case *Group:
-				fmt.Printf("%s/%s/%s\n", state.Space.Org.Name, state.Space.Name, state.Name)
-			case *ControlPlane:
-				fmt.Printf("%s/%s/%s/%s\n", state.Group.Space.Org.Name, state.Group.Space.Name, state.NamespacedName().Namespace, state.NamespacedName().Name)
-			}
-		} else {
-			fmt.Print(msg)
-		}
+	if c.Short {
+		fmt.Println(state.Breadcrumbs())
+	} else {
+		fmt.Print(msg)
 	}
 
 	return nil

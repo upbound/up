@@ -41,7 +41,7 @@ func (s *Space) Accept(upCtx *upbound.Context, navCtx *navContext) (msg string, 
 		return "", err
 	}
 
-	return fmt.Sprintf(contextSwitchedFmt, s.Breadcrumbs()), nil
+	return fmt.Sprintf(contextSwitchedFmt, withUpboundPrefix(s.Breadcrumbs())), nil
 }
 
 // Accept upserts the "upbound" kubeconfig context and cluster to the chosen
@@ -59,7 +59,7 @@ func (g *Group) Accept(upCtx *upbound.Context, navCtx *navContext) (msg string, 
 		return "", err
 	}
 
-	return fmt.Sprintf(contextSwitchedFmt, g.Breadcrumbs()), nil
+	return fmt.Sprintf(contextSwitchedFmt, withUpboundPrefix(g.Breadcrumbs())), nil
 }
 
 // Accept upserts a controlplane context and cluster to the chosen kubeconfig.
@@ -76,5 +76,5 @@ func (ctp *ControlPlane) Accept(upCtx *upbound.Context, navCtx *navContext) (msg
 		return "", err
 	}
 
-	return fmt.Sprintf(contextSwitchedFmt, ctp.Breadcrumbs()), nil
+	return fmt.Sprintf(contextSwitchedFmt, withUpboundPrefix(ctp.Breadcrumbs())), nil
 }
