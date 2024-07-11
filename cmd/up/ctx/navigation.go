@@ -146,12 +146,8 @@ func (r *Root) Items(ctx context.Context, upCtx *upbound.Context, navCtx *navCon
 	}), nil
 }
 
-func (r *Root) breadcrumbs() string {
-	return upboundRootStyle.Render("Upbound")
-}
-
 func (r *Root) Breadcrumbs() string {
-	return r.breadcrumbs()
+	return ""
 }
 
 type Disconnected struct{}
@@ -241,7 +237,7 @@ func spaceItemFromKubeContext(ctx context.Context, kubeconfig clientcmdapi.Confi
 }
 
 func (d *Disconnected) breadcrumbs(styles breadcrumbStyle) string {
-	return upboundRootStyle.Render("Upbound ") + styles.currentLevel.Render("disconnected/")
+	return styles.currentLevel.Render("disconnected/")
 }
 
 func (d *Disconnected) Breadcrumbs() string {
@@ -374,7 +370,7 @@ func (o *Organization) BackLabel() string {
 }
 
 func (o *Organization) breadcrumbs(styles breadcrumbStyle) string {
-	return upboundRootStyle.Render("Upbound ") + styles.currentLevel.Render(fmt.Sprintf("%s/", o.Name))
+	return styles.currentLevel.Render(fmt.Sprintf("%s/", o.Name))
 }
 
 func (o *Organization) Breadcrumbs() string {
