@@ -146,12 +146,8 @@ func (r *Root) Items(ctx context.Context, upCtx *upbound.Context, navCtx *navCon
 	}), nil
 }
 
-func (r *Root) breadcrumbs() string {
-	return ""
-}
-
 func (r *Root) Breadcrumbs() string {
-	return r.breadcrumbs()
+	return ""
 }
 
 type Disconnected struct{}
