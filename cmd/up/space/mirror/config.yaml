@@ -1,0 +1,67 @@
+# Copyright 2024 Upbound Inc
+#
+# Licensed under the Apache License, Version 2.0 (the "License");
+# you may not use this file except in compliance with the License.
+# You may obtain a copy of the License at
+#
+#     http://www.apache.org/licenses/LICENSE-2.0
+#
+# Unless required by applicable law or agreed to in writing, software
+# distributed under the License is distributed on an "AS IS" BASIS,
+# WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+# See the License for the specific language governing permissions and
+# limitations under the License.
+
+oci:
+  - chart: "xpkg.upbound.io/spaces-artifacts/spaces"
+    subCharts:
+      - pathNavigatorType: uxpVersionsPath
+        chart: "xpkg.upbound.io/upbound/universal-crossplane"
+        image: "xpkg.upbound.io/upbound/crossplane"
+    images:
+      - image: "xpkg.upbound.io/spaces-artifacts/hyperspace"
+        compatibleChartVersion: ">=1.6"
+      - image: "xpkg.upbound.io/spaces-artifacts/mxe-composition-templates"
+        compatibleChartVersion: "1.5.x"
+      - image: "xpkg.upbound.io/spaces-artifacts/mxp-authz-webhook"
+      # compatibleChartVersion: "1.5.x" # Will be removed with https://github.com/upbound/spaces/pull/1393
+      - image: "xpkg.upbound.io/spaces-artifacts/mxp-benchmark"
+      - image: "xpkg.upbound.io/spaces-artifacts/mxp-charts"
+      - image: "xpkg.upbound.io/spaces-artifacts/mxp-control-plane"
+      - image: "xpkg.upbound.io/spaces-artifacts/mxp-host-cluster-worker"
+      - image: "xpkg.upbound.io/spaces-artifacts/mxp-host-cluster"
+      - image: "xpkg.upbound.io/spaces-artifacts/opentelemetry-collector-spaces"
+      - image: "xpkg.upbound.io/spaces-artifacts/provider-host-cluster"
+      - image: "xpkg.upbound.io/crossplane-contrib/function-auto-ready:v0.2.1"
+        compatibleChartVersion: "1.5.x"
+      - image: "xpkg.upbound.io/crossplane-contrib/provider-helm:v0.19.0"
+        compatibleChartVersion: "1.5.x"
+      - image: "xpkg.upbound.io/crossplane-contrib/provider-kubernetes:v0.14.0"
+        compatibleChartVersion: "1.5.x"
+      - image: "xpkg.upbound.io/spaces-artifacts/mcp-connector:0.6.0"
+      - image: "xpkg.upbound.io/spaces-artifacts/mcp-connector-server:v0.6.0"
+      - image: "xpkg.upbound.io/spaces-artifacts/coredns:1.10.1"
+      - image: "xpkg.upbound.io/spaces-artifacts/coredns:latest"
+      - image: "xpkg.upbound.io/spaces-artifacts/envoy:v1.26-latest"
+      - image: "xpkg.upbound.io/spaces-artifacts/etcd:3.5.6-0"
+      - image: "xpkg.upbound.io/spaces-artifacts/external-secrets:v0.9.11-3.g8e279dea"
+      - image: "xpkg.upbound.io/spaces-artifacts/kine:v0.0.0-224.g6a07aa9"
+      - image: "xpkg.upbound.io/spaces-artifacts/kube-apiserver:v1.28.6"
+      - image: "xpkg.upbound.io/spaces-artifacts/kube-controller-manager:v1.28.6"
+      - image: "xpkg.upbound.io/spaces-artifacts/kube-scheduler:v1.28.6"
+      - image: "xpkg.upbound.io/spaces-artifacts/kube-state-metrics:v2.8.1-upbound003"
+      - image: "xpkg.upbound.io/spaces-artifacts/kubectl:1.29"
+      - image: "xpkg.upbound.io/spaces-artifacts/kyverno-background-controller:v1.11.4"
+      - image: "xpkg.upbound.io/spaces-artifacts/kyverno-cleanup-controller:v1.11.4"
+      - image: "xpkg.upbound.io/spaces-artifacts/kyverno-kyverno:v1.11.4"
+      - image: "xpkg.upbound.io/spaces-artifacts/kyverno-kyvernopre:v1.11.4"
+      - image: "xpkg.upbound.io/spaces-artifacts/kyverno-reports-controller:v1.11.4"
+      - image: "xpkg.upbound.io/spaces-artifacts/mxp-authz-webhook-openssl:3.1.4"
+      - image: "xpkg.upbound.io/spaces-artifacts/opentelemetry-collector-contrib:0.98.0"
+      - image: "xpkg.upbound.io/spaces-artifacts/uxp-bootstrapper:v1.10.4-up.2"
+        compatibleChartVersion: "1.6.x"
+      - image: "xpkg.upbound.io/spaces-artifacts/uxp-bootstrapper:v1.10.1-up.1"
+        compatibleChartVersion: "1.5.x"
+      - image: "xpkg.upbound.io/spaces-artifacts/vcluster:0.15.7"
+      - image: "xpkg.upbound.io/spaces-artifacts/vector:0.30.0-distroless-libc"
+      - image: "xpkg.upbound.io/spaces-artifacts/xgql:v0.2.0-rc.0.153.g0a1d4ae"

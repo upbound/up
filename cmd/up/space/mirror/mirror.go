@@ -17,13 +17,17 @@ package mirror
 import (
 	"context"
 	"fmt"
+	"log"
 	"os"
+	"reflect"
 	"strings"
 
+	"github.com/Masterminds/semver/v3"
 	"github.com/crossplane/crossplane-runtime/pkg/errors"
 	"github.com/google/go-containerregistry/pkg/authn"
 	"github.com/google/go-containerregistry/pkg/crane"
 	"github.com/pterm/pterm"
+	"gopkg.in/yaml.v3"
 
 	"github.com/upbound/up/internal/oci"
 	"github.com/upbound/up/internal/upterm"
@@ -43,12 +47,27 @@ func (s spinner) Start(text ...interface{}) (Printer, error) {
 	return s.SpinnerPrinter.Start(text...)
 }
 
-func (j *uxpVersionsPath) GetSupportedVersions() ([]string, error) {
-	return j.Controller.Crossplane.SupportedVersions, nil
-}
-
 // Run executes the mirror command.
 func (c *Cmd) Run(ctx context.Context, printer upterm.ObjectPrinter) (rErr error) { //nolint:gocyclo
+	configData, pathNavigator := initConfig()
+	var artifacts config
+	err := yaml.Unmarshal(configData, &artifacts)
+	if err != nil {
+		log.Fatalf("error: %v", err)
+	}
+
+	for _, repo := range artifacts.OCI {
+		for i := range repo.SubCharts {
+			subChart := &repo.SubCharts[i]
+			if subChart.PathNavigatorType != "" {
+				pathValueType, ok := pathNavigator[subChart.PathNavigatorType]
+				if ok {
+					pathValue := reflect.New(pathValueType).Interface().(oci.PathNavigator)
+					subChart.PathNavigator = pathValue
+				}
+			}
+		}
+	}
 
 	if c.ToDir != "" {
 		info, err := os.Stat(c.ToDir)
@@ -80,15 +99,9 @@ func (c *Cmd) Run(ctx context.Context, printer upterm.ObjectPrinter) (rErr error
 		crane.WithAuthFromKeychain(authn.DefaultKeychain),
 	}
 
-	for _, repo := range artifacts.oci {
+	for _, repo := range artifacts.OCI {
 		if err := c.mirrorWithExtraImages(ctx, printer, repo, craneOpts); err != nil {
 			return errors.Wrap(err, "mirror artifacts failed")
-		}
-	}
-
-	for _, image := range artifacts.images {
-		if err := c.mirrorArtifact(printer, image, craneOpts); err != nil {
-			return fmt.Errorf("mirror artifacts failed: %w", err)
 		}
 	}
 
@@ -104,7 +117,7 @@ func (c *Cmd) Run(ctx context.Context, printer upterm.ObjectPrinter) (rErr error
 	return nil
 }
 
-func (c *Cmd) mirrorWithExtraImages(ctx context.Context, printer upterm.ObjectPrinter, repo repository, craneOpts []crane.Option) error { //nolint:gocyclo
+func (c *Cmd) mirrorWithExtraImages(ctx context.Context, printer upterm.ObjectPrinter, repo Repository, craneOpts []crane.Option) error { //nolint:gocyclo
 	setupStyling(printer)
 	upterm.DefaultObjPrinter.Pretty = true
 
@@ -122,48 +135,69 @@ func (c *Cmd) mirrorWithExtraImages(ctx context.Context, printer upterm.ObjectPr
 	s := logAndStartSpinner(printer, "Scanning tags to export...")
 
 	// check if version is available
-	tags, err := oci.ListTags(ctx, repo.chart)
+	tags, err := oci.ListTags(ctx, repo.Chart)
 	if err != nil {
 		return fmt.Errorf("listing tags: %w", err)
 	}
 
 	if !oci.TagExists(tags, c.Version) {
-		return fmt.Errorf("version %s not found in the list of tags for %s", c.Version, repo.chart)
+		return fmt.Errorf("version %s not found in the list of tags for %s", c.Version, repo.Chart)
 	}
 
 	if !printer.DryRun {
 		s.Success("Scanning tags to export...")
 	}
 	// mirror main chart
-	if err := c.mirrorArtifact(printer, fmt.Sprintf("%s:%s", repo.chart, c.Version), craneOpts); err != nil {
+	if err := c.mirrorArtifact(printer, fmt.Sprintf("%s:%s", repo.Chart, c.Version), craneOpts); err != nil {
 		return fmt.Errorf("mirroring chart: %w", err)
 	}
 
-	for _, subChart := range repo.subCharts {
-		if subChart.pathNavigator != nil {
+	for _, subChart := range repo.SubCharts {
+		if subChart.PathNavigator != nil {
 			// extract path from values from main chart
-			versions, err := oci.GetValuesFromChart(repo.chart, c.Version, subChart.pathNavigator)
+			versions, err := oci.GetValuesFromChart(repo.Chart, c.Version, subChart.PathNavigator)
 			if err != nil {
 				return fmt.Errorf("unable to extract: %w", err)
 			}
 			for _, version := range versions {
 				// mirror sub chart
-				if err := c.mirrorArtifact(printer, fmt.Sprintf("%s:%s", subChart.chart, version), craneOpts); err != nil {
-					return fmt.Errorf("mirroring chart image %s: %w", subChart.chart, err)
+				if err := c.mirrorArtifact(printer, fmt.Sprintf("%s:%s", subChart.Chart, version), craneOpts); err != nil {
+					return fmt.Errorf("mirroring chart image %s: %w", subChart.Chart, err)
 				}
 				// mirror image for sub chart
-				if err := c.mirrorArtifact(printer, fmt.Sprintf("%s:v%s", subChart.image, version), craneOpts); err != nil {
-					return fmt.Errorf("mirroring image %s: %w", subChart.image, err)
+				if err := c.mirrorArtifact(printer, fmt.Sprintf("%s:v%s", subChart.Image, version), craneOpts); err != nil {
+					return fmt.Errorf("mirroring image %s: %w", subChart.Image, err)
 				}
 			}
 
 		}
 	}
 
-	for _, image := range repo.images {
-		// mirror all other images with same tag than main chart
-		if err := c.mirrorArtifact(printer, fmt.Sprintf("%s:v%s", image, c.Version), craneOpts); err != nil {
-			return fmt.Errorf("mirroring image %s: %w", image, err)
+	baseVersion, err := semver.NewVersion(c.Version)
+	if err != nil {
+		return fmt.Errorf("error parsing space version: %w", err)
+	}
+	for _, image := range repo.Images {
+		include := true
+		if image.CompatibleChartVersion != "" {
+			constraint, err := semver.NewConstraint(image.CompatibleChartVersion)
+			if err != nil {
+				continue
+			}
+			include = constraint.Check(baseVersion) || oci.CheckPreReleaseConstraint(constraint, baseVersion)
+		}
+
+		if include {
+			version := fmt.Sprintf("v%s", c.Version)
+			image := image.Image
+			// with static tags
+			if parts := strings.Split(image, ":"); len(parts) > 1 {
+				image = parts[0]
+				version = parts[1]
+			}
+			if err := c.mirrorArtifact(printer, fmt.Sprintf("%s:%s", image, version), craneOpts); err != nil {
+				return fmt.Errorf("mirroring image %s: %w", image, err)
+			}
 		}
 	}
 
