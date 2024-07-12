@@ -14,29 +14,28 @@
 
 package mirror
 
-import "github.com/upbound/up/internal/oci"
+import (
+	"github.com/upbound/up/internal/oci"
+)
 
-type repository struct {
-	chart     string
-	images    []string
-	subCharts []subChart
+type Repository struct {
+	Chart     string           `yaml:"chart"`
+	Images    []ImageReference `yaml:"images"`
+	SubCharts []SubChart       `yaml:"subCharts"`
 }
 
-type subChart struct {
-	pathNavigator oci.PathNavigator
-	chart         string
-	image         string
+type ImageReference struct {
+	Image                  string `yaml:"image"`
+	CompatibleChartVersion string `yaml:"compatibleChartVersion,omitempty"`
 }
 
-type uxpVersionsPath struct {
-	Controller struct {
-		Crossplane struct {
-			SupportedVersions []string `json:"supportedVersions"`
-		} `json:"crossplane"`
-	} `json:"controller"`
+type SubChart struct {
+	PathNavigator     oci.PathNavigator `yaml:"pathNavigator,omitempty"`
+	PathNavigatorType string            `yaml:"pathNavigatorType"`
+	Chart             string            `yaml:"chart"`
+	Image             string            `yaml:"image"`
 }
 
 type config struct {
-	oci    []repository
-	images []string
+	OCI []Repository `yaml:"oci"`
 }

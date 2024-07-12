@@ -14,42 +14,29 @@
 
 package mirror
 
-var artifacts = config{
-	oci: []repository{
-		{
-			// spaces chart
-			// version given by --version in cmd
-			chart: "xpkg.upbound.io/spaces-artifacts/spaces",
-			// searchPath list all supported uxp versions in spaces chart
-			subCharts: []subChart{
-				{
-					pathNavigator: &uxpVersionsPath{},
-					chart:         "xpkg.upbound.io/upbound/universal-crossplane",
-					image:         "xpkg.upbound.io/upbound/crossplane",
-				},
-			},
-			// all images with the same tag then spaces helm-chart
-			// version given by --version in cmd
-			images: []string{
-				"xpkg.upbound.io/spaces-artifacts/hyperspace",
-				"xpkg.upbound.io/spaces-artifacts/mxe-composition-templates",
-				"xpkg.upbound.io/spaces-artifacts/mxp-authz-webhook",
-				"xpkg.upbound.io/spaces-artifacts/mxp-benchmark",
-				"xpkg.upbound.io/spaces-artifacts/mxp-charts",
-				"xpkg.upbound.io/spaces-artifacts/mxp-control-plane",
-				"xpkg.upbound.io/spaces-artifacts/mxp-host-cluster-worker",
-				"xpkg.upbound.io/spaces-artifacts/mxp-host-cluster",
-				"xpkg.upbound.io/spaces-artifacts/opentelemetry-collector-spaces",
-				"xpkg.upbound.io/spaces-artifacts/provider-host-cluster",
-			},
-		},
-	},
-	// additional images for prerequisits
-	images: []string{
-		"xpkg.upbound.io/spaces-artifacts/mcp-connector:0.6.0",
-		"xpkg.upbound.io/spaces-artifacts/mcp-connector-server:v0.6.0",
-		"xpkg.upbound.io/crossplane-contrib/function-auto-ready:v0.2.1",
-		"xpkg.upbound.io/crossplane-contrib/provider-helm:v0.19.0",
-		"xpkg.upbound.io/crossplane-contrib/provider-kubernetes:v0.14.0",
-	},
+import (
+	_ "embed"
+	"reflect"
+)
+
+// Embed the YAML file.
+//
+//go:embed config.yaml
+var configFile []byte
+
+type UXPVersionsPath struct {
+	Controller struct {
+		Crossplane struct {
+			SupportedVersions []string `json:"supportedVersions"`
+		} `json:"crossplane"`
+	} `json:"controller"`
+}
+
+func (j *UXPVersionsPath) GetSupportedVersions() ([]string, error) {
+	return j.Controller.Crossplane.SupportedVersions, nil
+}
+
+// init function to return byte slice and oci.PathNavigator
+func initConfig() ([]byte, map[string]reflect.Type) {
+	return configFile, map[string]reflect.Type{"uxpVersionsPath": reflect.TypeOf(UXPVersionsPath{})}
 }
