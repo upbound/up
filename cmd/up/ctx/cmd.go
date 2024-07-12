@@ -333,7 +333,7 @@ func (c *Cmd) RunNonInteractive(ctx context.Context, upCtx *upbound.Context, nav
 
 	// don't print anything else or we are going to pollute stdout
 	if c.Short {
-		fmt.Println(state.Breadcrumbs())
+		fmt.Println(m.state.Breadcrumbs())
 	} else {
 		fmt.Print(msg)
 	}
