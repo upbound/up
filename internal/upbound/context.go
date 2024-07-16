@@ -267,21 +267,15 @@ func (c *Context) buildSDKConfig(endpoint *url.URL) (*up.Config, error) {
 // BuildControllerClientConfig builds a REST config suitable for usage with any
 // K8s controller-runtime client.
 func (c *Context) BuildControllerClientConfig() (*rest.Config, error) {
-	cfg := &rest.Config{
+	return &rest.Config{
 		Host:    c.APIEndpoint.String(),
 		APIPath: controllerClientPath,
-		Transport: &http.Transport{
-			TLSClientConfig: &tls.Config{
-				InsecureSkipVerify: c.InsecureSkipTLSVerify, //nolint:gosec
-			},
+		TLSClientConfig: rest.TLSClientConfig{
+			Insecure: c.InsecureSkipTLSVerify, //nolint:gosec
 		},
-		UserAgent: version.UserAgent(),
-	}
-
-	if c.Profile.Session != "" {
-		cfg.BearerToken = c.Profile.Session
-	}
-	return cfg, nil
+		BearerToken: c.Profile.Session,
+		UserAgent:   version.UserAgent(),
+	}, nil
 }
 
 // applyOverrides applies applicable overrides to the given Flags based on the
