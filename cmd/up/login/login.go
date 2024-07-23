@@ -116,7 +116,7 @@ type LoginCmd struct {
 
 	Username string `short:"u" env:"UP_USER" xor:"identifier" help:"Username used to execute command."`
 	Password string `short:"p" env:"UP_PASSWORD" help:"Password for specified user. '-' to read from stdin."`
-	Token    string `short:"t" env:"UP_TOKEN" hidden:"" xor:"identifier" help:"Token used to execute command. '-' to read from stdin."`
+	Token    string `short:"t" env:"UP_TOKEN" xor:"identifier" help:"Upbound API token (personal access token) used to execute command. '-' to read from stdin."`
 
 	accountsEndpoint url.URL
 	// Common Upbound API configuration
