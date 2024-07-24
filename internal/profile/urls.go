@@ -30,7 +30,7 @@ var (
 
 // ParseSpacesK8sURL parses a URL and returns the namespace and optionally the
 // controlplane name (if specified).
-func ParseSpacesK8sURL(url string) (base string, resource types.NamespacedName, matches bool) {
+func ParseSpacesK8sURL(url string) (base string, ctp types.NamespacedName, matches bool) {
 	m := controlPlaneRE.FindStringSubmatch(url)
 	if m == nil {
 		return "", types.NamespacedName{}, false
@@ -44,7 +44,7 @@ func ParseSpacesK8sURL(url string) (base string, resource types.NamespacedName, 
 
 // ParseMCPK8sURL attempts to parse a legacy MCP URL and returns the name of the
 // matching control plane if it matches
-func ParseMCPK8sURL(url string) (resource types.NamespacedName, matches bool) {
+func ParseMCPK8sURL(url string) (ctp types.NamespacedName, matches bool) {
 	m := legacyControlPlanePathRE.FindStringSubmatch(url)
 	if m == nil {
 		return types.NamespacedName{}, false

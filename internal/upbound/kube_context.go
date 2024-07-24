@@ -18,12 +18,13 @@ import (
 	"encoding/json"
 	"strings"
 
-	"github.com/crossplane/crossplane-runtime/pkg/errors"
 	runtime "k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/client-go/tools/clientcmd"
 	clientcmdapi "k8s.io/client-go/tools/clientcmd/api"
 	"sigs.k8s.io/controller-runtime/pkg/client"
+
+	"github.com/crossplane/crossplane-runtime/pkg/errors"
 
 	"github.com/upbound/up/internal/profile"
 	"github.com/upbound/up/internal/version"
@@ -108,7 +109,7 @@ func (c *Context) GetCurrentContext() (context *clientcmdapi.Context, cluster *c
 	return context, cluster, auth, exists
 }
 
-func (c *Context) GetCurrentSpaceContextScope() (ingressHost string, resource types.NamespacedName, inSpace bool) {
+func (c *Context) GetCurrentSpaceContextScope() (ingressHost string, ctp types.NamespacedName, inSpace bool) {
 	context, cluster, _, exists := c.GetCurrentContext()
 	if !exists {
 		return "", types.NamespacedName{}, false
