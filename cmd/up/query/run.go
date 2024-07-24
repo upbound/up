@@ -96,12 +96,12 @@ func (c *cmd) Run(ctx context.Context, kongCtx *kong.Context, upCtx *upbound.Con
 	var querySpecs []*queryv1alpha1.QuerySpec
 	for gk, names := range gkNames {
 		if len(names) == 0 {
-			query := createQuerySpec(types.NamespacedName{Namespace: c.namespace}, gk, nil, c.OutputFormat)
+			query := createQuerySpec(types.NamespacedName{Namespace: c.namespace}, gk, nil, c.OutputFormat, c.Template, c.NoHeaders)
 			querySpecs = append(querySpecs, query)
 			continue
 		}
 		for _, name := range names {
-			query := createQuerySpec(types.NamespacedName{Namespace: c.namespace, Name: name}, gk, nil, c.OutputFormat)
+			query := createQuerySpec(types.NamespacedName{Namespace: c.namespace, Name: name}, gk, nil, c.OutputFormat, c.Template, c.NoHeaders)
 			querySpecs = append(querySpecs, query)
 		}
 	}
@@ -111,12 +111,12 @@ func (c *cmd) Run(ctx context.Context, kongCtx *kong.Context, upCtx *upbound.Con
 			catList = nil
 		}
 		if len(names) == 0 {
-			query := createQuerySpec(types.NamespacedName{Namespace: c.namespace}, metav1.GroupKind{}, catList, c.OutputFormat)
+			query := createQuerySpec(types.NamespacedName{Namespace: c.namespace}, metav1.GroupKind{}, catList, c.OutputFormat, c.Template, c.NoHeaders)
 			querySpecs = append(querySpecs, query)
 			continue
 		}
 		for _, name := range names {
-			query := createQuerySpec(types.NamespacedName{Namespace: c.namespace, Name: name}, metav1.GroupKind{}, catList, c.OutputFormat)
+			query := createQuerySpec(types.NamespacedName{Namespace: c.namespace, Name: name}, metav1.GroupKind{}, catList, c.OutputFormat, c.Template, c.NoHeaders)
 			querySpecs = append(querySpecs, query)
 		}
 	}
@@ -160,28 +160,88 @@ func (c *cmd) Run(ctx context.Context, kongCtx *kong.Context, upCtx *upbound.Con
 			}
 
 			// collect objects
-			for _, obj := range resp.Objects {
-				if obj.Object == nil {
-					return fmt.Errorf("received unexpected nil object in response")
-				}
-
-				u := &unstructured.Unstructured{Object: obj.Object.Object}
-				infos = append(infos, &cliresource.Info{
-					Client: nil,
-					Mapping: &meta.RESTMapping{
-						Resource: runtimeschema.GroupVersionResource{
-							Group: u.GroupVersionKind().Group,
+			if len(resp.Tables) > 0 {
+				for i := range resp.Tables {
+					tbl := &resp.Tables[i]
+					t := &metav1.Table{
+						TypeMeta: metav1.TypeMeta{
+							APIVersion: metav1.SchemeGroupVersion.String(),
+							Kind:       "Table",
 						},
-						GroupVersionKind: u.GroupVersionKind(),
-						Scope:            RESTScopeNameFunc(u.GetNamespace()),
-					},
-					Namespace:       u.GetNamespace(),
-					Name:            u.GetName(),
-					Source:          types.NamespacedName{Namespace: obj.ControlPlane.Namespace, Name: obj.ControlPlane.Name}.String(),
-					Object:          u,
-					ResourceVersion: u.GetResourceVersion(),
-				})
-				gks.Insert(u.GroupVersionKind().GroupKind())
+						ColumnDefinitions: tbl.Columns,
+						Rows:              tbl.Rows,
+					}
+					for i := range tbl.Rows {
+						r := &tbl.Rows[i]
+						if len(r.Object.Raw) > 0 && r.Object.Object == nil {
+							u := &unstructured.Unstructured{}
+							r.Object.Object = u
+							if err := json.Unmarshal(r.Object.Raw, &u.Object); err != nil {
+								return fmt.Errorf("failed to unmarshal object: %w", err)
+							}
+						}
+					}
+					info := &cliresource.Info{
+						Client: nil,
+						Mapping: &meta.RESTMapping{
+							Resource: runtimeschema.GroupVersionResource{
+								Group:   tbl.GroupVersionKind.Group,
+								Version: tbl.GroupVersionKind.Version,
+								// used to switch to another printer. We don't know
+								// the resource anyway and it has no impact on the
+								// output other than creation of a new printer.
+								Resource: fmt.Sprintf("table-%d", i),
+							},
+							GroupVersionKind: runtimeschema.GroupVersionKind{
+								Group:   tbl.GroupVersionKind.Group,
+								Version: tbl.GroupVersionKind.Version,
+								Kind:    tbl.GroupVersionKind.Kind,
+							},
+							Scope: RESTScopeNameFunc(meta.RESTScopeNameRoot),
+						},
+						Object: t,
+					}
+					if hasNamespacedResources(tbl) {
+						info.Mapping.Scope = RESTScopeNameFunc(meta.RESTScopeNameNamespace)
+					} else {
+						// remove namespace column
+						for i, col := range t.ColumnDefinitions {
+							if col.Name == "Namespace" {
+								t.ColumnDefinitions = append(t.ColumnDefinitions[:i], t.ColumnDefinitions[i+1:]...)
+								for j := range tbl.Rows {
+									t.Rows[j].Cells = append(t.Rows[j].Cells[:i], t.Rows[j].Cells[i+1:]...)
+								}
+								break
+							}
+						}
+					}
+					infos = append(infos, info)
+					gks.Insert(runtimeschema.GroupKind{Group: tbl.GroupVersionKind.Group, Kind: tbl.GroupVersionKind.Kind})
+				}
+			} else {
+				for _, obj := range resp.Objects {
+					if obj.Object == nil {
+						return fmt.Errorf("received unexpected nil object in response")
+					}
+
+					u := &unstructured.Unstructured{Object: obj.Object.Object}
+					infos = append(infos, &cliresource.Info{
+						Client: nil,
+						Mapping: &meta.RESTMapping{
+							Resource: runtimeschema.GroupVersionResource{
+								Group: u.GroupVersionKind().Group,
+							},
+							GroupVersionKind: u.GroupVersionKind(),
+							Scope:            RESTScopeNameFunc(u.GetNamespace()),
+						},
+						Namespace:       u.GetNamespace(),
+						Name:            u.GetName(),
+						Source:          types.NamespacedName{Namespace: obj.ControlPlane.Namespace, Name: obj.ControlPlane.Name}.String(),
+						Object:          u,
+						ResourceVersion: u.GetResourceVersion(),
+					})
+					gks.Insert(u.GroupVersionKind().GroupKind())
+				}
 			}
 
 			// do paging
@@ -228,15 +288,12 @@ func (c *cmd) humanReadablePrintObjects(kongCtx *kong.Context, infos []*cliresou
 	w := printers.GetNewTabWriter(separatorWriter)
 
 	var (
-		allErrs                []error
-		errs                   = sets.NewString()
-		printer                printers.ResourcePrinter
-		lastMapping            *meta.RESTMapping
-		allResourcesNamespaced = c.namespace != ""
+		allErrs     []error
+		errs        = sets.NewString()
+		printer     printers.ResourcePrinter
+		lastMapping *meta.RESTMapping
 	)
 	for ix := range objs {
-		obj := objs[ix]
-
 		var mapping *meta.RESTMapping
 		var info *cliresource.Info
 		if positioner != nil {
@@ -245,13 +302,6 @@ func (c *cmd) humanReadablePrintObjects(kongCtx *kong.Context, infos []*cliresou
 		} else {
 			info = infos[ix]
 			mapping = info.Mapping
-		}
-
-		allResourcesNamespaced = allResourcesNamespaced && info.Namespace != ""
-		printWithNamespace := c.namespace == ""
-
-		if mapping != nil && mapping.Scope.Name() == meta.RESTScopeNameRoot {
-			printWithNamespace = false
 		}
 
 		if shouldGetNewPrinterForMapping(printer, lastMapping, mapping) {
@@ -270,7 +320,7 @@ func (c *cmd) humanReadablePrintObjects(kongCtx *kong.Context, infos []*cliresou
 			}
 
 			var err error
-			printer, err = c.createPrinter(mapping, printWithNamespace, printWithKind)
+			printer, err = c.createPrinter(mapping, false, printWithKind)
 			if err != nil {
 				if !errs.Has(err.Error()) {
 					errs.Insert(err.Error())
@@ -282,7 +332,7 @@ func (c *cmd) humanReadablePrintObjects(kongCtx *kong.Context, infos []*cliresou
 			lastMapping = mapping
 		}
 
-		if err := printer.PrintObj(obj, w); err != nil {
+		if err := printer.PrintObj(info.Object, w); err != nil {
 			return err
 		}
 	}
@@ -412,44 +462,39 @@ func (c *cmd) createPrinter(mapping *meta.RESTMapping, withNamespace bool, withK
 	return printer.PrintObj, nil
 }
 
-func createQuerySpec(obj types.NamespacedName, gk metav1.GroupKind, categories []string, outputFormat string) *queryv1alpha1.QuerySpec {
+func createQuerySpec(nname types.NamespacedName, gk metav1.GroupKind, categories []string, outputFormat string, tmpl string, noHeaders bool) *queryv1alpha1.QuerySpec {
 	// retrieve minimal schema for the given output format
-	var schema interface{}
+	var obj *common.JSON
+	var tbl *queryv1alpha1.QueryTable
 	switch outputFormat {
 	case "", "wide":
-		schema = map[string]interface{}{
-			"kind":       true,
-			"apiVersion": true,
-			"metadata": map[string]interface{}{
-				"creationTimestamp": true,
-				"deletionTimestamp": true,
-				"name":              true,
-				"namespace":         true,
-			},
-			"status": map[string]interface{}{
-				"conditions": true,
-			},
+		if tmpl == "" {
+			tbl = &queryv1alpha1.QueryTable{
+				NoHeaders: noHeaders,
+			}
+		} else {
+			obj = &common.JSON{Object: true} // everything
 		}
 	case "name":
-		schema = map[string]interface{}{
+		obj = &common.JSON{Object: map[string]interface{}{
 			"kind":       true,
 			"apiVersion": true,
 			"metadata": map[string]interface{}{
 				"name":      true,
 				"namespace": true,
 			},
-		}
+		}}
 	default:
 		// TODO: would be good to have a way to exclude managed fields
-		schema = true // everything
+		obj = &common.JSON{Object: true} // everything
 	}
 
 	return &queryv1alpha1.QuerySpec{
 		QueryTopLevelResources: queryv1alpha1.QueryTopLevelResources{
 			Filter: queryv1alpha1.QueryTopLevelFilter{
 				QueryFilter: queryv1alpha1.QueryFilter{
-					Namespace:  obj.Namespace,
-					Name:       obj.Name,
+					Namespace:  nname.Namespace,
+					Name:       nname.Name,
 					Categories: categories,
 					Group:      gk.Group,
 					Kind:       gk.Kind,
@@ -460,9 +505,8 @@ func createQuerySpec(obj types.NamespacedName, gk metav1.GroupKind, categories [
 				Cursor: true,
 				Objects: &queryv1alpha1.QueryObjects{
 					ControlPlane: true,
-					Object: &common.JSON{
-						Object: schema,
-					},
+					Object:       obj,
+					Table:        tbl,
 				},
 			},
 		},
@@ -480,4 +524,31 @@ func (f RESTScopeNameFunc) Name() meta.RESTScopeName {
 		return meta.RESTScopeNameRoot
 	}
 	return meta.RESTScopeNameNamespace
+}
+
+// hasNamespacedResources looks for cells with a non-empty namespace.
+func hasNamespacedResources(t *queryv1alpha1.QueryResponseTable) bool {
+	nsColumn := -1
+	for i, col := range t.Columns {
+		if col.Name == "Namespace" {
+			nsColumn = i
+			break
+		}
+	}
+
+	if nsColumn == -1 {
+		return false
+	}
+
+	for _, row := range t.Rows {
+		if nsColumn >= len(row.Cells) {
+			continue
+		}
+		if row.Cells[nsColumn] == "" || row.Cells[nsColumn] == nil {
+			continue
+		}
+		return true
+	}
+
+	return false
 }
