@@ -25,6 +25,8 @@ import (
 	"github.com/alecthomas/kong"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 
+	"github.com/crossplane/crossplane-runtime/pkg/errors"
+
 	"github.com/upbound/up/cmd/up/query/resource"
 	"github.com/upbound/up/internal/feature"
 	"github.com/upbound/up/internal/upbound"
@@ -54,17 +56,37 @@ func (c *QueryCmd) AfterApply(kongCtx *kong.Context) error { // nolint:gocyclo /
 	}
 	kongCtx.Bind(upCtx)
 
-	_, ctp, isSpace := upCtx.GetCurrentSpaceContextScope()
-
-	if c.Group == "" && !c.AllGroups {
-		if isSpace && ctp.Namespace != "" {
-			c.Group = ctp.Namespace
-		}
-	}
 	kubeconfig, err := upCtx.Kubecfg.ClientConfig()
 	if err != nil {
 		return err
 	}
+
+	// where are we?
+	base, ctp, isSpace := upCtx.GetCurrentSpaceContextScope()
+	if !isSpace {
+		return errors.New("not connected to a Space. Use 'up ctx' to switch to a Space or control plane context.")
+	}
+	if ctp.Namespace != "" && ctp.Name != "" {
+		// on a controlplane
+		if c.AllGroups {
+			return errors.Errorf("cannot use --all-groups in a control plane context. Use `up ctx ..' to switch to the Space.")
+		}
+		if c.Group != "" {
+			return errors.Errorf("cannot use --group in a control plane context. Use `up ctx ..' to switch to the Space.")
+		}
+		c.Group = ctp.Namespace
+		c.ControlPlane = ctp.Name
+
+		// move from ctp URL to Spaces API in order to send Query API requests
+		kubeconfig.Host = base
+		kubeconfig.APIPath = ""
+	} else if c.Group == "" && !c.AllGroups {
+		// on the Spaces API
+		if ctp.Namespace != "" {
+			c.Group = ctp.Namespace
+		}
+	}
+
 	kongCtx.Bind(kubeconfig)
 
 	// create query template, kind depending on the scope
