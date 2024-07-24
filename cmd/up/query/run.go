@@ -171,6 +171,16 @@ func (c *cmd) Run(ctx context.Context, kongCtx *kong.Context, upCtx *upbound.Con
 						ColumnDefinitions: tbl.Columns,
 						Rows:              tbl.Rows,
 					}
+					for i := range tbl.Rows {
+						r := &tbl.Rows[i]
+						if len(r.Object.Raw) > 0 && r.Object.Object == nil {
+							u := &unstructured.Unstructured{}
+							r.Object.Object = u
+							if err := json.Unmarshal(r.Object.Raw, &u.Object); err != nil {
+								return fmt.Errorf("failed to unmarshal object: %w", err)
+							}
+						}
+					}
 					info := &cliresource.Info{
 						Client: nil,
 						Mapping: &meta.RESTMapping{
