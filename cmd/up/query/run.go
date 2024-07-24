@@ -27,6 +27,7 @@ import (
 	"github.com/alecthomas/kong"
 	"github.com/pterm/pterm"
 	corev1 "k8s.io/api/core/v1"
+	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/api/meta"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
@@ -38,12 +39,15 @@ import (
 	"k8s.io/apimachinery/pkg/util/sets"
 	"k8s.io/cli-runtime/pkg/printers"
 	cliresource "k8s.io/cli-runtime/pkg/resource"
+	"k8s.io/client-go/kubernetes"
 	"k8s.io/client-go/kubernetes/scheme"
 	"k8s.io/client-go/rest"
 	"k8s.io/kubectl/pkg/cmd/get"
 	"k8s.io/utils/ptr"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/yaml"
+
+	"github.com/crossplane/crossplane-runtime/pkg/errors"
 
 	"github.com/upbound/up-sdk-go/apis/common"
 	queryv1alpha1 "github.com/upbound/up-sdk-go/apis/query/v1alpha1"
@@ -87,9 +91,15 @@ func (c *cmd) Run(ctx context.Context, kongCtx *kong.Context, upCtx *upbound.Con
 	if upCtx.WrapTransport != nil {
 		kubeconfig.Wrap(upCtx.WrapTransport)
 	}
+
+	// pre-check that the server supports the v1alpha1 query API
+	if err := checkQueryAPIAvailability(kubeconfig); err != nil {
+		return err
+	}
+
 	kc, err := client.New(kubeconfig, client.Options{Scheme: queryScheme})
 	if err != nil {
-		return fmt.Errorf("failed to create client: %w", err)
+		return errors.Wrap(err, "failed to create client")
 	}
 
 	// create queries
@@ -136,23 +146,23 @@ func (c *cmd) Run(ctx context.Context, kongCtx *kong.Context, upCtx *upbound.Con
 			if c.Flags.Debug > 0 {
 				kinds, _, err := queryScheme.ObjectKinds(query)
 				if err != nil {
-					return fmt.Errorf("failed to get object kinds: %w", err)
+					return errors.Wrap(err, "failed to get object kinds")
 				}
 				if len(kinds) != 1 {
-					return fmt.Errorf("expected exactly one kind, got %d", len(kinds))
+					return errors.Errorf("expected exactly one kind, got %d", len(kinds))
 				}
 				query := query.DeepCopyQueryObject()
 				query.GetObjectKind().SetGroupVersionKind(queryv1alpha1.SchemeGroupVersion.WithKind(kinds[0].Kind))
 				bs, err := yaml.Marshal(query)
 				if err != nil {
-					return fmt.Errorf("failed to marshal query: %w", err)
+					return errors.Wrap(err, "failed to marshal query")
 				}
 				fmt.Fprintf(kongCtx.Stderr, "Sending query:\n\n%s\n", string(bs)) // nolint:errcheck // just debug output
 			}
 
 			// send request
 			if err := kc.Create(ctx, query); err != nil {
-				return fmt.Errorf("SpaceQuery request failed: %w", err)
+				return errors.Wrap(err, "SpaceQuery request failed")
 			}
 			resp := query.GetResponse()
 			for _, w := range resp.Warnings {
@@ -551,4 +561,40 @@ func hasNamespacedResources(t *queryv1alpha1.QueryResponseTable) bool {
 	}
 
 	return false
+}
+
+func checkQueryAPIAvailability(kubeconfig *rest.Config) error { //nolint:gocyclo // it is what it is ¯\_(ツ)_/¯
+	cl, err := kubernetes.NewForConfig(kubeconfig)
+	if err != nil {
+		return errors.Wrap(err, "failed to create client: %v")
+	}
+
+	// check for query API group
+	groups, err := cl.Discovery().ServerGroups()
+	if err != nil && !apierrors.IsNotFound(err) {
+		return errors.Wrap(err, "failed to discover server groups")
+	}
+	foundV1alpha1 := false
+	foundLaterVersion := false
+	for _, g := range groups.Groups {
+		if g.Name != queryv1alpha1.Group {
+			continue
+		}
+		for _, v := range g.Versions {
+			if v.Version == queryv1alpha1.Version {
+				foundV1alpha1 = true
+			} else {
+				foundLaterVersion = true
+			}
+		}
+	}
+
+	if !foundV1alpha1 && foundLaterVersion {
+		return errors.Errorf("server does not support the %s/%s API anymore. Update 'up' to a later version.", queryv1alpha1.Group, queryv1alpha1.Version)
+	}
+	if !foundV1alpha1 && !foundLaterVersion {
+		return errors.Errorf("server does not support the %s/%s API. Make sure the 'apollo' tech preview feature is enabled on the Space.", queryv1alpha1.Group, queryv1alpha1.Version)
+	}
+
+	return nil
 }
