@@ -52,8 +52,16 @@ Client:
 Server:
   Crossplane Version:	{{.CrossplaneVersion}}
   Spaces Controller Version:	{{.SpacesControllerVersion}}
-{{- end}}{{- end}}`
+{{- end}}{{- end}}
+
+{{- if ne .ConnectAgent nil}}
+Connect Agent:
+  Connect Agent Version: {{.ConnectAgent}}
+{{- end}}`
 )
+
+// TODO(jastang): remove hardcoded version if/when we support agent update.
+type connectAgentVersion string
 
 type clientVersion struct {
 	Arch      string `json:"arch,omitempty" yaml:"arch,omitempty"`
@@ -69,8 +77,9 @@ type serverVersion struct {
 }
 
 type versionInfo struct {
-	Client clientVersion  `json:"client" yaml:"client"`
-	Server *serverVersion `json:"server,omitempty" yaml:"server,omitempty"`
+	Client       clientVersion       `json:"client" yaml:"client"`
+	ConnectAgent connectAgentVersion `json:"agent" yaml:"agent"`
+	Server       *serverVersion      `json:"server,omitempty" yaml:"server,omitempty"`
 }
 
 type Cmd struct {
@@ -155,6 +164,8 @@ func (c *Cmd) BuildVersionInfo(ctx context.Context, kongCtx *kong.Context, upCtx
 	if v.Server.SpacesControllerVersion == "" {
 		v.Server.SpacesControllerVersion = versionUnknown
 	}
+
+	v.ConnectAgent = connectAgentVersion(version.AgentVersion())
 
 	return v
 }
