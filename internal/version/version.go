@@ -50,7 +50,7 @@ const (
 
 var (
 	version      string
-	agentVersion string = "0.0.0-408.g343d295"
+	agentVersion string = "0.0.0-416.g084be68"
 	gitCommit    string = "unknown-commit"
 	target       string = string(ReleaseTargetDebug)
 )
