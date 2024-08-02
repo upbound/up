@@ -21,21 +21,29 @@ import (
 )
 
 // ConvertToV1beta1 converts v1.Dependency types to v1beta1.Dependency types.
-func ConvertToV1beta1(in metav1.Dependency) v1beta1.Dependency {
+func ConvertToV1beta1(in metav1.Dependency) (v1beta1.Dependency, bool) {
 	betaD := v1beta1.Dependency{
 		Constraints: in.Version,
 	}
-	if in.Provider != nil && in.Configuration == nil {
+
+	switch {
+	case in.Provider != nil:
 		betaD.Package = *in.Provider
 		betaD.Type = v1beta1.ProviderPackageType
-	}
 
-	if in.Configuration != nil && in.Provider == nil {
+	case in.Configuration != nil:
 		betaD.Package = *in.Configuration
 		betaD.Type = v1beta1.ConfigurationPackageType
+
+	case in.Function != nil:
+		betaD.Package = *in.Function
+		betaD.Type = v1beta1.FunctionPackageType
+
+	default:
+		return betaD, false
 	}
 
-	return betaD
+	return betaD, true
 }
 
 // ConvertToV1alpha1 converts v1.Dependency types to v1alpha1.Dependency types.
