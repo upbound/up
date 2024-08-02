@@ -38,7 +38,7 @@ import (
 )
 
 var (
-	spacefieldNames = []string{"GROUP", "NAME", "CROSSPLANE", "SYNCED", "READY", "MESSAGE", "AGE"}
+	spacefieldNames = []string{"GROUP", "NAME", "CROSSPLANE", "READY", "HEALTHY", "MESSAGE", "AGE"}
 )
 
 // BeforeReset is the first hook to run.
@@ -142,9 +142,9 @@ func extractSpaceFields(obj any) []string {
 		ctp.GetNamespace(),
 		ctp.GetName(),
 		v,
-		string(ctp.GetCondition(xpcommonv1.TypeSynced).Status),
 		string(ctp.GetCondition(xpcommonv1.TypeReady).Status),
-		ctp.Annotations["internal.spaces.upbound.io/message"],
+		string(ctp.GetCondition(spacesv1beta1.ConditionTypeHealthy).Status),
+		ctp.Status.Message,
 		formatAge(ptr.To(time.Since(ctp.CreationTimestamp.Time))),
 	}
 }
