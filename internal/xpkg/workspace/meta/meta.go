@@ -34,6 +34,7 @@ const (
 	errInvalidMetaFile           = "invalid meta type supplied"
 	errMetaContainsDupeDep       = "meta file contains duplicate dependency"
 	errUnsupportedPackageVersion = "unsupported package version supplied"
+	errInvalidDep                = "meta file contains invalid dependency"
 )
 
 // Meta provides helpful methods for interacting with a metafile's
@@ -59,7 +60,11 @@ func (m *Meta) DependsOn() ([]v1beta1.Dependency, error) {
 
 	out := make([]v1beta1.Dependency, len(pkg.GetDependencies()))
 	for i, d := range pkg.GetDependencies() {
-		out[i] = manager.ConvertToV1beta1(d)
+		dep, ok := manager.ConvertToV1beta1(d)
+		if !ok {
+			return nil, errors.New(errInvalidDep)
+		}
+		out[i] = dep
 	}
 
 	return out, nil

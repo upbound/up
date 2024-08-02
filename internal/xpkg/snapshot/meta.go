@@ -91,7 +91,11 @@ func (m *MetaValidator) Validate(ctx context.Context, data any) *validate.Result
 	errs = append(errs, validateAPIVersion(o))
 
 	for i, d := range pkg.GetDependencies() {
-		cd := manager.ConvertToV1beta1(d)
+		cd, ok := manager.ConvertToV1beta1(d)
+		if !ok {
+			errs = append(errs, fmt.Errorf("invalid dependency at position %d", i))
+			continue
+		}
 		for _, v := range m.validators {
 			errs = append(errs, v.validate(ctx, i, cd))
 		}
