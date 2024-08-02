@@ -18,6 +18,8 @@ import (
 	"context"
 	"fmt"
 
+	"github.com/upbound/up-sdk-go/apis/spaces/v1beta1"
+
 	corev1 "k8s.io/api/core/v1"
 	kerrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -151,8 +153,8 @@ func convert(ctp *resources.ControlPlane) *controlplane.Response {
 		Group:             ctp.GetNamespace(),
 		Name:              ctp.GetName(),
 		CrossplaneVersion: ctp.GetCrossplaneVersion(),
-		Synced:            string(ctp.GetCondition(xpcommonv1.TypeSynced).Status),
 		Ready:             string(ctp.GetCondition(xpcommonv1.TypeReady).Status),
+		Healthy:           string(ctp.GetCondition(v1beta1.ConditionTypeHealthy).Status),
 		Message:           ctp.GetMessage(),
 		Age:               ctp.GetAge(),
 		Cfg:               "",

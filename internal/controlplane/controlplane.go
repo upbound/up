@@ -26,8 +26,8 @@ type Response struct {
 	Group             string
 	Name              string
 	CrossplaneVersion string
-	Synced            string
 	Ready             string
+	Healthy           string
 	Message           string
 	Age               *time.Duration
 
