@@ -19,6 +19,8 @@ import (
 	"errors"
 	"testing"
 
+	spacesv1beta1 "github.com/upbound/up-sdk-go/apis/spaces/v1beta1"
+
 	"github.com/google/go-cmp/cmp"
 	kerrors "k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
@@ -427,9 +429,9 @@ func TestConvert(t *testing.T) {
 						Name:      "kubeconfig-ctp1",
 						Namespace: "default",
 					})
-					c.SetConditions([]xpcommonv1.Condition{xpcommonv1.ReconcileSuccess()}...)
 					c.SetConditions([]xpcommonv1.Condition{xpcommonv1.Available()}...)
-					c.SetAnnotations(map[string]string{"internal.spaces.upbound.io/message": ""})
+					c.SetConditions(spacesv1beta1.Healthy())
+					c.SetMessage("")
 
 					return c
 				}(),
@@ -439,8 +441,8 @@ func TestConvert(t *testing.T) {
 					Name:     "ctp1",
 					ID:       "mxp1",
 					Group:    "default",
-					Synced:   "True",
 					Ready:    "True",
+					Healthy:  "True",
 					ConnName: "kubeconfig-ctp1",
 					Message:  "",
 				},
@@ -458,9 +460,9 @@ func TestConvert(t *testing.T) {
 						Name:      "kubeconfig-ctp1",
 						Namespace: "default",
 					})
-					c.SetConditions(xpcommonv1.ReconcileSuccess())
 					c.SetConditions(xpcommonv1.Creating().WithMessage("something"))
-					c.SetAnnotations(map[string]string{"internal.spaces.upbound.io/message": "creating..."})
+					c.SetConditions(spacesv1beta1.Healthy())
+					c.SetMessage("creating...")
 
 					return c
 				}(),
@@ -470,8 +472,8 @@ func TestConvert(t *testing.T) {
 					Name:     "ctp1",
 					ID:       "mxp1",
 					Group:    "default",
-					Synced:   "True",
 					Ready:    "False",
+					Healthy:  "True",
 					Message:  "creating...",
 					ConnName: "kubeconfig-ctp1",
 				},
@@ -484,18 +486,18 @@ func TestConvert(t *testing.T) {
 					c := &resources.ControlPlane{}
 					c.SetName("ctp1")
 					c.SetControlPlaneID("mxp1")
-					c.SetConditions(xpcommonv1.ReconcileSuccess())
 					c.SetConditions([]xpcommonv1.Condition{xpcommonv1.Available()}...)
+					c.SetConditions(spacesv1beta1.Healthy())
 
 					return c
 				}(),
 			},
 			want: want{
 				resp: &controlplane.Response{
-					Name:   "ctp1",
-					ID:     "mxp1",
-					Synced: "True",
-					Ready:  "True",
+					Name:    "ctp1",
+					ID:      "mxp1",
+					Ready:   "True",
+					Healthy: "True",
 				},
 			},
 		},
