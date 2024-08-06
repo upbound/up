@@ -98,11 +98,15 @@ func (c *ControlPlane) GetCrossplaneVersion() string {
 }
 
 func (c *ControlPlane) GetMessage() string {
-	var ann map[string]string
-	if err := fieldpath.Pave(c.Object).GetValueInto("metadata.annotations", &ann); err != nil {
+	msg, err := fieldpath.Pave(c.Object).GetString("status.message")
+	if err != nil {
 		return ""
 	}
-	return ann["internal.spaces.upbound.io/message"]
+	return msg
+}
+
+func (c *ControlPlane) SetMessage(msg string) {
+	_ = fieldpath.Pave(c.Object).SetString("status.message", msg)
 }
 
 func (c *ControlPlane) GetAge() *time.Duration {
