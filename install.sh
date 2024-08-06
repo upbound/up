@@ -79,7 +79,8 @@ if [ $BIN = "up" ]; then
   echo up version
   echo
   echo "Visit https://upbound.io to get started. 🚀"
-  echo "Have a nice day! 👋\n"
+  echo "Have a nice day! 👋"
+  echo
 fi
 
 if [ $BIN = "docker-credential-up" ]; then
@@ -94,5 +95,6 @@ if [ $BIN = "docker-credential-up" ]; then
   echo docker-credential-up -v
   echo
   echo 'Add "xpkg.upbound.io": "up" to the "credHelpers" section of your Docker config file. 🚀'
-  echo "Have a nice day! 👋\n"
+  echo "Have a nice day! 👋"
+  echo
 fi
