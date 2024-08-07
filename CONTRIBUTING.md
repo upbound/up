@@ -26,7 +26,7 @@ This is a slimmed-down version of the release process described [here](https://g
    desired version (e.g. `v0.25.0`).
 1. **build/publish**: Run the `CI` action on the release-branch (**not on the tag!**).
 1. **tag next pre-release**: Run the `tag` action on the main development branch
-   with the `rc.0` for the next release (e.g. `v0.26.0-rc.0`).
+   with the `-0.rc.0` for the next release (e.g. `v0.26.0-0.rc.0`).
 1. **verify**: Verify all artifacts have been published successfully, perform
    sanity testing.
    - Check in https://cli.upbound.io/stable?prefix=build/release-0.25/v0.25.0.
@@ -49,6 +49,7 @@ This is a slimmed-down version of the release process described [here](https://g
    - "Generate release notes" from previous release ("auto" might not work).
    - Make sure the release notes are complete, presize and well formatted.
    - Publish the well authored Github release.
+1. **invalidate cache**: If needed see the internal Notion documentation.
 1. **wait for CDN**: Wait for CloudFront to distribute the artifacts, e.g. wait
    until `curl -sL https://cli.upbound.io | sh -x && ./up version` gives the new
    release.
