@@ -280,6 +280,9 @@ func (c *Cmd) RunNonInteractive(ctx context.Context, upCtx *upbound.Context, nav
 	}
 	for _, s := range strings.Split(c.Argument, "/") {
 		switch s {
+		case "":
+			// Ignore empty path components. This allows for trailing slashes,
+			// as well as duplicate slashes.
 		case ".":
 		case "..":
 			back, ok := m.state.(Back)

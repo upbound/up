@@ -53,12 +53,15 @@ import (
 var (
 	compResources *yaml.Path
 	compBase      *yaml.Path
+	compPipeline  *yaml.Path
 )
 
 const (
 	yamlExt = ".yaml"
 
 	errCompositionResources = "resources in Composition are malformed"
+	errCompositionPipeline  = "pipeline in Composition is malformed"
+	errCompositionMode      = "unknown Composition mode"
 	errInvalidFileURI       = "invalid path supplied"
 	errInvalidPackage       = "invalid package; more than one meta (configuration or provider) file supplied"
 )
@@ -71,6 +74,10 @@ func init() {
 		panic(err)
 	}
 	compBase, err = yaml.PathString("$.base")
+	if err != nil {
+		panic(err)
+	}
+	compPipeline, err = yaml.PathString("$.spec.pipeline")
 	if err != nil {
 		panic(err)
 	}
@@ -358,11 +365,39 @@ func (v *View) parseComposition(ctx context.Context, pCtx parseContext) error {
 		return nil // nolint:nilerr
 	}
 
-	resNode, err := compResources.FilterNode(pCtx.node)
-	if err != nil {
-		return err
+	mode := xpextv1.CompositionModeResources
+	if cp.Spec.Mode != nil {
+		mode = *cp.Spec.Mode
 	}
-	seq, ok := resNode.(*ast.SequenceNode)
+	switch mode {
+	case xpextv1.CompositionModeResources:
+		resNode, err := compResources.FilterNode(pCtx.node)
+		if err != nil {
+			return err
+		}
+		pCtx.node = resNode
+		pCtx.rootNode = false
+
+		return v.parseCompositionResources(ctx, pCtx)
+
+	case xpextv1.CompositionModePipeline:
+		pipeNode, err := compPipeline.FilterNode(pCtx.node)
+		if err != nil {
+			return err
+		}
+
+		pCtx.node = pipeNode
+		pCtx.rootNode = false
+
+		return v.parseCompositionPipeline(ctx, pCtx)
+
+	default:
+		return errors.New(errCompositionMode)
+	}
+}
+
+func (v *View) parseCompositionResources(ctx context.Context, pCtx parseContext) error {
+	seq, ok := pCtx.node.(*ast.SequenceNode)
 	if !ok {
 		// NOTE(hasheddan): if the Composition's resources field is not a
 		// sequence node, we skip parsing embedded resources because the
@@ -400,6 +435,18 @@ func (v *View) parseComposition(ctx context.Context, pCtx parseContext) error {
 		}
 		dependants[id] = struct{}{}
 	}
+
+	return nil
+}
+
+func (v *View) parseCompositionPipeline(_ context.Context, pCtx parseContext) error {
+	_, ok := pCtx.node.(*ast.SequenceNode)
+	if !ok {
+		return errors.New(errCompositionPipeline)
+	}
+
+	// TODO(adamwg): Parse the pipeline more thoroughly to expose any issues.
+
 	return nil
 }
 

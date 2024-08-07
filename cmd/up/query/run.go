@@ -106,12 +106,12 @@ func (c *cmd) Run(ctx context.Context, kongCtx *kong.Context, upCtx *upbound.Con
 	var querySpecs []*queryv1alpha1.QuerySpec
 	for gk, names := range gkNames {
 		if len(names) == 0 {
-			query := createQuerySpec(types.NamespacedName{Namespace: c.namespace}, gk, nil, c.OutputFormat, c.Template, c.NoHeaders)
+			query := createQuerySpec(types.NamespacedName{Namespace: c.namespace}, gk, nil, c.OutputFormat, c.Template)
 			querySpecs = append(querySpecs, query)
 			continue
 		}
 		for _, name := range names {
-			query := createQuerySpec(types.NamespacedName{Namespace: c.namespace, Name: name}, gk, nil, c.OutputFormat, c.Template, c.NoHeaders)
+			query := createQuerySpec(types.NamespacedName{Namespace: c.namespace, Name: name}, gk, nil, c.OutputFormat, c.Template)
 			querySpecs = append(querySpecs, query)
 		}
 	}
@@ -121,12 +121,12 @@ func (c *cmd) Run(ctx context.Context, kongCtx *kong.Context, upCtx *upbound.Con
 			catList = nil
 		}
 		if len(names) == 0 {
-			query := createQuerySpec(types.NamespacedName{Namespace: c.namespace}, metav1.GroupKind{}, catList, c.OutputFormat, c.Template, c.NoHeaders)
+			query := createQuerySpec(types.NamespacedName{Namespace: c.namespace}, metav1.GroupKind{}, catList, c.OutputFormat, c.Template)
 			querySpecs = append(querySpecs, query)
 			continue
 		}
 		for _, name := range names {
-			query := createQuerySpec(types.NamespacedName{Namespace: c.namespace, Name: name}, metav1.GroupKind{}, catList, c.OutputFormat, c.Template, c.NoHeaders)
+			query := createQuerySpec(types.NamespacedName{Namespace: c.namespace, Name: name}, metav1.GroupKind{}, catList, c.OutputFormat, c.Template)
 			querySpecs = append(querySpecs, query)
 		}
 	}
@@ -472,16 +472,14 @@ func (c *cmd) createPrinter(mapping *meta.RESTMapping, withNamespace bool, withK
 	return printer.PrintObj, nil
 }
 
-func createQuerySpec(nname types.NamespacedName, gk metav1.GroupKind, categories []string, outputFormat string, tmpl string, noHeaders bool) *queryv1alpha1.QuerySpec {
+func createQuerySpec(nname types.NamespacedName, gk metav1.GroupKind, categories []string, outputFormat string, tmpl string) *queryv1alpha1.QuerySpec {
 	// retrieve minimal schema for the given output format
 	var obj *common.JSON
 	var tbl *queryv1alpha1.QueryTable
 	switch outputFormat {
 	case "", "wide":
 		if tmpl == "" {
-			tbl = &queryv1alpha1.QueryTable{
-				NoHeaders: noHeaders,
-			}
+			tbl = &queryv1alpha1.QueryTable{}
 		} else {
 			obj = &common.JSON{Object: true} // everything
 		}

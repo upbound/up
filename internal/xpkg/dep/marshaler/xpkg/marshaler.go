@@ -28,6 +28,7 @@ import (
 	"k8s.io/apimachinery/pkg/runtime"
 
 	xpmetav1 "github.com/crossplane/crossplane/apis/pkg/meta/v1"
+	xpmetav1beta1 "github.com/crossplane/crossplane/apis/pkg/meta/v1beta1"
 
 	"github.com/crossplane/crossplane-runtime/pkg/parser"
 	"github.com/crossplane/crossplane/apis/pkg/v1beta1"
@@ -156,12 +157,16 @@ func processPackage(pkg linter.Package) (*ParsedPackage, error) {
 	meta := metas[0]
 	var linter linter.Linter
 	var pkgType v1beta1.PackageType
-	if meta.GetObjectKind().GroupVersionKind().Kind == xpmetav1.ConfigurationKind {
+	switch meta.GetObjectKind().GroupVersionKind().Kind {
+	case xpmetav1.ConfigurationKind:
 		linter = xpkg.NewConfigurationLinter()
 		pkgType = v1beta1.ConfigurationPackageType
-	} else {
+	case xpmetav1.ProviderKind:
 		linter = xpkg.NewProviderLinter()
 		pkgType = v1beta1.ProviderPackageType
+	case xpmetav1beta1.FunctionKind:
+		linter = xpkg.NewFunctionLinter()
+		pkgType = v1beta1.FunctionPackageType
 	}
 	if err := linter.Lint(pkg); err != nil {
 		return nil, errors.Wrap(err, errLintPackage)
