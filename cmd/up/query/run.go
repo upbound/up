@@ -134,7 +134,7 @@ func (c *cmd) Run(ctx context.Context, kongCtx *kong.Context, upCtx *upbound.Con
 	// send queries and collect objects
 	var infos []*cliresource.Info
 	gks := sets.New[runtimeschema.GroupKind]()
-	for _, spec := range querySpecs {
+	for qi, spec := range querySpecs {
 		var cursor string
 		var page int
 		for {
@@ -200,7 +200,7 @@ func (c *cmd) Run(ctx context.Context, kongCtx *kong.Context, upCtx *upbound.Con
 								// used to switch to another printer. We don't know
 								// the resource anyway and it has no impact on the
 								// output other than creation of a new printer.
-								Resource: fmt.Sprintf("table-%d", i),
+								Resource: fmt.Sprintf("table-%d", qi+i),
 							},
 							GroupVersionKind: runtimeschema.GroupVersionKind{
 								Group:   tbl.GroupVersionKind.Group,
