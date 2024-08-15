@@ -1,0 +1,24 @@
+# This file controls automatic PR reviewer assignment. See the following docs:
+#
+# * https://docs.github.com/en/repositories/managing-your-repositorys-settings-and-features/customizing-your-repository/about-code-owners
+# * https://docs.github.com/en/organizations/organizing-members-into-teams/managing-code-review-settings-for-your-team
+#
+# The goal of this file is to automatically set reviewers on a PR. 
+#
+# Guidelines
+# * All Upbound employees have permission to approve a PR, but only maintainers
+# can merge PRs. 
+# * Subject matter experts are identified for specific areas of the project. 
+# * PRs don't require approval by a subject matter expert.
+# * PRs only need 1 approval. 
+# * Maintainers should not approve their own PRs.
+#
+
+#
+#
+# Where possible, prefer explicitly specifying a maintainer who is a subject
+# matter expert for a particular part of the codebase rather than using a group.
+#
+
+# Fallback owners
+*                                           @adamwg
