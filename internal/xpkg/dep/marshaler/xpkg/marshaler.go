@@ -213,7 +213,7 @@ func finalizePkg(pkg *ParsedPackage) (*ParsedPackage, error) { // nolint:gocyclo
 }
 
 func determineDeps(o runtime.Object) ([]v1beta1.Dependency, error) {
-	pkg, ok := scheme.TryConvertToPkg(o, &xpmetav1.Provider{}, &xpmetav1.Configuration{})
+	pkg, ok := scheme.TryConvertToPkg(o, &xpmetav1.Provider{}, &xpmetav1.Configuration{}, &xpmetav1beta1.Function{})
 	if !ok {
 		return nil, errors.New(errFailedToConvertMetaToPackage)
 	}
@@ -230,14 +230,20 @@ func convertToV1beta1(in xpmetav1.Dependency) v1beta1.Dependency {
 	betaD := v1beta1.Dependency{
 		Constraints: in.Version,
 	}
-	if in.Provider != nil && in.Configuration == nil {
+
+	if in.Provider != nil {
 		betaD.Package = *in.Provider
 		betaD.Type = v1beta1.ProviderPackageType
 	}
 
-	if in.Configuration != nil && in.Provider == nil {
+	if in.Configuration != nil {
 		betaD.Package = *in.Configuration
 		betaD.Type = v1beta1.ConfigurationPackageType
+	}
+
+	if in.Function != nil {
+		betaD.Package = *in.Function
+		betaD.Type = v1beta1.FunctionPackageType
 	}
 
 	return betaD
