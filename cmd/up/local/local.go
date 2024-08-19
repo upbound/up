@@ -13,6 +13,6 @@ func (c *Cmd) BeforeReset(p *kong.Path, maturity feature.Maturity) error {
 
 // Cmd contains commands for interacting with the dev environment.
 type Cmd struct {
-	Run      runCmd      `cmd:"" help:"Optionally build then launch a local control plane."`
-	Teardown teardownCmd `cmd:"" help:"Destroy the current local control plane."`
+	Start startCmd `cmd:"" help:"Optionally build then start a local control plane."`
+	Stop  stopCmd  `cmd:"" help:"Stop the current local control plane."`
 }

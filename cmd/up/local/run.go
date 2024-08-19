@@ -25,10 +25,10 @@ const (
 	controlPlaneNamespace = "crossplane-system"
 )
 
-// runCmd runs a local control plane.
-type runCmd struct{}
+// startCmd runs a local control plane.
+type startCmd struct{}
 
-func (c *runCmd) Run(ctx context.Context) error {
+func (c *startCmd) Run(ctx context.Context) error {
 	// Turn on colored output for pterm.
 	pterm.EnableStyling()
 
@@ -88,7 +88,7 @@ func (c *runCmd) Run(ctx context.Context) error {
 // installUXP installs the UXP helm chart into the crossplane-system namespace.
 // Currently we don't support customization, so any logic around supplying
 // parameters is not included.
-func (c *runCmd) installUXP(ctx context.Context) (string, error) {
+func (c *startCmd) installUXP(ctx context.Context) (string, error) {
 	// NOTE(tnthornton) we don't currently support kubeconfig overriding.
 	kubeconfig, err := kube.GetKubeConfig("")
 	if err != nil {
