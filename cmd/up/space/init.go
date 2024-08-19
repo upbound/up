@@ -156,6 +156,11 @@ func (c *initCmd) AfterApply(kongCtx *kong.Context, quiet config.QuietFlag) erro
 	if err != nil {
 		return err
 	}
+	// todo(avalanche123): Remove these defaults once we can default to using
+	// Upbound IAM, through connected spaces, to authenticate users in the
+	// cluster
+	defs.SpacesValues["authentication.hubIdentities"] = "true"
+	defs.SpacesValues["authorization.hubRBAC"] = "true"
 	// User supplied values always override the defaults
 	maps.Copy(defs.SpacesValues, c.Set)
 	c.Set = defs.SpacesValues
@@ -164,12 +169,6 @@ func (c *initCmd) AfterApply(kongCtx *kong.Context, quiet config.QuietFlag) erro
 	} else {
 		pterm.Info.Println("Public ingress will be exposed")
 	}
-
-	// todo(redbackthomson): Remove these defaults once we can default to using
-	// Upbound IAM, through connected spaces, to authenticate users in the
-	// cluster
-	defs.SpacesValues["authentication.hubIdentities"] = "true"
-	defs.SpacesValues["authorization.hubRBAC"] = "true"
 
 	secret := kube.NewSecretApplicator(kClient)
 	c.pullSecret = kube.NewImagePullApplicator(secret)
