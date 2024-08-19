@@ -2,7 +2,6 @@ package dev
 
 import (
 	"context"
-	"fmt"
 
 	corev1 "k8s.io/api/core/v1"
 	kerrors "k8s.io/apimachinery/pkg/api/errors"
@@ -10,13 +9,14 @@ import (
 	"k8s.io/client-go/kubernetes"
 	"sigs.k8s.io/kind/pkg/apis/config/defaults"
 	"sigs.k8s.io/kind/pkg/cluster"
-	"sigs.k8s.io/kind/pkg/cmd"
 
 	"github.com/crossplane/crossplane-runtime/pkg/errors"
+	"github.com/pterm/pterm"
 
 	"github.com/upbound/up/cmd/up/uxp"
 	"github.com/upbound/up/internal/install/helm"
 	"github.com/upbound/up/internal/kube"
+	"github.com/upbound/up/internal/upterm"
 )
 
 const (
@@ -29,37 +29,59 @@ const (
 type runCmd struct{}
 
 func (c *runCmd) Run(ctx context.Context) error {
+	// Turn on colored output for pterm.
+	pterm.EnableStyling()
 
-	logger := cmd.NewLogger()
+	pterm.Println("Creating local control plane...")
+	startk8s := func() error {
+		// Including the logger parameter will result in kind logging output
+		// to the end user.
+		provider := cluster.NewProvider()
 
-	provider := cluster.NewProvider(
-		cluster.ProviderWithLogger(logger),
-	)
+		if err := provider.Create(
+			controlPlaneName,
+			cluster.CreateWithNodeImage(defaults.Image),
+			// Removes the following block:
+			/*
+				Set kubectl context to "kind-up-run"
+				You can now use your cluster with:
 
-	if err := provider.Create(
-		controlPlaneName,
-		cluster.CreateWithNodeImage(defaults.Image),
-		// Removes the following block:
-		/*
-			Set kubectl context to "kind-up-run"
-			You can now use your cluster with:
+				kubectl cluster-info --context kind-up-run
+			*/
+			cluster.CreateWithDisplayUsage(false),
+			// Removes 'Thanks for using kind! 😊'
+			cluster.CreateWithDisplaySalutation(false),
+		); err != nil {
+			return errors.Wrap(err, "failed to create cluster")
+		}
+		return nil
+	}
 
-			kubectl cluster-info --context kind-up-run
-		*/
-		cluster.CreateWithDisplayUsage(false),
-		// Removes 'Thanks for using kind! 😊'
-		cluster.CreateWithDisplaySalutation(false),
+	if err := upterm.WrapWithSuccessSpinner(
+		upterm.StepCounter("Starting control plane", 1, 2),
+		upterm.CheckmarkSuccessSpinner,
+		startk8s,
 	); err != nil {
-		return errors.Wrap(err, "failed to create cluster")
+		return errors.Wrap(err, "failed to print status")
 	}
 
-	ver, err := c.installUXP(ctx)
-	if err != nil {
-		return errors.Wrap(err, "failed to install UXP into the control plane")
+	startxp := func() error {
+		_, err := c.installUXP(ctx)
+		if err != nil {
+			return errors.Wrap(err, "failed to install UXP into the control plane")
+		}
+		return nil
 	}
 
-	fmt.Println(ver)
+	if err := upterm.WrapWithSuccessSpinner(
+		upterm.StepCounter("Starting Crossplane", 2, 2),
+		upterm.CheckmarkSuccessSpinner,
+		startxp,
+	); err != nil {
+		return errors.Wrap(err, "failed to print status")
+	}
 
+	outputNextSteps()
 	return nil
 }
 
@@ -110,4 +132,12 @@ func (c *runCmd) installUXP(ctx context.Context) (string, error) {
 	}
 
 	return curVer, nil
+}
+
+// outputNextSteps is a simple function that is intended to be used after the
+// install operation.
+func outputNextSteps() {
+	pterm.Println()
+	pterm.Info.WithPrefix(upterm.RaisedPrefix).Println("Your local control plane is ready 👀")
+	pterm.Println()
 }
