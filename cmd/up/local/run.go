@@ -1,4 +1,4 @@
-package dev
+package local
 
 import (
 	"context"
@@ -89,6 +89,7 @@ func (c *runCmd) Run(ctx context.Context) error {
 // Currently we don't support customization, so any logic around supplying
 // parameters is not included.
 func (c *runCmd) installUXP(ctx context.Context) (string, error) {
+	// NOTE(tnthornton) we don't currently support kubeconfig overriding.
 	kubeconfig, err := kube.GetKubeConfig("")
 	if err != nil {
 		return "", errors.Wrap(err, "failed to get kubeconfig")
