@@ -1,3 +1,17 @@
+// Copyright 2024 Upbound Inc
+//
+// Licensed under the Apache License, Version 2.0 (the "License");
+// you may not use this file except in compliance with the License.
+// You may obtain a copy of the License at
+//
+//     http://www.apache.org/licenses/LICENSE-2.0
+//
+// Unless required by applicable law or agreed to in writing, software
+// distributed under the License is distributed on an "AS IS" BASIS,
+// WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+// See the License for the specific language governing permissions and
+// limitations under the License.
+
 package local
 
 import (
@@ -38,21 +52,29 @@ func (c *startCmd) Run(ctx context.Context) error {
 		// to the end user.
 		provider := cluster.NewProvider()
 
-		if err := provider.Create(
-			controlPlaneName,
-			cluster.CreateWithNodeImage(defaults.Image),
-			// Removes the following block:
-			/*
-				Set kubectl context to "kind-up-run"
-				You can now use your cluster with:
+		n, err := provider.ListNodes(controlPlaneName)
+		if err != nil {
+			return errors.Wrap(err, "failed to check if control plane already exists")
+		}
 
-				kubectl cluster-info --context kind-up-run
-			*/
-			cluster.CreateWithDisplayUsage(false),
-			// Removes 'Thanks for using kind! 😊'
-			cluster.CreateWithDisplaySalutation(false),
-		); err != nil {
-			return errors.Wrap(err, "failed to create cluster")
+		// We're missing pre-existing nodes, safe to attempt to create.
+		if len(n) == 0 {
+			if err := provider.Create(
+				controlPlaneName,
+				cluster.CreateWithNodeImage(defaults.Image),
+				// Removes the following block:
+				/*
+					Set kubectl context to "kind-up-run"
+					You can now use your cluster with:
+
+					kubectl cluster-info --context kind-up-run
+				*/
+				cluster.CreateWithDisplayUsage(false),
+				// Removes 'Thanks for using kind! 😊'
+				cluster.CreateWithDisplaySalutation(false),
+			); err != nil {
+				return errors.Wrap(err, "failed to create cluster")
+			}
 		}
 		return nil
 	}
@@ -66,8 +88,7 @@ func (c *startCmd) Run(ctx context.Context) error {
 	}
 
 	startxp := func() error {
-		_, err := c.installUXP(ctx)
-		if err != nil {
+		if err := c.installUXP(ctx); err != nil {
 			return errors.Wrap(err, "failed to install UXP into the control plane")
 		}
 		return nil
@@ -88,11 +109,11 @@ func (c *startCmd) Run(ctx context.Context) error {
 // installUXP installs the UXP helm chart into the crossplane-system namespace.
 // Currently we don't support customization, so any logic around supplying
 // parameters is not included.
-func (c *startCmd) installUXP(ctx context.Context) (string, error) {
+func (c *startCmd) installUXP(ctx context.Context) error {
 	// NOTE(tnthornton) we don't currently support kubeconfig overriding.
 	kubeconfig, err := kube.GetKubeConfig("")
 	if err != nil {
-		return "", errors.Wrap(err, "failed to get kubeconfig")
+		return errors.Wrap(err, "failed to get kubeconfig")
 	}
 
 	repo := uxp.RepoURL
@@ -103,12 +124,12 @@ func (c *startCmd) installUXP(ctx context.Context) (string, error) {
 		helm.Wait(),
 	)
 	if err != nil {
-		return "", errors.Wrap(err, "failed to build new Helm manager")
+		return errors.Wrap(err, "failed to build new Helm manager")
 	}
 
 	client, err := kubernetes.NewForConfig(kubeconfig)
 	if err != nil {
-		return "", errors.Wrap(err, "failed to build kubernetes client")
+		return errors.Wrap(err, "failed to build kubernetes client")
 	}
 
 	// Create namespace if it does not exist.
@@ -118,21 +139,23 @@ func (c *startCmd) installUXP(ctx context.Context) (string, error) {
 		},
 	}, metav1.CreateOptions{})
 	if err != nil && !kerrors.IsAlreadyExists(err) {
-		return "", errors.Wrapf(err, "failed to create %q namespace", controlPlaneNamespace)
+		return errors.Wrapf(err, "failed to create %q namespace", controlPlaneNamespace)
 	}
 
-	// Install UXP Helm chart.
-	if err = mgr.Install("", map[string]any{}); err != nil {
-		return "", errors.Wrap(err, "failed to install UXP Helm chart")
+	// Get current version of UXP helm chart, if it already exists at this
+	// stage there's no need to attempt an install.
+	// NOTE(tnthornton) we're explicitly ignoring the error here as an empty
+	// install will return an error and the curVer check accounts for that.
+	curVer, _ := mgr.GetCurrentVersion()
+
+	if curVer == "" {
+		// Install UXP Helm chart.
+		if err = mgr.Install("", map[string]any{}); err != nil {
+			return errors.Wrap(err, "failed to install UXP Helm chart")
+		}
 	}
 
-	// Get current version of UXP helm chart.
-	curVer, err := mgr.GetCurrentVersion()
-	if err != nil {
-		return "", errors.Wrap(err, "failed to get current Helm chart version")
-	}
-
-	return curVer, nil
+	return nil
 }
 
 // outputNextSteps is a simple function that is intended to be used after the
