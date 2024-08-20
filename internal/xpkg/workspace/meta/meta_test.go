@@ -84,6 +84,51 @@ func TestUpsert(t *testing.T) {
 				},
 			},
 		},
+		"AddFunctionEntryNoPrior": {
+			reason: "Should not return an error if package is created at path.",
+			args: args{
+				dep: dep.NewWithType(
+					"crossplane-contrib/function-test@v1.0.0",
+					string(v1beta1.FunctionPackageType),
+				),
+				metaFile: &metav1.Configuration{
+					TypeMeta: apimetav1.TypeMeta{
+						APIVersion: "meta.pkg.crossplane.io/v1",
+						Kind:       "Configuration",
+					},
+					ObjectMeta: apimetav1.ObjectMeta{
+						Name: "getting-started-with-aws",
+					},
+					Spec: metav1.ConfigurationSpec{
+						MetaSpec: metav1.MetaSpec{
+							Crossplane: &metav1.CrossplaneConstraints{
+								Version: ">=1.0.0-0",
+							},
+							DependsOn: []metav1.Dependency{
+								{
+									Provider: ptr.To("crossplane/provider-aws"),
+									Version:  ">=1.0.5",
+								},
+							},
+						},
+					},
+				},
+			},
+			want: want{
+				deps: []v1beta1.Dependency{
+					{
+						Package:     "crossplane/provider-aws",
+						Type:        v1beta1.ProviderPackageType,
+						Constraints: ">=1.0.5",
+					},
+					{
+						Package:     "crossplane-contrib/function-test",
+						Type:        v1beta1.FunctionPackageType,
+						Constraints: "v1.0.0",
+					},
+				},
+			},
+		},
 		"AddEntryNoPriorV1alpha1": {
 			reason: "Should not return an error if package is created at path.",
 			args: args{
@@ -535,6 +580,30 @@ func TestUpsertDeps(t *testing.T) {
 				err: errors.New(errMetaContainsDupeDep),
 			},
 		},
+		"FunctionEmptyDependencyList": {
+			reason: "Should return an updated deps list with the included function.",
+			args: args{
+				dep: dep.NewWithType(
+					"crossplane-contrib/function-test@v1.0.0",
+					string(v1beta1.FunctionPackageType),
+				),
+				pkg: &metav1.Configuration{
+					Spec: metav1.ConfigurationSpec{
+						MetaSpec: metav1.MetaSpec{
+							DependsOn: []metav1.Dependency{},
+						},
+					},
+				},
+			},
+			want: want{
+				deps: []metav1.Dependency{
+					{
+						Function: ptr.To("crossplane-contrib/function-test"),
+						Version:  "v1.0.0",
+					},
+				},
+			},
+		},
 	}
 
 	for name, tc := range cases {
@@ -668,6 +737,10 @@ func TestDependsOn(t *testing.T) {
 									Provider: ptr.To("crossplane/provider-aws"),
 									Version:  "v1.0.0",
 								},
+								{
+									Function: ptr.To("crossplane-contrib/function-test"),
+									Version:  "v1.0.0",
+								},
 							},
 						},
 					},
@@ -683,6 +756,11 @@ func TestDependsOn(t *testing.T) {
 					{
 						Package:     "crossplane/provider-aws",
 						Type:        v1beta1.ProviderPackageType,
+						Constraints: "v1.0.0",
+					},
+					{
+						Package:     "crossplane-contrib/function-test",
+						Type:        v1beta1.FunctionPackageType,
 						Constraints: "v1.0.0",
 					},
 				},

@@ -17,6 +17,7 @@ package manager
 import (
 	metav1 "github.com/crossplane/crossplane/apis/pkg/meta/v1"
 	metav1alpha1 "github.com/crossplane/crossplane/apis/pkg/meta/v1alpha1"
+	metav1beta1 "github.com/crossplane/crossplane/apis/pkg/meta/v1beta1"
 	"github.com/crossplane/crossplane/apis/pkg/v1beta1"
 )
 
@@ -46,8 +47,8 @@ func ConvertToV1beta1(in metav1.Dependency) (v1beta1.Dependency, bool) {
 	return betaD, true
 }
 
-// ConvertToV1alpha1 converts v1.Dependency types to v1alpha1.Dependency types.
-func ConvertToV1alpha1(in metav1.Dependency) metav1alpha1.Dependency {
+// MetaConvertToV1alpha1 converts v1.Dependency types to v1alpha1.Dependency types.
+func MetaConvertToV1alpha1(in metav1.Dependency) metav1alpha1.Dependency {
 	alphaD := metav1alpha1.Dependency{
 		Version: in.Version,
 	}
@@ -60,4 +61,20 @@ func ConvertToV1alpha1(in metav1.Dependency) metav1alpha1.Dependency {
 	}
 
 	return alphaD
+}
+
+// MetaConvertToV1beta1 converts v1.Dependency types to v1beta1.Dependency types.
+func MetaConvertToV1beta1(in metav1.Dependency) metav1beta1.Dependency {
+	betaD := metav1beta1.Dependency{
+		Version: in.Version,
+	}
+	if in.Provider != nil && in.Configuration == nil {
+		betaD.Provider = in.Provider
+	}
+
+	if in.Configuration != nil && in.Provider == nil {
+		betaD.Configuration = in.Configuration
+	}
+
+	return betaD
 }

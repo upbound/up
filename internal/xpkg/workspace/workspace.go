@@ -63,7 +63,7 @@ const (
 	errCompositionPipeline  = "pipeline in Composition is malformed"
 	errCompositionMode      = "unknown Composition mode"
 	errInvalidFileURI       = "invalid path supplied"
-	errInvalidPackage       = "invalid package; more than one meta (configuration or provider) file supplied"
+	errInvalidPackage       = "invalid package; more than one meta (configuration,provider or function) file supplied"
 )
 
 // builds static YAML path strings ahead of usage.
@@ -334,6 +334,10 @@ func (v *View) parseDoc(ctx context.Context, pCtx parseContext) (NodeIdentifier,
 			return NodeIdentifier{}, err
 		}
 	case pkgmetav1.ProviderKind:
+		if err := v.parseMeta(ctx, pCtx); err != nil {
+			return NodeIdentifier{}, err
+		}
+	case pkgmetav1.FunctionKind:
 		if err := v.parseMeta(ctx, pCtx); err != nil {
 			return NodeIdentifier{}, err
 		}

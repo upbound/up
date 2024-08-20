@@ -198,6 +198,33 @@ func TestRWMetaFile(t *testing.T) {
 		},
 	}
 
+	cfgMetaFileWithFunction := &metav1.Configuration{
+		TypeMeta: apimetav1.TypeMeta{
+			APIVersion: "meta.pkg.crossplane.io/v1",
+			Kind:       "Configuration",
+		},
+		ObjectMeta: apimetav1.ObjectMeta{
+			Name: "getting-started-with-aws",
+		},
+		Spec: metav1.ConfigurationSpec{
+			MetaSpec: metav1.MetaSpec{
+				Crossplane: &metav1.CrossplaneConstraints{
+					Version: ">=1.0.0-0",
+				},
+				DependsOn: []metav1.Dependency{
+					{
+						Configuration: ptr.To("crossplane/provider-aws"),
+						Version:       "v1.0.0",
+					},
+					{
+						Function: ptr.To("crossplane-contrib/function-test"),
+						Version:  "v1.0.0",
+					},
+				},
+			},
+		},
+	}
+
 	providerMetaFile := &metav1.Provider{
 		TypeMeta: apimetav1.TypeMeta{
 			APIVersion: "meta.pkg.crossplane.io/v1",
@@ -248,6 +275,16 @@ func TestRWMetaFile(t *testing.T) {
 			},
 			want: want{
 				metaFile: cfgMetaFile,
+			},
+		},
+		"NoPriorCfgFileWithFunction": {
+			reason: "Should create file and read it back in without modification.",
+			args: args{
+				opt:      WithFS(afero.NewMemMapFs()),
+				metaFile: cfgMetaFileWithFunction,
+			},
+			want: want{
+				metaFile: cfgMetaFileWithFunction,
 			},
 		},
 		"NoPriorProviderFile": {

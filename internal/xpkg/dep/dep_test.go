@@ -26,6 +26,7 @@ import (
 
 func TestNew(t *testing.T) {
 	providerAws := "crossplane/provider-aws"
+	functionTest := "crossplane-contrib/function-test"
 
 	type args struct {
 		pkg string
@@ -44,6 +45,7 @@ func TestNew(t *testing.T) {
 		"EmptyVersion": {
 			args: args{
 				pkg: providerAws,
+				t:   "provider",
 			},
 			want: want{
 				dep: v1beta1.Dependency{
@@ -53,9 +55,23 @@ func TestNew(t *testing.T) {
 				},
 			},
 		},
+		"FunctionWithVersion": {
+			args: args{
+				pkg: functionTest,
+				t:   "function",
+			},
+			want: want{
+				dep: v1beta1.Dependency{
+					Package:     functionTest,
+					Type:        v1beta1.FunctionPackageType,
+					Constraints: image.DefaultVer,
+				},
+			},
+		},
 		"VersionSupplied": {
 			args: args{
 				pkg: fmt.Sprintf("%s@%s", providerAws, "v1.0.0"),
+				t:   "provider",
 			},
 			want: want{
 				dep: v1beta1.Dependency{

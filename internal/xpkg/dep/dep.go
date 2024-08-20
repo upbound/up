@@ -18,6 +18,8 @@ import (
 	"strings"
 
 	"github.com/crossplane/crossplane/apis/pkg/v1beta1"
+	"golang.org/x/text/cases"
+	"golang.org/x/text/language"
 
 	"github.com/upbound/up/internal/xpkg/dep/resolver/image"
 )
@@ -51,9 +53,16 @@ func New(pkg string) v1beta1.Dependency {
 func NewWithType(pkg string, t string) v1beta1.Dependency {
 	d := New(pkg)
 
-	d.Type = v1beta1.ProviderPackageType
-	if strings.Title(strings.ToLower(t)) == string(v1beta1.ConfigurationPackageType) { //nolint:staticcheck // ignore staticcheck for now
+	c := cases.Title(language.Und) // Create a caser for title casing
+	normalized := c.String(strings.ToLower(t))
+
+	switch normalized {
+	case string(v1beta1.ConfigurationPackageType):
 		d.Type = v1beta1.ConfigurationPackageType
+	case string(v1beta1.FunctionPackageType):
+		d.Type = v1beta1.FunctionPackageType
+	case string(v1beta1.ProviderPackageType):
+		d.Type = v1beta1.ProviderPackageType
 	}
 
 	return d

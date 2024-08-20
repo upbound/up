@@ -52,6 +52,13 @@ func TestTypes(t *testing.T) {
 			},
 			want: true,
 		},
+		"FunctionIsPackage": {
+			reason: "We should return true when the given a function package.",
+			args: args{
+				pkgType: "function",
+			},
+			want: true,
+		},
 	}
 
 	for name, tc := range cases {

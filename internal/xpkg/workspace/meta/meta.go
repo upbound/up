@@ -22,8 +22,9 @@ import (
 	"k8s.io/apimachinery/pkg/runtime"
 	sigsyaml "sigs.k8s.io/yaml"
 
-	v1 "github.com/crossplane/crossplane/apis/pkg/meta/v1"
-	"github.com/crossplane/crossplane/apis/pkg/meta/v1alpha1"
+	pkgmetav1 "github.com/crossplane/crossplane/apis/pkg/meta/v1"
+	pkgmetav1alpha1 "github.com/crossplane/crossplane/apis/pkg/meta/v1alpha1"
+	pkgmetav1beta1 "github.com/crossplane/crossplane/apis/pkg/meta/v1beta1"
 	"github.com/crossplane/crossplane/apis/pkg/v1beta1"
 
 	"github.com/upbound/up/internal/xpkg/dep/manager"
@@ -53,7 +54,7 @@ func New(obj runtime.Object) *Meta {
 
 // DependsOn returns a slice of v1beta1.Dependency that this workspace depends on.
 func (m *Meta) DependsOn() ([]v1beta1.Dependency, error) {
-	pkg, ok := scheme.TryConvertToPkg(m.obj, &v1.Provider{}, &v1.Configuration{})
+	pkg, ok := scheme.TryConvertToPkg(m.obj, &pkgmetav1.Provider{}, &pkgmetav1.Configuration{}, &pkgmetav1.Function{})
 	if !ok {
 		return nil, errors.New(errUnsupportedPackageVersion)
 	}
@@ -89,13 +90,17 @@ func (m *Meta) Bytes() ([]byte, error) {
 	t := apimetav1.Time{}
 
 	switch v := m.obj.(type) {
-	case *v1alpha1.Configuration:
+	case *pkgmetav1alpha1.Configuration:
 		t = v.GetCreationTimestamp()
-	case *v1.Configuration:
+	case *pkgmetav1.Configuration:
 		t = v.GetCreationTimestamp()
-	case *v1alpha1.Provider:
+	case *pkgmetav1alpha1.Provider:
 		t = v.GetCreationTimestamp()
-	case *v1.Provider:
+	case *pkgmetav1.Provider:
+		t = v.GetCreationTimestamp()
+	case *pkgmetav1beta1.Function:
+		t = v.GetCreationTimestamp()
+	case *pkgmetav1.Function:
 		t = v.GetCreationTimestamp()
 	default:
 		return nil, errors.New(errInvalidMetaFile)
@@ -116,7 +121,7 @@ func (m *Meta) Bytes() ([]byte, error) {
 // be converted to a v1.Pkg and returns an updated runtime.Object with a slice
 // of dependencies that includes the provided dependency d.
 func upsertDeps(d v1beta1.Dependency, o runtime.Object) error { // nolint:gocyclo
-	p, ok := scheme.TryConvertToPkg(o, &v1.Provider{}, &v1.Configuration{})
+	p, ok := scheme.TryConvertToPkg(o, &pkgmetav1.Provider{}, &pkgmetav1.Configuration{}, &pkgmetav1.Function{})
 	if !ok {
 		return errors.New(errUnsupportedPackageVersion)
 	}
@@ -126,13 +131,20 @@ func upsertDeps(d v1beta1.Dependency, o runtime.Object) error { // nolint:gocycl
 	for i := range deps {
 		// modify the underlying slice
 		dep := deps[i]
-		if dep.Provider != nil && *dep.Provider == d.Package {
+		switch {
+		case dep.Provider != nil && *dep.Provider == d.Package:
 			if processed {
 				return errors.New(errMetaContainsDupeDep)
 			}
 			deps[i].Version = d.Constraints
 			processed = true
-		} else if dep.Configuration != nil && *dep.Configuration == d.Package {
+		case dep.Configuration != nil && *dep.Configuration == d.Package:
+			if processed {
+				return errors.New(errMetaContainsDupeDep)
+			}
+			deps[i].Version = d.Constraints
+			processed = true
+		case dep.Function != nil && *dep.Function == d.Package:
 			if processed {
 				return errors.New(errMetaContainsDupeDep)
 			}
@@ -143,27 +155,34 @@ func upsertDeps(d v1beta1.Dependency, o runtime.Object) error { // nolint:gocycl
 
 	if !processed {
 
-		dep := v1.Dependency{
+		dep := pkgmetav1.Dependency{
 			Version: d.Constraints,
 		}
 
-		if d.Type == v1beta1.ProviderPackageType {
+		switch d.Type {
+		case v1beta1.ProviderPackageType:
 			dep.Provider = &d.Package
-		} else {
+		case v1beta1.ConfigurationPackageType:
 			dep.Configuration = &d.Package
+		case v1beta1.FunctionPackageType:
+			dep.Function = &d.Package
 		}
 
 		deps = append(deps, dep)
 	}
 
 	switch v := o.(type) {
-	case *v1alpha1.Configuration:
+	case *pkgmetav1alpha1.Configuration:
 		v.Spec.DependsOn = convertToV1alpha1(deps)
-	case *v1.Configuration:
+	case *pkgmetav1.Configuration:
 		v.Spec.DependsOn = deps
-	case *v1alpha1.Provider:
+	case *pkgmetav1alpha1.Provider:
 		v.Spec.DependsOn = convertToV1alpha1(deps)
-	case *v1.Provider:
+	case *pkgmetav1.Provider:
+		v.Spec.DependsOn = deps
+	case *pkgmetav1beta1.Function:
+		v.Spec.DependsOn = convertToV1beta1(deps)
+	case *pkgmetav1.Function:
 		v.Spec.DependsOn = deps
 	}
 
@@ -189,10 +208,18 @@ func cleanNullTs(p runtime.Object) ([]byte, error) {
 	return sigsyaml.Marshal(m)
 }
 
-func convertToV1alpha1(deps []v1.Dependency) []v1alpha1.Dependency {
-	alphaDeps := make([]v1alpha1.Dependency, 0)
+func convertToV1alpha1(deps []pkgmetav1.Dependency) []pkgmetav1alpha1.Dependency {
+	alphaDeps := make([]pkgmetav1alpha1.Dependency, 0)
 	for _, d := range deps {
-		alphaDeps = append(alphaDeps, manager.ConvertToV1alpha1(d))
+		alphaDeps = append(alphaDeps, manager.MetaConvertToV1alpha1(d))
 	}
 	return alphaDeps
+}
+
+func convertToV1beta1(deps []pkgmetav1.Dependency) []pkgmetav1beta1.Dependency {
+	betaDeps := make([]pkgmetav1beta1.Dependency, 0)
+	for _, d := range deps {
+		betaDeps = append(betaDeps, manager.MetaConvertToV1beta1(d))
+	}
+	return betaDeps
 }

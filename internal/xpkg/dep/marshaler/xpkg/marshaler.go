@@ -213,7 +213,7 @@ func finalizePkg(pkg *ParsedPackage) (*ParsedPackage, error) { // nolint:gocyclo
 }
 
 func determineDeps(o runtime.Object) ([]v1beta1.Dependency, error) {
-	pkg, ok := scheme.TryConvertToPkg(o, &xpmetav1.Provider{}, &xpmetav1.Configuration{}, &xpmetav1beta1.Function{})
+	pkg, ok := scheme.TryConvertToPkg(o, &xpmetav1.Provider{}, &xpmetav1.Configuration{}, &xpmetav1.Function{})
 	if !ok {
 		return nil, errors.New(errFailedToConvertMetaToPackage)
 	}
