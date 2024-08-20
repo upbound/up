@@ -26,6 +26,7 @@ import (
 	"github.com/upbound/up/cmd/up/configuration"
 	"github.com/upbound/up/cmd/up/controlplane"
 	"github.com/upbound/up/cmd/up/ctx"
+	"github.com/upbound/up/cmd/up/dependency"
 	"github.com/upbound/up/cmd/up/group"
 	"github.com/upbound/up/cmd/up/login"
 	"github.com/upbound/up/cmd/up/migration"
@@ -96,27 +97,33 @@ type cli struct {
 	Pretty bool             `name:"pretty" help:"Pretty print output."`
 	DryRun bool             `name:"dry-run" help:"dry-run output."`
 
-	License licenseCmd `cmd:"" help:"Print Up license information."`
+	// Manage Upbound Resources
+	Organization organization.Cmd `cmd:"" group:"Manage Upbound Resources" name:"organization" aliases:"org" help:"Interact with Upbound organizations."`
+	Team         team.Cmd         `cmd:"" group:"Manage Upbound Resources" name:"team" help:"Interact with teams."`
+	Robot        robot.Cmd        `cmd:"" group:"Manage Upbound Resources" name:"robot" help:"Interact with robots."`
+	Repository   repository.Cmd   `cmd:"" group:"Manage Upbound Resources" name:"repository" aliases:"repo" help:"Interact with repositories."`
+	Space        space.Cmd        `cmd:"" group:"Manage Upbound Resources" help:"Interact with Spaces."`
+	Group        group.Cmd        `cmd:"" group:"Manage Upbound Resources" help:"Interact with groups inside Spaces."`
+	ControlPlane controlplane.Cmd `cmd:"" group:"Manage Upbound Resources" name:"controlplane" aliases:"ctp" help:"Interact with control planes in the current context, both in the cloud and in a local Space."`
+	UXP          uxp.Cmd          `cmd:"" group:"Manage Upbound Resources" help:"Interact with UXP."`
 
-	Help               helpCmd                      `cmd:"" help:"Show help."`
-	Login              login.LoginCmd               `cmd:"" help:"Login to Upbound. Will attempt to launch a web browser by default. Use --username and --password flags for automations."`
-	Logout             login.LogoutCmd              `cmd:"" help:"Logout of Upbound."`
-	Ctx                ctx.Cmd                      `cmd:"" help:"Select an Upbound kubeconfig context."`
-	Space              space.Cmd                    `cmd:"" help:"Interact with Spaces."`
-	Group              group.Cmd                    `cmd:"" help:"Interact with groups inside Spaces."`
-	ControlPlane       controlplane.Cmd             `cmd:"" name:"controlplane" aliases:"ctp" help:"Interact with control planes in the current context, both in the cloud and in a local Space."`
-	Configuration      configuration.Cmd            `cmd:"" help:"Build configurations."`
-	Organization       organization.Cmd             `cmd:"" name:"organization" aliases:"org" help:"Interact with Upbound organizations."`
-	Profile            profile.Cmd                  `cmd:"" help:"Interact with Upbound profiles or local Spaces."`
-	Repository         repository.Cmd               `cmd:"" name:"repository" aliases:"repo" help:"Interact with repositories."`
-	Robot              robot.Cmd                    `cmd:"" name:"robot" help:"Interact with robots."`
-	Team               team.Cmd                     `cmd:"" name:"team" help:"Interact with teams."`
-	UXP                uxp.Cmd                      `cmd:"" help:"Interact with UXP."`
-	XPKG               xpkg.Cmd                     `cmd:"" help:"Interact with UXP packages."`
-	XPLS               xpls.Cmd                     `cmd:"" help:"Start xpls language server."`
-	Alpha              alpha                        `cmd:"" help:"Alpha features. Commands may be removed in future releases."`
-	InstallCompletions kongplete.InstallCompletions `cmd:"" help:"Install shell completions"`
-	Version            v.Cmd                        `cmd:"" help:"Print the client and server version information for the current context."`
+	// Develop with Crossplane
+	Configuration configuration.Cmd `cmd:"" group:"Develop with Crossplane" help:"Build configurations."`
+	Dependency    dependency.Cmd    `cmd:"" group:"Develop with Crossplane" help:"Manage configuration dependencies."`
+	XPKG          xpkg.Cmd          `cmd:"" group:"Develop with Crossplane" help:"Package configurations, functions, and providers for distribution."`
+	XPLS          xpls.Cmd          `cmd:"" group:"Develop with Crossplane" help:"Start xpls language server."`
+
+	// Configure up
+	Completion kongplete.InstallCompletions `cmd:"" group:"Configure up" help:"Generate shell autocompletions"`
+	Ctx        ctx.Cmd                      `cmd:"" group:"Configure up" help:"Select an Upbound kubeconfig context."`
+	Help       helpCmd                      `cmd:"" group:"Configure up" help:"Show help."`
+	License    licenseCmd                   `cmd:"" group:"Configure up" help:"Show license information."`
+	Profile    profile.Cmd                  `cmd:"" group:"Configure up" help:"Manage configuration profiles."`
+	Login      login.LoginCmd               `cmd:"" group:"Configure up" help:"Login to Upbound. Will attempt to launch a web browser by default. Use --username and --password flags for automations."`
+	Logout     login.LogoutCmd              `cmd:"" group:"Configure up" help:"Logout of Upbound."`
+	Version    v.Cmd                        `cmd:"" group:"Configure up" help:"Show current version."`
+
+	Alpha alpha `cmd:"" group:"Alpha" help:"Alpha features. Commands may be removed in future releases."`
 }
 
 type helpCmd struct{}

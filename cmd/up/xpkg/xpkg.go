@@ -29,15 +29,13 @@ func (c *Cmd) BeforeReset(p *kong.Path, maturity feature.Maturity) error {
 type Cmd struct {
 	Build     buildCmd     `cmd:"" help:"Build a package, by default from the current directory."`
 	XPExtract xpExtractCmd `cmd:"" maturity:"alpha" help:"Extract package contents into a Crossplane cache compatible format. Fetches from a remote registry by default."`
-	Init      initCmd      `cmd:"" help:"Initialize a package, by default in the current directory."`
-	Dep       depCmd       `cmd:"" help:"Manage package dependencies in the filesystem and populate the cache, e.g. used by the Crossplane Language Server."`
 	Push      pushCmd      `cmd:"" help:"Push a package."`
 	Batch     batchCmd     `cmd:"" maturity:"alpha" help:"Batch build and push a family of service-scoped provider packages."`
 }
 
 func (c *Cmd) Help() string {
 	return `
-A Crossplane package is an opinionated OCI image that contains an additional layer 
+A Crossplane package is an opinionated OCI image that contains an additional layer
 holding meta information to drive the Crossplane package manager. The package manager
 uses this information to install packages into a Crossplane instance.
 
@@ -47,7 +45,7 @@ the Upbound marketplace to display packages and their contents. See the xpkg
 reference document for more information.
 
 There are different kinds of Crossplane packages, each with a different set of
-meta information and files in the additional layer. The following kinds are 
+meta information and files in the additional layer. The following kinds are
 currently supported:
 
 - **Provider**: A Crossplane package that contains a Crossplane provider. The layer

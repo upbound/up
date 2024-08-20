@@ -12,7 +12,7 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-package xpkg
+package dependency
 
 import (
 	"context"
@@ -39,7 +39,7 @@ const (
 
 // AfterApply constructs and binds Upbound-specific context to any subcommands
 // that have Run() methods that receive it.
-func (c *depCmd) AfterApply(kongCtx *kong.Context, p pterm.TextPrinter) error {
+func (c *addCmd) AfterApply(kongCtx *kong.Context, p pterm.TextPrinter) error {
 	kongCtx.Bind(pterm.DefaultBulletList.WithWriter(kongCtx.Stdout))
 	ctx := context.Background()
 	fs := afero.NewOsFs()
@@ -88,8 +88,8 @@ func (c *depCmd) AfterApply(kongCtx *kong.Context, p pterm.TextPrinter) error {
 	return nil
 }
 
-// depCmd manages crossplane dependencies.
-type depCmd struct {
+// addCmd manages crossplane dependencies.
+type addCmd struct {
 	c  *cache.Local
 	m  *manager.Manager
 	ws *workspace.Workspace
@@ -103,20 +103,8 @@ type depCmd struct {
 	Package string `arg:"" optional:"" help:"Package to be added."`
 }
 
-func (c *depCmd) Help() string {
-	return `
-The dep command manages crossplane package dependencies of the package
-in the current directory. It caches package information in a local file system
-cache (by default in ~/.up/cache), to be used e.g. for the Crossplane language
-server.
-
-If a package (e.g. provider-foo@v0.42.0 or provider-foo for latest) is specified,
-it will be added to the crossplane.yaml file in the current directory as dependency.
-`
-}
-
 // Run executes the dep command.
-func (c *depCmd) Run(ctx context.Context, p pterm.TextPrinter, pb *pterm.BulletListPrinter) error {
+func (c *addCmd) Run(ctx context.Context, p pterm.TextPrinter, pb *pterm.BulletListPrinter) error {
 	// no need to do anything else if clean cache was called.
 
 	// TODO (@tnthornton) this feels a little out of place here. We should
@@ -159,7 +147,7 @@ func (c *depCmd) Run(ctx context.Context, p pterm.TextPrinter, pb *pterm.BulletL
 	return pb.WithItems(li).Render()
 }
 
-func (c *depCmd) userSuppliedDep(ctx context.Context) error {
+func (c *addCmd) userSuppliedDep(ctx context.Context) error {
 	// exit early check if we were supplied an invalid package string
 	_, err := xpkg.ValidDep(c.Package)
 	if err != nil {
@@ -189,7 +177,7 @@ func (c *depCmd) userSuppliedDep(ctx context.Context) error {
 	return nil
 }
 
-func (c *depCmd) metaSuppliedDeps(ctx context.Context) ([]v1beta1.Dependency, error) {
+func (c *addCmd) metaSuppliedDeps(ctx context.Context) ([]v1beta1.Dependency, error) {
 	meta := c.ws.View().Meta()
 
 	if meta == nil {
