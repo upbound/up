@@ -28,6 +28,7 @@ import (
 	"github.com/upbound/up/cmd/up/ctx"
 	"github.com/upbound/up/cmd/up/dependency"
 	"github.com/upbound/up/cmd/up/group"
+	"github.com/upbound/up/cmd/up/local"
 	"github.com/upbound/up/cmd/up/login"
 	"github.com/upbound/up/cmd/up/migration"
 	"github.com/upbound/up/cmd/up/organization"
@@ -110,6 +111,7 @@ type cli struct {
 	// Develop with Crossplane
 	Configuration configuration.Cmd `cmd:"" group:"Develop with Crossplane" help:"Build configurations."`
 	Dependency    dependency.Cmd    `cmd:"" group:"Develop with Crossplane" help:"Manage configuration dependencies."`
+	Local         local.Cmd         `cmd:"" group:"Develop with Crossplane" help:"Interact with a local development control plane."`
 	XPKG          xpkg.Cmd          `cmd:"" group:"Develop with Crossplane" help:"Package configurations, functions, and providers for distribution."`
 	XPLS          xpls.Cmd          `cmd:"" group:"Develop with Crossplane" help:"Start xpls language server."`
 

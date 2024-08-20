@@ -40,6 +40,17 @@ const (
 	upboundNamespace      = "upbound-system"
 )
 
+var (
+	// Helm Values we supply to the Control Plane.
+	uxpValues = map[string]any{
+		"args": []string{
+			"--enable-environment-configs=true",
+			"--enable-composition-functions=true",
+			"--enable-usages=true",
+		},
+	}
+)
+
 // startCmd runs a local control plane.
 type startCmd struct{}
 
@@ -160,7 +171,7 @@ func (c *startCmd) installUXP(ctx context.Context) error {
 
 	if curVer == "" {
 		// Install UXP Helm chart.
-		if err = mgr.Install("", map[string]any{}); err != nil {
+		if err = mgr.Install("", uxpValues); err != nil {
 			return errors.Wrap(err, "failed to install UXP Helm chart")
 		}
 	}
