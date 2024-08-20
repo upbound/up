@@ -37,6 +37,7 @@ const (
 	chartName             = "universal-crossplane"
 	controlPlaneName      = "up-run"
 	controlPlaneNamespace = "crossplane-system"
+	upboundNamespace      = "upbound-system"
 )
 
 // startCmd runs a local control plane.
@@ -132,7 +133,7 @@ func (c *startCmd) installUXP(ctx context.Context) error {
 		return errors.Wrap(err, "failed to build kubernetes client")
 	}
 
-	// Create namespace if it does not exist.
+	// Create crossplane-system namespace if it does not exist.
 	_, err = client.CoreV1().Namespaces().Create(ctx, &corev1.Namespace{
 		ObjectMeta: metav1.ObjectMeta{
 			Name: controlPlaneNamespace,
@@ -140,6 +141,15 @@ func (c *startCmd) installUXP(ctx context.Context) error {
 	}, metav1.CreateOptions{})
 	if err != nil && !kerrors.IsAlreadyExists(err) {
 		return errors.Wrapf(err, "failed to create %q namespace", controlPlaneNamespace)
+	}
+	// Create upbound-system namespace if it does not exist.
+	_, err = client.CoreV1().Namespaces().Create(ctx, &corev1.Namespace{
+		ObjectMeta: metav1.ObjectMeta{
+			Name: upboundNamespace,
+		},
+	}, metav1.CreateOptions{})
+	if err != nil && !kerrors.IsAlreadyExists(err) {
+		return errors.Wrapf(err, "failed to create %q namespace", upboundNamespace)
 	}
 
 	// Get current version of UXP helm chart, if it already exists at this
