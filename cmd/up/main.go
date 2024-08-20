@@ -23,6 +23,7 @@ import (
 	"github.com/pterm/pterm"
 	"github.com/willabides/kongplete"
 
+	"github.com/upbound/up/cmd/up/configuration"
 	"github.com/upbound/up/cmd/up/controlplane"
 	"github.com/upbound/up/cmd/up/ctx"
 	"github.com/upbound/up/cmd/up/group"
@@ -104,6 +105,7 @@ type cli struct {
 	Space              space.Cmd                    `cmd:"" help:"Interact with Spaces."`
 	Group              group.Cmd                    `cmd:"" help:"Interact with groups inside Spaces."`
 	ControlPlane       controlplane.Cmd             `cmd:"" name:"controlplane" aliases:"ctp" help:"Interact with control planes in the current context, both in the cloud and in a local Space."`
+	Configuration      configuration.Cmd            `cmd:"" help:"Build configurations."`
 	Organization       organization.Cmd             `cmd:"" name:"organization" aliases:"org" help:"Interact with Upbound organizations."`
 	Profile            profile.Cmd                  `cmd:"" help:"Interact with Upbound profiles or local Spaces."`
 	Repository         repository.Cmd               `cmd:"" name:"repository" aliases:"repo" help:"Interact with repositories."`
