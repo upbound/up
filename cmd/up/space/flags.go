@@ -22,8 +22,8 @@ type authorizedRegistryFlags struct {
 	registryFlags
 
 	TokenFile *os.File `name:"token-file" help:"File containing authentication token."`
-	Username  string   `hidden:"" name:"registry-username" help:"Set the registry username."`
-	Password  string   `hidden:"" name:"registry-password" help:"Set the registry password."`
+	Username  string   `hidden:"" name:"registry-username" env:"UPBOUND_REGISTRY_USERNAME" help:"Set the registry username."`
+	Password  string   `hidden:"" name:"registry-password" env:"UPBOUND_REGISTRY_PASSWORD" help:"Set the registry password."`
 }
 
 func (p *authorizedRegistryFlags) AfterApply() error {
