@@ -322,7 +322,7 @@ func (c *Cmd) RunNonInteractive(ctx context.Context, upCtx *upbound.Context, nav
 
 	// final step if we moved: accept the state
 	msg := fmt.Sprintf("Kubeconfig context %q: %s\n", c.KubeContext, withUpboundPrefix(m.state.Breadcrumbs()))
-	if m.state.Breadcrumbs() != initialState.Breadcrumbs() {
+	if m.state.Breadcrumbs() != initialState.Breadcrumbs() || c.File == "-" {
 		accepting, ok := m.state.(Accepting)
 		if !ok {
 			return fmt.Errorf("cannot move context to: %s", m.state.Breadcrumbs())
@@ -334,11 +334,14 @@ func (c *Cmd) RunNonInteractive(ctx context.Context, upCtx *upbound.Context, nav
 		}
 	}
 
-	// don't print anything else or we are going to pollute stdout
-	if c.Short {
-		fmt.Println(m.state.Breadcrumbs())
-	} else {
-		fmt.Print(msg)
+	// if printing the kubeconfig to stdout, don't print anything els
+	if c.File != "-" {
+		// don't print anything else or we are going to pollute stdout
+		if c.Short {
+			fmt.Println(m.state.Breadcrumbs())
+		} else {
+			fmt.Print(msg)
+		}
 	}
 
 	return nil
