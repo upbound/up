@@ -14,10 +14,16 @@
 
 oci:
   - chart: "xpkg.upbound.io/spaces-artifacts/spaces"
-    subCharts:
+    subResources:
       - pathNavigatorType: uxpVersionsPath
-        chart: "xpkg.upbound.io/upbound/universal-crossplane"
-        image: "xpkg.upbound.io/upbound/crossplane"
+        chart: "xpkg.upbound.io/spaces-artifacts/universal-crossplane"
+        image: "xpkg.upbound.io/spaces-artifacts/crossplane"
+      - pathNavigatorType: kubeVersionPath
+        image: xpkg.upbound.io/spaces-artifacts/kube-apiserver
+      - pathNavigatorType: kubeVersionPath
+        image: xpkg.upbound.io/spaces-artifacts/kube-controller-manager
+      - pathNavigatorType: kubeVersionPath
+        image: xpkg.upbound.io/spaces-artifacts/kube-scheduler
     images:
       - image: "xpkg.upbound.io/spaces-artifacts/hyperspace"
         compatibleChartVersion: ">=1.6"
@@ -46,9 +52,6 @@ oci:
       - image: "xpkg.upbound.io/spaces-artifacts/etcd:3.5.6-0"
       - image: "xpkg.upbound.io/spaces-artifacts/external-secrets:v0.9.11-3.g8e279dea"
       - image: "xpkg.upbound.io/spaces-artifacts/kine:v0.0.0-224.g6a07aa9"
-      - image: "xpkg.upbound.io/spaces-artifacts/kube-apiserver:v1.28.6"
-      - image: "xpkg.upbound.io/spaces-artifacts/kube-controller-manager:v1.28.6"
-      - image: "xpkg.upbound.io/spaces-artifacts/kube-scheduler:v1.28.6"
       - image: "xpkg.upbound.io/spaces-artifacts/kube-state-metrics:v2.8.1-upbound003"
       - image: "xpkg.upbound.io/spaces-artifacts/kubectl:1.29"
       - image: "xpkg.upbound.io/spaces-artifacts/kyverno-background-controller:v1.11.4"
@@ -59,7 +62,7 @@ oci:
       - image: "xpkg.upbound.io/spaces-artifacts/mxp-authz-webhook-openssl:3.1.4"
       - image: "xpkg.upbound.io/spaces-artifacts/opentelemetry-collector-contrib:0.98.0"
       - image: "xpkg.upbound.io/spaces-artifacts/uxp-bootstrapper:v1.10.4-up.2"
-        compatibleChartVersion: "1.6.x"
+        compatibleChartVersion: ">=1.6.x"
       - image: "xpkg.upbound.io/spaces-artifacts/uxp-bootstrapper:v1.10.1-up.1"
         compatibleChartVersion: "1.5.x"
       - image: "xpkg.upbound.io/spaces-artifacts/vcluster:0.15.7"
