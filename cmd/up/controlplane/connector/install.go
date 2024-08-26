@@ -34,10 +34,11 @@ import (
 	"github.com/upbound/up/internal/install/helm"
 	"github.com/upbound/up/internal/kube"
 	"github.com/upbound/up/internal/upbound"
+	"github.com/upbound/up/internal/version"
 )
 
 var (
-	mcpRepoURL = urlMustParse("https://charts.upbound.io/beta")
+	mcpRepoURL = urlMustParse("xpkg.upbound.io/spaces-artifacts")
 )
 
 const (
@@ -63,6 +64,7 @@ func (c *installCmd) AfterApply(kongCtx *kong.Context, upCtx *upbound.Context) e
 	mgr, err := helm.NewManager(kubeconfig,
 		connectorName,
 		mcpRepoURL,
+		helm.IsOCI(),
 		helm.WithNamespace(c.InstallationNamespace),
 		helm.Wait(),
 	)
@@ -148,7 +150,7 @@ func (c *installCmd) Run(p pterm.TextPrinter, upCtx *upbound.Context) error {
 	}
 
 	p.Printfln("Installing %s to kube-system. This may take a few minutes.", connectorName)
-	if err = c.mgr.Install("", params); err != nil {
+	if err = c.mgr.Install(version.MCPConnectorVersion(), params); err != nil {
 		return err
 	}
 

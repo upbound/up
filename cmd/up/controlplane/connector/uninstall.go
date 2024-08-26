@@ -41,6 +41,7 @@ func (c *uninstallCmd) AfterApply(kongCtx *kong.Context, upCtx *upbound.Context)
 		connectorName,
 		mcpRepoURL,
 		helm.WithNamespace(c.InstallationNamespace),
+		helm.IsOCI(),
 		helm.Wait(),
 	)
 	if err != nil {
