@@ -21,6 +21,7 @@ import (
 	"strings"
 	"time"
 
+	"github.com/Masterminds/semver/v3"
 	"github.com/alecthomas/kong"
 	xpv1 "github.com/crossplane/crossplane-runtime/apis/common/v1"
 	"github.com/crossplane/crossplane-runtime/pkg/errors"
@@ -78,9 +79,8 @@ const (
 	defaultImagePullSecret = "upbound-pull-secret"
 	ns                     = "upbound-system"
 
-	jsonKey = "_json_key"
-
 	errReadTokenFile          = "unable to read token file"
+	errReadTokenFileData      = "unable to extract parameters from token file"
 	errReadParametersFile     = "unable to read parameters file"
 	errParseInstallParameters = "unable to parse install parameters"
 	errCreateImagePullSecret  = "failed to create image pull secret"
@@ -213,7 +213,7 @@ func (c *initCmd) AfterApply(kongCtx *kong.Context, quiet config.QuietFlag) erro
 	c.features = &feature.Flags{}
 	spacefeature.EnableFeatures(c.features, c.helmParams)
 
-	prereqs, err := prerequisites.New(kubeconfig, defs, c.features)
+	prereqs, err := prerequisites.New(kubeconfig, defs, c.features, c.Version)
 	if err != nil {
 		return err
 	}
@@ -385,18 +385,23 @@ func (c *initCmd) deploySpace(ctx context.Context, params map[string]any) error 
 
 	hcSpinner, _ := upterm.CheckmarkSuccessSpinner.Start(upterm.StepCounter("Starting Space Components", 3, 3))
 
-	errC, err := kube.DynamicWatch(ctx, c.dClient.Resource(hostclusterGVR), &watcherTimeout, func(u *unstructured.Unstructured) (bool, error) {
-		up := resources.HostCluster{Unstructured: *u}
-		if resource.IsConditionTrue(up.GetCondition(xpv1.TypeReady)) {
-			return true, nil
+	version, _ := semver.NewVersion(c.Version)
+	requiresUXP, _ := semver.NewConstraint("< v1.7.0-0")
+
+	if requiresUXP.Check(version) {
+		errC, err := kube.DynamicWatch(ctx, c.dClient.Resource(hostclusterGVR), &watcherTimeout, func(u *unstructured.Unstructured) (bool, error) {
+			up := resources.HostCluster{Unstructured: *u}
+			if resource.IsConditionTrue(up.GetCondition(xpv1.TypeReady)) {
+				return true, nil
+			}
+			return false, nil
+		})
+		if err != nil {
+			return err
 		}
-		return false, nil
-	})
-	if err != nil {
-		return err
-	}
-	if err := <-errC; err != nil {
-		return err
+		if err := <-errC; err != nil {
+			return err
+		}
 	}
 	hcSpinner.Success()
 	return nil
