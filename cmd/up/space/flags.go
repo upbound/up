@@ -4,24 +4,24 @@
 package space
 
 import (
-	"io"
 	"net/url"
 	"os"
 
 	"github.com/crossplane/crossplane-runtime/pkg/errors"
 
 	"github.com/upbound/up/internal/input"
+	"github.com/upbound/up/internal/upbound"
 )
 
 type registryFlags struct {
-	Repository *url.URL `hidden:"" name:"registry-repository" env:"UPBOUND_REGISTRY" default:"us-west1-docker.pkg.dev/orchestration-build/upbound-environments" help:"Set registry for where to pull OCI artifacts from. This is an OCI registry reference, i.e. a URL without the scheme or protocol prefix."`
-	Endpoint   *url.URL `hidden:"" name:"registry-endpoint" env:"UPBOUND_REGISTRY_ENDPOINT" default:"https://us-west1-docker.pkg.dev" help:"Set registry endpoint, including scheme, for authentication."`
+	Repository *url.URL `hidden:"" name:"registry-repository" env:"UPBOUND_REGISTRY" default:"xpkg.upbound.io/spaces-artifacts" help:"Set registry for where to pull OCI artifacts from. This is an OCI registry reference, i.e. a URL without the scheme or protocol prefix."`
+	Endpoint   *url.URL `hidden:"" name:"registry-endpoint" env:"UPBOUND_REGISTRY_ENDPOINT" default:"https://xpkg.upbound.io" help:"Set registry endpoint, including scheme, for authentication."`
 }
 
 type authorizedRegistryFlags struct {
 	registryFlags
 
-	TokenFile *os.File `name:"token-file" help:"File containing authentication token."`
+	TokenFile *os.File `name:"token-file" help:"File containing authentication token. Expecting a JSON file with \"accessId\" and \"token\" keys."`
 	Username  string   `hidden:"" name:"registry-username" help:"Set the registry username."`
 	Password  string   `hidden:"" name:"registry-password" help:"Set the registry password."`
 }
@@ -51,13 +51,11 @@ func (p *authorizedRegistryFlags) AfterApply() error {
 		return nil
 	}
 
-	b, err := io.ReadAll(p.TokenFile)
-	defer p.TokenFile.Close() // nolint:errcheck
+	tf, err := upbound.TokenFromPath(p.TokenFile.Name())
 	if err != nil {
-		return errors.Wrap(err, errReadTokenFile)
+		return err
 	}
-	p.Username = jsonKey
-	p.Password = string(b)
+	p.Username, p.Password = tf.AccessID, tf.Token
 
 	return nil
 }

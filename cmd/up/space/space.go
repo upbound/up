@@ -26,7 +26,7 @@ import (
 const (
 	spacesChart = "spaces"
 
-	defaultRegistry = "us-west1-docker.pkg.dev/orchestration-build/upbound-environments"
+	defaultRegistry = "xpkg.upbound.io/spaces-artifacts"
 )
 
 // BeforeReset is the first hook to run.
