@@ -49,10 +49,11 @@ const (
 )
 
 var (
-	version      string
-	agentVersion string = "0.0.0-416.g084be68"
-	gitCommit    string = "unknown-commit"
-	target       string = string(ReleaseTargetDebug)
+	version             string
+	agentVersion        string = "0.0.0-416.g084be68"
+	mcpConnectorVersion string = "0.7.0"
+	gitCommit           string = "unknown-commit"
+	target              string = string(ReleaseTargetDebug)
 )
 
 func UserAgent() string {
@@ -72,6 +73,11 @@ func GitCommit() string {
 // AgentVersion returns the connect agent version.
 func AgentVersion() string {
 	return agentVersion
+}
+
+// MCPConnectorVersion returns the connector version.
+func MCPConnectorVersion() string {
+	return mcpConnectorVersion
 }
 
 // ReleaseTarget returns the target type that the binary was built with.
