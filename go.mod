@@ -67,7 +67,7 @@ require (
 	github.com/charmbracelet/lipgloss v0.9.1
 	github.com/distribution/reference v0.5.0 // indirect
 	github.com/dlclark/regexp2 v1.4.0 // indirect
-	github.com/gobuffalo/flect v1.0.2 // indirect
+	github.com/gobuffalo/flect v1.0.2
 	github.com/gorilla/websocket v1.5.0 // indirect
 	github.com/mxk/go-flowrate v0.0.0-20140419014527-cca7078d478f // indirect
 	rsc.io/qr v0.2.0 // indirect

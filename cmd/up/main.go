@@ -45,6 +45,7 @@ import (
 	v "github.com/upbound/up/cmd/up/version"
 	"github.com/upbound/up/cmd/up/xpkg"
 	"github.com/upbound/up/cmd/up/xpls"
+	"github.com/upbound/up/cmd/up/xrd"
 	"github.com/upbound/up/internal/config"
 	"github.com/upbound/up/internal/feature"
 	"github.com/upbound/up/internal/upterm"
@@ -111,6 +112,7 @@ type cli struct {
 	// Develop with Crossplane
 	Configuration configuration.Cmd `cmd:"" group:"Develop with Crossplane" help:"Build configurations."`
 	Dependency    dependency.Cmd    `cmd:"" group:"Develop with Crossplane" help:"Manage configuration dependencies."`
+	XRD           xrd.Cmd           `cmd:"" group:"Develop with Crossplane" help:"Manage XRDs from Composite Resources or Claims."`
 	Local         local.Cmd         `cmd:"" group:"Develop with Crossplane" help:"Interact with a local development control plane."`
 	XPKG          xpkg.Cmd          `cmd:"" group:"Develop with Crossplane" help:"Package configurations, functions, and providers for distribution."`
 	XPLS          xpls.Cmd          `cmd:"" group:"Develop with Crossplane" help:"Start xpls language server."`
