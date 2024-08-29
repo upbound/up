@@ -33,6 +33,7 @@ import (
 	"github.com/upbound/up/cmd/up/migration"
 	"github.com/upbound/up/cmd/up/organization"
 	"github.com/upbound/up/cmd/up/profile"
+	"github.com/upbound/up/cmd/up/project"
 	"github.com/upbound/up/cmd/up/query"
 	"github.com/upbound/up/cmd/up/repository"
 	"github.com/upbound/up/cmd/up/robot"
@@ -110,6 +111,7 @@ type cli struct {
 	UXP          uxp.Cmd          `cmd:"" group:"Manage Upbound Resources" help:"Interact with UXP."`
 
 	// Develop with Crossplane
+	Project       project.Cmd       `cmd:"" group:"Develop with Crossplane" help:"Manage Upbound development projects."`
 	Configuration configuration.Cmd `cmd:"" group:"Develop with Crossplane" help:"Build configurations."`
 	Dependency    dependency.Cmd    `cmd:"" group:"Develop with Crossplane" help:"Manage configuration dependencies."`
 	XRD           xrd.Cmd           `cmd:"" group:"Develop with Crossplane" help:"Manage XRDs from Composite Resources or Claims."`
