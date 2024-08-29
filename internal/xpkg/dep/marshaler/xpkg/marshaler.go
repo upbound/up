@@ -21,6 +21,8 @@ import (
 	"path/filepath"
 	"strings"
 
+	"k8s.io/apimachinery/pkg/runtime/schema"
+
 	"github.com/crossplane/crossplane-runtime/pkg/errors"
 	"github.com/google/go-containerregistry/pkg/v1/mutate"
 	"github.com/spf13/afero"
@@ -31,7 +33,9 @@ import (
 	xpmetav1beta1 "github.com/crossplane/crossplane/apis/pkg/meta/v1beta1"
 
 	"github.com/crossplane/crossplane-runtime/pkg/parser"
+	v1 "github.com/crossplane/crossplane/apis/apiextensions/v1"
 	"github.com/crossplane/crossplane/apis/pkg/v1beta1"
+	"github.com/crossplane/crossplane/xcrd"
 
 	"github.com/upbound/up/internal/xpkg"
 	"github.com/upbound/up/internal/xpkg/parser/linter"
@@ -44,9 +48,14 @@ const (
 	errFailedToParsePkgYaml         = "failed to parse package yaml"
 	errLintPackage                  = "failed to lint package"
 	errOpenPackageStream            = "failed to open package stream file"
+	errConvertXRDs                  = "failed to convert XRD to CRD"
 	errFailedToConvertMetaToPackage = "failed to convert meta to package"
 	errInvalidPath                  = "invalid path provided for package lookup"
 	errNotExactlyOneMeta            = "not exactly one package meta type"
+)
+
+var (
+	crdGVK = schema.GroupVersionKind{Group: "apiextensions.k8s.io", Version: "v1", Kind: "CustomResourceDefinition"}
 )
 
 // Marshaler represents a xpkg Marshaler
@@ -113,6 +122,10 @@ func (r *Marshaler) FromImage(i xpkg.Image) (*ParsedPackage, error) {
 	}
 
 	pkg = applyImageMeta(i.Meta, pkg)
+
+	if pkg, err = convertXRD2CRD(pkg); err != nil {
+		return nil, errors.Wrap(err, errConvertXRDs)
+	}
 
 	return finalizePkg(pkg)
 }
@@ -199,6 +212,32 @@ func applyImageMeta(m xpkg.ImageMeta, pkg *ParsedPackage) *ParsedPackage {
 	pkg.Ver = m.Version
 
 	return pkg
+}
+
+func convertXRD2CRD(pkg *ParsedPackage) (*ParsedPackage, error) {
+	for _, obj := range pkg.Objects() {
+		if obj.GetObjectKind().GroupVersionKind().Kind == "CompositeResourceDefinition" {
+			xrd := obj.(*v1.CompositeResourceDefinition)
+
+			crd, err := xcrd.ForCompositeResource(obj.(*v1.CompositeResourceDefinition))
+			if err != nil {
+				return nil, errors.Wrapf(err, "cannot derive composite CRD from XRD %q", xrd.GetName())
+			}
+			crd.SetGroupVersionKind(crdGVK)
+			pkg.Objs = append(pkg.Objs, crd)
+
+			if xrd.Spec.ClaimNames != nil {
+				claimCrd, err := xcrd.ForCompositeResourceClaim(obj.(*v1.CompositeResourceDefinition))
+				if err != nil {
+					return nil, errors.Wrapf(err, "cannot derive claim CRD from XRD %q", xrd.GetName())
+				}
+				claimCrd.SetGroupVersionKind(crdGVK)
+				pkg.Objs = append(pkg.Objs, claimCrd)
+			}
+		}
+	}
+
+	return pkg, nil
 }
 
 func finalizePkg(pkg *ParsedPackage) (*ParsedPackage, error) { // nolint:gocyclo

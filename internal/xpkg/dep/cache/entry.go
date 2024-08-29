@@ -217,7 +217,6 @@ func (e *entry) writeObjects(objs []runtime.Object) (*flushstats, error) { // no
 
 	for _, o := range objs {
 		var inc statsIncrementer
-
 		yb, err := yaml.Marshal(o)
 		if err != nil {
 			return stats, err
@@ -237,7 +236,7 @@ func (e *entry) writeObjects(objs []runtime.Object) (*flushstats, error) { // no
 			name = crd.GetName()
 			inc = stats.incCRDs
 		case *xpv1.CompositeResourceDefinition:
-			name = crd.GetName()
+			name = crd.GetName() + ".xrd"
 			inc = stats.incXRDs
 		case *xpv1.Composition:
 			name = crd.GetName()

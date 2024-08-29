@@ -485,10 +485,6 @@ func (v *View) parseMeta(ctx context.Context, pCtx parseContext) error {
 		return errors.Errorf("%s in %s", errInvalidPackage, v.relativePath(pCtx.path))
 	}
 
-	if v.meta != nil {
-		return errors.Errorf("%s: %s, %s and maybe more", errInvalidPackage, v.relativePath(v.metaPath), v.relativePath(pCtx.path))
-	}
-
 	v.meta = meta.New(p.GetMeta()[0])
 	v.metaPath = pCtx.path
 
