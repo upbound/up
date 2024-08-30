@@ -15,6 +15,8 @@
 package xpkg
 
 import (
+	"fmt"
+
 	"github.com/Masterminds/semver/v3"
 	"github.com/crossplane/crossplane-runtime/pkg/errors"
 	v1 "github.com/crossplane/crossplane/apis/apiextensions/v1"
@@ -38,8 +40,8 @@ const (
 	errNotCRD                            = "object is not a CRD"
 	errNotMutatingWebhookConfiguration   = "object is not a MutatingWebhookConfiguration"
 	errNotValidatingWebhookConfiguration = "object is not a ValidatingWebhookConfiguration"
-	errNotXRD                            = "object is not an XRD"
-	errNotComposition                    = "object is not a Composition"
+	errNotXRD                            = "object is not a CompositeResourceDefinition (XRD); got Group: %s, Version: %s, Kind: %s"
+	errNotComposition                    = "object is not a Composition; got Group: %s, Version: %s, Kind: %s"
 	errBadConstraints                    = "package version constraints are poorly formatted"
 )
 
@@ -56,14 +58,16 @@ func NewProviderLinter() linter.Linter {
 
 // NewConfigurationLinter is a convenience function for creating a package linter for
 // configurations.
+// Since we generate CRDs from XRDs for the cache,
+// a Configuration Package retrieved from the cache may include CRDs.
 func NewConfigurationLinter() linter.Linter {
-	return linter.NewPackageLinter(linter.PackageLinterFns(OneMeta), linter.ObjectLinterFns(IsConfiguration, PackageValidSemver), linter.ObjectLinterFns(linter.Or(IsXRD, IsComposition)))
+	return linter.NewPackageLinter(linter.PackageLinterFns(OneMeta), linter.ObjectLinterFns(IsConfiguration, PackageValidSemver), linter.ObjectLinterFns(linter.Or(IsXRD, IsComposition, IsCRD)))
 }
 
 // NewFunctionLinter is a convenience function for creating a package linter for
 // functions.
 func NewFunctionLinter() linter.Linter {
-	return linter.NewPackageLinter(linter.PackageLinterFns(OneMeta), linter.ObjectLinterFns(IsFunction), linter.ObjectLinterFns())
+	return linter.NewPackageLinter(linter.PackageLinterFns(OneMeta), linter.ObjectLinterFns(IsFunction), linter.ObjectLinterFns(IsCRD))
 }
 
 // OneMeta checks that there is only one meta object in the package.
@@ -149,7 +153,7 @@ func IsValidatingWebhookConfiguration(o runtime.Object) error {
 // IsXRD checks that an object is a CompositeResourceDefinition.
 func IsXRD(o runtime.Object) error {
 	if _, ok := o.(*v1.CompositeResourceDefinition); !ok {
-		return errors.New(errNotXRD)
+		return errors.New(fmt.Sprintf(errNotXRD, o.GetObjectKind().GroupVersionKind().Group, o.GetObjectKind().GroupVersionKind().Version, o.GetObjectKind().GroupVersionKind().Kind))
 	}
 	return nil
 }
@@ -157,7 +161,7 @@ func IsXRD(o runtime.Object) error {
 // IsComposition checks that an object is a Composition.
 func IsComposition(o runtime.Object) error {
 	if _, ok := o.(*v1.Composition); !ok {
-		return errors.New(errNotComposition)
+		return errors.New(fmt.Sprintf(errNotComposition, o.GetObjectKind().GroupVersionKind().Group, o.GetObjectKind().GroupVersionKind().Version, o.GetObjectKind().GroupVersionKind().Kind))
 	}
 	return nil
 }

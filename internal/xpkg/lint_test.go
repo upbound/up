@@ -301,7 +301,7 @@ func TestIsXRD(t *testing.T) {
 		"ErrNotConfiguration": {
 			reason: "Should return error if object is not XRD.",
 			obj:    v1beta1crd,
-			err:    errors.New(errNotXRD),
+			err:    errors.New("object is not a CompositeResourceDefinition (XRD); got Group: apiextensions.k8s.io, Version: v1beta1, Kind: CustomResourceDefinition"),
 		},
 	}
 
@@ -329,7 +329,7 @@ func TestIsComposition(t *testing.T) {
 		"ErrNotComposition": {
 			reason: "Should return error if object is not composition.",
 			obj:    v1beta1crd,
-			err:    errors.New(errNotComposition),
+			err:    errors.New("object is not a Composition; got Group: apiextensions.k8s.io, Version: v1beta1, Kind: CustomResourceDefinition"),
 		},
 	}
 
