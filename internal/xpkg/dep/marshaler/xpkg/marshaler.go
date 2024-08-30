@@ -197,6 +197,29 @@ func (r *Marshaler) parseNDJSON(reader io.ReadCloser) (*ParsedPackage, error) {
 	if err != nil {
 		return nil, errors.Wrap(err, errFailedToParsePkgYaml)
 	}
+
+	metas := pkg.GetMeta()
+	if len(metas) != 1 {
+		return nil, errors.New(errNotExactlyOneMeta)
+	}
+
+	meta := metas[0]
+
+	// Check if the meta kind is ConfigurationKind
+	if meta.GetObjectKind().GroupVersionKind().Kind == xpmetav1.ConfigurationKind {
+		filteredObjects := []runtime.Object{}
+		for _, obj := range pkg.GetObjects() {
+			// Only include objects of type CompositeResourceDefinition or Composition
+			if _, isXRD := obj.(*v1.CompositeResourceDefinition); isXRD {
+				filteredObjects = append(filteredObjects, obj)
+			} else if _, isComposition := obj.(*v1.Composition); isComposition {
+				filteredObjects = append(filteredObjects, obj)
+			}
+		}
+		// Replace pkg.objects with the filtered list
+		pkg.SetObjects(filteredObjects)
+	}
+
 	p, err := processPackage(pkg)
 	if err != nil {
 		return nil, err

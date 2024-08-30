@@ -65,6 +65,11 @@ func (p *Package) GetObjects() []runtime.Object {
 	return p.objects
 }
 
+// SetObjects updates the slice of runtime.Objects corresponding to CRDs, XRDs, and Compositions contained in the package.
+func (p *Package) SetObjects(objs []runtime.Object) {
+	p.objects = objs
+}
+
 // New returns a new NDJSONPackageParser
 func New() (*PackageParser, error) {
 	metaScheme, err := scheme.BuildMetaScheme()
