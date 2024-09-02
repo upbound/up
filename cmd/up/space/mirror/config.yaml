@@ -24,7 +24,8 @@ oci:
       - image: "xpkg.upbound.io/spaces-artifacts/mxe-composition-templates"
         compatibleChartVersion: "1.5.x"
       - image: "xpkg.upbound.io/spaces-artifacts/mxp-authz-webhook"
-      # compatibleChartVersion: "1.5.x" # Will be removed with https://github.com/upbound/spaces/pull/1393
+        # starting from v1.7.0, mxp-authz-webhook chart is removed
+        compatibleChartVersion: "<=1.6.x"
       - image: "xpkg.upbound.io/spaces-artifacts/mxp-benchmark"
       - image: "xpkg.upbound.io/spaces-artifacts/mxp-charts"
       - image: "xpkg.upbound.io/spaces-artifacts/mxp-control-plane"
@@ -57,6 +58,8 @@ oci:
       - image: "xpkg.upbound.io/spaces-artifacts/kyverno-kyvernopre:v1.11.4"
       - image: "xpkg.upbound.io/spaces-artifacts/kyverno-reports-controller:v1.11.4"
       - image: "xpkg.upbound.io/spaces-artifacts/mxp-authz-webhook-openssl:3.1.4"
+        # starting from v1.7.0, mxp-authz-webhook chart is removed
+        compatibleChartVersion: "<=1.6.x"
       - image: "xpkg.upbound.io/spaces-artifacts/opentelemetry-collector-contrib:0.98.0"
       - image: "xpkg.upbound.io/spaces-artifacts/uxp-bootstrapper:v1.10.4-up.2"
         compatibleChartVersion: "1.6.x"
