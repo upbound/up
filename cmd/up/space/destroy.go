@@ -56,6 +56,7 @@ func (c *destroyCmd) AfterApply(kongCtx *kong.Context) error {
 	if err != nil {
 		return err
 	}
+	upCtx.SetupLogging()
 
 	kubeconfig, err := upCtx.Kubecfg.ClientConfig()
 	if err != nil {

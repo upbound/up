@@ -91,6 +91,7 @@ func (c *upgradeCmd) AfterApply(quiet config.QuietFlag) error { //nolint:gocyclo
 	if err != nil {
 		return err
 	}
+	upCtx.SetupLogging()
 
 	kubeconfig, err := upCtx.Kubecfg.ClientConfig()
 	if err != nil {

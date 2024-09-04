@@ -57,6 +57,8 @@ func PredictRobots() complete.Predictor {
 		if err != nil {
 			return nil
 		}
+		upCtx.SetupLogging()
+
 		cfg, err := upCtx.BuildSDKConfig()
 		if err != nil {
 			return nil

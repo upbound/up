@@ -23,10 +23,6 @@ import (
 
 	"github.com/Masterminds/semver/v3"
 	"github.com/alecthomas/kong"
-	xpv1 "github.com/crossplane/crossplane-runtime/apis/common/v1"
-	"github.com/crossplane/crossplane-runtime/pkg/errors"
-	"github.com/crossplane/crossplane-runtime/pkg/feature"
-	"github.com/crossplane/crossplane-runtime/pkg/resource"
 	"github.com/pterm/pterm"
 	"golang.org/x/exp/maps"
 	"helm.sh/helm/v3/pkg/chart"
@@ -40,6 +36,11 @@ import (
 	"k8s.io/client-go/kubernetes"
 	"k8s.io/client-go/kubernetes/scheme"
 	"sigs.k8s.io/yaml"
+
+	xpv1 "github.com/crossplane/crossplane-runtime/apis/common/v1"
+	"github.com/crossplane/crossplane-runtime/pkg/errors"
+	"github.com/crossplane/crossplane-runtime/pkg/feature"
+	"github.com/crossplane/crossplane-runtime/pkg/resource"
 
 	upboundv1alpha1 "github.com/upbound/up-sdk-go/apis/upbound/v1alpha1"
 	"github.com/upbound/up/cmd/up/space/defaults"
@@ -141,6 +142,7 @@ func (c *initCmd) AfterApply(kongCtx *kong.Context, quiet config.QuietFlag) erro
 		return err
 	}
 	kongCtx.Bind(upCtx)
+	upCtx.SetupLogging()
 
 	kubeconfig := c.Kube.GetConfig()
 

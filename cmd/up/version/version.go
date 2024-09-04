@@ -86,6 +86,7 @@ func (c *Cmd) AfterApply(kongCtx *kong.Context) error {
 		return err
 	}
 	kongCtx.Bind(upCtx)
+	upCtx.SetupLogging()
 
 	return nil
 }

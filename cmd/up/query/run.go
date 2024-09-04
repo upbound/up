@@ -88,10 +88,6 @@ func (c *cmd) Run(ctx context.Context, kongCtx *kong.Context, upCtx *upbound.Con
 	}
 	gkNames, categoryNames := SplitGroupKindAndCategories(tgns)
 
-	if upCtx.WrapTransport != nil {
-		kubeconfig.Wrap(upCtx.WrapTransport)
-	}
-
 	// pre-check that the server supports the v1alpha1 query API
 	if err := checkQueryAPIAvailability(kubeconfig); err != nil {
 		return err

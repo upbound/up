@@ -19,8 +19,9 @@ import (
 	"net/http"
 
 	"github.com/alecthomas/kong"
-	"github.com/crossplane/crossplane-runtime/pkg/errors"
 	"github.com/pterm/pterm"
+
+	"github.com/crossplane/crossplane-runtime/pkg/errors"
 
 	"github.com/upbound/up-sdk-go"
 
@@ -41,6 +42,8 @@ func (c *LogoutCmd) AfterApply(kongCtx *kong.Context) error {
 		return err
 	}
 	kongCtx.Bind(upCtx)
+	upCtx.SetupLogging()
+
 	cfg, err := upCtx.BuildSDKConfig()
 	if err != nil {
 		return err
