@@ -23,7 +23,6 @@ import (
 	"github.com/pterm/pterm"
 	"github.com/willabides/kongplete"
 
-	"github.com/upbound/up/cmd/up/configuration"
 	"github.com/upbound/up/cmd/up/controlplane"
 	"github.com/upbound/up/cmd/up/ctx"
 	"github.com/upbound/up/cmd/up/dependency"
@@ -111,13 +110,12 @@ type cli struct {
 	UXP          uxp.Cmd          `cmd:"" group:"Manage Upbound Resources" help:"Interact with UXP."`
 
 	// Develop with Crossplane
-	Project       project.Cmd       `cmd:"" group:"Develop with Crossplane" help:"Manage Upbound development projects."`
-	Configuration configuration.Cmd `cmd:"" group:"Develop with Crossplane" help:"Build configurations."`
-	Dependency    dependency.Cmd    `cmd:"" group:"Develop with Crossplane" help:"Manage configuration dependencies."`
-	XRD           xrd.Cmd           `cmd:"" group:"Develop with Crossplane" help:"Manage XRDs from Composite Resources or Claims."`
-	Local         local.Cmd         `cmd:"" group:"Develop with Crossplane" help:"Interact with a local development control plane."`
-	XPKG          xpkg.Cmd          `cmd:"" group:"Develop with Crossplane" help:"Package configurations, functions, and providers for distribution."`
-	XPLS          xpls.Cmd          `cmd:"" group:"Develop with Crossplane" help:"Start xpls language server."`
+	Project    project.Cmd    `cmd:"" group:"Develop with Crossplane" help:"Manage Upbound development projects."`
+	Dependency dependency.Cmd `cmd:"" group:"Develop with Crossplane" help:"Manage configuration dependencies."`
+	XRD        xrd.Cmd        `cmd:"" group:"Develop with Crossplane" help:"Manage XRDs from Composite Resources or Claims."`
+	Local      local.Cmd      `cmd:"" group:"Develop with Crossplane" help:"Interact with a local development control plane."`
+	XPKG       xpkg.Cmd       `cmd:"" group:"Develop with Crossplane" help:"Package configurations, functions, and providers for distribution."`
+	XPLS       xpls.Cmd       `cmd:"" group:"Develop with Crossplane" help:"Start xpls language server."`
 
 	// Configure up
 	Completion kongplete.InstallCompletions `cmd:"" group:"Configure up" help:"Generate shell autocompletions"`
