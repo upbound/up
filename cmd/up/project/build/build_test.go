@@ -35,7 +35,7 @@ import (
 	"github.com/upbound/up/pkg/apis/project/v1alpha1"
 )
 
-//go:embed testdata/configuration-getting-started
+//go:embed testdata/configuration-getting-started/**
 var configurationGettingStarted embed.FS
 
 func TestBuild(t *testing.T) {
