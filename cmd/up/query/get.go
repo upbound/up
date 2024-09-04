@@ -53,6 +53,7 @@ func (c *GetCmd) AfterApply(kongCtx *kong.Context) error {
 		return err
 	}
 	kongCtx.Bind(upCtx)
+	upCtx.SetupLogging()
 
 	// load current kubeconfig context
 	rules := clientcmd.NewDefaultClientConfigLoadingRules()

@@ -20,7 +20,6 @@ import (
 	"time"
 
 	"github.com/alecthomas/kong"
-	"github.com/crossplane/crossplane-runtime/pkg/errors"
 	"github.com/google/go-containerregistry/pkg/name"
 	"github.com/pterm/pterm"
 	corev1 "k8s.io/api/core/v1"
@@ -28,6 +27,8 @@ import (
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/client-go/dynamic"
+
+	"github.com/crossplane/crossplane-runtime/pkg/errors"
 
 	"github.com/upbound/up/internal/kube"
 	"github.com/upbound/up/internal/resources"
@@ -82,10 +83,6 @@ func (c *installCmd) AfterApply(kongCtx *kong.Context, upCtx *upbound.Context) e
 		return err
 	}
 	kubeconfig.UserAgent = version.UserAgent()
-
-	if upCtx.WrapTransport != nil {
-		kubeconfig.Wrap(upCtx.WrapTransport)
-	}
 
 	// todo(redbackthomson): Migrate to using client.Client for standardization
 	client, err := dynamic.NewForConfig(kubeconfig)

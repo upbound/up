@@ -22,7 +22,6 @@ import (
 	"os"
 	"path/filepath"
 
-	"github.com/crossplane/crossplane-runtime/pkg/errors"
 	"github.com/google/go-containerregistry/pkg/name"
 	v1 "github.com/google/go-containerregistry/pkg/v1"
 	"github.com/google/go-containerregistry/pkg/v1/daemon"
@@ -31,6 +30,8 @@ import (
 	"github.com/google/go-containerregistry/pkg/v1/tarball"
 	"github.com/pterm/pterm"
 	"github.com/spf13/afero"
+
+	"github.com/crossplane/crossplane-runtime/pkg/errors"
 
 	"github.com/upbound/up/internal/upbound"
 	"github.com/upbound/up/internal/xpkg"
@@ -107,6 +108,8 @@ func (c *xpExtractCmd) AfterApply() error {
 		if err != nil {
 			return err
 		}
+		upCtx.SetupLogging()
+
 		name, err := name.ParseReference(c.Package, name.WithDefaultRegistry(upCtx.RegistryEndpoint.Hostname()))
 		if err != nil {
 			return errors.Wrap(err, errInvalidTag)

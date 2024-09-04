@@ -18,9 +18,10 @@ import (
 	"context"
 
 	"github.com/alecthomas/kong"
-	"github.com/crossplane/crossplane-runtime/pkg/errors"
 	"github.com/pterm/pterm"
 	"k8s.io/client-go/kubernetes"
+
+	"github.com/crossplane/crossplane-runtime/pkg/errors"
 
 	"github.com/upbound/up/internal/kube"
 	"github.com/upbound/up/internal/upbound"
@@ -39,9 +40,6 @@ func (c *createCmd) AfterApply(kongCtx *kong.Context, upCtx *upbound.Context) er
 	kubeconfig, err := kube.GetKubeConfig(c.Kubeconfig)
 	if err != nil {
 		return err
-	}
-	if upCtx.WrapTransport != nil {
-		kubeconfig.Wrap(upCtx.WrapTransport)
 	}
 	client, err := kubernetes.NewForConfig(kubeconfig)
 	if err != nil {

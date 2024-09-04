@@ -30,6 +30,7 @@ import (
 
 	"github.com/crossplane/crossplane-runtime/pkg/errors"
 	xplogging "github.com/crossplane/crossplane-runtime/pkg/logging"
+
 	"github.com/upbound/up/internal/logging"
 
 	"github.com/spf13/afero"

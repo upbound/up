@@ -25,14 +25,15 @@ import (
 	"text/template"
 
 	"github.com/alecthomas/kong"
-	"github.com/crossplane/crossplane-runtime/pkg/errors"
-	"github.com/crossplane/crossplane-runtime/pkg/parser"
 	"github.com/google/go-containerregistry/pkg/name"
 	v1 "github.com/google/go-containerregistry/pkg/v1"
 	"github.com/google/go-containerregistry/pkg/v1/mutate"
 	"github.com/google/go-containerregistry/pkg/v1/tarball"
 	"github.com/pterm/pterm"
 	"github.com/spf13/afero"
+
+	"github.com/crossplane/crossplane-runtime/pkg/errors"
+	"github.com/crossplane/crossplane-runtime/pkg/parser"
 
 	"github.com/upbound/up/internal/upbound"
 	"github.com/upbound/up/internal/xpkg"
@@ -84,6 +85,7 @@ func (c *batchCmd) AfterApply(kongCtx *kong.Context) error {
 		return err
 	}
 	kongCtx.Bind(upCtx)
+	upCtx.SetupLogging()
 
 	return nil
 }

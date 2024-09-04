@@ -22,10 +22,11 @@ import (
 	"strconv"
 
 	"github.com/alecthomas/kong"
-	"github.com/crossplane/crossplane-runtime/pkg/errors"
 	"github.com/pterm/pterm"
 	"k8s.io/client-go/kubernetes"
 	"sigs.k8s.io/yaml"
+
+	"github.com/crossplane/crossplane-runtime/pkg/errors"
 
 	"github.com/upbound/up-sdk-go/service/accounts"
 	"github.com/upbound/up-sdk-go/service/tokens"
@@ -56,9 +57,6 @@ func (c *installCmd) AfterApply(kongCtx *kong.Context, upCtx *upbound.Context) e
 	kubeconfig, err := kube.GetKubeConfig(c.Kubeconfig)
 	if err != nil {
 		return err
-	}
-	if upCtx.WrapTransport != nil {
-		kubeconfig.Wrap(upCtx.WrapTransport)
 	}
 
 	mgr, err := helm.NewManager(kubeconfig,

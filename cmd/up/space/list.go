@@ -52,6 +52,8 @@ func (c *listCmd) AfterApply(kongCtx *kong.Context) error {
 	if err != nil {
 		return err
 	}
+	upCtx.SetupLogging()
+
 	cfg, err := upCtx.BuildSDKConfig()
 	if err != nil {
 		return err

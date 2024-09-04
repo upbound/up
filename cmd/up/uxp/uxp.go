@@ -38,15 +38,14 @@ var (
 // that have Run() methods that receive it.
 func (c *Cmd) AfterApply(kongCtx *kong.Context) error {
 	upCtx, err := upbound.NewFromFlags(c.Flags)
+	upCtx.SetupLogging()
+
 	if err != nil {
 		return err
 	}
 	kubeconfig, err := kube.GetKubeConfig(c.Kubeconfig)
 	if err != nil {
 		return err
-	}
-	if upCtx.WrapTransport != nil {
-		kubeconfig.Wrap(upCtx.WrapTransport)
 	}
 	kongCtx.Bind(&install.Context{
 		Kubeconfig: kubeconfig,
