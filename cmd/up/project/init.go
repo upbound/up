@@ -12,7 +12,7 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-package configuration
+package project
 
 import (
 	"context"
@@ -30,12 +30,12 @@ import (
 	"github.com/pterm/pterm"
 	"sigs.k8s.io/yaml"
 
-	meta "github.com/crossplane/crossplane/apis/pkg/meta/v1"
+	"github.com/upbound/up/pkg/apis/project/v1alpha1"
 )
 
 type initCmd struct {
-	Name      string `help:"The name of the new configuration package to initialize."`
-	Template  string `default:"configuration-template" help:"The template name or URL to use to initialize the new package."`
+	Name      string `arg:"" help:"The name of the new project to initialize."`
+	Template  string `default:"project-template" help:"The template name or URL to use to initialize the new project."`
 	Directory string `default:"." help:"The directory to initialize. It must be empty. It will be created if it doesn't exist." type:"path"`
 	RefName   string `default:"main" help:"The branch or tag to clone from the template repository." name:"ref-name"`
 
@@ -48,8 +48,8 @@ type initCmd struct {
 // wellKnownTemplates are short aliases for template repositories.
 func wellKnownTemplates() map[string]string {
 	return map[string]string{
-		"configuration-template":     "https://github.com/upbound/configuration-template",
-		"configuration-template-ssh": "git@github.com:upbound/configuration-template.git",
+		"project-template":     "https://github.com/upbound/project-template",
+		"project-template-ssh": "git@github.com:upbound/project-template.git",
 	}
 }
 
@@ -143,28 +143,28 @@ func (c *initCmd) Run(ctx context.Context, p pterm.TextPrinter) error { // nolin
 		return errors.Wrapf(err, "failed to get repository's HEAD from %q", repoURL)
 	}
 
-	filePath := filepath.Join(c.Directory, "crossplane.yaml")
-	configuration, err := os.ReadFile(filepath.Clean(filePath))
+	filePath := filepath.Join(c.Directory, "upbound.yaml")
+	projectYAML, err := os.ReadFile(filepath.Clean(filePath))
 	if err != nil {
-		return errors.Wrapf(err, "could not read configuration")
+		return errors.Wrap(err, "could not read project file")
 	}
 
-	var config meta.Configuration
-	err = yaml.Unmarshal(configuration, &config)
+	var project v1alpha1.Project
+	err = yaml.Unmarshal(projectYAML, &project)
 	if err != nil {
-		return errors.Wrapf(err, "could not parse configuration")
+		return errors.Wrap(err, "could not parse project file")
 	}
 
-	config.ObjectMeta.Name = c.Name
+	project.ObjectMeta.Name = c.Name
 
-	modifiedConfiguration, err := yaml.Marshal(&config)
+	modifiedProject, err := yaml.Marshal(&project)
 	if err != nil {
-		return errors.Wrapf(err, "could not construct configuration")
+		return errors.Wrap(err, "could not construct project file")
 	}
 
-	err = os.WriteFile(filePath, modifiedConfiguration, 0600)
+	err = os.WriteFile(filePath, modifiedProject, 0600)
 	if err != nil {
-		return errors.Wrapf(err, "could not write configuration")
+		return errors.Wrap(err, "could not write project file")
 	}
 
 	p.Printfln("initialized package %q in directory %q from %s (%s)\n",

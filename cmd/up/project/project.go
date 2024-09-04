@@ -17,5 +17,6 @@ package project
 import "github.com/upbound/up/cmd/up/project/build"
 
 type Cmd struct {
+	Init  initCmd   `cmd:"" help:"Initialize a new project."`
 	Build build.Cmd `cmd:"" help:"Build a project into a Crossplane package."`
 }
