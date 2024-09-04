@@ -25,7 +25,6 @@ import (
 	"k8s.io/client-go/rest"
 	"k8s.io/client-go/tools/clientcmd"
 	"k8s.io/client-go/tools/clientcmd/api"
-	"k8s.io/client-go/transport"
 )
 
 const (
@@ -67,7 +66,7 @@ func BuildCloudControlPlaneKubeconfig(proxy *url.URL, id string, token string, i
 	return conf
 }
 
-func VerifyKubeConfig(wrapTransport transport.WrapperFunc) func(cfg *api.Config) error {
+func VerifyKubeConfig() func(cfg *api.Config) error {
 	return func(cfg *api.Config) error {
 		clientConfig := clientcmd.NewDefaultClientConfig(*cfg, &clientcmd.ConfigOverrides{
 			CurrentContext: cfg.CurrentContext,
@@ -77,9 +76,6 @@ func VerifyKubeConfig(wrapTransport transport.WrapperFunc) func(cfg *api.Config)
 			return err
 		}
 		restConfig.Timeout = 2 * time.Second
-		if wrapTransport != nil {
-			restConfig.Wrap(wrapTransport)
-		}
 		clientset, err := kubernetes.NewForConfig(restConfig)
 		if err != nil {
 			return err

@@ -23,12 +23,19 @@ import (
 	"net/url"
 
 	"github.com/alecthomas/kong"
+	"github.com/go-logr/logr"
+	"go.uber.org/zap/zapcore"
+	ctrl "sigs.k8s.io/controller-runtime"
+	"sigs.k8s.io/controller-runtime/pkg/log/zap"
+
 	"github.com/crossplane/crossplane-runtime/pkg/errors"
+	xplogging "github.com/crossplane/crossplane-runtime/pkg/logging"
+	"github.com/upbound/up/internal/logging"
+
 	"github.com/spf13/afero"
 	utilnet "k8s.io/apimachinery/pkg/util/net"
 	"k8s.io/client-go/rest"
 	"k8s.io/client-go/tools/clientcmd"
-	"k8s.io/client-go/transport"
 
 	"github.com/upbound/up-sdk-go"
 
@@ -82,14 +89,15 @@ type Context struct {
 	RegistryEndpoint      *url.URL
 	InsecureSkipTLSVerify bool
 
-	// Debugging
-	DebugLevel    int
-	WrapTransport func(rt http.RoundTripper) http.RoundTripper
+	// Logging
+	Log        xplogging.Logger
+	DebugLevel int
 
 	// Miscellaneous
 	allowMissingProfile bool
 	cfgPath             string
 	fs                  afero.Fs
+	zl                  logr.Logger
 }
 
 // Option modifies a Context
@@ -100,6 +108,14 @@ type Option func(*Context)
 func AllowMissingProfile() Option {
 	return func(ctx *Context) {
 		ctx.allowMissingProfile = true
+	}
+}
+
+// HideLogging disables logging for the context (after calling SetupLogging).
+func HideLogging() Option {
+	return func(ctx *Context) {
+		ctx.zl = zap.New(zap.Level(zapcore.FatalLevel))
+		ctx.Log = xplogging.NewLogrLogger(ctx.zl)
 	}
 }
 
@@ -195,21 +211,15 @@ func NewFromFlags(f Flags, opts ...Option) (*Context, error) { //nolint:gocyclo
 
 	c.InsecureSkipTLSVerify = of.InsecureSkipTLSVerify
 
+	// setup logging
 	c.DebugLevel = of.Debug
-	switch {
-	case of.Debug >= 3:
-		c.WrapTransport = func(rt http.RoundTripper) http.RoundTripper {
-			return transport.NewDebuggingRoundTripper(rt, transport.DebugCurlCommand, transport.DebugURLTiming, transport.DebugDetailedTiming, transport.DebugResponseHeaders)
+	if c.Log == nil {
+		zapOpts := []zap.Opts{}
+		if f.Debug > 0 {
+			zapOpts = append(zapOpts, zap.Level(zapcore.DebugLevel))
 		}
-	case of.Debug >= 2:
-		c.WrapTransport = func(rt http.RoundTripper) http.RoundTripper {
-			return transport.NewDebuggingRoundTripper(rt, transport.DebugJustURL, transport.DebugRequestHeaders, transport.DebugResponseStatus, transport.DebugResponseHeaders)
-		}
-	case of.Debug >= 1:
-		c.WrapTransport = func(rt http.RoundTripper) http.RoundTripper {
-			return transport.NewDebuggingRoundTripper(rt, transport.DebugURLTiming)
-		}
-	default:
+		c.zl = zap.New(zapOpts...).WithName("up")
+		c.Log = xplogging.NewLogrLogger(c.zl)
 	}
 
 	c.Kubecfg = clientcmd.NewNonInteractiveDeferredLoadingClientConfig(
@@ -218,6 +228,20 @@ func NewFromFlags(f Flags, opts ...Option) (*Context, error) { //nolint:gocyclo
 	)
 
 	return c, nil
+}
+
+// SetupLogging sets up the logger in controller-runtime and kube's klog
+func (c *Context) SetupLogging() {
+	logging.SetFilteredKlogLogger(c.DebugLevel, c.zl)
+	ctrl.SetLogger(c.zl)
+}
+
+// HideLogging disables logging for the context retrospectively. This is
+// not thread safe.
+func (c *Context) HideLogging() {
+	c.zl = zap.New(zap.Level(zapcore.FatalLevel))
+	c.Log = xplogging.NewLogrLogger(c.zl)
+	c.SetupLogging()
 }
 
 // BuildSDKConfig builds an Upbound SDK config suitable for usage with any
@@ -248,9 +272,6 @@ func (c *Context) buildSDKConfig(endpoint *url.URL) (*up.Config, error) {
 		TLSClientConfig: &tls.Config{
 			InsecureSkipVerify: c.InsecureSkipTLSVerify, //nolint:gosec
 		},
-	}
-	if c.WrapTransport != nil {
-		tr = c.WrapTransport(tr)
 	}
 	client := up.NewClient(func(u *up.HTTPClient) {
 		u.BaseURL = endpoint
@@ -292,10 +313,6 @@ func (c *Context) BuildControllerClientConfig() (*rest.Config, error) {
 	// For now, we need to add the SID cookie to every request to authenticate
 	// it.
 	tr = &cookieImpersonatingRoundTripper{session: c.Profile.Session, rt: tr}
-
-	if c.WrapTransport != nil {
-		tr = c.WrapTransport(tr)
-	}
 
 	cfg := &rest.Config{
 		Host:      c.APIEndpoint.String(),
