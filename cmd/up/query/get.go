@@ -52,6 +52,8 @@ func (c *GetCmd) AfterApply(kongCtx *kong.Context) error {
 	if err != nil {
 		return err
 	}
+	upCtx.SetupLogging()
+
 	kongCtx.Bind(upCtx)
 
 	// load current kubeconfig context

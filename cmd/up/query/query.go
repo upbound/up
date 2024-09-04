@@ -54,6 +54,8 @@ func (c *QueryCmd) AfterApply(kongCtx *kong.Context) error { // nolint:gocyclo /
 	if err != nil {
 		return err
 	}
+	upCtx.SetupLogging()
+
 	kongCtx.Bind(upCtx)
 
 	kubeconfig, err := upCtx.Kubecfg.ClientConfig()

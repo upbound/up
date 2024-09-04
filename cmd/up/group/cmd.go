@@ -18,11 +18,12 @@ import (
 	"strconv"
 
 	"github.com/alecthomas/kong"
-	"github.com/crossplane/crossplane-runtime/pkg/errors"
 	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/util/runtime"
 	"k8s.io/client-go/kubernetes/scheme"
 	"sigs.k8s.io/controller-runtime/pkg/client"
+
+	"github.com/crossplane/crossplane-runtime/pkg/errors"
 
 	spacesv1beta1 "github.com/upbound/up-sdk-go/apis/spaces/v1beta1"
 	"github.com/upbound/up/internal/feature"
@@ -49,6 +50,8 @@ func (c *Cmd) AfterApply(kongCtx *kong.Context) error {
 	if err != nil {
 		return err
 	}
+	upCtx.SetupLogging()
+
 	kongCtx.Bind(upCtx)
 
 	// we can't use groups from inside a control plane

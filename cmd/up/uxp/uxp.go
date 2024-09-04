@@ -41,12 +41,11 @@ func (c *Cmd) AfterApply(kongCtx *kong.Context) error {
 	if err != nil {
 		return err
 	}
+	upCtx.SetupLogging()
+
 	kubeconfig, err := kube.GetKubeConfig(c.Kubeconfig)
 	if err != nil {
 		return err
-	}
-	if upCtx.WrapTransport != nil {
-		kubeconfig.Wrap(upCtx.WrapTransport)
 	}
 	kongCtx.Bind(&install.Context{
 		Kubeconfig: kubeconfig,

@@ -21,7 +21,6 @@ import (
 	"strings"
 
 	"github.com/alecthomas/kong"
-	"github.com/crossplane/crossplane-runtime/pkg/errors"
 	"github.com/google/uuid"
 	"github.com/pterm/pterm"
 	"helm.sh/helm/v3/pkg/storage/driver"
@@ -31,6 +30,8 @@ import (
 	"k8s.io/client-go/kubernetes"
 	"k8s.io/client-go/rest"
 	"sigs.k8s.io/controller-runtime/pkg/client"
+
+	"github.com/crossplane/crossplane-runtime/pkg/errors"
 
 	upboundv1alpha1 "github.com/upbound/up-sdk-go/apis/upbound/v1alpha1"
 	sdkerrs "github.com/upbound/up-sdk-go/errors"
@@ -72,6 +73,8 @@ func (c *disconnectCmd) AfterApply(kongCtx *kong.Context) error {
 	if err != nil {
 		return err
 	}
+	upCtx.SetupLogging()
+
 	cfg, err := upCtx.BuildSDKConfig()
 	if err != nil {
 		return err

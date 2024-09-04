@@ -71,6 +71,8 @@ func (c *Cmd) AfterApply(kongCtx *kong.Context) error {
 	if err != nil {
 		return err
 	}
+	upCtx.SetupLogging()
+
 	kongCtx.Bind(upCtx)
 
 	return nil
@@ -208,6 +210,7 @@ func (c *Cmd) Run(ctx context.Context, kongCtx *kong.Context, upCtx *upbound.Con
 		return &unstructured.Unstructured{Object: query.GetResponse().Objects[0].Object.Object}, nil
 	}
 
+	upCtx.HideLogging()
 	app := NewApp("upbound trace", c.Resources, gkNames, categoryNames, poll, fetch)
 	return app.Run(ctx)
 }

@@ -30,11 +30,12 @@ import (
 	"time"
 
 	"github.com/alecthomas/kong"
-	"github.com/crossplane/crossplane-runtime/pkg/errors"
 	"github.com/golang-jwt/jwt"
 	"github.com/mdp/qrterminal/v3"
 	"github.com/pkg/browser"
 	"github.com/pterm/pterm"
+
+	"github.com/crossplane/crossplane-runtime/pkg/errors"
 
 	"github.com/upbound/up-sdk-go/service/userinfo"
 	uphttp "github.com/upbound/up/internal/http"
@@ -72,6 +73,8 @@ func (c *LoginCmd) AfterApply(kongCtx *kong.Context) error {
 	if err != nil {
 		return err
 	}
+	upCtx.SetupLogging()
+
 	// NOTE(hasheddan): client timeout is handled with request context.
 	// TODO(hasheddan): we can't use the typical up-sdk-go client here because
 	// we need to read session cookie from body. We should add support in the
@@ -80,9 +83,6 @@ func (c *LoginCmd) AfterApply(kongCtx *kong.Context) error {
 		TLSClientConfig: &tls.Config{
 			InsecureSkipVerify: upCtx.InsecureSkipTLSVerify, //nolint:gosec
 		},
-	}
-	if upCtx.WrapTransport != nil {
-		tr = upCtx.WrapTransport(tr)
 	}
 	c.client = &http.Client{
 		Transport: tr,

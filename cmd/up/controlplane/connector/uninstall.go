@@ -33,9 +33,6 @@ func (c *uninstallCmd) AfterApply(kongCtx *kong.Context, upCtx *upbound.Context)
 	if err != nil {
 		return err
 	}
-	if upCtx.WrapTransport != nil {
-		kubeconfig.Wrap(upCtx.WrapTransport)
-	}
 
 	mgr, err := helm.NewManager(kubeconfig,
 		connectorName,

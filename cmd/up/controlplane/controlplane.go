@@ -53,6 +53,8 @@ func (c *Cmd) AfterApply(kongCtx *kong.Context) error {
 	if err != nil {
 		return err
 	}
+	upCtx.SetupLogging()
+
 	kongCtx.Bind(upCtx)
 
 	// we can't use control planes from inside a control plane
@@ -75,6 +77,7 @@ func PredictControlPlanes() complete.Predictor {
 		if err != nil {
 			return nil
 		}
+		upCtx.SetupLogging()
 
 		client, err := upCtx.BuildCurrentContextClient()
 		if err != nil {

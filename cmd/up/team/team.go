@@ -38,6 +38,8 @@ func (c *Cmd) AfterApply(kongCtx *kong.Context) error {
 	if err != nil {
 		return err
 	}
+	upCtx.SetupLogging()
+
 	cfg, err := upCtx.BuildSDKConfig()
 	if err != nil {
 		return err
@@ -55,6 +57,8 @@ func PredictTeams() complete.Predictor {
 		if err != nil {
 			return nil
 		}
+		upCtx.SetupLogging()
+
 		cfg, err := upCtx.BuildSDKConfig()
 		if err != nil {
 			return nil

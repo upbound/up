@@ -44,6 +44,7 @@ func (c *tokenCmd) AfterApply(kongCtx *kong.Context) error {
 	if err != nil {
 		return err
 	}
+	upCtx.SetupLogging()
 
 	kongCtx.Bind(upCtx)
 	return nil

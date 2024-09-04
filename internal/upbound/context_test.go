@@ -112,9 +112,8 @@ func TestNewFromFlags(t *testing.T) {
 		opts  []Option
 	}
 	type want struct {
-		err     error
-		c       *Context
-		wantErr error
+		err error
+		c   *Context
 	}
 
 	cases := map[string]struct {

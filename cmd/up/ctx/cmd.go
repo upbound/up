@@ -17,7 +17,6 @@ package ctx
 import (
 	"context"
 	"fmt"
-	"io"
 	"strings"
 
 	"github.com/alecthomas/kong"
@@ -31,8 +30,6 @@ import (
 	corev1client "k8s.io/client-go/kubernetes/typed/core/v1"
 	"k8s.io/client-go/tools/clientcmd"
 	clientcmdapi "k8s.io/client-go/tools/clientcmd/api"
-	ctrl "sigs.k8s.io/controller-runtime"
-	"sigs.k8s.io/controller-runtime/pkg/log/zap"
 
 	spacesv1beta1 "github.com/upbound/up-sdk-go/apis/spaces/v1beta1"
 	"github.com/upbound/up/internal/kube"
@@ -68,6 +65,8 @@ func (c *Cmd) AfterApply(kongCtx *kong.Context) error {
 	if err != nil {
 		return err
 	}
+	upCtx.SetupLogging()
+
 	kongCtx.Bind(upCtx)
 
 	return nil
@@ -109,8 +108,6 @@ func (m model) WithTermination(msg string, err error) model {
 }
 
 func (c *Cmd) Run(ctx context.Context, kongCtx *kong.Context, upCtx *upbound.Context) error {
-	ctrl.SetLogger(zap.New(zap.WriteTo(io.Discard)))
-
 	// find profile and derive controlplane from kubeconfig
 	po := clientcmd.NewDefaultPathOptions()
 	conf, err := po.GetStartingConfig()
@@ -348,6 +345,8 @@ func (c *Cmd) RunNonInteractive(ctx context.Context, upCtx *upbound.Context, nav
 }
 
 func (c *Cmd) RunInteractive(ctx context.Context, kongCtx *kong.Context, upCtx *upbound.Context, navCtx *navContext, initialState NavigationState) error {
+	upCtx.HideLogging()
+
 	// start interactive mode
 	m := model{
 		state:      initialState,
@@ -388,7 +387,7 @@ func (c *Cmd) kubeContextWriter(upCtx *upbound.Context) kubeContextWriter {
 		upCtx:            upCtx,
 		fileOverride:     c.File,
 		kubeContext:      c.KubeContext,
-		verify:           kube.VerifyKubeConfig(upCtx.WrapTransport),
+		verify:           kube.VerifyKubeConfig(),
 		writeLastContext: writeLastContext,
 		modifyConfig:     clientcmd.ModifyConfig,
 	}
