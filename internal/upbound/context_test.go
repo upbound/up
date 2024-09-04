@@ -21,11 +21,12 @@ import (
 	"testing"
 
 	"github.com/alecthomas/kong"
-	"github.com/crossplane/crossplane-runtime/pkg/errors"
-	"github.com/crossplane/crossplane-runtime/pkg/test"
 	"github.com/google/go-cmp/cmp"
 	"github.com/google/go-cmp/cmp/cmpopts"
 	"github.com/spf13/afero"
+
+	"github.com/crossplane/crossplane-runtime/pkg/errors"
+	"github.com/crossplane/crossplane-runtime/pkg/test"
 
 	"github.com/upbound/up/internal/config"
 	"github.com/upbound/up/internal/profile"
@@ -111,9 +112,9 @@ func TestNewFromFlags(t *testing.T) {
 		opts  []Option
 	}
 	type want struct {
-		err           error
-		c             *Context
-		wrapTransport bool
+		err     error
+		c       *Context
+		wantErr error
 	}
 
 	cases := map[string]struct {
@@ -300,7 +301,6 @@ func TestNewFromFlags(t *testing.T) {
 					RegistryEndpoint: withURL("https://xpkg.upbound.io"),
 					DebugLevel:       3,
 				},
-				wrapTransport: true,
 			},
 		},
 	}
@@ -311,21 +311,20 @@ func TestNewFromFlags(t *testing.T) {
 			parser, _ := kong.New(&flags)
 			parser.Parse(tc.args.flags)
 
-			c, err := NewFromFlags(flags, tc.args.opts...)
+			upCtx, err := NewFromFlags(flags, tc.args.opts...)
+			if diff := cmp.Diff(tc.want.err, err, test.EquateErrors()); diff != "" {
+				t.Fatalf("NewFromFlags(...): -want error, +got error:\n%s", diff)
+			}
+			if upCtx == nil {
+				return
+			}
+			upCtx.SetupLogging()
 
 			if diff := cmp.Diff(tc.want.err, err, test.EquateErrors()); diff != "" {
 				t.Errorf("\n%s\nNewFromFlags(...): -want error, +got error:\n%s", tc.reason, diff)
 			}
 
-			if c != nil {
-				if c.WrapTransport != nil && !tc.want.wrapTransport {
-					t.Errorf("\n%s\nNewFromFlags(...): -want wrapTransport, +got wrapTransport\n", tc.reason)
-				} else if c.WrapTransport == nil && tc.want.wrapTransport {
-					t.Errorf("\n%s\nNewFromFlags(...): +want wrapTransport, -got wrapTransport\n", tc.reason)
-				}
-			}
-
-			if diff := cmp.Diff(tc.want.c, c,
+			if diff := cmp.Diff(tc.want.c, upCtx,
 				cmpopts.IgnoreUnexported(Context{}),
 				// NOTE(tnthornton): we're not concerned about the FSSource's
 				// internal components.
@@ -336,9 +335,8 @@ func TestNewFromFlags(t *testing.T) {
 				// NOTE(redbackthomson) we're not concerned about the logic used
 				// to load the default kubeconfig.
 				cmpopts.IgnoreFields(Context{}, "Kubecfg"),
-				// NOTE(sttts) we compare check it before
-				// a function pointer we cannot compare
-				cmpopts.IgnoreFields(Context{}, "WrapTransport"),
+				// an interface pointer we cannot compare
+				cmpopts.IgnoreFields(Context{}, "Log"),
 			); diff != "" {
 				t.Errorf("\n%s\nNewFromFlags(...): -want error, +got error:\n%s", tc.reason, diff)
 			}
