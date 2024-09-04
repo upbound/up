@@ -1,0 +1,65 @@
+# Copyright 2024 Upbound Inc
+#
+# Licensed under the Apache License, Version 2.0 (the "License");
+# you may not use this file except in compliance with the License.
+# You may obtain a copy of the License at
+#
+#     http://www.apache.org/licenses/LICENSE-2.0
+#
+# Unless required by applicable law or agreed to in writing, software
+# distributed under the License is distributed on an "AS IS" BASIS,
+# WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+# See the License for the specific language governing permissions and
+# limitations under the License.
+
+apiVersion: apiextensions.crossplane.io/v1
+kind: CompositeResourceDefinition
+metadata:
+  name: xcompositeclusters.platform.acme.co
+spec:
+  group: platform.acme.co
+  names:
+    kind: XCompositeCluster
+    plural: xcompositeclusters
+  claimNames:
+    kind: CompositeCluster
+    plural: compositeclusters
+  versions:
+    - name: v1alpha1
+      served: true
+      referenceable: true
+      schema:
+        openAPIV3Schema:
+          type: object
+          properties:
+            spec:
+              type: object
+              description: |
+                The specification for how this composite cluster should be
+                deployed.
+              properties:
+                parameters:
+                  type: object
+                  description: |
+                    The parameters indicating how this composite cluster should
+                    be configured.
+                  properties:
+                    nodeCount:
+                      type: number
+                      description: |
+                        The number of nodes for this cluster.
+                    size:
+                      type: string
+                      description: |
+                        The machine type to use for the nodes in this cluster.
+                    location:
+                      type: string
+                      description: |
+                        The geographic region this composite cluster and it's
+                        associated resources should get deployed into.
+                  required:
+                    - nodeCount
+                    - size
+                    - location
+              required:
+                - parameters
