@@ -4,13 +4,13 @@ on: issue_comment
 
 jobs:
   points:
-    runs-on: ubuntu-20.04
+    runs-on: ubuntu-22.04
     if: startsWith(github.event.comment.body, '/points')
 
     steps:
     - name: Extract Command
       id: command
-      uses: xt0rted/slash-command-action@v1
+      uses: xt0rted/slash-command-action@bf51f8f5f4ea3d58abc7eca58f77104182b23e88 # v2
       with:
         repo-token: ${{ secrets.GITHUB_TOKEN }}
         command: points
@@ -65,12 +65,12 @@ jobs:
   # NOTE(negz): See also backport.yml, which is the variant that triggers on PR
   # merge rather than on comment.
   backport:
-    runs-on: ubuntu-20.04
+    runs-on: ubuntu-22.04
     if: github.event.issue.pull_request && startsWith(github.event.comment.body, '/backport')
     steps:
     - name: Extract Command
       id: command
-      uses: xt0rted/slash-command-action@v1
+      uses: xt0rted/slash-command-action@bf51f8f5f4ea3d58abc7eca58f77104182b23e88 # v2
       with:
         repo-token: ${{ secrets.GITHUB_TOKEN }}
         command: backport
@@ -80,13 +80,12 @@ jobs:
         permission-level: write
 
     - name: Checkout
-      uses: actions/checkout@v2
+      uses: actions/checkout@692973e3d937129bcbf40652eb9f2f61becf3332 # v4
       with:
         fetch-depth: 0
 
     - name: Open Backport PR
-      uses: zeebe-io/backport-action@v0.0.4
+      uses: korthout/backport-action@v3
       with:
         github_token: ${{ secrets.GITHUB_TOKEN }}
         github_workspace: ${{ github.workspace }}
-        version: v0.0.4
