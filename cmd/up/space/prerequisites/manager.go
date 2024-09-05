@@ -15,6 +15,7 @@
 package prerequisites
 
 import (
+	"github.com/Masterminds/semver/v3"
 	"github.com/crossplane/crossplane-runtime/pkg/errors"
 	"github.com/crossplane/crossplane-runtime/pkg/feature"
 	"k8s.io/client-go/rest"
@@ -55,19 +56,45 @@ type Status struct {
 }
 
 // New constructs a new Manager for working with installation Prerequisites.
-func New(config *rest.Config, defs *defaults.CloudConfig, features *feature.Flags) (*Manager, error) {
+func New(config *rest.Config, defs *defaults.CloudConfig, features *feature.Flags, versionStr string) (*Manager, error) { // nolint:gocyclo
 	prereqs := []Prerequisite{}
+
+	version, err := semver.NewVersion(versionStr)
+	if err != nil {
+		return nil, errors.New("invalid version format: " + err.Error())
+	}
+
+	requiresUXP, err := semver.NewConstraint("< v1.7.0-0")
+	if err != nil {
+		return nil, errors.New("invalid version constraint: " + err.Error())
+	}
+
+	// Check if the version satisfies the constraint
+	if requiresUXP.Check(version) {
+		uxp, err := uxp.New(config)
+		if err != nil {
+			return nil, errors.Wrap(err, "failed to create UXP prerequisite")
+		}
+		prereqs = append(prereqs, uxp)
+
+		pk8s, err := kubernetes.New(config)
+		if err != nil {
+			return nil, errors.Wrap(err, "failed to create Kubernetes prerequisite")
+		}
+		prereqs = append(prereqs, pk8s)
+
+		phelm, err := helm.New(config)
+		if err != nil {
+			return nil, errors.Wrap(err, "failed to create Helm prerequisite")
+		}
+		prereqs = append(prereqs, phelm)
+	}
+
 	certmanager, err := certmanager.New(config)
 	if err != nil {
 		return nil, errors.Wrap(err, errCreatePrerequisite)
 	}
 	prereqs = append(prereqs, certmanager)
-
-	uxp, err := uxp.New(config)
-	if err != nil {
-		return nil, errors.Wrap(err, errCreatePrerequisite)
-	}
-	prereqs = append(prereqs, uxp)
 
 	svcType := ingressnginx.NodePort
 	if defs != nil && defs.PublicIngress {
@@ -79,18 +106,6 @@ func New(config *rest.Config, defs *defaults.CloudConfig, features *feature.Flag
 		return nil, errors.Wrap(err, errCreatePrerequisite)
 	}
 	prereqs = append(prereqs, ingress)
-
-	pk8s, err := kubernetes.New(config)
-	if err != nil {
-		return nil, errors.Wrap(err, errCreatePrerequisite)
-	}
-	prereqs = append(prereqs, pk8s)
-
-	phelm, err := helm.New(config)
-	if err != nil {
-		return nil, errors.Wrap(err, errCreatePrerequisite)
-	}
-	prereqs = append(prereqs, phelm)
 
 	if features.Enabled(spacefeature.EnableAlphaSharedTelemetry) {
 		otelopr, err := opentelemetrycollector.New(config)
