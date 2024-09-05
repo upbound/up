@@ -26,6 +26,7 @@ import (
 	"github.com/pterm/pterm"
 	"github.com/spf13/afero"
 	"gotest.tools/v3/assert"
+	"gotest.tools/v3/assert/cmp"
 	v1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 	"sigs.k8s.io/yaml"
@@ -35,7 +36,7 @@ import (
 	"github.com/upbound/up/pkg/apis/project/v1alpha1"
 )
 
-//go:embed testdata/configuration-getting-started
+//go:embed testdata/configuration-getting-started/**
 var configurationGettingStarted embed.FS
 
 func TestBuild(t *testing.T) {
@@ -71,6 +72,7 @@ func TestBuild(t *testing.T) {
 	// 2. Unmarshal it to make sure it's a valid Crossplane package.
 	// 3. Lint it to make sure it's a valid Crossplane Configuration package.
 	// 4. Check that the package metadata is correctly constructed.
+	// 5. Check that the package has the right number of objects in it.
 	img, err := tarball.Image(func() (io.ReadCloser, error) {
 		return outFS.Open("_output/configuration-getting-started-unittest.xpkg")
 	}, nil)
@@ -110,6 +112,14 @@ func TestBuild(t *testing.T) {
 			},
 		},
 	})
+
+	objs := pkg.Objects()
+	// TODO(adamwg): There are 8 APIs, which should mean 16 objects - 8 XRDs and
+	// 8 compositions. But right now we generate CRDs during parsing and inject
+	// them into the package as well, which doubles the count. This assertion
+	// will need to change when we refactor the dependency manager to generate
+	// the CRDs after, rather than during, package loading.
+	assert.Assert(t, cmp.Len(objs, 32))
 }
 
 type TestWriter struct {

@@ -29,7 +29,6 @@ import (
 	"github.com/pterm/pterm"
 	"github.com/spf13/afero"
 	v1 "k8s.io/apimachinery/pkg/apis/meta/v1"
-	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 	"sigs.k8s.io/yaml"
 
 	"github.com/upbound/up/internal/xpkg"
@@ -201,7 +200,7 @@ func collectComposites(fromFS afero.Fs, exclude []string) (afero.Fs, error) { //
 			return nil
 		}
 
-		var u unstructured.Unstructured
+		var u v1.TypeMeta
 		bs, err := afero.ReadFile(fromFS, path)
 		if err != nil {
 			return errors.Wrapf(err, "failed to read file %q", path)
@@ -216,7 +215,7 @@ func collectComposites(fromFS afero.Fs, exclude []string) (afero.Fs, error) { //
 		if u.GroupVersionKind().Group != xpv1.Group {
 			return nil
 		}
-		if u.GetKind() != xpv1.CompositeResourceDefinitionKind && u.GetKind() != xpv1.CompositionKind {
+		if u.Kind != xpv1.CompositeResourceDefinitionKind && u.Kind != xpv1.CompositionKind {
 			return nil
 		}
 
