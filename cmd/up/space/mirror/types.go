@@ -19,9 +19,9 @@ import (
 )
 
 type Repository struct {
-	Chart     string           `yaml:"chart"`
-	Images    []ImageReference `yaml:"images"`
-	SubCharts []SubChart       `yaml:"subCharts"`
+	Chart        string           `yaml:"chart"`
+	Images       []ImageReference `yaml:"images"`
+	SubResources []SubResource    `yaml:"subResources"`
 }
 
 type ImageReference struct {
@@ -29,11 +29,11 @@ type ImageReference struct {
 	CompatibleChartVersion string `yaml:"compatibleChartVersion,omitempty"`
 }
 
-type SubChart struct {
+type SubResource struct {
 	PathNavigator     oci.PathNavigator `yaml:"pathNavigator,omitempty"`
 	PathNavigatorType string            `yaml:"pathNavigatorType"`
-	Chart             string            `yaml:"chart"`
-	Image             string            `yaml:"image"`
+	Chart             string            `yaml:"chart,omitempty"`
+	Image             string            `yaml:"image,omitempty"`
 }
 
 type config struct {

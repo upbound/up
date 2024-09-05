@@ -57,8 +57,8 @@ func (c *Cmd) Run(ctx context.Context, printer upterm.ObjectPrinter) (rErr error
 	}
 
 	for _, repo := range artifacts.OCI {
-		for i := range repo.SubCharts {
-			subChart := &repo.SubCharts[i]
+		for i := range repo.SubResources {
+			subChart := &repo.SubResources[i]
 			if subChart.PathNavigatorType != "" {
 				pathValueType, ok := pathNavigator[subChart.PathNavigatorType]
 				if ok {
@@ -152,24 +152,33 @@ func (c *Cmd) mirrorWithExtraImages(ctx context.Context, printer upterm.ObjectPr
 		return fmt.Errorf("mirroring chart: %w", err)
 	}
 
-	for _, subChart := range repo.SubCharts {
-		if subChart.PathNavigator != nil {
+	for _, subResource := range repo.SubResources {
+		if subResource.PathNavigator != nil {
 			// extract path from values from main chart
-			versions, err := oci.GetValuesFromChart(repo.Chart, c.Version, subChart.PathNavigator)
+			versions, err := oci.GetValuesFromChart(repo.Chart, c.Version, subResource.PathNavigator)
 			if err != nil {
 				return fmt.Errorf("unable to extract: %w", err)
 			}
 			for _, version := range versions {
-				// mirror sub chart
-				if err := c.mirrorArtifact(printer, fmt.Sprintf("%s:%s", subChart.Chart, version), craneOpts); err != nil {
-					return fmt.Errorf("mirroring chart image %s: %w", subChart.Chart, err)
+				// mirror sub resource
+				if len(subResource.Chart) > 0 {
+					if err := c.mirrorArtifact(printer, fmt.Sprintf("%s:%s", subResource.Chart, version), craneOpts); err != nil {
+						return fmt.Errorf("mirroring chart image %s: %w", subResource.Chart, err)
+					}
 				}
-				// mirror image for sub chart
-				if err := c.mirrorArtifact(printer, fmt.Sprintf("%s:v%s", subChart.Image, version), craneOpts); err != nil {
-					return fmt.Errorf("mirroring image %s: %w", subChart.Image, err)
+				// mirror image for sub resource
+				if len(subResource.Image) > 0 {
+					// Check if the version starts with 'v'
+					versionWithV := version
+					if !strings.HasPrefix(version, "v") {
+						versionWithV = "v" + version
+					}
+					imageWithVersion := fmt.Sprintf("%s:%s", subResource.Image, versionWithV)
+					if err := c.mirrorArtifact(printer, imageWithVersion, craneOpts); err != nil {
+						return fmt.Errorf("mirroring image %s: %w", subResource.Image, err)
+					}
 				}
 			}
-
 		}
 	}
 
