@@ -233,7 +233,9 @@ func NewFromFlags(f Flags, opts ...Option) (*Context, error) { //nolint:gocyclo
 
 // SetupLogging sets up the logger in controller-runtime and kube's klog
 func (c *Context) SetupLogging() {
-	logging.SetFilteredKlogLogger(c.DebugLevel, c.zl)
+	if c.DebugLevel > 1 {
+		logging.SetKlogLogger(c.DebugLevel, c.zl)
+	}
 	ctrl.SetLogger(c.zl)
 }
 
