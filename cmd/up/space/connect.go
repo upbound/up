@@ -17,7 +17,6 @@ package space
 import (
 	"context"
 	"fmt"
-	"net/url"
 	"path"
 	"slices"
 	"strconv"
@@ -60,10 +59,6 @@ const (
 	keyToken   = "token"
 	keyRobotID = "robotID"
 	keyTokenID = "tokenID"
-
-	// TODO(tnthornton) these can probably be replaced by our public chart
-	// museum. This would allow us to use wildcards like mxp-connector.
-	agentRegistry = "us-west1-docker.pkg.dev/orchestration-build/connect"
 )
 
 const (
@@ -74,6 +69,8 @@ const (
 )
 
 type connectCmd struct {
+	Registry registryFlags `embed:""`
+
 	Upbound upbound.Flags     `embed:""`
 	Kube    upbound.KubeFlags `embed:""`
 
@@ -84,11 +81,6 @@ type connectCmd struct {
 }
 
 func (c *connectCmd) AfterApply(kongCtx *kong.Context) error {
-	registryURL, err := url.Parse(agentRegistry)
-	if err != nil {
-		return err
-	}
-
 	upCtx, err := upbound.NewFromFlags(c.Upbound)
 	if err != nil {
 		return err
@@ -129,7 +121,7 @@ func (c *connectCmd) AfterApply(kongCtx *kong.Context) error {
 
 	mgr, err := helm.NewManager(kubeconfig,
 		agentChart,
-		registryURL,
+		c.Registry.Repository,
 		helm.WithNamespace(agentNs),
 		helm.IsOCI(),
 		helm.Wait(),
@@ -264,6 +256,14 @@ func (c *connectCmd) deriveParams(a *accounts.AccountResponse) map[string]any {
 		"space":        c.Space,
 		"organization": a.Organization.Name,
 		"tokenSecret":  agentSecret,
+		"image": map[string]any{
+			"repository": c.Registry.Repository.JoinPath("agent").String(),
+		},
+		"registration": map[string]any{
+			"image": map[string]any{
+				"repository": c.Registry.Repository.JoinPath("register-init").String(),
+			},
+		},
 	}
 
 	if c.Environment != "prod" {

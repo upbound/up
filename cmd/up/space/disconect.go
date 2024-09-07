@@ -17,7 +17,6 @@ package space
 import (
 	"context"
 	"fmt"
-	"net/url"
 	"strings"
 
 	"github.com/alecthomas/kong"
@@ -45,6 +44,8 @@ import (
 )
 
 type disconnectCmd struct {
+	Registry registryFlags `embed:""`
+
 	Upbound upbound.Flags     `embed:""`
 	Kube    upbound.KubeFlags `embed:""`
 
@@ -52,11 +53,6 @@ type disconnectCmd struct {
 }
 
 func (c *disconnectCmd) AfterApply(kongCtx *kong.Context) error {
-	registryURL, err := url.Parse(agentRegistry)
-	if err != nil {
-		return err
-	}
-
 	needsKube := true
 	if err := c.Kube.AfterApply(); err != nil {
 		if c.Space == "" {
@@ -112,7 +108,7 @@ func (c *disconnectCmd) AfterApply(kongCtx *kong.Context) error {
 
 	mgr, err := helm.NewManager(kubeconfig,
 		agentChart,
-		registryURL,
+		c.Registry.Repository,
 		with...,
 	)
 	if err != nil {
