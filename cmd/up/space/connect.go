@@ -69,7 +69,7 @@ const (
 )
 
 type connectCmd struct {
-	Registry registryFlags `embed:""`
+	Registry authorizedRegistryFlags `embed:""`
 
 	Upbound upbound.Flags     `embed:""`
 	Kube    upbound.KubeFlags `embed:""`
@@ -123,6 +123,7 @@ func (c *connectCmd) AfterApply(kongCtx *kong.Context) error {
 		agentChart,
 		c.Registry.Repository,
 		helm.WithNamespace(agentNs),
+		helm.WithBasicAuth(c.Registry.Username, c.Registry.Password),
 		helm.IsOCI(),
 		helm.Wait(),
 		helm.Force(true),
@@ -262,6 +263,11 @@ func (c *connectCmd) deriveParams(a *accounts.AccountResponse) map[string]any {
 		"registration": map[string]any{
 			"image": map[string]any{
 				"repository": c.Registry.Repository.JoinPath("register-init").String(),
+			},
+		},
+		"imagePullSecrets": []map[string]string{
+			{
+				"name": defaultImagePullSecret,
 			},
 		},
 	}
