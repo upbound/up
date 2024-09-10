@@ -22,6 +22,7 @@ import (
 	"runtime"
 
 	"k8s.io/client-go/kubernetes"
+	"k8s.io/client-go/rest"
 
 	"github.com/alecthomas/kong"
 
@@ -34,8 +35,9 @@ const (
 	errKubeConfig      = "failed to get kubeconfig"
 	errCreateK8sClient = "failed to connect to cluster"
 
-	errGetCrossplaneVersion = "unable to get crossplane version. Is your kubecontext pointed at a control plane?"
-	errGetSpacesVersion     = "unable to get spaces version. Is your kubecontext pointed at a Space?"
+	errGetConnectAgentVersion = "unable to get connect agent version. Did you run `up space connect`?"
+	errGetCrossplaneVersion   = "unable to get crossplane version. Is your kubecontext pointed at a control plane?"
+	errGetSpacesVersion       = "unable to get spaces version. Is your kubecontext pointed at a Space?"
 )
 
 const (
@@ -52,8 +54,18 @@ Client:
 Server:
   Crossplane Version:	{{.CrossplaneVersion}}
   Spaces Controller Version:	{{.SpacesControllerVersion}}
+{{- end}}{{- end}}
+
+{{- if ne .ConnectAgent nil}}{{with .ConnectAgent}}
+Connect Agent:
+  Installed Connect Agent Version: {{.InstalledVersion}}
 {{- end}}{{- end}}`
 )
+
+type connectAgentVersion struct {
+	DesiredVersion   string `json:"desiredVersion" yaml:"desiredVersion"`
+	InstalledVersion string `json:"installedVersion,omitempty" yaml:"installedVersion,omitempty"`
+}
 
 type clientVersion struct {
 	Arch      string `json:"arch,omitempty" yaml:"arch,omitempty"`
@@ -69,8 +81,9 @@ type serverVersion struct {
 }
 
 type versionInfo struct {
-	Client clientVersion  `json:"client" yaml:"client"`
-	Server *serverVersion `json:"server,omitempty" yaml:"server,omitempty"`
+	Client       clientVersion       `json:"client" yaml:"client"`
+	ConnectAgent connectAgentVersion `json:"agent" yaml:"agent"`
+	Server       *serverVersion      `json:"server,omitempty" yaml:"server,omitempty"`
 }
 
 type Cmd struct {
@@ -157,6 +170,9 @@ func (c *Cmd) BuildVersionInfo(ctx context.Context, kongCtx *kong.Context, upCtx
 		v.Server.SpacesControllerVersion = versionUnknown
 	}
 
+	// If we're not in an Upbound cloud-hosted space, then see if the agent was installed.
+	v.AddAgentVersionInfo(ctx, kongCtx, rest)
+
 	return v
 }
 
@@ -164,4 +180,20 @@ func (c *Cmd) Run(ctx context.Context, kongCtx *kong.Context, upCtx *upbound.Con
 	v := c.BuildVersionInfo(ctx, kongCtx, upCtx)
 
 	return printer.PrintTemplate(v, versionTemplate)
+}
+
+func (v *versionInfo) AddAgentVersionInfo(ctx context.Context, kongCtx *kong.Context, rest *rest.Config) {
+	if v.Server.SpacesControllerVersion != "Upbound Cloud Managed" {
+		installedVersion, err := FetchConnectAgentVersion(ctx, rest)
+		if err != nil {
+			fmt.Fprintln(kongCtx.Stderr, errGetConnectAgentVersion)
+		}
+		if installedVersion == "" {
+			v.ConnectAgent.InstalledVersion = versionUnknown
+		}
+		v.ConnectAgent.InstalledVersion = installedVersion
+	} else {
+		v.ConnectAgent.InstalledVersion = "n/a"
+	}
+	v.ConnectAgent.DesiredVersion = version.AgentVersion()
 }
