@@ -25,7 +25,7 @@ import (
 
 	xpv1 "github.com/crossplane/crossplane-runtime/apis/common/v1"
 
-	queryv1alpha1 "github.com/upbound/up-sdk-go/apis/query/v1alpha1"
+	queryv1alpha2 "github.com/upbound/up-sdk-go/apis/query/v1alpha2"
 )
 
 type Tree struct {
@@ -44,11 +44,11 @@ func (t *Tree) Root() *tview.TreeNode {
 	return t.root
 }
 
-func (t *Tree) Update(objs []queryv1alpha1.QueryResponseObject) {
+func (t *Tree) Update(objs []queryv1alpha2.QueryResponseObject) {
 	t.update(t.root, objs, 0)
 }
 
-func (t *Tree) update(parent *tview.TreeNode, respObjs []queryv1alpha1.QueryResponseObject, level int) []*Object { // nolint:gocyclo // TODO: split up
+func (t *Tree) update(parent *tview.TreeNode, respObjs []queryv1alpha2.QueryResponseObject, level int) []*Object { // nolint:gocyclo // TODO: split up
 	existing := map[string]*tview.TreeNode{}
 	for _, n := range parent.GetChildren() {
 		obj := n.GetReference().(*Object)

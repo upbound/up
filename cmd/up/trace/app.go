@@ -30,7 +30,7 @@ import (
 
 	"github.com/crossplane/crossplane-runtime/pkg/errors"
 
-	queryv1alpha1 "github.com/upbound/up-sdk-go/apis/query/v1alpha1"
+	queryv1alpha2 "github.com/upbound/up-sdk-go/apis/query/v1alpha2"
 	"github.com/upbound/up/cmd/up/query"
 	"github.com/upbound/up/cmd/up/trace/model"
 	"github.com/upbound/up/cmd/up/trace/views"
@@ -52,11 +52,11 @@ type App struct {
 	grid     *tview.Grid
 	topLevel *upviews.TopLevel
 
-	pollFn  func(gkns query.GroupKindNames, cns query.CategoryNames) ([]queryv1alpha1.QueryResponseObject, error)
+	pollFn  func(gkns query.GroupKindNames, cns query.CategoryNames) ([]queryv1alpha2.QueryResponseObject, error)
 	fetchFn func(id string) (*unstructured.Unstructured, error)
 }
 
-func NewApp(title string, resources []string, gkns query.GroupKindNames, cns query.CategoryNames, pollFn func(gkns query.GroupKindNames, cns query.CategoryNames) ([]queryv1alpha1.QueryResponseObject, error), fetchFn func(id string) (*unstructured.Unstructured, error)) *App {
+func NewApp(title string, resources []string, gkns query.GroupKindNames, cns query.CategoryNames, pollFn func(gkns query.GroupKindNames, cns query.CategoryNames) ([]queryv1alpha2.QueryResponseObject, error), fetchFn func(id string) (*unstructured.Unstructured, error)) *App {
 	app := &App{
 		Application: tview.NewApplication(),
 		model:       model.NewApp(resources, gkns, cns),

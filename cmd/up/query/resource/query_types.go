@@ -7,29 +7,29 @@ import (
 	"k8s.io/apimachinery/pkg/runtime"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 
-	queryv1alpha1 "github.com/upbound/up-sdk-go/apis/query/v1alpha1"
+	queryv1alpha2 "github.com/upbound/up-sdk-go/apis/query/v1alpha2"
 )
 
 type QueryObject interface {
 	client.Object
 
-	GetSpec() *queryv1alpha1.QuerySpec
-	SetSpec(spec *queryv1alpha1.QuerySpec) QueryObject
-	SetResponse(response *queryv1alpha1.QueryResponse) QueryObject
-	GetResponse() *queryv1alpha1.QueryResponse
+	GetSpec() *queryv1alpha2.QuerySpec
+	SetSpec(spec *queryv1alpha2.QuerySpec) QueryObject
+	SetResponse(response *queryv1alpha2.QueryResponse) QueryObject
+	GetResponse() *queryv1alpha2.QueryResponse
 	DeepCopyQueryObject() QueryObject
 }
 
-type SpaceQuery queryv1alpha1.SpaceQuery
-type GroupQuery queryv1alpha1.GroupQuery
-type Query queryv1alpha1.Query
+type SpaceQuery queryv1alpha2.SpaceQuery
+type GroupQuery queryv1alpha2.GroupQuery
+type Query queryv1alpha2.Query
 
 func (c *SpaceQuery) DeepCopy() *SpaceQuery {
-	return (*SpaceQuery)((*queryv1alpha1.SpaceQuery)(c).DeepCopy())
+	return (*SpaceQuery)((*queryv1alpha2.SpaceQuery)(c).DeepCopy())
 }
 
 func (c *SpaceQuery) DeepCopyInto(cpy *SpaceQuery) {
-	(*queryv1alpha1.SpaceQuery)(cpy).DeepCopyInto((*queryv1alpha1.SpaceQuery)(c))
+	(*queryv1alpha2.SpaceQuery)(cpy).DeepCopyInto((*queryv1alpha2.SpaceQuery)(c))
 }
 
 func (c *SpaceQuery) DeepCopyObject() runtime.Object {
@@ -41,11 +41,11 @@ func (c *SpaceQuery) DeepCopyQueryObject() QueryObject {
 }
 
 func (c *GroupQuery) DeepCopy() *GroupQuery {
-	return (*GroupQuery)((*queryv1alpha1.GroupQuery)(c).DeepCopy())
+	return (*GroupQuery)((*queryv1alpha2.GroupQuery)(c).DeepCopy())
 }
 
 func (c *GroupQuery) DeepCopyInto(cpy *GroupQuery) {
-	(*queryv1alpha1.GroupQuery)(cpy).DeepCopyInto((*queryv1alpha1.GroupQuery)(c))
+	(*queryv1alpha2.GroupQuery)(cpy).DeepCopyInto((*queryv1alpha2.GroupQuery)(c))
 }
 
 func (c *GroupQuery) DeepCopyObject() runtime.Object {
@@ -57,11 +57,11 @@ func (c *GroupQuery) DeepCopyQueryObject() QueryObject {
 }
 
 func (c *Query) DeepCopy() *Query {
-	return (*Query)((*queryv1alpha1.Query)(c).DeepCopy())
+	return (*Query)((*queryv1alpha2.Query)(c).DeepCopy())
 }
 
 func (c *Query) DeepCopyInto(cpy *Query) {
-	(*queryv1alpha1.Query)(cpy).DeepCopyInto((*queryv1alpha1.Query)(c))
+	(*queryv1alpha2.Query)(cpy).DeepCopyInto((*queryv1alpha2.Query)(c))
 }
 
 func (c *Query) DeepCopyObject() runtime.Object {
@@ -73,68 +73,68 @@ func (c *Query) DeepCopyQueryObject() QueryObject {
 }
 
 // GetSpec returns the spec of the query.
-func (q *SpaceQuery) GetSpec() *queryv1alpha1.QuerySpec {
+func (q *SpaceQuery) GetSpec() *queryv1alpha2.QuerySpec {
 	return q.Spec
 }
 
 // SetSpec sets the spec of the query.
-func (q *SpaceQuery) SetSpec(spec *queryv1alpha1.QuerySpec) QueryObject {
+func (q *SpaceQuery) SetSpec(spec *queryv1alpha2.QuerySpec) QueryObject {
 	q.Spec = spec
 	return q
 }
 
 // SetResponse sets the response of the query.
-func (q *SpaceQuery) SetResponse(response *queryv1alpha1.QueryResponse) QueryObject {
+func (q *SpaceQuery) SetResponse(response *queryv1alpha2.QueryResponse) QueryObject {
 	q.Response = response
 	return q
 }
 
 // GetResponse gets the response of the query.
-func (q *SpaceQuery) GetResponse() *queryv1alpha1.QueryResponse {
+func (q *SpaceQuery) GetResponse() *queryv1alpha2.QueryResponse {
 	return q.Response
 }
 
 // GetSpec returns the spec of the query.
-func (q *GroupQuery) GetSpec() *queryv1alpha1.QuerySpec {
+func (q *GroupQuery) GetSpec() *queryv1alpha2.QuerySpec {
 	return q.Spec
 }
 
 // SetSpec sets the spec of the query.
-func (q *GroupQuery) SetSpec(spec *queryv1alpha1.QuerySpec) QueryObject {
+func (q *GroupQuery) SetSpec(spec *queryv1alpha2.QuerySpec) QueryObject {
 	q.Spec = spec
 	return q
 }
 
 // SetResponse sets the response of the query.
-func (q *GroupQuery) SetResponse(response *queryv1alpha1.QueryResponse) QueryObject {
+func (q *GroupQuery) SetResponse(response *queryv1alpha2.QueryResponse) QueryObject {
 	q.Response = response
 	return q
 }
 
 // GetResponse gets the response of the query.
-func (q *GroupQuery) GetResponse() *queryv1alpha1.QueryResponse {
+func (q *GroupQuery) GetResponse() *queryv1alpha2.QueryResponse {
 	return q.Response
 }
 
 // GetSpec returns the spec of the query.
-func (q *Query) GetSpec() *queryv1alpha1.QuerySpec {
+func (q *Query) GetSpec() *queryv1alpha2.QuerySpec {
 	return q.Spec
 }
 
 // SetSpec sets the spec of the query.
-func (q *Query) SetSpec(spec *queryv1alpha1.QuerySpec) QueryObject {
+func (q *Query) SetSpec(spec *queryv1alpha2.QuerySpec) QueryObject {
 	q.Spec = spec
 	return q
 }
 
 // SetResponse sets the response of the query.
-func (q *Query) SetResponse(response *queryv1alpha1.QueryResponse) QueryObject {
+func (q *Query) SetResponse(response *queryv1alpha2.QueryResponse) QueryObject {
 	q.Response = response
 	return q
 }
 
 // GetResponse gets the response of the query.
-func (q *Query) GetResponse() *queryv1alpha1.QueryResponse {
+func (q *Query) GetResponse() *queryv1alpha2.QueryResponse {
 	return q.Response
 }
 
