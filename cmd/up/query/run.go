@@ -50,7 +50,7 @@ import (
 	"github.com/crossplane/crossplane-runtime/pkg/errors"
 
 	"github.com/upbound/up-sdk-go/apis/common"
-	queryv1alpha1 "github.com/upbound/up-sdk-go/apis/query/v1alpha1"
+	queryv1alpha2 "github.com/upbound/up-sdk-go/apis/query/v1alpha2"
 	"github.com/upbound/up/cmd/up/query/resource"
 	"github.com/upbound/up/internal/upbound"
 )
@@ -99,7 +99,7 @@ func (c *cmd) Run(ctx context.Context, kongCtx *kong.Context, upCtx *upbound.Con
 	}
 
 	// create queries
-	var querySpecs []*queryv1alpha1.QuerySpec
+	var querySpecs []*queryv1alpha2.QuerySpec
 	for gk, names := range gkNames {
 		if len(names) == 0 {
 			query := createQuerySpec(types.NamespacedName{Namespace: c.namespace}, gk, nil, c.OutputFormat, c.Template)
@@ -148,7 +148,7 @@ func (c *cmd) Run(ctx context.Context, kongCtx *kong.Context, upCtx *upbound.Con
 					return errors.Errorf("expected exactly one kind, got %d", len(kinds))
 				}
 				query := query.DeepCopyQueryObject()
-				query.GetObjectKind().SetGroupVersionKind(queryv1alpha1.SchemeGroupVersion.WithKind(kinds[0].Kind))
+				query.GetObjectKind().SetGroupVersionKind(queryv1alpha2.SchemeGroupVersion.WithKind(kinds[0].Kind))
 				bs, err := yaml.Marshal(query)
 				if err != nil {
 					return errors.Wrap(err, "failed to marshal query")
@@ -468,14 +468,14 @@ func (c *cmd) createPrinter(mapping *meta.RESTMapping, withNamespace bool, withK
 	return printer.PrintObj, nil
 }
 
-func createQuerySpec(nname types.NamespacedName, gk metav1.GroupKind, categories []string, outputFormat string, tmpl string) *queryv1alpha1.QuerySpec {
+func createQuerySpec(nname types.NamespacedName, gk metav1.GroupKind, categories []string, outputFormat string, tmpl string) *queryv1alpha2.QuerySpec {
 	// retrieve minimal schema for the given output format
 	var obj *common.JSON
-	var tbl *queryv1alpha1.QueryTable
+	var tbl *queryv1alpha2.QueryTable
 	switch outputFormat {
 	case "", "wide":
 		if tmpl == "" {
-			tbl = &queryv1alpha1.QueryTable{}
+			tbl = &queryv1alpha2.QueryTable{}
 		} else {
 			obj = &common.JSON{Object: true} // everything
 		}
@@ -493,21 +493,25 @@ func createQuerySpec(nname types.NamespacedName, gk metav1.GroupKind, categories
 		obj = &common.JSON{Object: true} // everything
 	}
 
-	return &queryv1alpha1.QuerySpec{
-		QueryTopLevelResources: queryv1alpha1.QueryTopLevelResources{
-			Filter: queryv1alpha1.QueryTopLevelFilter{
-				QueryFilter: queryv1alpha1.QueryFilter{
-					Namespace:  nname.Namespace,
-					Name:       nname.Name,
-					Categories: categories,
-					Group:      gk.Group,
-					Kind:       gk.Kind,
+	return &queryv1alpha2.QuerySpec{
+		QueryTopLevelResources: queryv1alpha2.QueryTopLevelResources{
+			Filter: queryv1alpha2.QueryTopLevelFilter{
+				Objects: []queryv1alpha2.QueryFilter{
+					{
+						GroupKind: queryv1alpha2.QueryGroupKind{
+							APIGroup: gk.Group,
+							Kind:     gk.Kind,
+						},
+						Namespace:  nname.Namespace,
+						Name:       nname.Name,
+						Categories: categories,
+					},
 				},
 			},
-			QueryResources: queryv1alpha1.QueryResources{
+			QueryResources: queryv1alpha2.QueryResources{
 				Limit:  500,
 				Cursor: true,
-				Objects: &queryv1alpha1.QueryObjects{
+				Objects: &queryv1alpha2.QueryObjects{
 					ControlPlane: true,
 					Object:       obj,
 					Table:        tbl,
@@ -531,7 +535,7 @@ func (f RESTScopeNameFunc) Name() meta.RESTScopeName {
 }
 
 // hasNamespacedResources looks for cells with a non-empty namespace.
-func hasNamespacedResources(t *queryv1alpha1.QueryResponseTable) bool {
+func hasNamespacedResources(t *queryv1alpha2.QueryResponseTable) bool {
 	nsColumn := -1
 	for i, col := range t.Columns {
 		if col.Name == "Namespace" {
@@ -571,11 +575,11 @@ func checkQueryAPIAvailability(kubeconfig *rest.Config) error { //nolint:gocyclo
 	foundV1alpha1 := false
 	foundLaterVersion := false
 	for _, g := range groups.Groups {
-		if g.Name != queryv1alpha1.Group {
+		if g.Name != queryv1alpha2.Group {
 			continue
 		}
 		for _, v := range g.Versions {
-			if v.Version == queryv1alpha1.Version {
+			if v.Version == queryv1alpha2.Version {
 				foundV1alpha1 = true
 			} else {
 				foundLaterVersion = true
@@ -584,10 +588,10 @@ func checkQueryAPIAvailability(kubeconfig *rest.Config) error { //nolint:gocyclo
 	}
 
 	if !foundV1alpha1 && foundLaterVersion {
-		return errors.Errorf("server does not support the %s/%s API anymore. Update 'up' to a later version.", queryv1alpha1.Group, queryv1alpha1.Version)
+		return errors.Errorf("server does not support the %s/%s API anymore. Update 'up' to a later version.", queryv1alpha2.Group, queryv1alpha2.Version)
 	}
 	if !foundV1alpha1 && !foundLaterVersion {
-		return errors.Errorf("server does not support the %s/%s API. Make sure the 'apollo' tech preview feature is enabled on the Space.", queryv1alpha1.Group, queryv1alpha1.Version)
+		return errors.Errorf("server does not support the %s/%s API. Make sure the 'apollo' tech preview feature is enabled on the Space.", queryv1alpha2.Group, queryv1alpha2.Version)
 	}
 
 	return nil

@@ -26,7 +26,7 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/client"
 
 	"github.com/upbound/up-sdk-go/apis/common"
-	queryv1alpha1 "github.com/upbound/up-sdk-go/apis/query/v1alpha1"
+	queryv1alpha2 "github.com/upbound/up-sdk-go/apis/query/v1alpha2"
 	"github.com/upbound/up/cmd/up/query"
 	"github.com/upbound/up/cmd/up/query/resource"
 	"github.com/upbound/up/internal/upbound"
@@ -124,8 +124,8 @@ func (c *Cmd) Run(ctx context.Context, kongCtx *kong.Context, upCtx *upbound.Con
 		queryObject = &resource.SpaceQuery{}
 	}
 
-	poll := func(gkns query.GroupKindNames, cns query.CategoryNames) ([]queryv1alpha1.QueryResponseObject, error) {
-		var querySpecs []*queryv1alpha1.QuerySpec
+	poll := func(gkns query.GroupKindNames, cns query.CategoryNames) ([]queryv1alpha2.QueryResponseObject, error) {
+		var querySpecs []*queryv1alpha2.QuerySpec
 		for gk, names := range gkns {
 			if len(names) == 0 {
 				query := createQuerySpec(types.NamespacedName{Namespace: c.Namespace}, gk, nil)
@@ -153,7 +153,7 @@ func (c *Cmd) Run(ctx context.Context, kongCtx *kong.Context, upCtx *upbound.Con
 			}
 		}
 
-		var objs []queryv1alpha1.QueryResponseObject
+		var objs []queryv1alpha2.QueryResponseObject
 		for _, spec := range querySpecs {
 			var cursor string
 			var page int
@@ -181,13 +181,17 @@ func (c *Cmd) Run(ctx context.Context, kongCtx *kong.Context, upCtx *upbound.Con
 	}
 
 	fetch := func(id string) (*unstructured.Unstructured, error) {
-		query := queryObject.DeepCopyQueryObject().SetSpec(&queryv1alpha1.QuerySpec{
-			QueryTopLevelResources: queryv1alpha1.QueryTopLevelResources{
-				Filter: queryv1alpha1.QueryTopLevelFilter{
-					IDs: []string{id},
+		query := queryObject.DeepCopyQueryObject().SetSpec(&queryv1alpha2.QuerySpec{
+			QueryTopLevelResources: queryv1alpha2.QueryTopLevelResources{
+				Filter: queryv1alpha2.QueryTopLevelFilter{
+					Objects: []queryv1alpha2.QueryFilter{
+						{
+							ID: id,
+						},
+					},
 				},
-				QueryResources: queryv1alpha1.QueryResources{
-					Objects: &queryv1alpha1.QueryObjects{
+				QueryResources: queryv1alpha2.QueryResources{
+					Objects: &queryv1alpha2.QueryObjects{
 						ID:           true,
 						ControlPlane: true,
 						Object: &common.JSON{
@@ -214,22 +218,26 @@ func (c *Cmd) Run(ctx context.Context, kongCtx *kong.Context, upCtx *upbound.Con
 	return app.Run(ctx)
 }
 
-func createQuerySpec(obj types.NamespacedName, gk metav1.GroupKind, categories []string) *queryv1alpha1.QuerySpec {
-	return &queryv1alpha1.QuerySpec{
-		QueryTopLevelResources: queryv1alpha1.QueryTopLevelResources{
-			Filter: queryv1alpha1.QueryTopLevelFilter{
-				QueryFilter: queryv1alpha1.QueryFilter{
-					Kind:       gk.Kind,
-					Group:      gk.Group,
-					Namespace:  obj.Namespace,
-					Name:       obj.Name,
-					Categories: categories,
+func createQuerySpec(obj types.NamespacedName, gk metav1.GroupKind, categories []string) *queryv1alpha2.QuerySpec {
+	return &queryv1alpha2.QuerySpec{
+		QueryTopLevelResources: queryv1alpha2.QueryTopLevelResources{
+			Filter: queryv1alpha2.QueryTopLevelFilter{
+				Objects: []queryv1alpha2.QueryFilter{
+					{
+						GroupKind: queryv1alpha2.QueryGroupKind{
+							APIGroup: gk.Group,
+							Kind:     gk.Kind,
+						},
+						Namespace:  obj.Namespace,
+						Name:       obj.Name,
+						Categories: categories,
+					},
 				},
 			},
-			QueryResources: queryv1alpha1.QueryResources{
+			QueryResources: queryv1alpha2.QueryResources{
 				Limit:  500,
 				Cursor: true,
-				Objects: &queryv1alpha1.QueryObjects{
+				Objects: &queryv1alpha2.QueryObjects{
 					ID:           true,
 					ControlPlane: true,
 					Object: &common.JSON{
@@ -247,11 +255,11 @@ func createQuerySpec(obj types.NamespacedName, gk metav1.GroupKind, categories [
 							},
 						},
 					},
-					Relations: map[string]queryv1alpha1.QueryRelation{
+					Relations: map[string]queryv1alpha2.QueryRelation{
 						"events": {
-							QueryNestedResources: queryv1alpha1.QueryNestedResources{
-								QueryResources: queryv1alpha1.QueryResources{
-									Objects: &queryv1alpha1.QueryObjects{
+							QueryNestedResources: queryv1alpha2.QueryNestedResources{
+								QueryResources: queryv1alpha2.QueryResources{
+									Objects: &queryv1alpha2.QueryObjects{
 										ID:           true,
 										ControlPlane: true,
 										Object: &common.JSON{
@@ -267,10 +275,10 @@ func createQuerySpec(obj types.NamespacedName, gk metav1.GroupKind, categories [
 							},
 						},
 						"resources+": {
-							QueryNestedResources: queryv1alpha1.QueryNestedResources{
-								QueryResources: queryv1alpha1.QueryResources{
+							QueryNestedResources: queryv1alpha2.QueryNestedResources{
+								QueryResources: queryv1alpha2.QueryResources{
 									Limit: 10000,
-									Objects: &queryv1alpha1.QueryObjects{
+									Objects: &queryv1alpha2.QueryObjects{
 										ID:           true,
 										ControlPlane: true,
 										Object: &common.JSON{
@@ -288,11 +296,11 @@ func createQuerySpec(obj types.NamespacedName, gk metav1.GroupKind, categories [
 												},
 											},
 										},
-										Relations: map[string]queryv1alpha1.QueryRelation{
+										Relations: map[string]queryv1alpha2.QueryRelation{
 											"events": {
-												QueryNestedResources: queryv1alpha1.QueryNestedResources{
-													QueryResources: queryv1alpha1.QueryResources{
-														Objects: &queryv1alpha1.QueryObjects{
+												QueryNestedResources: queryv1alpha2.QueryNestedResources{
+													QueryResources: queryv1alpha2.QueryResources{
+														Objects: &queryv1alpha2.QueryObjects{
 															ID:           true,
 															ControlPlane: true,
 															Object: &common.JSON{

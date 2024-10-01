@@ -23,6 +23,7 @@ import (
 	"github.com/upbound/up/cmd/up/space/defaults"
 	spacefeature "github.com/upbound/up/cmd/up/space/features"
 	"github.com/upbound/up/cmd/up/space/prerequisites/certmanager"
+	"github.com/upbound/up/cmd/up/space/prerequisites/cloudnativepg"
 	"github.com/upbound/up/cmd/up/space/prerequisites/ingressnginx"
 	"github.com/upbound/up/cmd/up/space/prerequisites/opentelemetrycollector"
 	"github.com/upbound/up/cmd/up/space/prerequisites/providers/helm"
@@ -113,6 +114,14 @@ func New(config *rest.Config, defs *defaults.CloudConfig, features *feature.Flag
 			return nil, errors.Wrap(err, errCreatePrerequisite)
 		}
 		prereqs = append(prereqs, otelopr)
+	}
+
+	if features.Enabled(spacefeature.EnableAlphaQueryAPI) {
+		cnpg, err := cloudnativepg.New(config)
+		if err != nil {
+			return nil, errors.Wrap(err, errCreatePrerequisite)
+		}
+		prereqs = append(prereqs, cnpg)
 	}
 
 	return &Manager{
