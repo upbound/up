@@ -27,7 +27,6 @@ type Response struct {
 	Name              string
 	CrossplaneVersion string
 	Ready             string
-	Healthy           string
 	Message           string
 	Age               *time.Duration
 

@@ -38,7 +38,7 @@ import (
 )
 
 var (
-	spacefieldNames = []string{"GROUP", "NAME", "CROSSPLANE", "READY", "HEALTHY", "MESSAGE", "AGE"}
+	spacefieldNames = []string{"GROUP", "NAME", "CROSSPLANE", "READY", "MESSAGE", "AGE"}
 )
 
 // BeforeReset is the first hook to run.
@@ -145,7 +145,6 @@ func extractSpaceFields(obj any) []string {
 		ctp.GetName(),
 		v,
 		string(ctp.GetCondition(xpcommonv1.TypeReady).Status),
-		string(ctp.GetCondition(spacesv1beta1.ConditionTypeHealthy).Status),
 		ctp.Status.Message,
 		formatAge(ptr.To(time.Since(ctp.CreationTimestamp.Time))),
 	}
