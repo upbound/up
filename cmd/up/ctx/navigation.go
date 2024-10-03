@@ -487,12 +487,10 @@ func (s *Space) GetClient(upCtx *upbound.Context) (client.Client, error) {
 // buildSpacesClient creates a new kubeconfig hardcoded to match the provided
 // spaces access configuration and pointed directly at the resource. If the
 // resource only specifies a namespace, then the client will point at the space
-// hub and the context will be set at the namespace. If the resource specifies
-// both a namespace and a name, then the client will point directly at the
-// control plane ingress and set the namespace to "default".
-// TODO(redbackthomson): Refactor into smaller methods (one for space-level, one
-// for ctp-level)
-func (s *Space) buildClient(upCtx *upbound.Context, resource types.NamespacedName) (clientcmd.ClientConfig, error) { // nolint:gocyclo
+// and the context will be set at the group. If the resource specifies both a
+// namespace and a name, then the client will point directly at the control
+// plane ingress and set the namespace to "default".
+func (s *Space) buildClient(upCtx *upbound.Context, resource types.NamespacedName) (clientcmd.ClientConfig, error) {
 	// reference name for all context, cluster and authinfo for in-memory
 	// kubeconfig
 	ref := "upbound"
@@ -511,65 +509,49 @@ func (s *Space) buildClient(upCtx *upbound.Context, resource types.NamespacedNam
 		AuthInfos:      make(map[string]*clientcmdapi.AuthInfo),
 	}
 
+	// Build a new context with a new cluster that points to the space's
+	// ingress.
 	refContext := &clientcmdapi.Context{
 		Extensions: make(map[string]runtime.Object),
+		Cluster:    ref,
+	}
+
+	if s.Ingress.Host == "" {
+		return nil, errors.New("missing ingress address for context")
+	}
+	if len(s.Ingress.CAData) == 0 {
+		return nil, errors.New("missing ingress CA for context")
+	}
+
+	config.Clusters[ref] = &clientcmdapi.Cluster{
+		Server:                   profile.ToSpacesK8sURL(s.Ingress.Host, resource),
+		CertificateAuthorityData: s.Ingress.CAData,
+	}
+
+	// Use the space's authinfo if we have it, otherwise fall back to the hub
+	// context's auth.
+	switch {
+	case s.AuthInfo != nil:
+		config.AuthInfos[ref] = s.AuthInfo
+		refContext.AuthInfo = ref
+	case s.HubContext != "":
+		hubContext, ok := prev.Contexts[s.HubContext]
+		if ok {
+			// import the authinfo from the hub context
+			refContext.AuthInfo = hubContext.AuthInfo
+			config.AuthInfos[hubContext.AuthInfo] = ptr.To(*prev.AuthInfos[hubContext.AuthInfo])
+		}
+	default:
+		return nil, errors.New("no auth info for context")
 	}
 
 	if resource.Name == "" {
-		// point at the space hub
+		// point at the relevant namespace in the space hub
 		refContext.Namespace = resource.Namespace
-
-		hubContext, ok := prev.Contexts[s.HubContext]
-		if s.HubContext != "" && ok {
-			// import the cluster and authinfo from the hub context
-			refContext.Cluster = hubContext.Cluster
-			config.Clusters[hubContext.Cluster] = ptr.To(*prev.Clusters[hubContext.Cluster])
-			refContext.AuthInfo = hubContext.AuthInfo
-			config.AuthInfos[hubContext.AuthInfo] = ptr.To(*prev.AuthInfos[hubContext.AuthInfo])
-		} else {
-			// fall back to ingress if hub context not available
-			config.Clusters[ref] = &clientcmdapi.Cluster{
-				Server: profile.ToSpacesK8sURL(s.Ingress.Host, resource),
-			}
-			if len(s.Ingress.CAData) == 0 {
-				config.Clusters[ref].InsecureSkipTLSVerify = true
-			} else {
-				config.Clusters[ref].CertificateAuthorityData = s.Ingress.CAData
-			}
-			refContext.Cluster = ref
-
-			if s.AuthInfo != nil {
-				config.AuthInfos[ref] = s.AuthInfo
-				refContext.AuthInfo = ref
-			}
-		}
 	} else {
 		// since we are pointing at an individual control plane, point at the
 		// "default" namespace inside it
 		refContext.Namespace = "default"
-
-		config.Clusters[ref] = &clientcmdapi.Cluster{
-			Server: profile.ToSpacesK8sURL(s.Ingress.Host, resource),
-		}
-		refContext.Cluster = ref
-
-		if len(s.Ingress.CAData) == 0 {
-			config.Clusters[ref].InsecureSkipTLSVerify = true
-		} else {
-			config.Clusters[ref].CertificateAuthorityData = s.Ingress.CAData
-		}
-
-		if s.AuthInfo != nil {
-			config.AuthInfos[ref] = s.AuthInfo
-			refContext.AuthInfo = ref
-		} else if s.HubContext != "" {
-			hubContext, ok := prev.Contexts[s.HubContext]
-			if ok {
-				// import the authinfo from the hub context
-				refContext.AuthInfo = hubContext.AuthInfo
-				config.AuthInfos[hubContext.AuthInfo] = ptr.To(*prev.AuthInfos[hubContext.AuthInfo])
-			}
-		}
 	}
 
 	if s.IsCloud() {

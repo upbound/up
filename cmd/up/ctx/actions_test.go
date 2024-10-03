@@ -31,6 +31,8 @@ import (
 )
 
 func TestDisconnectedGroupAccept(t *testing.T) {
+	t.Parallel()
+
 	spaceExtension := upbound.NewDisconnectedV1Alpha1SpaceExtension("profile")
 	extensionMap := map[string]runtime.Object{upbound.ContextExtensionKeySpace: spaceExtension}
 
@@ -61,7 +63,7 @@ func TestDisconnectedGroupAccept(t *testing.T) {
 					"upbound": {Namespace: "group", Cluster: "upbound", AuthInfo: "upbound", Extensions: extensionMap},
 					"profile": {Namespace: "group", Cluster: "profile", AuthInfo: "profile"},
 				},
-				Clusters:  map[string]*clientcmdapi.Cluster{"upbound": {Server: "profile"}, "upbound-previous": {Server: "server1"}, "profile": {Server: "profile"}},
+				Clusters:  map[string]*clientcmdapi.Cluster{"upbound": {Server: "https://ingress", CertificateAuthorityData: []uint8{1, 2, 3}}, "upbound-previous": {Server: "server1"}, "profile": {Server: "profile"}},
 				AuthInfos: map[string]*clientcmdapi.AuthInfo{"upbound": {Token: "profile"}, "upbound-previous": {Token: "token1"}, "profile": {Token: "profile"}},
 			},
 			wantLast: "profile",
@@ -87,7 +89,7 @@ func TestDisconnectedGroupAccept(t *testing.T) {
 					"upbound-previous": {Namespace: "namespace1", Cluster: "upbound-previous", AuthInfo: "upbound-previous"},
 					"profile":          {Namespace: "group", Cluster: "profile", AuthInfo: "profile"},
 				},
-				Clusters:  map[string]*clientcmdapi.Cluster{"upbound": {Server: "profile"}, "upbound-previous": {Server: "server1"}, "profile": {Server: "profile"}},
+				Clusters:  map[string]*clientcmdapi.Cluster{"upbound": {Server: "https://ingress", CertificateAuthorityData: []uint8{1, 2, 3}}, "upbound-previous": {Server: "server1"}, "profile": {Server: "profile"}},
 				AuthInfos: map[string]*clientcmdapi.AuthInfo{"upbound": {Token: "profile"}, "upbound-previous": {Token: "token1"}, "profile": {Token: "profile"}},
 			},
 			wantLast: "upbound-previous",
@@ -113,7 +115,7 @@ func TestDisconnectedGroupAccept(t *testing.T) {
 					"upbound-previous": {Namespace: "namespace2", Cluster: "upbound", AuthInfo: "upbound"},
 					"profile":          {Namespace: "group", Cluster: "profile", AuthInfo: "profile"},
 				},
-				Clusters:  map[string]*clientcmdapi.Cluster{"upbound": {Server: "profile"}, "upbound-previous": {Server: "server1"}, "profile": {Server: "profile"}},
+				Clusters:  map[string]*clientcmdapi.Cluster{"upbound": {Server: "https://ingress", CertificateAuthorityData: []uint8{1, 2, 3}}, "upbound-previous": {Server: "server1"}, "profile": {Server: "profile"}},
 				AuthInfos: map[string]*clientcmdapi.AuthInfo{"upbound": {Token: "profile"}, "upbound-previous": {Token: "token1"}, "profile": {Token: "profile"}},
 			},
 			wantLast: "upbound-previous",
@@ -122,6 +124,8 @@ func TestDisconnectedGroupAccept(t *testing.T) {
 	}
 	for name, tt := range tests {
 		t.Run(name, func(t *testing.T) {
+			t.Parallel()
+
 			var last string
 			var conf *clientcmdapi.Config
 			upCtx := &upbound.Context{Kubecfg: clientcmd.NewDefaultClientConfig(*tt.conf, nil)}
@@ -166,6 +170,8 @@ func TestDisconnectedGroupAccept(t *testing.T) {
 }
 
 func TestCloudGroupAccept(t *testing.T) {
+	t.Parallel()
+
 	spaceExtension := upbound.NewCloudV1Alpha1SpaceExtension("org", "space")
 	extensionMap := map[string]runtime.Object{upbound.ContextExtensionKeySpace: spaceExtension}
 	spaceAuth := clientcmdapi.AuthInfo{Token: "space"}
@@ -258,6 +264,8 @@ func TestCloudGroupAccept(t *testing.T) {
 	}
 	for name, tt := range tests {
 		t.Run(name, func(t *testing.T) {
+			t.Parallel()
+
 			var last string
 			var conf *clientcmdapi.Config
 			upCtx := &upbound.Context{Kubecfg: clientcmd.NewDefaultClientConfig(*tt.conf, nil)}
@@ -303,6 +311,8 @@ func TestCloudGroupAccept(t *testing.T) {
 }
 
 func TestDisconnectedControlPlaneAccept(t *testing.T) {
+	t.Parallel()
+
 	spaceExtension := upbound.NewDisconnectedV1Alpha1SpaceExtension("profile")
 	extensionMap := map[string]runtime.Object{upbound.ContextExtensionKeySpace: spaceExtension}
 
@@ -453,6 +463,8 @@ func TestDisconnectedControlPlaneAccept(t *testing.T) {
 	}
 	for name, tt := range tests {
 		t.Run(name, func(t *testing.T) {
+			t.Parallel()
+
 			var last string
 			var conf *clientcmdapi.Config
 			upCtx := &upbound.Context{Kubecfg: clientcmd.NewDefaultClientConfig(*tt.conf, nil)}
@@ -500,6 +512,8 @@ func TestDisconnectedControlPlaneAccept(t *testing.T) {
 }
 
 func TestCloudControlPlaneAccept(t *testing.T) {
+	t.Parallel()
+
 	spaceExtension := upbound.NewCloudV1Alpha1SpaceExtension("org", "space")
 	extensionMap := map[string]runtime.Object{upbound.ContextExtensionKeySpace: spaceExtension}
 
@@ -650,6 +664,8 @@ func TestCloudControlPlaneAccept(t *testing.T) {
 	}
 	for name, tt := range tests {
 		t.Run(name, func(t *testing.T) {
+			t.Parallel()
+
 			var last string
 			var conf *clientcmdapi.Config
 			upCtx := &upbound.Context{Kubecfg: clientcmd.NewDefaultClientConfig(*tt.conf, nil)}
