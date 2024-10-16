@@ -66,5 +66,5 @@ func (c *getCmd) Run(ctx context.Context, printer upterm.ObjectPrinter, ac *acco
 			return printer.Print(r, fieldNames, extractFields)
 		}
 	}
-	return fmt.Errorf("no team named \"" + c.Name + "\"")
+	return fmt.Errorf("no team named %q", c.Name)
 }
