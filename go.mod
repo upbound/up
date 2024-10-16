@@ -1,6 +1,6 @@
 module github.com/upbound/up
 
-go 1.22.1
+go 1.23.1
 
 require (
 	cloud.google.com/go/storage v1.36.0
@@ -39,7 +39,8 @@ require (
 	github.com/spf13/afero v1.11.0
 	github.com/spf13/cobra v1.8.0
 	github.com/stretchr/testify v1.8.4
-	github.com/upbound/up-sdk-go v1.8.1-0.20240930100145-5e5f4d89101d
+	github.com/upbound/up-sdk-go v0.3.1-0.20241001164936-775e6eb0e36a
+	github.com/upbound/up-sdk-go/apis v1.8.1-0.20241001164936-775e6eb0e36a
 	github.com/upbound/up/pkg/migration v0.0.0-00010101000000-000000000000
 	github.com/willabides/kongplete v0.3.0
 	golang.org/x/exp v0.0.0-20240213143201-ec583247a57a
@@ -94,7 +95,7 @@ require (
 	github.com/muesli/mango-pflag v0.1.0 // indirect
 	github.com/muesli/roff v0.1.0 // indirect
 	github.com/pjbgf/sha1cd v0.3.0 // indirect
-	github.com/pmezard/go-difflib v1.0.0 // indirect
+	github.com/pmezard/go-difflib v1.0.1-0.20181226105442-5d4384ee4fb2 // indirect
 	github.com/sahilm/fuzzy v0.1.0 // indirect
 	github.com/skeema/knownhosts v1.2.1 // indirect
 	github.com/wk8/go-ordered-map/v2 v2.1.8 // indirect
