@@ -162,7 +162,7 @@ func (c *batchCmd) Run(ctx context.Context, p pterm.TextPrinter, upCtx *upbound.
 					concurrency <- struct{}{}
 				}()
 			}
-			err := c.processService(p, upCtx, baseImgMap, s)
+			err := c.processService(ctx, p, upCtx, baseImgMap, s)
 			p.PrintOnErrorf(fmt.Sprintf("Publishing of smaller provider package has failed for service %q: %%v", s), err)
 			chErr <- errors.WithMessagef(err, errProcessFmt, s)
 		}()
@@ -190,7 +190,7 @@ func (c *batchCmd) Run(ctx context.Context, p pterm.TextPrinter, upCtx *upbound.
 // the smaller provider controller binary (which is platform specific) on top
 // of the addendum layers and then pushes the built multi-arch package
 // (if `len(c.Platforms) > 1`) to the specified package repository.
-func (c *batchCmd) processService(p pterm.TextPrinter, upCtx *upbound.Context, baseImgMap map[string]v1.Image, s string) error { //nolint:gocyclo
+func (c *batchCmd) processService(ctx context.Context, p pterm.TextPrinter, upCtx *upbound.Context, baseImgMap map[string]v1.Image, s string) error { //nolint:gocyclo
 	imgs := make([]v1.Image, 0, len(c.Platform))
 	// image layers added on top of the base image by xpkg push to be reused
 	// across the platforms so that they are computed only once.
@@ -238,7 +238,7 @@ func (c *batchCmd) processService(p pterm.TextPrinter, upCtx *upbound.Context, b
 		// then we need to compute the provider metadata "base" layer,
 		// and the upbound extensions layer ("upbound").
 		default:
-			img, err = c.buildImage(baseImgMap, p, s)
+			img, err = c.buildImage(ctx, baseImgMap, p, s)
 			if err != nil {
 				return err
 			}
@@ -257,7 +257,7 @@ func (c *batchCmd) processService(p pterm.TextPrinter, upCtx *upbound.Context, b
 		return nil
 	}
 	// now try to push the package with the specified retry configuration.
-	return c.pushWithRetry(p, upCtx, imgs, s)
+	return c.pushWithRetry(ctx, p, upCtx, imgs, s)
 }
 
 // Optionally stores the provider package under the configured directory,
@@ -307,13 +307,13 @@ func (c *batchCmd) getPackageVersion() string {
 	return tokens[len(tokens)-1]
 }
 
-func (c *batchCmd) pushWithRetry(p pterm.TextPrinter, upCtx *upbound.Context, imgs []v1.Image, s string) error {
+func (c *batchCmd) pushWithRetry(ctx context.Context, p pterm.TextPrinter, upCtx *upbound.Context, imgs []v1.Image, s string) error {
 	t := c.getPackageURL(s)
 	tries := c.PushRetry + 1
 	retryMsg := ""
 	for i := uint(0); i < tries; i++ {
 		p.Printfln("Pushing xpkg to %s.%s", t, retryMsg)
-		err := PushImages(p, upCtx, imgs, t, c.Create, c.Flags.Profile)
+		err := PushImages(ctx, p, upCtx, imgs, t, c.Create, c.Flags.Profile)
 		if err == nil {
 			break
 		}
@@ -377,12 +377,12 @@ func getAddendumLayers(baseImg, img v1.Image, platform, service string) (addendu
 	return addendumLayers, layerLabels, nil
 }
 
-func (c *batchCmd) buildImage(baseImgMap map[string]v1.Image, p, s string) (v1.Image, error) {
+func (c *batchCmd) buildImage(ctx context.Context, baseImgMap map[string]v1.Image, p, s string) (v1.Image, error) {
 	builder, err := c.getBuilder(s)
 	if err != nil {
 		return nil, err
 	}
-	img, _, err := builder.Build(context.Background(), xpkg.WithController(baseImgMap[p]))
+	img, _, err := builder.Build(ctx, xpkg.WithController(baseImgMap[p]))
 	if err != nil {
 		return nil, errors.Wrapf(err, errBuildPackageFmt, s)
 	}
