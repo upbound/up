@@ -159,7 +159,7 @@ func (p *PatchesValidator) validate(ctx context.Context, idx int, cd resource.Co
 		for _, e := range result.Errors {
 			var ve *verrors.Validation
 			if !errors.As(e, &ve) {
-				return []error{fmt.Errorf(errIncorrectErrType)}
+				return []error{errors.New(errIncorrectErrType)}
 			}
 			ie := &validator.Validation{
 				TypeCode: ve.Code(),
