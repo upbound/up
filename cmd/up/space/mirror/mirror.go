@@ -74,7 +74,7 @@ func (c *Cmd) Run(ctx context.Context, printer upterm.ObjectPrinter) (rErr error
 		switch {
 		case os.IsNotExist(err):
 			// Directory does not exist, create it
-			if err := os.MkdirAll(c.ToDir, os.ModePerm); err != nil {
+			if err := os.MkdirAll(c.ToDir, 0750); err != nil {
 				return fmt.Errorf("failed to create directory: %w", err)
 			}
 		case err != nil:

@@ -77,7 +77,7 @@ type pushCmd struct {
 }
 
 // Run runs the push cmd.
-func (c *pushCmd) Run(p pterm.TextPrinter, upCtx *upbound.Context) error { //nolint:gocyclo
+func (c *pushCmd) Run(ctx context.Context, p pterm.TextPrinter, upCtx *upbound.Context) error { //nolint:gocyclo
 	// If package is not defined, attempt to find single package in current
 	// directory.
 	if len(c.Package) == 0 {
@@ -100,10 +100,10 @@ func (c *pushCmd) Run(p pterm.TextPrinter, upCtx *upbound.Context) error { //nol
 		}
 		imgs = append(imgs, img)
 	}
-	return PushImages(p, upCtx, imgs, c.Tag, c.Create, c.Flags.Profile)
+	return PushImages(ctx, p, upCtx, imgs, c.Tag, c.Create, c.Flags.Profile)
 }
 
-func PushImages(p pterm.TextPrinter, upCtx *upbound.Context, imgs []v1.Image, t string, create bool, profile string) error { //nolint:gocyclo
+func PushImages(ctx context.Context, p pterm.TextPrinter, upCtx *upbound.Context, imgs []v1.Image, t string, create bool, profile string) error { //nolint:gocyclo
 	tag, err := name.NewTag(t, name.WithDefaultRegistry(upCtx.RegistryEndpoint.Hostname()))
 	if err != nil {
 		return err
@@ -131,7 +131,7 @@ func PushImages(p pterm.TextPrinter, upCtx *upbound.Context, imgs []v1.Image, t 
 		if err != nil {
 			return err
 		}
-		if err := repositories.NewClient(cfg).CreateOrUpdate(context.Background(), parts[0], parts[1]); err != nil {
+		if err := repositories.NewClient(cfg).CreateOrUpdate(ctx, parts[0], parts[1]); err != nil {
 			return errors.Wrap(err, errCreateRepo)
 		}
 	}
@@ -140,7 +140,7 @@ func PushImages(p pterm.TextPrinter, upCtx *upbound.Context, imgs []v1.Image, t 
 
 	// NOTE(hasheddan): the errgroup context is passed to each image write,
 	// meaning that if one fails it will cancel others that are in progress.
-	g, ctx := errgroup.WithContext(context.Background())
+	g, ctx := errgroup.WithContext(ctx)
 	for i, img := range imgs {
 		// pin range variables for use in go func
 		i, img := i, img
