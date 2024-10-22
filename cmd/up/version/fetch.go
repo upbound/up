@@ -17,19 +17,23 @@ package version
 
 import (
 	"context"
+	"net/url"
 	"strings"
 
 	v1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/client-go/kubernetes"
+	"k8s.io/client-go/rest"
 	clientcmdapi "k8s.io/client-go/tools/clientcmd/api"
 
 	"github.com/crossplane/crossplane-runtime/pkg/errors"
 
+	"github.com/upbound/up/internal/install/helm"
 	"github.com/upbound/up/internal/upbound"
 )
 
 const (
-	errFetchDeployment = "could not fetch deployments"
+	errAgentNotInstalled = "connect agent installation not found"
+	errFetchDeployment   = "could not fetch deployments"
 )
 
 // FetchCrossplaneVersion initializes a Kubernetes client and fetches
@@ -93,4 +97,32 @@ func FetchSpacesVersion(ctx context.Context, context *clientcmdapi.Context, clie
 	}
 
 	return "", errors.New("spaces-controller version not found")
+}
+
+// FetchConnectAgentVersion initializes a Helm install manager and
+// and returns the version of the connect agent release, if found.
+func FetchConnectAgentVersion(ctx context.Context, kubeconfig *rest.Config) (string, error) {
+	registryURL, err := url.Parse("us-west1-docker.pkg.dev/orchestration-build/connect")
+	if err != nil {
+		return "", err
+	}
+	mgr, err := helm.NewManager(kubeconfig,
+		"agent",
+		registryURL,
+		helm.WithNamespace("upbound-system"),
+		helm.IsOCI(),
+		helm.Wait(),
+		helm.Force(true),
+		helm.RollbackOnError(true),
+	)
+	if err != nil {
+		return "", errors.Wrap(err, errAgentNotInstalled)
+	}
+
+	agentVersion, err := mgr.GetCurrentVersion()
+	if err != nil {
+		return "", errors.New("could not get connect agent version")
+	}
+
+	return agentVersion, nil
 }
