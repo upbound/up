@@ -41,6 +41,30 @@ type KubeVersionPath struct {
 	} `json:"controlPlanes"`
 }
 
+type XgqlVersionPath struct {
+	ControlPlanes struct {
+		Uxp struct {
+			Xgql struct {
+				Version StringOrArray `json:"version"`
+			} `json:"xgql"`
+		} `json:"uxp"`
+	} `json:"controlPlanes"`
+}
+
+type ImageTag struct {
+	Image struct {
+		Tag StringOrArray `json:"tag"`
+	} `json:"image"`
+}
+
+type RegisterImageTag struct {
+	Registration struct {
+		Image struct {
+			Tag StringOrArray `json:"tag"`
+		} `json:"image"`
+	} `json:"registration"`
+}
+
 func (j *UXPVersionsPath) GetSupportedVersions() ([]string, error) {
 	if len(j.Controller.Crossplane.SupportedVersions) == 0 {
 		return nil, errors.New("no supported versions found in UXPVersionsPath")
@@ -55,11 +79,35 @@ func (k *KubeVersionPath) GetSupportedVersions() ([]string, error) {
 	return k.ControlPlanes.K8sVersion, nil
 }
 
+func (k *XgqlVersionPath) GetSupportedVersions() ([]string, error) {
+	if len(k.ControlPlanes.Uxp.Xgql.Version) == 0 {
+		return nil, errors.New("no supported versions found in XgqlVersionPath")
+	}
+	return k.ControlPlanes.Uxp.Xgql.Version, nil
+}
+
+func (k *ImageTag) GetSupportedVersions() ([]string, error) {
+	if len(k.Image.Tag) == 0 {
+		return nil, errors.New("no supported versions found in ImageTag")
+	}
+	return k.Image.Tag, nil
+}
+
+func (k *RegisterImageTag) GetSupportedVersions() ([]string, error) {
+	if len(k.Registration.Image.Tag) == 0 {
+		return nil, errors.New("no supported versions found in RegisterImageTag")
+	}
+	return k.Registration.Image.Tag, nil
+}
+
 // init function to return byte slice and oci.PathNavigator
 func initConfig() ([]byte, map[string]reflect.Type) {
 	return configFile, map[string]reflect.Type{
-		"uxpVersionsPath": reflect.TypeOf(UXPVersionsPath{}),
-		"kubeVersionPath": reflect.TypeOf(KubeVersionPath{}),
+		"uxpVersionsPath":  reflect.TypeOf(UXPVersionsPath{}),
+		"kubeVersionPath":  reflect.TypeOf(KubeVersionPath{}),
+		"xgqlVersionPath":  reflect.TypeOf(XgqlVersionPath{}),
+		"imageTag":         reflect.TypeOf(ImageTag{}),
+		"registerImageTag": reflect.TypeOf(RegisterImageTag{}),
 	}
 }
 
