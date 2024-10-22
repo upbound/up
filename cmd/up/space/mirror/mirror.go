@@ -26,6 +26,7 @@ import (
 	"github.com/crossplane/crossplane-runtime/pkg/errors"
 	"github.com/google/go-containerregistry/pkg/authn"
 	"github.com/google/go-containerregistry/pkg/crane"
+	"github.com/google/go-containerregistry/pkg/name"
 	"github.com/pterm/pterm"
 	"gopkg.in/yaml.v3"
 
@@ -134,28 +135,47 @@ func (c *Cmd) mirrorWithExtraImages(ctx context.Context, printer upterm.ObjectPr
 
 	s := logAndStartSpinner(printer, "Scanning tags to export...")
 
+	// Parse the image reference
+	ref, err := name.ParseReference(repo.Chart)
+	if err != nil {
+		return fmt.Errorf("error parsing reference: %w", err)
+	}
+
+	registry := ref.Context().RegistryStr()
+	repository := ref.Context().RepositoryStr()
+	chart := registry + "/" + repository
+
 	// check if version is available
-	tags, err := oci.ListTags(ctx, repo.Chart)
+	tags, err := oci.ListTags(ctx, chart)
 	if err != nil {
 		return fmt.Errorf("listing tags: %w", err)
 	}
 
-	if !oci.TagExists(tags, c.Version) {
-		return fmt.Errorf("version %s not found in the list of tags for %s", c.Version, repo.Chart)
+	// If the reference is tagged, get the tag
+	tagged, ok := ref.(name.Tag)
+	var tag string
+	if ok && tagged.TagStr() != "latest" {
+		tag = tagged.TagStr()
+	} else {
+		tag = c.Version
+	}
+
+	if !oci.TagExists(tags, tag) {
+		return fmt.Errorf("version %s not found in the list of tags for %s", tag, chart)
 	}
 
 	if !printer.DryRun {
 		s.Success("Scanning tags to export...")
 	}
 	// mirror main chart
-	if err := c.mirrorArtifact(printer, fmt.Sprintf("%s:%s", repo.Chart, c.Version), craneOpts); err != nil {
+	if err := c.mirrorArtifact(printer, fmt.Sprintf("%s:%s", chart, tag), craneOpts); err != nil {
 		return fmt.Errorf("mirroring chart: %w", err)
 	}
 
 	for _, subResource := range repo.SubResources {
 		if subResource.PathNavigator != nil {
 			// extract path from values from main chart
-			versions, err := oci.GetValuesFromChart(repo.Chart, c.Version, subResource.PathNavigator)
+			versions, err := oci.GetValuesFromChart(chart, tag, subResource.PathNavigator)
 			if err != nil {
 				return fmt.Errorf("unable to extract: %w", err)
 			}
